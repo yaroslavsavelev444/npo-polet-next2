@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17
+
+    container_name: npo-polet-postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: npo_polet
+      POSTGRES_USER: npo_user
+      POSTGRES_PASSWORD: npo_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8
+
+    container_name: npo-polet-redis
+
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:

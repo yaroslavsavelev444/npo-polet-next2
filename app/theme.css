@@ -1,0 +1,117 @@
+/* theme.css — для использования в Next.js (CSS-переменные) */
+
+:root {
+  /* ===========================
+     Brand Colors (из COLORS)
+  =========================== */
+  --primary: #FF4500;
+  --primary-hover: #912700;       /* darkPrimary */
+  --primary-light: #FFD9C0;       /* приблизительно, можно заменить на primary-100 */
+
+  --accent: #008CFF;
+  --accent-hover: #0070CC;        /* затемнённый accent */
+  --accent-light: #00C3FF;        /* link */
+
+  --link: #00C3FF;
+  --red: #FF0000;
+
+  /* ===========================
+     Backgrounds
+  =========================== */
+  --background: #1A1D24;
+  --surface: #20242D;
+  --surface-secondary: #2A2F3A;   /* дополнительный оттенок */
+
+  /* ===========================
+     Text
+  =========================== */
+  --text-primary: #ECEDEE;
+  --text-secondary: #A0A0A0;
+  --text-muted: #A0A0A0;          /* alias для textSecondary */
+  --text-inverse: #FFFFFF;        /* textLight */
+  --text-dark: #000000;
+
+  /* ===========================
+     Borders
+  =========================== */
+  --border: #242424;
+  --border-light: #3A3F4A;        /* дополнительный светлый вариант */
+
+  /* ===========================
+     Status
+  =========================== */
+  --success: #00C853;
+  --success-light: #E8F5E9;       /* приблизительно */
+
+  --warning: #FFD600;
+  --warning-light: #FFF8E1;       /* приблизительно */
+
+  --error: #FF4C4C;
+  --error-light: #FFEBEE;         /* приблизительно */
+  --danger: var(--error);
+  --danger-light: var(--error-light);
+
+  /* ===========================
+     Disabled
+  =========================== */
+  --disabled: #555555;
+
+  /* ===========================
+     Layout & Shadows
+  =========================== */
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  /* ===========================
+     Radius
+  =========================== */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  /* ===========================
+     Fonts
+  =========================== */
+  --font-body: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-code: var(--font-mono);
+
+  /* ===========================
+     Primary scale (из имеющихся оттенков)
+  =========================== */
+  --primary-50: #FFF0E6;
+  --primary-100: #FFD9C0;
+  --primary-200: #FFB080;
+  --primary-300: #FF8040;
+  --primary-400: #FF5A1A;
+  --primary-500: #FF4500;         /* основной */
+  --primary-600: #E63A00;
+  --primary-700: #912700;         /* darkPrimary */
+  --primary-800: #6B1A00;
+  --primary-900: #451000;
+
+  /* semantic alias */
+  --primary: var(--primary-500);
+  --primary-hover: var(--primary-700);
+  --primary-soft: var(--primary-100);
+
+  /* ===========================
+     Accent scale (из имеющихся оттенков)
+  =========================== */
+  --accent-50: #E6F3FF;
+  --accent-100: #B3D9FF;
+  --accent-200: #80BFFF;
+  --accent-300: #4DA6FF;
+  --accent-400: #1A8CFF;
+  --accent-500: #008CFF;          /* основной */
+  --accent-600: #0070CC;          /* accent-hover */
+  --accent-700: #005299;
+  --accent-800: #003366;
+  --accent-900: #001A33;
+
+  /* semantic alias */
+  --accent: var(--accent-500);
+  --accent-hover: var(--accent-600);
+  --accent-soft: var(--accent-100);
+}
