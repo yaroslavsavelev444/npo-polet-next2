@@ -7,13 +7,22 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "payload": "payload"
+    "payload": "payload",
+    "payload:types": "payload generate:types",
+
+    "payload:importmap": "payload generate:importmap",
+
+    "payload:sync": "pnpm payload:types && pnpm payload:importmap"
   },
   "dependencies": {
+    "@once-ui-system/core": "^1.7.10",
     "@payloadcms/db-postgres": "^3.85.1",
     "@payloadcms/next": "^3.85.1",
+    "@payloadcms/richtext-lexical": "^3.85.1",
     "@payloadcms/translations": "^3.85.1",
     "@payloadcms/ui": "^3.85.1",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query-devtools": "^5.101.0",
     "bullmq": "^5.79.0",
     "ioredis": "^5.11.1",
     "next": "16.2.9",
@@ -21,6 +30,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.14.0",
+    "xss": "^1.0.15",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
