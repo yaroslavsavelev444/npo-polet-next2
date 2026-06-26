@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin'
+import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
 
 export const ProductReviews: CollectionConfig = {
   slug: 'product-reviews',

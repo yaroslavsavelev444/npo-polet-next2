@@ -85,6 +85,10 @@ export interface Config {
     notifications: Notification;
     'content-blocks': ContentBlock;
     'faq-topics': FaqTopic;
+    'otp-codes': OtpCode;
+    'product-reviews': ProductReview;
+    sessions: Session;
+    'user-consents': UserConsent;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -110,6 +114,10 @@ export interface Config {
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     'content-blocks': ContentBlocksSelect<false> | ContentBlocksSelect<true>;
     'faq-topics': FaqTopicsSelect<false> | FaqTopicsSelect<true>;
+    'otp-codes': OtpCodesSelect<false> | OtpCodesSelect<true>;
+    'product-reviews': ProductReviewsSelect<false> | ProductReviewsSelect<true>;
+    sessions: SessionsSelect<false> | SessionsSelect<true>;
+    'user-consents': UserConsentsSelect<false> | UserConsentsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -163,9 +171,9 @@ export interface User {
   role: 'user' | 'admin' | 'superadmin';
   status: 'active' | 'blocked' | 'suspended';
   blockedUntil?: string | null;
-  acceptedTerms: boolean;
-  acceptedTermsVersion?: string | null;
-  acceptedTermsAt?: string | null;
+  twoFAVerified?: boolean | null;
+  twoFAVerifiedAt?: string | null;
+  emailVerified?: boolean | null;
   lastLoginAt?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -174,8 +182,6 @@ export interface User {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
-  _verified?: boolean | null;
-  _verificationToken?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -266,28 +272,37 @@ export interface Category {
  */
 export interface Product {
   id: number;
-  sku: string;
   title: string;
+  /**
+   * Автоматически генерируется из названия при создании
+   */
+  slug?: string | null;
   description: string;
   category: number | Category;
   images?: (number | Media)[] | null;
-  priceForIndividual: number;
-  discount?: {
-    isActive?: boolean | null;
-    percentage?: number | null;
-    amount?: number | null;
-    validFrom?: string | null;
-    validUntil?: string | null;
-    minQuantity?: number | null;
+  pricing: {
+    priceForIndividual: number;
+    discount?: {
+      isActive?: boolean | null;
+      type?: ('percentage' | 'fixed') | null;
+      value?: number | null;
+      validFrom?: string | null;
+      validUntil?: string | null;
+      minQuantity?: number | null;
+    };
   };
-  status?: ('available' | 'preorder' | 'out_of_stock' | 'discontinued') | null;
-  minOrderQuantity?: number | null;
-  maxOrderQuantity?: number | null;
-  isVisible?: boolean | null;
-  showOnMainPage?: boolean | null;
-  instructionType?: ('file' | 'link') | null;
-  instructionFile?: (number | null) | Media;
-  instructionLink?: string | null;
+  inventory?: {
+    status?: ('available' | 'preorder' | 'out_of_stock' | 'discontinued') | null;
+    minOrderQuantity?: number | null;
+    maxOrderQuantity?: number | null;
+    isVisible?: boolean | null;
+    showOnMainPage?: boolean | null;
+  };
+  instruction?: {
+    type?: ('file' | 'link') | null;
+    file?: (number | null) | Media;
+    link?: string | null;
+  };
   specifications?:
     | {
         name: string;
@@ -298,28 +313,33 @@ export interface Product {
         id?: string | null;
       }[]
     | null;
-  relatedProducts?: (number | Product)[] | null;
-  upsellProducts?: (number | Product)[] | null;
-  crossSellProducts?: (number | Product)[] | null;
-  manufacturer?: string | null;
-  warrantyMonths?: number | null;
-  weight?: number | null;
+  relations?: {
+    upsellProducts?: (number | Product)[] | null;
+  };
+  brand?: {
+    manufacturer?: string | null;
+    warrantyMonths?: number | null;
+  };
   dimensions?: {
+    weight?: number | null;
     length?: number | null;
     width?: number | null;
     height?: number | null;
   };
-  metaTitle?: string | null;
-  metaDescription?: string | null;
-  keywords?:
-    | {
-        keyword?: string | null;
-        id?: string | null;
-      }[]
-    | null;
-  viewsCount?: number | null;
-  purchasesCount?: number | null;
-  finalPrice?: number | null;
+  seo?: {
+    metaTitle?: string | null;
+    metaDescription?: string | null;
+    keywords?:
+      | {
+          keyword?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  analytics?: {
+    viewsCount?: number | null;
+    purchasesCount?: number | null;
+  };
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -846,6 +866,7 @@ export interface ContentBlock {
   title: string;
   subtitle: string;
   image?: (number | null) | Media;
+  variant: 'default' | 'image-left' | 'image-right' | 'text-only' | 'hero';
   button?: {
     text?: string | null;
     action?: string | null;
@@ -893,6 +914,91 @@ export interface FaqTopic {
         id?: string | null;
       }[]
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "otp-codes".
+ */
+export interface OtpCode {
+  id: number;
+  user: number | User;
+  type: 'email_verify' | 'login_2fa';
+  codeHash: string;
+  expiresAt: string;
+  attempts?: number | null;
+  maxAttempts?: number | null;
+  used?: boolean | null;
+  ip?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-reviews".
+ */
+export interface ProductReview {
+  id: number;
+  user: number | User;
+  product: number | Product;
+  rating: number;
+  title?: string | null;
+  comment: string;
+  pros?:
+    | {
+        value?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  cons?:
+    | {
+        value?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  status?: ('pending' | 'approved' | 'rejected') | null;
+  rejectionReason?: string | null;
+  isVerifiedPurchase?: boolean | null;
+  helpfulCount?: number | null;
+  notHelpfulCount?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Активные и завершённые сессии пользователей
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sessions".
+ */
+export interface Session {
+  id: number;
+  user: number | User;
+  userAgent?: string | null;
+  ip?: string | null;
+  deviceLabel?: string | null;
+  createdAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  revoked?: boolean | null;
+  revokedReason?: ('logout' | 'logout_all' | 'password_changed' | 'admin') | null;
+  updatedAt: string;
+}
+/**
+ * Журнал принятых пользователями соглашений
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user-consents".
+ */
+export interface UserConsent {
+  id: number;
+  user: number | User;
+  consent: number | Consent;
+  consentSlug: string;
+  version: string;
+  acceptedAt: string;
+  ip?: string | null;
+  userAgent?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -991,6 +1097,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'faq-topics';
         value: number | FaqTopic;
+      } | null)
+    | ({
+        relationTo: 'otp-codes';
+        value: number | OtpCode;
+      } | null)
+    | ({
+        relationTo: 'product-reviews';
+        value: number | ProductReview;
+      } | null)
+    | ({
+        relationTo: 'sessions';
+        value: number | Session;
+      } | null)
+    | ({
+        relationTo: 'user-consents';
+        value: number | UserConsent;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1043,9 +1165,9 @@ export interface UsersSelect<T extends boolean = true> {
   role?: T;
   status?: T;
   blockedUntil?: T;
-  acceptedTerms?: T;
-  acceptedTermsVersion?: T;
-  acceptedTermsAt?: T;
+  twoFAVerified?: T;
+  twoFAVerifiedAt?: T;
+  emailVerified?: T;
   lastLoginAt?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1054,8 +1176,6 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
-  _verified?: T;
-  _verificationToken?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -1149,30 +1269,42 @@ export interface CategoriesSelect<T extends boolean = true> {
  * via the `definition` "products_select".
  */
 export interface ProductsSelect<T extends boolean = true> {
-  sku?: T;
   title?: T;
+  slug?: T;
   description?: T;
   category?: T;
   images?: T;
-  priceForIndividual?: T;
-  discount?:
+  pricing?:
     | T
     | {
-        isActive?: T;
-        percentage?: T;
-        amount?: T;
-        validFrom?: T;
-        validUntil?: T;
-        minQuantity?: T;
+        priceForIndividual?: T;
+        discount?:
+          | T
+          | {
+              isActive?: T;
+              type?: T;
+              value?: T;
+              validFrom?: T;
+              validUntil?: T;
+              minQuantity?: T;
+            };
       };
-  status?: T;
-  minOrderQuantity?: T;
-  maxOrderQuantity?: T;
-  isVisible?: T;
-  showOnMainPage?: T;
-  instructionType?: T;
-  instructionFile?: T;
-  instructionLink?: T;
+  inventory?:
+    | T
+    | {
+        status?: T;
+        minOrderQuantity?: T;
+        maxOrderQuantity?: T;
+        isVisible?: T;
+        showOnMainPage?: T;
+      };
+  instruction?:
+    | T
+    | {
+        type?: T;
+        file?: T;
+        link?: T;
+      };
   specifications?:
     | T
     | {
@@ -1183,30 +1315,43 @@ export interface ProductsSelect<T extends boolean = true> {
         isVisible?: T;
         id?: T;
       };
-  relatedProducts?: T;
-  upsellProducts?: T;
-  crossSellProducts?: T;
-  manufacturer?: T;
-  warrantyMonths?: T;
-  weight?: T;
+  relations?:
+    | T
+    | {
+        upsellProducts?: T;
+      };
+  brand?:
+    | T
+    | {
+        manufacturer?: T;
+        warrantyMonths?: T;
+      };
   dimensions?:
     | T
     | {
+        weight?: T;
         length?: T;
         width?: T;
         height?: T;
       };
-  metaTitle?: T;
-  metaDescription?: T;
-  keywords?:
+  seo?:
     | T
     | {
-        keyword?: T;
-        id?: T;
+        metaTitle?: T;
+        metaDescription?: T;
+        keywords?:
+          | T
+          | {
+              keyword?: T;
+              id?: T;
+            };
       };
-  viewsCount?: T;
-  purchasesCount?: T;
-  finalPrice?: T;
+  analytics?:
+    | T
+    | {
+        viewsCount?: T;
+        purchasesCount?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -1662,6 +1807,7 @@ export interface ContentBlocksSelect<T extends boolean = true> {
   title?: T;
   subtitle?: T;
   image?: T;
+  variant?: T;
   button?:
     | T
     | {
@@ -1702,6 +1848,83 @@ export interface FaqTopicsSelect<T extends boolean = true> {
         isActive?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "otp-codes_select".
+ */
+export interface OtpCodesSelect<T extends boolean = true> {
+  user?: T;
+  type?: T;
+  codeHash?: T;
+  expiresAt?: T;
+  attempts?: T;
+  maxAttempts?: T;
+  used?: T;
+  ip?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-reviews_select".
+ */
+export interface ProductReviewsSelect<T extends boolean = true> {
+  user?: T;
+  product?: T;
+  rating?: T;
+  title?: T;
+  comment?: T;
+  pros?:
+    | T
+    | {
+        value?: T;
+        id?: T;
+      };
+  cons?:
+    | T
+    | {
+        value?: T;
+        id?: T;
+      };
+  status?: T;
+  rejectionReason?: T;
+  isVerifiedPurchase?: T;
+  helpfulCount?: T;
+  notHelpfulCount?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sessions_select".
+ */
+export interface SessionsSelect<T extends boolean = true> {
+  user?: T;
+  userAgent?: T;
+  ip?: T;
+  deviceLabel?: T;
+  createdAt?: T;
+  lastActiveAt?: T;
+  expiresAt?: T;
+  revoked?: T;
+  revokedReason?: T;
+  updatedAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user-consents_select".
+ */
+export interface UserConsentsSelect<T extends boolean = true> {
+  user?: T;
+  consent?: T;
+  consentSlug?: T;
+  version?: T;
+  acceptedAt?: T;
+  ip?: T;
+  userAgent?: T;
   updatedAt?: T;
   createdAt?: T;
 }

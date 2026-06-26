@@ -8,19 +8,23 @@ import { Carts } from './src/payload/collections/Carts.ts'
 import { Categories } from './src/payload/collections/Categories.ts'
 import { Companies } from './src/payload/collections/Companies.ts'
 import { Consents } from './src/payload/collections/Consents.ts'
+import { ContentBlocks } from './src/payload/collections/ContentBlocks.ts'
 import { Discounts } from './src/payload/collections/Discounts.ts'
+import { FaqTopics } from './src/payload/collections/FaqTopics.ts'
 import { Feedbacks } from './src/payload/collections/Feedbacks.ts'
+import { KnowledgeTopics } from './src/payload/collections/KnowledgeTopics.ts'
 import { Media } from './src/payload/collections/Media.ts'
+import { Notifications } from './src/payload/collections/Notifications.ts'
 import { Orders } from './src/payload/collections/Orders.ts'
+import { OtpCodes } from './src/payload/collections/OtpCodes.ts'                // добавили
 import PickupPoints from './src/payload/collections/PickupPoint.ts'
 import { Products } from './src/payload/collections/Products.ts'
+import { ProductReviews } from './src/payload/collections/Reviews.ts'            // добавили (если экспортируется как ProductReviews)
+import { Sessions } from './src/payload/collections/Sessions.ts'                // добавили
 import TransportCompanies from './src/payload/collections/TransportCompanies.ts'
 import { Users } from './src/payload/collections/User.ts'
-import { KnowledgeTopics } from './src/payload/collections/KnowledgeTopics.ts'
+import { UserConsents } from './src/payload/collections/UserConsents.ts'        // добавили
 import { Wishlists } from './src/payload/collections/Wishlists.ts'
-import { Notifications } from './src/payload/collections/Notifications.ts'
-import { ContentBlocks } from './src/payload/collections/ContentBlocks.ts'
-import { FaqTopics } from './src/payload/collections/FaqTopics.ts'
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET!,
@@ -33,7 +37,7 @@ export default buildConfig({
   admin: {
     user: Users.slug,
   },
-globals: [Settings],
+  globals: [Settings],
   localization: {
     locales: ['ru', 'en'],
     defaultLocale: 'ru',
@@ -57,7 +61,11 @@ globals: [Settings],
     Wishlists,
     Notifications,
     ContentBlocks,
-    FaqTopics
+    FaqTopics,
+    OtpCodes,              // добавили
+    ProductReviews,        // добавили
+    Sessions,              // добавили
+    UserConsents,          // добавили
   ],
 
   db: postgresAdapter({
@@ -69,5 +77,4 @@ globals: [Settings],
   typescript: {
     outputFile: path.resolve(process.cwd(), 'payload-types.ts'),
   },
-  
 })

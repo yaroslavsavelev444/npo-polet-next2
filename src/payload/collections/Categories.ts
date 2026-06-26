@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import { generateSlug } from '../utils/generateSlug.ts'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
@@ -8,7 +9,7 @@ export const Categories: CollectionConfig = {
     defaultColumns: ['name', 'slug', 'isActive', 'order'],
   },
   access: {
-    read: () => true, // публичный доступ
+    read: () => true,
     create: isAdminOrSuperAdmin,
     update: isAdminOrSuperAdmin,
     delete: isAdminOrSuperAdmin,
@@ -25,6 +26,9 @@ export const Categories: CollectionConfig = {
       type: 'text',
       required: true,
       unique: true,
+      hooks: {
+        beforeValidate: [generateSlug], // добавлен хук
+      },
       admin: {
         position: 'sidebar',
       },

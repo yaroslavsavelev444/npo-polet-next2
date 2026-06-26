@@ -9,12 +9,11 @@
     "lint": "eslint",
     "payload": "payload",
     "payload:types": "payload generate:types",
-
     "payload:importmap": "payload generate:importmap",
-
     "payload:sync": "pnpm payload:types && pnpm payload:importmap"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.2.5",
     "@once-ui-system/core": "^1.7.10",
     "@payloadcms/db-postgres": "^3.85.1",
     "@payloadcms/next": "^3.85.1",
@@ -23,13 +22,17 @@
     "@payloadcms/ui": "^3.85.1",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-query-devtools": "^5.101.0",
+    "@types/classnames": "^2.3.4",
+    "antd": "^6.4.5",
     "bullmq": "^5.79.0",
     "ioredis": "^5.11.1",
+    "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "payload": "^3.85.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.14.0",
+    "transliteration": "^2.6.1",
     "xss": "^1.0.15",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"

@@ -12,10 +12,11 @@ const serverSchema = z.object({
   DATABASE_URI: z.string().url(),
 
   // Redis (для BullMQ)
-//   REDIS_URL: z.string().url().optional(),
-
+  REDIS_URL: z.string().url().optional(),
+  REDIS_HOST: z.string().optional(),
+  REDIS_PORT: z.string().optional(),
   // Внешние сервисы
-//   RESEND_API_KEY: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
 
   // Node env
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -38,8 +39,10 @@ function buildEnv() {
   const serverEnv = {
     PAYLOAD_SECRET: process.env.PAYLOAD_SECRET,
     DATABASE_URI: process.env.DATABASE_URI,
-    // REDIS_URL: process.env.REDIS_URL,
-    // RESEND_API_KEY: process.env.RESEND_API_KEY,
+    REDIS_URL: process.env.REDIS_URL,
+    REDIS_HOST: process.env.REDIS_HOST,
+    REDIS_PORT: process.env.REDIS_PORT,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
     NODE_ENV: process.env.NODE_ENV,
   }
 

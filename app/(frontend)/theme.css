@@ -7,7 +7,7 @@
   --primary: #FF4500;
   --primary-hover: #912700;       /* darkPrimary */
   --primary-light: #FFD9C0;       /* приблизительно, можно заменить на primary-100 */
-
+  --page-background: #1A1D24;
   --accent: #008CFF;
   --accent-hover: #0070CC;        /* затемнённый accent */
   --accent-light: #00C3FF;        /* link */

@@ -1,11 +1,12 @@
 import type { CollectionConfig } from 'payload'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import { generateSlug } from '../utils/generateSlug'
+import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin'
 
 export const Products: CollectionConfig = {
   slug: 'products',
   admin: {
     useAsTitle: 'title',
-    defaultColumns: ['title', 'sku', 'status', 'category', 'priceForIndividual'],
+    defaultColumns: ['title', 'category', 'priceForIndividual', 'status'],
   },
   versions: {
     drafts: true,
@@ -17,20 +18,31 @@ export const Products: CollectionConfig = {
     delete: isAdminOrSuperAdmin,
   },
   fields: [
+    // ─── Основная информация ───────────────────────────────────────────────
     {
-      name: 'sku',
-      type: 'text',
-      required: true,
-      unique: true,
-      admin: {
-        position: 'sidebar',
-      },
-    },
-    {
-      name: 'title',
-      type: 'text',
-      required: true,
-      localized: true,
+      type: 'row',
+      fields: [
+        {
+          name: 'title',
+          type: 'text',
+          required: true,
+          localized: true,
+        },
+        {
+          name: 'slug',
+          type: 'text',
+          unique: true,
+          index: true,
+          hooks: {
+            beforeValidate: [generateSlug],
+          },
+          admin: {
+            readOnly: true,
+            position: 'sidebar',
+            description: 'Автоматически генерируется из названия при создании',
+          },
+        },
+      ],
     },
     {
       name: 'description',
@@ -44,6 +56,8 @@ export const Products: CollectionConfig = {
       relationTo: 'categories',
       required: true,
     },
+
+    // ─── Медиа ──────────────────────────────────────────────────────────────
     {
       name: 'images',
       type: 'relationship',
@@ -51,117 +65,169 @@ export const Products: CollectionConfig = {
       hasMany: true,
       label: 'Изображения товара',
     },
+
+    // ─── Цена и скидки ─────────────────────────────────────────────────────
     {
-      name: 'priceForIndividual',
-      type: 'number',
-      required: true,
-      min: 0,
-      label: 'Цена для физ. лиц',
-    },
-    {
-      name: 'discount',
       type: 'group',
+      name: 'pricing',
+      label: 'Цена и скидки',
       fields: [
-        { name: 'isActive', type: 'checkbox', defaultValue: false },
-        { name: 'percentage', type: 'number', min: 0, max: 100, defaultValue: 0 },
-        { name: 'amount', type: 'number', min: 0, defaultValue: 0 },
-        { name: 'validFrom', type: 'date' },
-        { name: 'validUntil', type: 'date' },
-        { name: 'minQuantity', type: 'number', defaultValue: 1, min: 1 },
+        {
+          name: 'priceForIndividual',
+          type: 'number',
+          required: true,
+          min: 0,
+          label: 'Цена для физ. лиц',
+        },
+        {
+          name: 'discount',
+          type: 'group',
+          label: 'Скидка',
+          fields: [
+            {
+              name: 'isActive',
+              type: 'checkbox',
+              defaultValue: false,
+            },
+            {
+              name: 'type',
+              type: 'select',
+              options: [
+                { label: 'Процент', value: 'percentage' },
+                { label: 'Фиксированная сумма', value: 'fixed' },
+              ],
+              defaultValue: 'percentage',
+            },
+            {
+              name: 'value',
+              type: 'number',
+              min: 0,
+              label: 'Значение скидки',
+            },
+            {
+              name: 'validFrom',
+              type: 'date',
+            },
+            {
+              name: 'validUntil',
+              type: 'date',
+            },
+            {
+              name: 'minQuantity',
+              type: 'number',
+              defaultValue: 1,
+              min: 1,
+            },
+          ],
+        },
       ],
     },
-    {
-  name: 'status',
-  type: 'select',
-  options: [
-    { label: 'Доступен', value: 'available' },
-    { label: 'Предзаказ', value: 'preorder' },
-    { label: 'Нет в наличии', value: 'out_of_stock' },
-    { label: 'Снят с производства', value: 'discontinued' },
-  ],
-  defaultValue: 'available',
-  enumName: 'product_status_enum', 
-  admin: {
-    position: 'sidebar',
-  },
-},
 
+    // ─── Остатки и статусы ─────────────────────────────────────────────────
     {
-      name: 'minOrderQuantity',
-      type: 'number',
-      defaultValue: 1,
-      min: 1,
-      max: 1000,
+      type: 'group',
+      name: 'inventory',
+      label: 'Склад и статусы',
+      fields: [
+        {
+          name: 'status',
+          type: 'select',
+          options: [
+            { label: 'Доступен', value: 'available' },
+            { label: 'Предзаказ', value: 'preorder' },
+            { label: 'Нет в наличии', value: 'out_of_stock' },
+            { label: 'Снят с производства', value: 'discontinued' },
+          ],
+          defaultValue: 'available',
+          enumName: 'product_status_enum',
+          admin: {
+            position: 'sidebar',
+          },
+        },
+        {
+          name: 'minOrderQuantity',
+          type: 'number',
+          defaultValue: 1,
+          min: 1,
+          max: 1000,
+        },
+        {
+          name: 'maxOrderQuantity',
+          type: 'number',
+          min: 1,
+          max: 10000,
+          validate: (value, { siblingData }) => {
+            if (value !== undefined && siblingData?.minOrderQuantity !== undefined && value < siblingData.minOrderQuantity) {
+              return 'Максимальное количество должно быть больше или равно минимальному'
+            }
+            return true
+          },
+        },
+        {
+          name: 'isVisible',
+          type: 'checkbox',
+          defaultValue: true,
+          admin: {
+            position: 'sidebar',
+          },
+        },
+        {
+          name: 'showOnMainPage',
+          type: 'checkbox',
+          defaultValue: false,
+          admin: {
+            position: 'sidebar',
+          },
+        },
+      ],
     },
-    {
-      name: 'maxOrderQuantity',
-      type: 'number',
-      min: 1,
-      max: 10000,
-      validate: (value: number, { siblingData }: any) => {
-        if (value && siblingData?.minOrderQuantity && value < siblingData.minOrderQuantity) {
-          return 'Максимальное количество должно быть больше или равно минимальному'
-        }
-        return true
-      },
-    },
-    {
-      name: 'isVisible',
-      type: 'checkbox',
-      defaultValue: true,
-      admin: {
-        position: 'sidebar',
-      },
-    },
-    {
-      name: 'showOnMainPage',
-      type: 'checkbox',
-      defaultValue: false,
-      admin: {
-        position: 'sidebar',
-      },
-    },
-    // Инструкция – разделяем на тип и условные поля
-   {
-  name: 'instructionType',
-  type: 'select',
-  options: [
-    { label: 'Файл', value: 'file' },
-    { label: 'Ссылка', value: 'link' },
-  ],
-  enumName: 'instruction_type_enum', // 👈 явное имя
-  admin: {
-    position: 'sidebar',
-  },
-},
 
+    // ─── Инструкция ────────────────────────────────────────────────────────
     {
-      name: 'instructionFile',
-      type: 'relationship',
-      relationTo: 'media',
-      label: 'Файл инструкции',
-      admin: {
-        condition: (data, siblingData) => siblingData?.instructionType === 'file',
-      },
+      name: 'instruction',
+      type: 'group',
+      label: 'Инструкция',
+      fields: [
+        {
+          name: 'type',
+          type: 'select',
+          options: [
+            { label: 'Файл', value: 'file' },
+            { label: 'Ссылка', value: 'link' },
+          ],
+          enumName: 'instruction_type_enum',
+        },
+        {
+          name: 'file',
+          type: 'relationship',
+          relationTo: 'media',
+          label: 'Файл инструкции',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'file',
+          },
+        },
+        {
+          name: 'link',
+          type: 'text',
+          label: 'Ссылка на инструкцию',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'link',
+          },
+          validate: (value) => {
+            if (value && !/^https?:\/\//.test(value)) {
+              return 'Введите корректный URL (начинается с http:// или https://)'
+            }
+            return true
+          },
+        },
+      ],
     },
-    {
-      name: 'instructionLink',
-      type: 'text',
-      label: 'Ссылка на инструкцию',
-      admin: {
-        condition: (data, siblingData) => siblingData?.instructionType === 'link',
-      },
-      validate: (value: string) => {
-        if (value && !/^https?:\/\//.test(value)) {
-          return 'Введите корректный URL (начинается с http:// или https://)'
-        }
-        return true
-      },
-    },
-    // Спецификации
+
+    // ─── Характеристики ────────────────────────────────────────────────────
     {
       name: 'specifications',
       type: 'array',
+      label: 'Характеристики',
       fields: [
         { name: 'name', type: 'text', required: true },
         { name: 'value', type: 'text', required: true },
@@ -170,111 +236,106 @@ export const Products: CollectionConfig = {
         { name: 'isVisible', type: 'checkbox', defaultValue: true },
       ],
     },
-    // Связи
+
+    // ─── Связи ─────────────────────────────────────────────────────────────
     {
-      name: 'relatedProducts',
-      type: 'relationship',
-      relationTo: 'products',
-      hasMany: true,
+      type: 'group',
+      name: 'relations',
+      label: 'Связанные товары',
+      fields: [
+        {
+          name: 'upsellProducts',
+          type: 'relationship',
+          relationTo: 'products',
+          hasMany: true,
+          label: 'Товары для апсейла',
+        },
+      ],
     },
+
+    // ─── Производитель и гарантия ─────────────────────────────────────────
     {
-      name: 'upsellProducts',
-      type: 'relationship',
-      relationTo: 'products',
-      hasMany: true,
+      type: 'group',
+      name: 'brand',
+      label: 'Бренд и гарантия',
+      fields: [
+        {
+
+    name:'manufacturer',
+
+    type:'text'
+
+},
+        {
+          name: 'warrantyMonths',
+          type: 'number',
+          min: 0,
+          max: 120,
+          label: 'Гарантия (месяцев)',
+        },
+      ],
     },
-    {
-      name: 'crossSellProducts',
-      type: 'relationship',
-      relationTo: 'products',
-      hasMany: true,
-    },
-    {
-      name: 'manufacturer',
-      type: 'text',
-    },
-    {
-      name: 'warrantyMonths',
-      type: 'number',
-      min: 0,
-      max: 120,
-    },
-    {
-      name: 'weight',
-      type: 'number',
-      min: 0,
-    },
+
+    // ─── Габариты и вес ────────────────────────────────────────────────────
     {
       name: 'dimensions',
       type: 'group',
+      label: 'Габариты и вес',
       fields: [
-        { name: 'length', type: 'number', min: 0 },
-        { name: 'width', type: 'number', min: 0 },
-        { name: 'height', type: 'number', min: 0 },
+        { name: 'weight', type: 'number', min: 0, label: 'Вес (кг)' },
+        { name: 'length', type: 'number', min: 0, label: 'Длина (см)' },
+        { name: 'width', type: 'number', min: 0, label: 'Ширина (см)' },
+        { name: 'height', type: 'number', min: 0, label: 'Высота (см)' },
       ],
     },
+
+    // ─── SEO ───────────────────────────────────────────────────────────────
     {
-      name: 'metaTitle',
-      type: 'text',
-      localized: true,
-      admin: { position: 'sidebar' },
-    },
-    {
-      name: 'metaDescription',
-      type: 'textarea',
-      localized: true,
-      admin: { position: 'sidebar' },
-    },
-    {
-      name: 'keywords',
-      type: 'array',
-      fields: [{ name: 'keyword', type: 'text' }],
-      admin: { position: 'sidebar' },
-    },
-    {
-      name: 'viewsCount',
-      type: 'number',
-      defaultValue: 0,
-      admin: { readOnly: true },
-    },
-    {
-      name: 'purchasesCount',
-      type: 'number',
-      defaultValue: 0,
-      admin: { readOnly: true },
-    },
-    // Виртуальное поле для финальной цены (вычисляется на сервере)
-    {
-      name: 'finalPrice',
-      type: 'number',
-      virtual: true,
-      hooks: {
-        afterRead: [({ data }) => calculateFinalPrice(data)],
+      type: 'group',
+      name: 'seo',
+      label: 'SEO',
+      admin: {
+        position: 'sidebar',
       },
+      fields: [
+        {
+          name: 'metaTitle',
+          type: 'text',
+          localized: true,
+        },
+        {
+          name: 'metaDescription',
+          type: 'textarea',
+          localized: true,
+        },
+        {
+          name: 'keywords',
+          type: 'array',
+          fields: [{ name: 'keyword', type: 'text' }],
+        },
+      ],
+    },
+
+    // ─── Аналитика ─────────────────────────────────────────────────────────
+    {
+      type: 'group',
+      name: 'analytics',
+      label: 'Аналитика',
       admin: {
         readOnly: true,
       },
+      fields: [
+        {
+          name: 'viewsCount',
+          type: 'number',
+          defaultValue: 0,
+        },
+        {
+          name: 'purchasesCount',
+          type: 'number',
+          defaultValue: 0,
+        },
+      ],
     },
   ],
-}
-
-// Функция вычисления финальной цены (используется в виртуальном поле)
-function calculateFinalPrice(product: any): number {
-  if (!product) return 0
-  const price = product.priceForIndividual || 0
-  const discount = product.discount
-  if (!discount?.isActive) return price
-
-  const now = new Date()
-  if (discount.validFrom && new Date(discount.validFrom) > now) return price
-  if (discount.validUntil && new Date(discount.validUntil) < now) return price
-
-  let final = price
-  if (discount.percentage && discount.percentage > 0) {
-    final = final * (1 - discount.percentage / 100)
-  }
-  if (discount.amount && discount.amount > 0) {
-    final = Math.max(0, final - discount.amount)
-  }
-  return Math.round(final * 100) / 100
 }
