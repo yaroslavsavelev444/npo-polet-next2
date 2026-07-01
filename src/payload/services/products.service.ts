@@ -1,9 +1,11 @@
-// services/products.service.ts
 import { unstable_cache } from 'next/cache'
 import { getPayloadInstance } from './getPayload'
 import { env } from '@/env'
 import type { Product } from '@/payload-types'
 import type { Where } from 'payload'
+import { ProductQuery } from '@/modules/productCard/types/query'
+import { mapProductToCardData, ProductCardData } from '@/modules/productCard'
+import { ProductCatalogResult } from '@/modules/productCatalog/types/filters'
 
 export interface GetProductsOptions {
   category?: string
@@ -19,7 +21,7 @@ export interface GetProductsOptions {
   depth?: number
 }
 
-function buildProductsWhere(options: GetProductsOptions): Where {
+export function buildProductWhere(options: GetProductsOptions): Where {
   const where: Where = {}
   const conditions: any[] = []
 
@@ -30,19 +32,31 @@ function buildProductsWhere(options: GetProductsOptions): Where {
     conditions.push({ status: { equals: options.status } })
   }
   if (options.isVisible !== undefined) {
-    conditions.push({ isVisible: { equals: options.isVisible } })
+    conditions.push({
+      'inventory.isVisible': {
+        equals: options.isVisible,
+      },
+    })
   }
   if (options.showOnMainPage !== undefined) {
-    conditions.push({ showOnMainPage: { equals: options.showOnMainPage } })
+    conditions.push({
+      'inventory.showOnMainPage': {
+        equals: options.showOnMainPage,
+      },
+    })
   }
   if (options.sku) {
     conditions.push({ sku: { equals: options.sku } })
   }
   if (options.minPrice !== undefined) {
-    conditions.push({ priceForIndividual: { greater_than_equal: options.minPrice } })
+    conditions.push({
+      'pricing.priceForIndividual': { greater_than_equal: options.minPrice },
+    })
   }
   if (options.maxPrice !== undefined) {
-    conditions.push({ priceForIndividual: { less_than_equal: options.maxPrice } })
+    conditions.push({
+      'pricing.priceForIndividual': { less_than_equal: options.maxPrice },
+    })
   }
 
   if (conditions.length > 0) {
@@ -60,6 +74,7 @@ function getProductsCacheKey(options?: GetProductsOptions): string {
     sku,
     minPrice,
     maxPrice,
+
     sort,
     limit,
     page,
@@ -68,9 +83,10 @@ function getProductsCacheKey(options?: GetProductsOptions): string {
   return `products-cat-${category || 'any'}-st-${status || 'any'}-vis-${isVisible ?? 'any'}-main-${showOnMainPage ?? 'any'}-sku-${sku || 'any'}-pmin-${minPrice ?? 'any'}-pmax-${maxPrice ?? 'any'}-sort-${sort || 'title'}-l-${limit || 100}-p-${page || 1}-d-${depth ?? 1}`
 }
 
+
 async function fetchProducts(options: GetProductsOptions = {}) {
   const payload = await getPayloadInstance()
-  const where = buildProductsWhere(options)
+  const where = buildProductWhere(options) // исправлено имя функции
   const result = await payload.find({
     collection: 'products',
     where,
@@ -141,4 +157,34 @@ export const getCachedProductBySku = (sku: string) => {
     [`product-sku-${sku}`],
     { tags: ['products'], revalidate: false }
   )()
+}
+
+export async function getCatalogData(query: ProductQuery): Promise<ProductCatalogResult> {
+  const options: GetProductsOptions = {
+    category: query.categoryId,
+    isVisible: query.isVisible,
+    status: query.status,
+    minPrice: query.priceFrom,
+    maxPrice: query.priceTo,
+    sort: query.sort ? `${query.sort}:${query.order || 'desc'}` : 'createdAt',
+    limit: query.limit || 24,
+    page: query.page || 1,
+    depth: 1,
+  };
+
+  const { docs, totalDocs } = await getCachedProducts(options);
+
+  const totalPages = Math.ceil(totalDocs / (options.limit || 24));
+  
+  return {
+    products: docs.map(mapProductToCardData),
+    totalDocs,
+    pagination: {
+      page: options.page || 1,
+      limit: options.limit || 24,
+      totalPages,
+      hasNextPage: (options.page || 1) < totalPages,
+      hasPrevPage: (options.page || 1) > 1,
+    },
+  };
 }

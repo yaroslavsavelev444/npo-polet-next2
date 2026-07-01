@@ -5,13 +5,13 @@ import '@once-ui-system/core/css/tokens.css'
 import './theme.css'
 import './globals.css'
 
-import classNames from 'classnames'
 import { Flex, Column, Meta } from '@once-ui-system/core'
 import { Manrope, IBM_Plex_Mono } from 'next/font/google'
 import {Providers} from '@/providers/Providers'
 import { home, baseURL } from '@/resources/content'
 import { StickyHeader } from '@/widgets/Header/StickyHeader'
 import Footer from '@/widgets/Footer/Footer'
+import { cn } from '@/utils/cn'
 const manrope = Manrope({
   weight: ['200', '300', '400', '500', '600', '700'],
   subsets: ['latin', 'cyrillic'],
@@ -46,7 +46,7 @@ export default async function RootLayout({
         as="html"
         lang="ru"
         fillWidth
-        className={classNames(manrope.variable, mono.variable)}
+        className={cn(manrope.variable, mono.variable)}
         style={{ height: '100%' }}
       >
         <Column

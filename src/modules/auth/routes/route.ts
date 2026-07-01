@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@/payloadconfig'
 import { getActiveSession } from '@/modules/auth/lib/session'
+import { isTwoFAVerified } from '../lib/twoFA'
 
 /**
  * GET /api/auth/session-status
@@ -48,11 +49,9 @@ export async function GET(req: NextRequest) {
   if (user.status === 'blocked' || user.status === 'suspended') {
     return NextResponse.json({ error: 'Account blocked' }, { status: 403 })
   }
+  
+  const twoFAVerified = isTwoFAVerified(user)
 
-  // twoFAVerifiedAt действителен 24 часа
-  const TWO_FA_TTL_MS = 24 * 60 * 60 * 1000
-  const verifiedAt = user.twoFAVerifiedAt ? new Date(user.twoFAVerifiedAt).getTime() : 0
-  const twoFAVerified = user.twoFAVerified === true && Date.now() - verifiedAt < TWO_FA_TTL_MS
 
   return NextResponse.json({ twoFAVerified })
 }

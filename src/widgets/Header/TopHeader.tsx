@@ -51,7 +51,7 @@ export const TopHeader = async () => {
           <Text as="a" href="/contacts" variant="body-default-s" onBackground="neutral-weak">
             Контакты
           </Text>
-          <Text as="a" href="/catalog" variant="body-default-s" onBackground="neutral-weak">
+          <Text as="a" href="/categories" variant="body-default-s" onBackground="neutral-weak">
             Каталог
           </Text>
         </Row>

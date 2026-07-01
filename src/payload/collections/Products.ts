@@ -156,7 +156,7 @@ export const Products: CollectionConfig = {
           type: 'number',
           min: 1,
           max: 10000,
-          validate: (value, { siblingData }) => {
+          validate: (value : any, { siblingData }: { siblingData: any }) => {
             if (value !== undefined && siblingData?.minOrderQuantity !== undefined && value < siblingData.minOrderQuantity) {
               return 'Максимальное количество должно быть больше или равно минимальному'
             }
@@ -213,7 +213,7 @@ export const Products: CollectionConfig = {
           admin: {
             condition: (_, siblingData) => siblingData?.type === 'link',
           },
-          validate: (value) => {
+          validate: (value: any) => {
             if (value && !/^https?:\/\//.test(value)) {
               return 'Введите корректный URL (начинается с http:// или https://)'
             }

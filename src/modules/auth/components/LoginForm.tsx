@@ -1,26 +1,35 @@
-'use client'
+'use client';
 
-import { useActionState, useEffect } from 'react'
-import Link from 'next/link'
-import { loginAction } from '../actions/login'
+import { useActionState, useEffect } from 'react';
+import Link from 'next/link';
+import { loginAction } from '../actions/login';
+import Input from '@/UI/Input/Input';
+import Button from '@/UI/Button/Button';
 
 interface LoginFormProps {
-  onRequiresOtp: () => void
+  onRequiresOtp: () => void;
 }
 
-/**
- * Форма входа.
- * useActionState — React 19 API, встроенная обработка pending/error состояния.
- * Не использует useState для полей — нативный FormData.
- */
+// Вспомогательная функция с поддержкой null
+function getFieldError(
+  state: Awaited<ReturnType<typeof loginAction>> | null,
+  field: string
+): string | undefined {
+  if (!state || state.success) return undefined;
+  if ('fieldErrors' in state && state.fieldErrors) {
+    return state.fieldErrors[field]?.[0];
+  }
+  return undefined;
+}
+
 export function LoginForm({ onRequiresOtp }: LoginFormProps) {
-  const [state, action, isPending] = useActionState(loginAction, null)
+  const [state, action, isPending] = useActionState(loginAction, null);
 
   useEffect(() => {
     if (state?.success && state.data.requiresOtp) {
-      onRequiresOtp()
+      onRequiresOtp();
     }
-  }, [state, onRequiresOtp])
+  }, [state, onRequiresOtp]);
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -40,47 +49,31 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
           </div>
         )}
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            disabled={isPending}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                       placeholder-gray-400 focus:border-blue-500 focus:outline-none
-                       focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            placeholder="name@example.com"
-          />
-          {state?.fieldErrors?.email && (
-            <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email[0]}</p>
-          )}
-        </div>
+        <Input
+          id="email"
+          name="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          disabled={isPending}
+          placeholder="name@example.com"
+          errorMessage={getFieldError(state, 'email')}
+          fullWidth
+        />
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            Пароль
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            disabled={isPending}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                       placeholder-gray-400 focus:border-blue-500 focus:outline-none
-                       focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            placeholder="Введите пароль"
-          />
-          {state?.fieldErrors?.password && (
-            <p className="mt-1 text-xs text-red-600">{state.fieldErrors.password[0]}</p>
-          )}
-        </div>
+        <Input
+          id="password"
+          name="password"
+          label="Пароль"
+          type="password"
+          autoComplete="current-password"
+          required
+          disabled={isPending}
+          placeholder="Введите пароль"
+          errorMessage={getFieldError(state, 'password')}
+          fullWidth
+        />
 
         <div className="flex items-center justify-end">
           <Link
@@ -91,16 +84,16 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
           </Link>
         </div>
 
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          size="md"
+          fullWidth
+          loading={isPending}
           disabled={isPending}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold
-                     text-white hover:bg-blue-500 focus:outline-none focus:ring-2
-                     focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60
-                     disabled:cursor-not-allowed transition-colors"
         >
-          {isPending ? 'Вход...' : 'Войти'}
-        </button>
+          Войти
+        </Button>
 
         <p className="text-center text-sm text-gray-500">
           Нет аккаунта?{' '}
@@ -110,5 +103,5 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
         </p>
       </form>
     </div>
-  )
+  );
 }

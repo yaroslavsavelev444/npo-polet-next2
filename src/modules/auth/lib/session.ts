@@ -141,3 +141,52 @@ export async function getUserActiveSessions(payload: BasePayload, userId: string
 
   return docs
 }
+
+/**
+ * Инвалидирует (отзывает) одну сессию.
+ * Если передан userId, проверяет, что сессия принадлежит этому пользователю.
+ *
+ * @param payload - экземпляр Payload
+ * @param sessionId - ID сессии (строка или число)
+ * @param userId - ID пользователя (опционально, для проверки владельца)
+ * @param reason - причина отзыва (по умолчанию 'logout')
+ * @returns true, если сессия была найдена и отозвана, иначе false
+ */
+export async function invalidateSession(
+  payload: BasePayload,
+  sessionId: string,
+  userId?: string,
+  reason: 'logout' | 'logout_all' | 'password_changed' | 'admin' = 'logout',
+): Promise<boolean> {
+  try {
+    // Если указан userId, проверяем, что сессия принадлежит этому пользователю
+    if (userId) {
+      const session = await payload.findByID({
+        collection: 'sessions',
+        id: sessionId,
+        overrideAccess: true,
+      });
+      if (!session) return false;
+      // Проверяем, что сессия принадлежит пользователю (преобразуем к строке для надёжности)
+      if (String(session.user) !== String(userId)) {
+        throw new Error('Session does not belong to the given user');
+      }
+    }
+
+    // Отзываем сессию
+    await payload.update({
+      collection: 'sessions',
+      id: sessionId,
+      data: {
+        revoked: true,
+        revokedReason: reason,
+      },
+      overrideAccess: true,
+    });
+
+    return true;
+  } catch {
+    // Если сессия не найдена или произошла ошибка, возвращаем false
+    return false;
+  }
+}

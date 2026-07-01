@@ -31,6 +31,16 @@ export interface AcceptedConsent {
   version: string
   consentId: string
 }
+export interface ConsentListItem {
+  id: string;               // идентификатор (может быть number или string)
+  slug: string;             // уникальный слаг
+  title: string;            // отображаемое название
+  version: string;          // версия документа
+  isRequired: boolean;      // обязательно ли к принятию
+  documentUrl: string | null; // ссылка на внешний документ (если есть)
+}
+
+
 
 // ─── Action Results ───────────────────────────────────────────────────────────
 

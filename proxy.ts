@@ -11,6 +11,13 @@ const OTP_PATH = '/auth/verify-otp'
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+  const redirectedFrom = req.nextUrl.searchParams.get('_r')
+if (redirectedFrom === pathname) {
+  // Что-то пошло не так — не редиректим повторно на тот же путь,
+  // пропускаем дальше, чтобы не зациклиться
+  return NextResponse.next()
+}
+
   console.log('[PROXY]', pathname)
 
   // ── 1. Служебные пути ── пропускаем без проверок ──────────────────────────

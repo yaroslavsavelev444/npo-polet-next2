@@ -6,6 +6,7 @@ import {
   getActiveContentBlocks,
   getContentBlocksByVariant,
 } from "@/modules/contentBlocks/lib";
+import { ProductListContainer } from "@/modules/productCard/components/ProductListContainer";
 
 export default async function Home() {
   // Параллельная загрузка для лучшей производительности
@@ -27,6 +28,11 @@ export default async function Home() {
       <ContentBlockGroup
         blocks={defaultResult.docs}       
       />
+
+       <ProductListContainer
+          query={{ showOnMainPage: true, isVisible: true }}
+          title="Популярные товары"
+        />
     </div>
   );
 }
