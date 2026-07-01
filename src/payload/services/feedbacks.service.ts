@@ -130,3 +130,30 @@ export const getCachedFeedbacksByUser = (userId: string, options?: Omit<GetFeedb
     { tags: ['feedbacks'], revalidate: false }
   )()
 }
+
+export async function createFeedback(data: {
+  type: 'bug' | 'improvement' | 'feature' | 'other'
+  title: string
+  description: string
+  email?: string
+  user?: string // Payload user ID
+}): Promise<Feedback> {
+  const payload = await getPayloadInstance()
+
+  const feedback = await payload.create({
+    collection: 'feedbacks',
+    data: {
+      type: data.type,
+      title: data.title,
+      description: data.description,
+      email: data.email || '',
+      user: data.user || undefined,
+      status: 'new',
+      priority: 'medium',
+      // Поля assignedTo, tags и другие можно не передавать — они останутся пустыми
+    },
+  })
+
+  return feedback as unknown as Feedback
+}
+

@@ -29,3 +29,13 @@ body {
     transform: translateY(0) scale(1);
   }
 }
+
+.ant-breadcrumb,
+
+.ant-breadcrumb a,
+
+.ant-breadcrumb-link {
+
+    color: white !important;
+
+}

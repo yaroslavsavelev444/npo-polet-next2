@@ -1,22 +1,21 @@
 
 import { About, Blog, Gallery, Home, Newsletter, Person, Social, Work } from "@/types";
-import { Line, Row, Text } from "@once-ui-system/core";
 
 // ============================================================
 // Данные о компании
 // ============================================================
 const person: Person = {
-  firstName: "СТК",
-  lastName: "Актив",
-  name: "СТК-Актив",
-  role: "Строительно-торговая компания",
+  firstName: "НПО",
+  lastName: "Полет",
+  name: "НПО Полет",
+  role: "Купить ручной сеткомет Паук, Вултур и стационарные установки",
   avatar: "/images/logo.jpg",        // замените на свой логотип
-  email: "info@stkaktiv.ru",
+  email: "npo-polet@yandex.ru",
   location: "Россия, Рязань",
   languages: ["Русский"],
 };
 
-export const baseURL = "https://stkaktiv.ru";
+export const baseURL = "https://npo-polet.ru";
 
 // ============================================================
 // Настройка рассылки (можно отключить)
@@ -47,28 +46,8 @@ const home: Home = {
   path: "/",
   image: "/images/og/home.jpg",
   label: "Главная",
-  title: "СТК-Актив – производство дорожных знаков",
-  description: "Производство и поставка дорожных знаков и средств безопасности для дорог федерального значения",
-  headline: <>Качество и надёжность на каждой дороге</>,
-  featured: {
-    display: true,
-    title: (
-      <Row gap="12" vertical="center">
-        <strong className="ml-4">Производитель</strong>
-        <Line background="brand-alpha-strong" vert height="20" />
-        <Text marginRight="4" onBackground="brand-medium">
-          ГОСТ 52290-2004
-        </Text>
-      </Row>
-    ),
-    href: "/work",
-  },
-  subline: (
-    <>
-      Мы производим дорожные знаки высшего качества для федеральных трасс. <br />
-      Опыт поставок на М-2, М-4, М-7, М-12 и другие магистрали.
-    </>
-  ),
+  title: "НПО Полет – Купить ручной сеткомет Паук, Вултур и стационарные установки",
+  description: "Производитель ручной сеткомет Паук, Вултур и стационарных установок",
 };
 
 // ============================================================

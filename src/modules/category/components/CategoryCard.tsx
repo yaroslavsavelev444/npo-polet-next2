@@ -76,7 +76,7 @@ export default function CategoryCard({
 
   return (
     <Link
-      href={`/categories/${category.slug}`}
+      href={`/category/${category.slug}`}
       aria-label={`Открыть категорию "${category.name}"`}
       className="
         group

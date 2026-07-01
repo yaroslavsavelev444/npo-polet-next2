@@ -60,7 +60,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   return (
     <main className="min-h-screen pb-12">
       <div className="container mx-auto px-4 py-8">
-        <Breadcrumbs items={breadcrumbItems} />
+        <Breadcrumbs items={breadcrumbItems} variant='white'/>
 
         <ProductCatalogLayout
           category={category}

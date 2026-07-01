@@ -12,17 +12,13 @@ interface BreadcrumbsProps {
   /** Дополнительный CSS-класс для контейнера */
   className?: string;
   /** Вариант оформления */
-  variant?: 'default' | 'light' | 'dark' | 'transparent';
+  variant?: 'default' | 'light' | 'dark' | 'transparent' | 'white';
   /** Выравнивание */
   align?: 'start' | 'center' | 'end';
 }
 
 /**
  * Улучшенный компонент хлебных крошек
- * - Горизонтальное расположение в одну строку
- * - Фон блока с закруглёнными краями
- * - Стрелочки-указатели между элементами
- * - Адаптивная стилизация
  */
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   items,
@@ -30,30 +26,47 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   variant = 'default',
   align = 'start',
 }) => {
-  // Стили контейнера в зависимости от варианта
+  const isWhiteText =
+    variant === 'default' ||
+    variant === 'dark' ||
+    variant === 'white';
+
+  // Стили контейнера
   const getContainerStyles = () => {
     const base = `
-      inline-flex items-center gap-2 px-5 py-3 
-      rounded-2xl border border-[var(--border)]
-      min-h-[48px] w-fit
-      transition-all duration-200
+      inline-flex items-center gap-2 px-5 py-3
+      rounded-2xl min-h-[48px] w-fit
+      transition-all duration-200 backdrop-blur-md
     `;
 
     switch (variant) {
       case 'light':
-        return `${base} bg-[var(--surface)]`;
+        return `${base} border bg-[var(--surface)] border-[var(--border)] text-[var(--text-primary)]`;
+
       case 'dark':
-        return `${base} bg-[var(--text-primary)] text-white border-transparent`;
+        return `${base} bg-[var(--text-primary)] text-white`;
+
+      case 'white':
+        return `${base} bg-[var(--border-light)] text-white`;
+
       case 'transparent':
-        return `${base} bg-transparent border-transparent px-0 py-2`;
+        return `${base} bg-transparent px-0 py-2`;
+
+      case 'default':
       default:
-        return `${base} bg-[var(--background)] shadow-sm`;
+        return `${base} border bg-zinc-900/70 border-white/20 text-white shadow-lg`;
     }
   };
 
   const containerClass = `
     ${getContainerStyles()}
-    ${align === 'center' ? 'justify-center' : align === 'end' ? 'justify-end' : 'justify-start'}
+    ${
+      align === 'center'
+        ? 'justify-center'
+        : align === 'end'
+          ? 'justify-end'
+          : 'justify-start'
+    }
     ${className}
   `;
 
@@ -61,25 +74,28 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
     <div className={containerClass}>
       <Breadcrumb
         separator={
-          <RightOutlined 
-            style={{ 
-              fontSize: '14px', 
-              opacity: 0.6,
-              color: 'var(--text-secondary)'
-            }} 
+          <RightOutlined
+            style={{
+              fontSize: '14px',
+              opacity: 0.75,
+              color: isWhiteText ? '#fff' : 'var(--text-primary)',
+            }}
           />
         }
         items={items}
-        itemRender={(route, params, routes, paths) => {
+        itemRender={(route, params, routes) => {
           const isLast = route === routes[routes.length - 1];
 
           const content = (
             <span
               className={`
                 transition-colors duration-200
-                ${isLast 
-                  ? 'text-[var(--text-primary)] font-medium cursor-default' 
-                  : 'hover:text-[var(--primary)] cursor-pointer'
+                ${
+                  isLast
+                    ? 'font-medium cursor-default'
+                    : isWhiteText
+                      ? 'hover:text-white/80 hover:underline cursor-pointer'
+                      : 'hover:text-[var(--primary)] hover:underline cursor-pointer'
                 }
               `}
             >
@@ -92,10 +108,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
           }
 
           return (
-            <Link
-              href={route.href || '#'}
-              className="no-underline"
-            >
+            <Link href={route.href || '#'} className="no-underline">
               {content}
             </Link>
           );
@@ -105,7 +118,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   );
 };
 
-// Вспомогательная функция для удобного создания items
+// Вспомогательная функция
 export const createBreadcrumbItem = (
   title: React.ReactNode,
   href?: string,
@@ -113,18 +126,4 @@ export const createBreadcrumbItem = (
 ): ItemType => ({
   title,
   href,
-  disabled,
 });
-
-// Пример использования:
-/*
-<Breadcrumbs
-  items={[
-    createBreadcrumbItem('Главная', '/'),
-    createBreadcrumbItem('Каталог', '/catalog'),
-    createBreadcrumbItem('Ноутбуки', '/catalog/laptops'),
-    createBreadcrumbItem('MacBook Pro', undefined, true),
-  ]}
-  variant="default"
-/>
-*/

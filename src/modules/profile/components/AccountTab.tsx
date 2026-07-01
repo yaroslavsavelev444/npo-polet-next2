@@ -8,7 +8,7 @@ import { Block, Button, Input } from "@/UI";
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 /** Full name: three Cyrillic words, each starting with uppercase */
-const FULL_NAME_RE = /^[А-ЯЁ][а-яё]+ [А-ЯЁ][а-яё]+ [А-ЯЁ][а-яё]+$/;
+const NAME_RE = /^[A-Za-zА-ЯЁа-яё]+(?:[-' ][A-Za-zА-ЯЁа-яё]+)*$/u;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export function AccountTab({ user, onUpdate, onLogoutRequest }: AccountTabProps)
       setNameError("Введите ФИО");
       return false;
     }
-    if (!FULL_NAME_RE.test(name.trim())) {
+    if (!NAME_RE.test(name.trim())) {
       setNameError("Формат: Фамилия Имя Отчество (кириллица)");
       return false;
     }

@@ -12,6 +12,7 @@ import { home, baseURL } from '@/resources/content'
 import { StickyHeader } from '@/widgets/Header/StickyHeader'
 import Footer from '@/widgets/Footer/Footer'
 import { cn } from '@/utils/cn'
+import { FeedbackButton } from '@/modules/feedback/components/FeedbackButton'
 const manrope = Manrope({
   weight: ['200', '300', '400', '500', '600', '700'],
   subsets: ['latin', 'cyrillic'],
@@ -63,6 +64,8 @@ export default async function RootLayout({
           <Flex zIndex={0} fillWidth padding="l" horizontal="center" flex={1}>
             <Flex horizontal="center" fillWidth minHeight="0">
               {children}
+              <FeedbackButton />
+
             </Flex>
           </Flex>
 

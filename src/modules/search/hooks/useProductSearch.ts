@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useSearchStore } from '@/shared/store/search.store'
 import { useDebouncedValue } from './useDebouncedValue'
 import { SEARCH_MIN_QUERY_LENGTH, SEARCH_DEBOUNCE_MS } from '../constants'
 import type { SearchApiResponse } from '../types'
+import { useSearchStore } from '@/shared/store/search.store'
 
 /**
  * Оркестрация загрузки результатов поиска:
