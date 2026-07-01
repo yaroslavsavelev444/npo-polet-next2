@@ -27,7 +27,6 @@ export default function UserMenu({ user }: Props) {
         { label: 'Профиль', href: '/profile' },
         { label: 'Мои заказы', href: '/orders' },
         { label: 'Мои отзывы', href: '/reviews' },
-        { label: 'Выйти', href: '#' }, // будет обработано в DropdownMenu при необходимости
       ]}
     />
   );

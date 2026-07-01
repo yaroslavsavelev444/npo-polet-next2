@@ -47,7 +47,10 @@ function mapStatus(status: RawInventoryStatus): ProductAvailabilityStatus {
   }
 }
 
-function mapDiscountPercentage(
+// Экспортируется: переиспользуется модулем поиска (src/modules/search)
+// для расчёта цены со скидкой в выпадающих подсказках поиска — единая
+// логика расчёта скидки на всём сайте.
+export function mapDiscountPercentage(
   discount: Product["pricing"]["discount"],
   priceForIndividual: number,
 ): { isActive: boolean; percentage: number | null } {
@@ -65,7 +68,6 @@ function mapDiscountPercentage(
 
 // ===== Основная функция =====
 export function mapProductToCardData(product: Product): ProductCardData {
-  // Извлекаем из вложенных групп
   const priceForIndividual = product.pricing?.priceForIndividual ?? 0;
   const discount = product.pricing?.discount;
   const discountInfo = mapDiscountPercentage(discount, priceForIndividual);
@@ -91,7 +93,7 @@ export function mapProductToCardData(product: Product): ProductCardData {
     status,
     minOrderQuantity,
     maxOrderQuantity,
-    rating: 0,             // TODO: агрегировать из reviews
+    rating: 0,
     reviewsCount: 0,
   };
 }
