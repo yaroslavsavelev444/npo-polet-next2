@@ -3,14 +3,16 @@ import NavbarClientIsland from './NavbarClientIsland';
 import type { Category, Setting } from '@/payload-types';
 import type { User } from '@/payload-types'; // или твой тип пользователя
 
-interface NavbarShellProps {
+interface Props {
   user: User | null;
   categories: Category[];
   settings: Setting | null;
+  cartItemCount: number;
 }
 
 
-export default function NavbarShell({ user, categories, settings }: NavbarShellProps) {
+
+export default function NavbarShell({ user, categories, settings, cartItemCount }: Props) {
   return (
     <Flex
       as="header"
@@ -38,6 +40,7 @@ export default function NavbarShell({ user, categories, settings }: NavbarShellP
           user={user}
           categories={categories}
           settings={settings}
+          cartItemCount={cartItemCount}
         />
       </Flex>
     </Flex>

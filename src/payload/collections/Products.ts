@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
-import { generateSlug } from '../utils/generateSlug'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin'
+import { generateSlug } from '../utils/generateSlug.ts'
+import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
 
 export const Products: CollectionConfig = {
   slug: 'products',

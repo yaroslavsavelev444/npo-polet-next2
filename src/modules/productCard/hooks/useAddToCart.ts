@@ -1,56 +1,53 @@
-"use client";
+// src/modules/productCard/hooks/useAddToCart.ts
+'use client'
 
-/**
- * modules/productCard/hooks/useAddToCart.ts
- *
- * TODO: временно закомментирован useCartStore, пока стор не реализован.
- * После создания стора раскомментировать импорт и использование.
- */
-
-import { useCallback, useState } from "react";
-import { useToast } from "@once-ui-system/core";
-// import { useCartStore } from "@/shared/store/cartStore"; // TODO: раскомментировать когда стор будет готов
-import type { ProductCardData } from "../types";
+import { useCallback, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useToast } from '@once-ui-system/core'
+import { addToCartAction } from '@/modules/cart'
+import { useCartStore } from '@/shared/store/cart.store'
+import type { ProductCardData } from '../types'
 
 export interface UseAddToCartResult {
-  isAdding: boolean;
-  addToCart: (product: ProductCardData, quantity: number) => Promise<void>;
+  isAdding: boolean
+  addToCart: (product: ProductCardData, quantity: number) => Promise<void>
 }
 
 export function useAddToCart(): UseAddToCartResult {
-  const { addToast } = useToast();
-  const [isAdding, setIsAdding] = useState(false);
-
-  // TODO: раскомментировать и использовать стор
-  // const addItem = useCartStore((state) => state.addItem);
-  // Временно заглушка
-  const addItem = useCallback(() => {
-    console.warn("useCartStore заглушка: добавление в корзину не реализовано");
-  }, []);
+  const { addToast } = useToast()
+  const router = useRouter()
+  const [isAdding, setIsAdding] = useState(false)
+  const setItemCount = useCartStore((s) => s.setItemCount)
 
   const addToCart = useCallback(
     async (product: ProductCardData, quantity: number) => {
-      setIsAdding(true);
+      setIsAdding(true)
       try {
-        // Временно заглушка: просто эмулируем успех
-        // addItem({ productId: product.id, title: product.title, ... }, quantity);
-        addItem(); // вызов заглушки
+        const result = await addToCartAction(product.id, quantity)
 
+        if (!result.success) {
+          if (result.error === 'AUTH_REQUIRED') {
+            addToast({ variant: 'danger', message: 'Войдите в аккаунт, чтобы добавить товар в корзину' })
+            router.push('/auth/login?from=/cart')
+            return
+          }
+          addToast({ variant: 'danger', message: result.message })
+          return
+        }
+
+        setItemCount(result.data.summary.totalItems)
         addToast({
-          variant: "success",
+          variant: 'success',
           message: `«${product.title}» добавлен в корзину (${quantity} шт.)`,
-        });
+        })
       } catch {
-        addToast({
-          variant: "danger",
-          message: "Не удалось добавить товар в корзину. Попробуйте ещё раз.",
-        });
+        addToast({ variant: 'danger', message: 'Не удалось добавить товар в корзину. Попробуйте ещё раз.' })
       } finally {
-        setIsAdding(false);
+        setIsAdding(false)
       }
     },
-    [addItem, addToast],
-  );
+    [addToast, router, setItemCount],
+  )
 
-  return { isAdding, addToCart };
+  return { isAdding, addToCart }
 }

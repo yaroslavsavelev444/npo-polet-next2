@@ -1,9 +1,35 @@
-// services/discounts.service.ts
+// src/payload/services/discounts.service.ts (append to the existing file)
+import { isDiscountCurrentlyActive, pickApplicableDiscount, type DiscountApplication } from '@/modules/cart/lib/discount-calculator'
+import { Discount } from '@/payload-types'
 import { unstable_cache } from 'next/cache'
 import { getPayloadInstance } from './getPayload'
+import { Where } from 'payload'
 import { env } from '@/env'
-import type { Discount } from '@/payload-types'
-import type { Where } from 'payload'
+
+export interface DiscountApplicationInput {
+  totalAmount: number
+  totalQuantity: number
+}
+
+export interface DiscountApplicationResult {
+  applied: DiscountApplication | null
+  hints: DiscountApplication[]
+}
+
+/**
+ * Single source of truth for "what discount applies to this cart right now".
+ * Uses the already-cached active discount list (cheap) and does the actual
+ * applicability math in-memory (cart totals are inherently request-specific,
+ * so this part is never cached).
+ */
+export async function getApplicableDiscount(
+  input: DiscountApplicationInput,
+): Promise<DiscountApplicationResult> {
+  const { docs: discounts } = await getCachedDiscounts({ isActive: true, sort: '-priority' })
+  const now = new Date()
+  const activeDiscounts = discounts.filter((d) => isDiscountCurrentlyActive(d, now))
+  return pickApplicableDiscount(activeDiscounts, input)
+}
 
 export interface GetDiscountsOptions {
   isActive?: boolean
