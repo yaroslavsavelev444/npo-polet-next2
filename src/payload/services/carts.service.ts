@@ -41,9 +41,10 @@ export async function setCartItemQuantity(
   userId: string,
   productId: string,
   quantity: number,
+  existingCart?: Cart,
 ): Promise<Cart> {
   const payload = await getPayloadInstance()
-  const cart = await getOrCreateCart(userId)
+  const cart = existingCart ?? (await getOrCreateCart(userId))
   const items = serializeItems(cart)
 
   const index = items.findIndex((i) => String(i.product) === String(productId))
@@ -61,6 +62,7 @@ export async function setCartItemQuantity(
   })
   return updated as unknown as Cart
 }
+
 
 export async function removeCartItem(userId: string, productId: string): Promise<Cart> {
   const payload = await getPayloadInstance()

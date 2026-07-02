@@ -1,6 +1,7 @@
 // src/payload/collections/Discounts.ts
 import type { CollectionConfig } from 'payload'
-import { revalidateTag } from 'next/cache.js'
+import { revalidateTag } from 'next/cache'
+
 import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
 
 export const DiscountType = {
@@ -69,7 +70,7 @@ export const Discounts: CollectionConfig = {
     { name: 'applicableProducts', type: 'relationship', relationTo: 'products', hasMany: true },
     { name: 'isActive', type: 'checkbox', defaultValue: true, index: true },
     { name: 'isUnlimited', type: 'checkbox', defaultValue: false },
-    { name: 'startAt', type: 'date', required: true, defaultValue: () => new Date() },
+    { name: 'startAt', type: 'date', required: true, defaultValue: () => new Date().toISOString() },
     { name: 'endAt', type: 'date' },
     { name: 'priority', type: 'number', defaultValue: 1, min: 1, max: 10, index: true },
     {

@@ -26,9 +26,9 @@ export function CartIcon({ initialCount }: CartIconProps) {
     >
       <ShoppingCart size={18} />
       {itemCount > 0 && (
-        <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-semibold leading-none text-white">
-          {itemCount > 99 ? '99+' : itemCount}
-        </span>
+        <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-semibold leading-none text-white">
+  {itemCount > 99 ? '99+' : itemCount}
+</span>
       )}
     </Link>
   )

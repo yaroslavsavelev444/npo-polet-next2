@@ -9,7 +9,8 @@ import UserMenu from './UserMenu';
 import MobileMenu from './MobileMenu';
 import type { Category, Setting } from '@/payload-types';
 import type { User } from '@/payload-types';
-import { CartIcon } from '@/modules/cart';
+import { CartIcon } from '@/modules/cart/components/CartIcon'
+
 
 interface Props {
   user: User | null;

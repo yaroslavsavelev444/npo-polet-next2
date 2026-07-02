@@ -4,7 +4,7 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@once-ui-system/core'
-import { addToCartAction } from '@/modules/cart'
+import { addToCartAction } from '@/modules/cart/actions/cart.actions'
 import { useCartStore } from '@/shared/store/cart.store'
 import type { ProductCardData } from '../types'
 

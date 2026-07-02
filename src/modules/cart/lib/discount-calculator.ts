@@ -79,14 +79,15 @@ export function calculateDiscount(discount: Discount, input: DiscountCalcInput):
   }
 
   if (discount.type === 'fixed') {
-    const discountAmount = roundMoney(discount.fixedAmount ?? 0)
-    return {
-      applicable: true,
-      discountAmount,
-      discountPercent,
-      message: `Скидка ${formatRub(discountAmount)} применена`,
-    }
+  const discountAmount = roundMoney(Math.min(discount.fixedAmount ?? 0, totalAmount))
+  return {
+    applicable: true,
+    discountAmount,
+    discountPercent,
+    message: `Скидка ${formatRub(discountAmount)} применена`,
   }
+}
+
 
   const discountAmount = roundMoney(totalAmount * (discountPercent / 100))
   return {

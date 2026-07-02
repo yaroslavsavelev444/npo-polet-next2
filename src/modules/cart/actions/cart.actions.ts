@@ -47,10 +47,12 @@ export async function addToCartAction(productId: string, quantity = 1): Promise<
     return failure('MAX_QUANTITY_EXCEEDED', `Максимальное количество для заказа: ${maxOrderQuantity} шт.`)
   }
 
-  await setCartItemQuantity(String(user.id), productId, nextQuantity)
+  // Reuse the cart we already fetched above instead of fetching it again inside the service.
+  await setCartItemQuantity(String(user.id), productId, nextQuantity, existingCart ?? undefined)
   revalidatePath('/cart')
   return successForUser(String(user.id))
 }
+
 
 export async function updateCartItemQuantityAction(
   productId: string,
