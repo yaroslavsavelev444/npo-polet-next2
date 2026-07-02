@@ -1,6 +1,7 @@
 "use client";
 
 import { dataStyle } from "@/resources/content";
+import { AppToaster } from "@/shared/components/Toaster";
 import {
   ChartMode,
   ChartVariant,
@@ -8,7 +9,6 @@ import {
   iconLibrary,
   IconProvider,
   LayoutProvider,
-  ToastProvider,
 } from "@once-ui-system/core";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -19,9 +19,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           mode={'categorical' as ChartMode}
           height={400}
         >
-          <ToastProvider>
-            <IconProvider icons={iconLibrary}>{children}</IconProvider>
-          </ToastProvider>
+            <IconProvider icons={iconLibrary}>{children}
+              <AppToaster />
+
+            </IconProvider>
         </DataThemeProvider>
 
     </LayoutProvider>

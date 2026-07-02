@@ -65,6 +65,7 @@ export default function MobileMenu({ isOpen, onClose, user, categories }: Props)
               <Link href="/profile" onClick={onClose}>Профиль</Link>
               <Link href="/orders" onClick={onClose}>Мои заказы</Link>
               <Link href="/reviews" onClick={onClose}>Мои отзывы</Link>
+              <Link href="/wishlist" onClick={onClose}>Избранное</Link>
               <button onClick={() => { /* logout action */ onClose(); }} className="text-left">
                 Выйти
               </button>

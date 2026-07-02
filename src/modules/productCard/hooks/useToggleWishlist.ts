@@ -1,65 +1,78 @@
-"use client";
+'use client'
 
 /**
  * modules/productCard/hooks/useToggleWishlist.ts
  *
- * TODO: временно закомментирован useWishlistStore, пока стор не реализован.
- * После создания стора раскомментировать импорт и использование.
+ * Mirrors useAddToCart.ts: optimistic store update, server action call,
+ * rollback on failure, toast feedback. Imports the wishlist action/store
+ * directly (not via the wishlist module barrel) to keep this a one-way
+ * dependency — productCard -> wishlist, never the reverse.
  */
 
-import { useCallback, useState } from "react";
-import { useToast } from "@once-ui-system/core";
-// import { useWishlistStore } from "@/shared/store/wishlistStore"; // TODO: раскомментировать когда стор будет готов
-import type { ProductCardData } from "../types";
+import { useCallback, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toggleWishlistAction } from '@/modules/wishlist/actions/wishlist.actions'
+import { useWishlistStore } from '@/shared/store/wishlist.store'
+import type { ProductCardData } from '../types'
+import { appToast } from '@/shared/lib/toast'
 
 export interface UseToggleWishlistResult {
-  isInWishlist: boolean;
-  isToggling: boolean;
-  toggleWishlist: (product: ProductCardData) => Promise<void>;
+  isInWishlist: boolean
+  isToggling: boolean
+  toggleWishlist: (product: ProductCardData) => Promise<void>
 }
 
 export function useToggleWishlist(productId: string): UseToggleWishlistResult {
-  const { addToast } = useToast();
-  const [isToggling, setIsToggling] = useState(false);
-  // Временно локальное состояние для isInWishlist (заглушка)
-  const [isInWishlist, setIsInWishlist] = useState(false);
+  const router = useRouter()
+  const [isToggling, setIsToggling] = useState(false)
 
-  // TODO: раскомментировать и использовать стор
-  // const isInWishlist = useWishlistStore((state) => Boolean(state.items[productId]));
-  // const toggleItem = useWishlistStore((state) => state.toggleItem);
-
-  // Временная заглушка для toggleItem
-  const toggleItem = useCallback((product: ProductCardData) => {
-    console.warn("useWishlistStore заглушка: переключение избранного не реализовано");
-    // Имитируем переключение
-    const nowInWishlist = !isInWishlist;
-    setIsInWishlist(nowInWishlist);
-    return nowInWishlist;
-  }, [isInWishlist]);
+  const isInWishlist = useWishlistStore((s) => s.productIds.has(productId))
+  const add = useWishlistStore((s) => s.add)
+  const remove = useWishlistStore((s) => s.remove)
 
   const toggleWishlist = useCallback(
     async (product: ProductCardData) => {
-      setIsToggling(true);
-      try {
-        const nowInWishlist = toggleItem(product);
+      const wasInWishlist = isInWishlist
+      setIsToggling(true)
 
-        addToast({
-          variant: "success",
-          message: nowInWishlist
+      // Optimistic update — instant heart flip, no waiting on the network.
+      if (wasInWishlist) remove(productId)
+      else add(productId)
+
+      try {
+        const result = await toggleWishlistAction(productId)
+
+        if (!result.success) {
+          // Roll back the optimistic change
+          if (wasInWishlist) add(productId)
+          else remove(productId)
+
+          if (result.error === 'AUTH_REQUIRED') {
+            appToast.warning(`Войдите в аккаунт, чтобы добавить товар в избранное`)
+            router.push('/auth/login?from=/wishlist')
+            return
+          }
+          appToast.warning(result.message ?? 'Не удалось обновить избранное. Попробуйте ещё раз.')
+          return
+        }
+
+        // Reconcile with the server's view in case of a race
+        if (result.data.isFavorite) add(productId)
+        else remove(productId)
+appToast.success(result.data.isFavorite
             ? `«${product.title}» добавлен в избранное`
             : `«${product.title}» удалён из избранного`,
-        });
+          )
       } catch {
-        addToast({
-          variant: "danger",
-          message: "Не удалось обновить избранное. Попробуйте ещё раз.",
-        });
+        if (wasInWishlist) add(productId)
+        else remove(productId)
+      appToast.warning('Не удалось обновить избранное. Попробуйте ещё раз.')
       } finally {
-        setIsToggling(false);
+        setIsToggling(false)
       }
     },
-    [addToast, toggleItem],
-  );
+    [isInWishlist, productId, add, remove, appToast, router],
+  )
 
-  return { isInWishlist, isToggling, toggleWishlist };
+  return { isInWishlist, isToggling, toggleWishlist }
 }

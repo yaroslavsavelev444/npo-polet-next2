@@ -8,11 +8,12 @@ interface Props {
   categories: Category[];
   settings: Setting | null;
   cartItemCount: number;
+  wishlistProductIds: string[];
 }
 
 
 
-export default function NavbarShell({ user, categories, settings, cartItemCount }: Props) {
+export default function NavbarShell({ user, categories, settings, cartItemCount, wishlistProductIds }: Props) {
   return (
     <Flex
       as="header"
@@ -41,6 +42,7 @@ export default function NavbarShell({ user, categories, settings, cartItemCount 
           categories={categories}
           settings={settings}
           cartItemCount={cartItemCount}
+          wishlistProductIds={wishlistProductIds}
         />
       </Flex>
     </Flex>

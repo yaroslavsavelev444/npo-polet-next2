@@ -10,7 +10,6 @@ import { Companies } from './src/payload/collections/Companies.ts'
 import { Consents } from './src/payload/collections/Consents.ts'
 import { ContentBlocks } from './src/payload/collections/ContentBlocks.ts'
 import { Discounts } from './src/payload/collections/Discounts.ts'
-import { FaqTopics } from './src/payload/collections/FaqTopics.ts'
 import { Feedbacks } from './src/payload/collections/Feedbacks.ts'
 import { KnowledgeTopics } from './src/payload/collections/KnowledgeTopics.ts'
 import { Media } from './src/payload/collections/Media.ts'
@@ -61,7 +60,6 @@ export default buildConfig({
     Wishlists,
     Notifications,
     ContentBlocks,
-    FaqTopics,
     OtpCodes,              // добавили
     ProductReviews,        // добавили
     Sessions,              // добавили

@@ -10,6 +10,7 @@ import MobileMenu from './MobileMenu';
 import type { Category, Setting } from '@/payload-types';
 import type { User } from '@/payload-types';
 import { CartIcon } from '@/modules/cart/components/CartIcon'
+import { WishlistIcon } from '@/modules/wishlist';
 
 
 interface Props {
@@ -17,9 +18,11 @@ interface Props {
   categories: Category[];
   settings: Setting | null;
   cartItemCount: number;
+  wishlistProductIds: string[];
+
 }
 
-export default function NavbarClientIsland({ user, categories, settings, cartItemCount }: Props) {
+export default function NavbarClientIsland({ user, categories, settings, cartItemCount, wishlistProductIds }: Props) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
@@ -39,6 +42,7 @@ export default function NavbarClientIsland({ user, categories, settings, cartIte
           <div className="hidden lg:flex items-center gap-8">
             <NavMenus categories={categories} />
           </div>
+           {user && <WishlistIcon initialProductIds={wishlistProductIds} />}
 {user && <CartIcon initialCount={cartItemCount} />}
           <UserMenu user={user} />
 
