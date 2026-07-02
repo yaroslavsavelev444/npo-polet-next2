@@ -1,24 +1,24 @@
-'use client';
+"use client";
 
-import { usePathname } from 'next/navigation';
-import { Breadcrumbs } from './Breadcrumbs';
-import type { ItemType } from 'antd/es/breadcrumb/Breadcrumb';
+import type { ItemType } from "antd/es/breadcrumb/Breadcrumb";
+import { usePathname } from "next/navigation";
+import { Breadcrumbs } from "./Breadcrumbs";
 
 const routeMap: Record<string, string> = {
-  '/': 'Главная',
-  '/about': 'О нас',
-  '/catalog': 'Каталог',
-  '/contacts': 'Контакты',
-  '/blog': 'Блог',
-  '/dashboard': 'Личный кабинет',
+  "/": "Главная",
+  "/about": "О нас",
+  "/catalog": "Каталог",
+  "/contacts": "Контакты",
+  "/blog": "Блог",
+  "/dashboard": "Личный кабинет",
 };
 
 export const AutoBreadcrumbs = () => {
   const pathname = usePathname();
-  const segments = pathname.split('/').filter(Boolean);
+  const segments = pathname.split("/").filter(Boolean);
 
   const items: ItemType[] = [];
-  let currentPath = '';
+  let currentPath = "";
 
   for (const segment of segments) {
     currentPath += `/${segment}`;
@@ -30,10 +30,10 @@ export const AutoBreadcrumbs = () => {
   }
 
   // Добавляем корневую страницу, если ещё не добавлена
-  if (items.length > 0 && items[0].href !== '/') {
-    items.unshift({ href: '/', title: routeMap['/'] || 'Главная' });
+  if (items.length > 0 && items[0].href !== "/") {
+    items.unshift({ href: "/", title: routeMap["/"] || "Главная" });
   } else if (items.length === 0) {
-    items.push({ title: routeMap['/'] || 'Главная' });
+    items.push({ title: routeMap["/"] || "Главная" });
   }
 
   // Последний элемент делаем без ссылки
