@@ -84,11 +84,11 @@ export interface Config {
     wishlists: Wishlist;
     notifications: Notification;
     'content-blocks': ContentBlock;
-    'faq-topics': FaqTopic;
     'otp-codes': OtpCode;
     'product-reviews': ProductReview;
     sessions: Session;
     'user-consents': UserConsent;
+    'checkout-preferences': CheckoutPreference;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -113,11 +113,11 @@ export interface Config {
     wishlists: WishlistsSelect<false> | WishlistsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     'content-blocks': ContentBlocksSelect<false> | ContentBlocksSelect<true>;
-    'faq-topics': FaqTopicsSelect<false> | FaqTopicsSelect<true>;
     'otp-codes': OtpCodesSelect<false> | OtpCodesSelect<true>;
     'product-reviews': ProductReviewsSelect<false> | ProductReviewsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     'user-consents': UserConsentsSelect<false> | UserConsentsSelect<true>;
+    'checkout-preferences': CheckoutPreferencesSelect<false> | CheckoutPreferencesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -386,15 +386,15 @@ export interface Order {
     contactPerson?: string | null;
   };
   delivery: {
-    method: 'door_to_door' | 'pickup_point' | 'transport_company';
+    method: 'door_to_door' | 'pickup_point' | 'self_pickup';
     address?: {
       street?: string | null;
       city?: string | null;
       postalCode?: string | null;
       country?: string | null;
     };
-    pickupPoint?: (number | null) | PickupPoint;
     transportCompany?: (number | null) | TransportCompany;
+    pickupPoint?: (number | null) | PickupPoint;
     trackingNumber?: string | null;
     estimatedDelivery?: string | null;
     notes?: string | null;
@@ -402,119 +402,83 @@ export interface Order {
   items?:
     | {
         product: number | Product;
-        sku?: string | null;
-        name?: string | null;
+        name: string;
         quantity: number;
         unitPrice: number;
         discount?: number | null;
         totalPrice: number;
-        weight?: number | null;
-        dimensions?: {
-          length?: number | null;
-          width?: number | null;
-          height?: number | null;
-        };
         id?: string | null;
       }[]
     | null;
   pricing: {
     subtotal: number;
-    discount?: number | null;
-    shippingCost?: number | null;
-    tax?: number | null;
-    total: number;
-    currency?: string | null;
     productDiscounts?: number | null;
     centralDiscountAmount?: number | null;
-    priceWithoutDiscount?: number | null;
     centralDiscountPercent?: number | null;
+    discount?: number | null;
+    shippingCost?: number | null;
+    total: number;
+    currency?: string | null;
   };
   payment: {
-    method: 'card' | 'cash' | 'invoice' | 'online';
+    method: 'invoice' | 'self_pickup_card' | 'self_pickup_cash';
     status?: ('pending' | 'paid' | 'failed' | 'refunded') | null;
     transactionId?: string | null;
     paidAt?: string | null;
-    paymentDetails?:
-      | {
-          [k: string]: unknown;
-        }
-      | unknown[]
-      | string
-      | number
-      | boolean
-      | null;
+    invoiceFile?: (number | null) | Media;
   };
-  statusHistory?:
-    | {
-        status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
-        changedAt?: string | null;
-        changedBy: number | User;
-        comment?: string | null;
-        metadata?:
-          | {
-              [k: string]: unknown;
-            }
-          | unknown[]
-          | string
-          | number
-          | boolean
-          | null;
-        id?: string | null;
-      }[]
-    | null;
   appliedDiscounts?:
     | {
         discountId?: (number | null) | Discount;
         name?: string | null;
-        type?: ('quantity_based' | 'amount_based' | 'percentage_based') | null;
         discountPercent?: number | null;
         discountAmount?: number | null;
-        condition?:
-          | {
-              [k: string]: unknown;
-            }
-          | unknown[]
-          | string
-          | number
-          | boolean
-          | null;
-        appliedAt?: string | null;
+        message?: string | null;
         id?: string | null;
       }[]
     | null;
-  cancellation?: {
-    reason?: string | null;
-    cancelledBy?: (number | null) | User;
-    cancelledAt?: string | null;
-    refundAmount?: number | null;
-    notes?: string | null;
-  };
   companyInfo?: {
     companyId?: (number | null) | Company;
     name?: string | null;
-    address?: string | null;
     legalAddress?: string | null;
+    companyAddress?: string | null;
     taxNumber?: string | null;
     contactPerson?: string | null;
   };
-  companyCreated?: boolean | null;
-  companySelection?: {
-    type?: ('existing' | 'new') | null;
-    companyId?: string | null;
-    taxNumber?: string | null;
-  };
-  attachments?: (number | Media)[] | null;
   notes?: string | null;
   internalNotes?: string | null;
-  tags?:
+  statusHistory?:
     | {
-        tag?: string | null;
+        status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+        changedAt?: string | null;
+        changedBy?: (number | null) | User;
+        comment?: string | null;
         id?: string | null;
       }[]
     | null;
-  source?: ('web' | 'mobile' | 'api' | 'admin') | null;
+  source?: ('web' | 'mobile' | 'admin') | null;
   ipAddress?: string | null;
   userAgent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "transport-companies".
+ */
+export interface TransportCompany {
+  id: number;
+  name: string;
+  phone?: string | null;
+  website?: string | null;
+  /**
+   * Шаблон URL для отслеживания, например https://track.ru/{trackingNumber}
+   */
+  trackingUrlTemplate?: string | null;
+  /**
+   * Показывать при оформлении заказа
+   */
+  isActive?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -533,22 +497,10 @@ export interface PickupPoint {
     lat?: number | null;
     lng?: number | null;
   };
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "transport-companies".
- */
-export interface TransportCompany {
-  id: number;
-  name: string;
-  phone?: string | null;
-  website?: string | null;
   /**
-   * Шаблон URL для отслеживания, например https://track.ru/{trackingNumber}
+   * Показывать при оформлении заказа
    */
-  trackingUrlTemplate?: string | null;
+  isActive?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -897,28 +849,6 @@ export interface ContentBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "faq-topics".
- */
-export interface FaqTopic {
-  id: number;
-  title: string;
-  description?: string | null;
-  order?: number | null;
-  isActive?: boolean | null;
-  questions?:
-    | {
-        question: string;
-        answer: string;
-        order?: number | null;
-        isActive?: boolean | null;
-        id?: string | null;
-      }[]
-    | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "otp-codes".
  */
 export interface OtpCode {
@@ -999,6 +929,34 @@ export interface UserConsent {
   acceptedAt: string;
   ip?: string | null;
   userAgent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Сохранённые получатель/адрес для автозаполнения оформления заказа
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "checkout-preferences".
+ */
+export interface CheckoutPreference {
+  id: number;
+  user: number | User;
+  recipient?: {
+    fullName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  };
+  delivery?: {
+    method?: ('door_to_door' | 'pickup_point' | 'self_pickup') | null;
+    address?: {
+      street?: string | null;
+      city?: string | null;
+      postalCode?: string | null;
+      country?: string | null;
+    };
+    transportCompany?: (number | null) | TransportCompany;
+    pickupPoint?: (number | null) | PickupPoint;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -1095,10 +1053,6 @@ export interface PayloadLockedDocument {
         value: number | ContentBlock;
       } | null)
     | ({
-        relationTo: 'faq-topics';
-        value: number | FaqTopic;
-      } | null)
-    | ({
         relationTo: 'otp-codes';
         value: number | OtpCode;
       } | null)
@@ -1113,6 +1067,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'user-consents';
         value: number | UserConsent;
+      } | null)
+    | ({
+        relationTo: 'checkout-preferences';
+        value: number | CheckoutPreference;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1401,8 +1359,8 @@ export interface OrdersSelect<T extends boolean = true> {
               postalCode?: T;
               country?: T;
             };
-        pickupPoint?: T;
         transportCompany?: T;
+        pickupPoint?: T;
         trackingNumber?: T;
         estimatedDelivery?: T;
         notes?: T;
@@ -1411,35 +1369,24 @@ export interface OrdersSelect<T extends boolean = true> {
     | T
     | {
         product?: T;
-        sku?: T;
         name?: T;
         quantity?: T;
         unitPrice?: T;
         discount?: T;
         totalPrice?: T;
-        weight?: T;
-        dimensions?:
-          | T
-          | {
-              length?: T;
-              width?: T;
-              height?: T;
-            };
         id?: T;
       };
   pricing?:
     | T
     | {
         subtotal?: T;
-        discount?: T;
-        shippingCost?: T;
-        tax?: T;
-        total?: T;
-        currency?: T;
         productDiscounts?: T;
         centralDiscountAmount?: T;
-        priceWithoutDiscount?: T;
         centralDiscountPercent?: T;
+        discount?: T;
+        shippingCost?: T;
+        total?: T;
+        currency?: T;
       };
   payment?:
     | T
@@ -1448,8 +1395,30 @@ export interface OrdersSelect<T extends boolean = true> {
         status?: T;
         transactionId?: T;
         paidAt?: T;
-        paymentDetails?: T;
+        invoiceFile?: T;
       };
+  appliedDiscounts?:
+    | T
+    | {
+        discountId?: T;
+        name?: T;
+        discountPercent?: T;
+        discountAmount?: T;
+        message?: T;
+        id?: T;
+      };
+  companyInfo?:
+    | T
+    | {
+        companyId?: T;
+        name?: T;
+        legalAddress?: T;
+        companyAddress?: T;
+        taxNumber?: T;
+        contactPerson?: T;
+      };
+  notes?: T;
+  internalNotes?: T;
   statusHistory?:
     | T
     | {
@@ -1457,55 +1426,6 @@ export interface OrdersSelect<T extends boolean = true> {
         changedAt?: T;
         changedBy?: T;
         comment?: T;
-        metadata?: T;
-        id?: T;
-      };
-  appliedDiscounts?:
-    | T
-    | {
-        discountId?: T;
-        name?: T;
-        type?: T;
-        discountPercent?: T;
-        discountAmount?: T;
-        condition?: T;
-        appliedAt?: T;
-        id?: T;
-      };
-  cancellation?:
-    | T
-    | {
-        reason?: T;
-        cancelledBy?: T;
-        cancelledAt?: T;
-        refundAmount?: T;
-        notes?: T;
-      };
-  companyInfo?:
-    | T
-    | {
-        companyId?: T;
-        name?: T;
-        address?: T;
-        legalAddress?: T;
-        taxNumber?: T;
-        contactPerson?: T;
-      };
-  companyCreated?: T;
-  companySelection?:
-    | T
-    | {
-        type?: T;
-        companyId?: T;
-        taxNumber?: T;
-      };
-  attachments?: T;
-  notes?: T;
-  internalNotes?: T;
-  tags?:
-    | T
-    | {
-        tag?: T;
         id?: T;
       };
   source?: T;
@@ -1639,6 +1559,7 @@ export interface PickupPointsSelect<T extends boolean = true> {
         lat?: T;
         lng?: T;
       };
+  isActive?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1651,6 +1572,7 @@ export interface TransportCompaniesSelect<T extends boolean = true> {
   phone?: T;
   website?: T;
   trackingUrlTemplate?: T;
+  isActive?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1832,27 +1754,6 @@ export interface ContentBlocksSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "faq-topics_select".
- */
-export interface FaqTopicsSelect<T extends boolean = true> {
-  title?: T;
-  description?: T;
-  order?: T;
-  isActive?: T;
-  questions?:
-    | T
-    | {
-        question?: T;
-        answer?: T;
-        order?: T;
-        isActive?: T;
-        id?: T;
-      };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "otp-codes_select".
  */
 export interface OtpCodesSelect<T extends boolean = true> {
@@ -1925,6 +1826,37 @@ export interface UserConsentsSelect<T extends boolean = true> {
   acceptedAt?: T;
   ip?: T;
   userAgent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "checkout-preferences_select".
+ */
+export interface CheckoutPreferencesSelect<T extends boolean = true> {
+  user?: T;
+  recipient?:
+    | T
+    | {
+        fullName?: T;
+        phone?: T;
+        email?: T;
+      };
+  delivery?:
+    | T
+    | {
+        method?: T;
+        address?:
+          | T
+          | {
+              street?: T;
+              city?: T;
+              postalCode?: T;
+              country?: T;
+            };
+        transportCompany?: T;
+        pickupPoint?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

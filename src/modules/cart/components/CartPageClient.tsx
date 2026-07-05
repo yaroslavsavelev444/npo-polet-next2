@@ -1,76 +1,82 @@
 // src/modules/cart/components/CartPageClient.tsx
-'use client'
+"use client";
 
-import { useEffect, useState, useTransition } from 'react'
-import { ShoppingCart } from 'lucide-react'
-import { Button } from '@/UI'
-import { useCartStore } from '@/shared/store/cart.store'
-import { clearCartAction, removeFromCartAction, updateCartItemQuantityAction } from '../actions/cart.actions'
-import type { CartView } from '../types'
-import { CartEmptyState } from './CartEmptyState'
-import { CartItemRow } from './CartItemRow'
-import { CartSummaryPanel } from './CartSummaryPanel'
-import { DiscountBanner } from './DiscountBanner'
+import { ShoppingCart } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+import { useCartStore } from "@/shared/store/cart.store";
+import { Button } from "@/UI";
+import {
+  clearCartAction,
+  removeFromCartAction,
+  updateCartItemQuantityAction,
+} from "../actions/cart.actions";
+import type { CartView } from "../types";
+import { CartEmptyState } from "./CartEmptyState";
+import { CartItemRow } from "./CartItemRow";
+import { CartSummaryPanel } from "./CartSummaryPanel";
+import { DiscountBanner } from "./DiscountBanner";
 
 interface CartPageClientProps {
-  initialCart: CartView
+  initialCart: CartView;
 }
 
 function pluralizePositions(count: number): string {
-  const mod10 = count % 10
-  const mod100 = count % 100
-  if (mod100 >= 11 && mod100 <= 14) return 'позиций'
-  if (mod10 === 1) return 'позиция'
-  if (mod10 >= 2 && mod10 <= 4) return 'позиции'
-  return 'позиций'
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 14) return "позиций";
+  if (mod10 === 1) return "позиция";
+  if (mod10 >= 2 && mod10 <= 4) return "позиции";
+  return "позиций";
 }
 
 export function CartPageClient({ initialCart }: CartPageClientProps) {
-  const [cart, setCart] = useState(initialCart)
-  const [pendingProductId, setPendingProductId] = useState<string | null>(null)
-  const [isClearing, startClearing] = useTransition()
-  const setItemCount = useCartStore((s) => s.setItemCount)
+  const [cart, setCart] = useState(initialCart);
+  const [pendingProductId, setPendingProductId] = useState<string | null>(null);
+  const [isClearing, startClearing] = useTransition();
+  const setItemCount = useCartStore((s) => s.setItemCount);
+  const router = useRouter();
 
   useEffect(() => {
-    setItemCount(initialCart.summary.totalItems)
-  }, [initialCart, setItemCount])
+    setItemCount(initialCart.summary.totalItems);
+  }, [initialCart, setItemCount]);
 
   async function handleQuantityChange(productId: string, quantity: number) {
-    setPendingProductId(productId)
-    const result = await updateCartItemQuantityAction(productId, quantity)
+    setPendingProductId(productId);
+    const result = await updateCartItemQuantityAction(productId, quantity);
     if (result.success) {
-      setCart(result.data)
-      setItemCount(result.data.summary.totalItems)
+      setCart(result.data);
+      setItemCount(result.data.summary.totalItems);
     }
-    setPendingProductId(null)
+    setPendingProductId(null);
   }
 
   async function handleRemove(productId: string) {
-    setPendingProductId(productId)
-    const result = await removeFromCartAction(productId)
+    setPendingProductId(productId);
+    const result = await removeFromCartAction(productId);
     if (result.success) {
-      setCart(result.data)
-      setItemCount(result.data.summary.totalItems)
+      setCart(result.data);
+      setItemCount(result.data.summary.totalItems);
     }
-    setPendingProductId(null)
+    setPendingProductId(null);
   }
 
   function handleClear() {
     startClearing(async () => {
-      const result = await clearCartAction()
+      const result = await clearCartAction();
       if (result.success) {
-        setCart(result.data)
-        setItemCount(0)
+        setCart(result.data);
+        setItemCount(0);
       }
-    })
+    });
   }
 
   function handleCheckout() {
-    // Оформление заказа будет реализовано на следующем этапе.
+    router.push("/checkout");
   }
 
   if (cart.items.length === 0) {
-    return <CartEmptyState />
+    return <CartEmptyState />;
   }
 
   return (
@@ -82,11 +88,19 @@ export function CartPageClient({ initialCart }: CartPageClientProps) {
             Корзина
           </h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            {cart.summary.itemsCount} {pluralizePositions(cart.summary.itemsCount)}, {cart.summary.totalItems} шт.
+            {cart.summary.itemsCount}{" "}
+            {pluralizePositions(cart.summary.itemsCount)},{" "}
+            {cart.summary.totalItems} шт.
           </p>
         </div>
 
-        <Button variant="outline" size="sm" onClick={handleClear} loading={isClearing} disabled={isClearing}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleClear}
+          loading={isClearing}
+          disabled={isClearing}
+        >
           Очистить корзину
         </Button>
       </div>
@@ -100,8 +114,12 @@ export function CartPageClient({ initialCart }: CartPageClientProps) {
           </p>
           <ul className="mt-2 space-y-1">
             {cart.validation.issues.map((issue) => (
-              <li key={issue.productId} className="text-sm text-[var(--text-secondary)]">
-                «{issue.productTitle}» — {issue.currentQuantity} шт. (минимум {issue.minOrderQuantity} шт.)
+              <li
+                key={issue.productId}
+                className="text-sm text-[var(--text-secondary)]"
+              >
+                «{issue.productTitle}» — {issue.currentQuantity} шт. (минимум{" "}
+                {issue.minOrderQuantity} шт.)
               </li>
             ))}
           </ul>
@@ -115,16 +133,22 @@ export function CartPageClient({ initialCart }: CartPageClientProps) {
               key={item.product.id}
               item={item}
               isPending={pendingProductId === item.product.id}
-              onQuantityChange={(quantity) => handleQuantityChange(item.product.id, quantity)}
+              onQuantityChange={(quantity) =>
+                handleQuantityChange(item.product.id, quantity)
+              }
               onRemove={() => handleRemove(item.product.id)}
             />
           ))}
         </div>
 
         <div className="lg:col-span-1">
-          <CartSummaryPanel summary={cart.summary} isValid={cart.validation.isValid} onCheckout={handleCheckout} />
+          <CartSummaryPanel
+            summary={cart.summary}
+            isValid={cart.validation.isValid}
+            onCheckout={handleCheckout}
+          />
         </div>
       </div>
     </div>
-  )
+  );
 }

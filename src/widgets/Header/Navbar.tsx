@@ -1,14 +1,14 @@
-import { getCurrentUser } from '@/modules/auth/lib/getCurrentUser';
-import { getCachedCategories } from '@/payload/services/categories.service';
-import { getCachedSettings } from '@/payload/services/settings.service';
-import { getCartItemCount } from '@/payload/services/carts.service';
-import { getWishlistProductIds } from '@/payload/services/wishlists.service';
-import NavbarShell from './NavbarShell';
+import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
+import { getCartItemCount } from "@/payload/services/carts.service";
+import { getCachedCategories } from "@/payload/services/categories.service";
+import { getCachedSettings } from "@/payload/services/settings.service";
+import { getWishlistProductIds } from "@/payload/services/wishlists.service";
+import NavbarShell from "./NavbarShell";
 
 export default async function Navbar() {
   const [user, categoriesResult, settings] = await Promise.all([
     getCurrentUser(),
-    getCachedCategories({ isActive: true, sort: 'order' }),
+    getCachedCategories({ isActive: true, sort: "order" }),
     getCachedSettings(),
   ]);
 

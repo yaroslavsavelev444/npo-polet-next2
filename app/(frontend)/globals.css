@@ -2,8 +2,11 @@
 @import "./theme.css";
 
 :root {
-  --foreground: #ECEDEE;   /* из theme.css — текст */
+  --foreground: #ECEDEE;
+  --sticky-header-height: 124px;
+
 }
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -24,6 +27,7 @@ body {
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -36,6 +40,6 @@ body {
 
 .ant-breadcrumb-link {
 
-    color: white !important;
+  color: white !important;
 
 }

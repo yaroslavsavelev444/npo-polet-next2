@@ -1,8 +1,7 @@
-// src/components/header/StickyHeader.tsx
-import { Flex } from '@once-ui-system/core';
-import { TopHeader } from './TopHeader';
-import Navbar from './Navbar';
-// import { Header } from './Header';
+// src/widgets/Header/StickyHeader.tsx
+import { Flex } from "@once-ui-system/core";
+import Navbar from "./Navbar";
+import TopHeader from "./TopHeader";
 
 export const StickyHeader = () => {
   return (
@@ -11,14 +10,16 @@ export const StickyHeader = () => {
       direction="column"
       fillWidth
       style={{
-        position: 'sticky',
-        top: 0,
+        position: "fixed",
+
+        inset: "0 0 auto 0",
+
         zIndex: 20,
-        background: 'transparent', // чтобы не перекрывать контент
+        background: "transparent",
       }}
     >
       <TopHeader />
-       <Navbar />
+      <Navbar />
     </Flex>
   );
 };
