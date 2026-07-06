@@ -1,15 +1,15 @@
-import type { CollectionConfig } from 'payload'
-import xss from 'xss'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import type { CollectionConfig } from "payload";
+import xss from "xss";
+import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
 export const ContentBlocks: CollectionConfig = {
-  slug: 'content-blocks',
+  slug: "content-blocks",
   admin: {
-    useAsTitle: 'title',
-    group: 'Контент',
-    defaultColumns: ['title', 'variant', 'position', 'isActive', 'updatedAt'],
+    useAsTitle: "title",
+    group: "Контент",
+    defaultColumns: ["title", "variant", "position", "isActive", "updatedAt"],
     // Скрываем системные поля от редактирования в админке
-    listSearchableFields: ['title', 'subtitle'],
+    listSearchableFields: ["title", "subtitle"],
   },
   access: {
     read: () => true,
@@ -21,153 +21,153 @@ export const ContentBlocks: CollectionConfig = {
   hooks: {
     beforeChange: [
       ({ data, req }) => {
-        if (!data) return data
+        if (!data) return data;
 
         // XSS защита
-        if (data.title) data.title = xss(data.title)
-        if (data.subtitle) data.subtitle = xss(data.subtitle)
-        if (data.description) data.description = xss(data.description)
+        if (data.title) data.title = xss(data.title);
+        if (data.subtitle) data.subtitle = xss(data.subtitle);
+        if (data.description) data.description = xss(data.description);
         if (data.button?.text) {
-          data.button.text = xss(data.button.text)
+          data.button.text = xss(data.button.text);
         }
 
         // Нормализация тегов
         if (Array.isArray(data.tags)) {
           data.tags = data.tags
             .filter(Boolean)
-            .map((tag: string) => tag.trim().toLowerCase())
+            .map((tag: string) => tag.trim().toLowerCase());
         }
 
         // Автозаполнение createdBy / updatedBy
         if (req?.user?.id) {
           if (!data.createdBy) {
-            data.createdBy = req.user.id
+            data.createdBy = req.user.id;
           }
-          data.updatedBy = req.user.id
+          data.updatedBy = req.user.id;
         }
 
-        return data
+        return data;
       },
     ],
   },
   fields: [
     {
-      name: 'title',
-      type: 'text',
+      name: "title",
+      type: "text",
       required: true,
       maxLength: 200,
     },
     {
-      name: 'subtitle',
-      type: 'text',
+      name: "subtitle",
+      type: "text",
       required: true,
       maxLength: 500,
     },
     {
-      name: 'image',
-      type: 'relationship',
-      relationTo: 'media',
+      name: "image",
+      type: "relationship",
+      relationTo: "media",
     },
 
     // === Новая вариация размещения блока ===
     {
-      name: 'variant',
-      type: 'select',
+      name: "variant",
+      type: "select",
       required: true,
-      defaultValue: 'default',
+      defaultValue: "default",
       options: [
-        { label: 'Стандартный', value: 'default' },
-        { label: 'Слева изображение', value: 'image-left' },
-        { label: 'Справа изображение', value: 'image-right' },
-        { label: 'Только текст', value: 'text-only' },
-        { label: 'Большое изображение', value: 'hero' },
+        { label: "Стандартный", value: "default" },
+        { label: "Слева изображение", value: "image-left" },
+        { label: "Справа изображение", value: "image-right" },
+        { label: "Только текст", value: "text-only" },
+        { label: "Большое изображение", value: "hero" },
         // Добавляй свои варианты по необходимости
       ],
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
     },
 
     {
-      name: 'button',
-      type: 'group',
+      name: "button",
+      type: "group",
       fields: [
         {
-          name: 'text',
-          type: 'text',
+          name: "text",
+          type: "text",
           maxLength: 50,
         },
         {
-          name: 'action',
-          type: 'text',
+          name: "action",
+          type: "text",
           validate: (value: string | null | undefined) => {
-            if (!value) return true
+            if (!value) return true;
             const isValid =
               /^(https?:\/\/|\/)[^\s]+$/.test(value) ||
-              /^[a-zA-Z0-9_]+$/.test(value)
-            return isValid || 'Некорректный формат действия кнопки'
+              /^[a-zA-Z0-9_]+$/.test(value);
+            return isValid || "Некорректный формат действия кнопки";
           },
         },
         {
-          name: 'style',
-          type: 'select',
+          name: "style",
+          type: "select",
           options: [
-            { label: 'Primary', value: 'primary' },
-            { label: 'Secondary', value: 'secondary' },
-            { label: 'Outline', value: 'outline' },
+            { label: "Primary", value: "primary" },
+            { label: "Secondary", value: "secondary" },
+            { label: "Outline", value: "outline" },
           ],
         },
       ],
     },
 
     {
-      name: 'description',
-      type: 'textarea',
+      name: "description",
+      type: "textarea",
       maxLength: 2000,
     },
 
     {
-      name: 'position',
-      type: 'number',
+      name: "position",
+      type: "number",
       defaultValue: 0,
       min: 0,
       index: true,
     },
     {
-      name: 'isActive',
-      type: 'checkbox',
+      name: "isActive",
+      type: "checkbox",
       defaultValue: true,
       index: true,
     },
 
     {
-      name: 'tags',
-      type: 'array',
+      name: "tags",
+      type: "array",
       fields: [
         {
-          name: 'tag',
-          type: 'text',
+          name: "tag",
+          type: "text",
         },
       ],
     },
 
     {
-      name: 'metadata',
-      type: 'json',
+      name: "metadata",
+      type: "json",
     },
 
     // Системные поля — скрыты в админке
     {
-      name: 'createdBy',
-      type: 'relationship',
-      relationTo: 'users',
-      admin: { readOnly: true, position: 'sidebar' },
+      name: "createdBy",
+      type: "relationship",
+      relationTo: "users",
+      admin: { readOnly: true, position: "sidebar" },
     },
     {
-      name: 'updatedBy',
-      type: 'relationship',
-      relationTo: 'users',
-      admin: { readOnly: true, position: 'sidebar' },
+      name: "updatedBy",
+      type: "relationship",
+      relationTo: "users",
+      admin: { readOnly: true, position: "sidebar" },
     },
   ],
-}
+};

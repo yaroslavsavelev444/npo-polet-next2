@@ -21,10 +21,8 @@ export function ProductCard({
   priorityImage = false,
   className,
 }: ProductCardProps) {
-  const { finalPrice, hasDiscount, discountPercentage } = calculatePriceBreakdown(
-    product.priceForIndividual,
-    product.discount,
-  );
+  const { finalPrice, hasDiscount, discountPercentage } =
+    calculatePriceBreakdown(product.priceForIndividual, product.discount);
 
   const isOutOfStock = product.status === "out_of_stock";
   const href = getProductHref(product, currentCategorySlug);
@@ -33,9 +31,9 @@ export function ProductCard({
     <Card
       href={href}
       direction="column"
-      radius='m-4'           // увеличенные закругления
-      border={false}        // убираем обводку
-      background={'accent-medium'} // чуть другой фон (из theme.css)
+      radius="m-4" // увеличенные закругления
+      border={false} // убираем обводку
+      background={"accent-medium"} // чуть другой фон (из theme.css)
       className={`
         group relative flex h-full flex-col overflow-hidden 
         transition-all duration-200 
@@ -69,7 +67,10 @@ export function ProductCard({
             originalPrice={product.priceForIndividual}
             hasDiscount={hasDiscount}
           />
-          <ProductRating rating={product.rating} reviewsCount={product.reviewsCount} />
+          <ProductRating
+            rating={product.rating}
+            reviewsCount={product.reviewsCount}
+          />
         </div>
 
         <ProductTitle title={product.title} />

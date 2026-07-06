@@ -1,16 +1,16 @@
-'use client'
+"use client";
 
-import { useEffect, useTransition } from 'react'
-import { Heart } from 'lucide-react'
-import { Button } from '@/UI'
-import { useWishlistStore } from '@/shared/store/wishlist.store'
-import { ProductListContainer } from '@/modules/productCard/components/ProductListContainer'
-import { clearWishlistAction } from '../actions/wishlist.actions'
-import type { WishlistView } from '../types'
-import { WishlistEmptyState } from './WishlistEmptyState'
+import { Heart } from "lucide-react";
+import { useEffect, useTransition } from "react";
+import { ProductListContainer } from "@/modules/productCard/components/ProductListContainer";
+import { useWishlistStore } from "@/shared/store/wishlist.store";
+import { Button } from "@/UI";
+import { clearWishlistAction } from "../actions/wishlist.actions";
+import type { WishlistView } from "../types";
+import { WishlistEmptyState } from "./WishlistEmptyState";
 
 interface WishlistPageClientProps {
-  initialWishlist: WishlistView
+  initialWishlist: WishlistView;
 }
 
 /**
@@ -20,27 +20,31 @@ interface WishlistPageClientProps {
  * grid below reactively drops that item — no extra round trip, no
  * duplicated removal UI.
  */
-export function WishlistPageClient({ initialWishlist }: WishlistPageClientProps) {
-  const hydrate = useWishlistStore((s) => s.hydrate)
-  const clear = useWishlistStore((s) => s.clear)
-  const favoriteIds = useWishlistStore((s) => s.productIds)
-  const [isClearing, startClearing] = useTransition()
+export function WishlistPageClient({
+  initialWishlist,
+}: WishlistPageClientProps) {
+  const hydrate = useWishlistStore((s) => s.hydrate);
+  const clear = useWishlistStore((s) => s.clear);
+  const favoriteIds = useWishlistStore((s) => s.productIds);
+  const [isClearing, startClearing] = useTransition();
 
   useEffect(() => {
-    hydrate(initialWishlist.productIds)
-  }, [initialWishlist, hydrate])
+    hydrate(initialWishlist.productIds);
+  }, [initialWishlist, hydrate]);
 
-  const visibleItems = initialWishlist.items.filter((item) => favoriteIds.has(item.product.id))
+  const visibleItems = initialWishlist.items.filter((item) =>
+    favoriteIds.has(item.product.id),
+  );
 
   function handleClear() {
     startClearing(async () => {
-      const result = await clearWishlistAction()
-      if (result.success) clear()
-    })
+      const result = await clearWishlistAction();
+      if (result.success) clear();
+    });
   }
 
   if (visibleItems.length === 0) {
-    return <WishlistEmptyState />
+    return <WishlistEmptyState />;
   }
 
   return (
@@ -51,10 +55,18 @@ export function WishlistPageClient({ initialWishlist }: WishlistPageClientProps)
             <Heart className="h-6 w-6" />
             Избранное
           </h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">{visibleItems.length} товаров</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            {visibleItems.length} товаров
+          </p>
         </div>
 
-        <Button variant="outline" size="sm" onClick={handleClear} loading={isClearing} disabled={isClearing}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleClear}
+          loading={isClearing}
+          disabled={isClearing}
+        >
           Очистить избранное
         </Button>
       </div>
@@ -64,5 +76,5 @@ export function WishlistPageClient({ initialWishlist }: WishlistPageClientProps)
         totalProducts={visibleItems.length}
       />
     </div>
-  )
+  );
 }

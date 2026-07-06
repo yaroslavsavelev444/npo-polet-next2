@@ -1,35 +1,29 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig } from "payload";
 
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
 export const Wishlists: CollectionConfig = {
-  slug: 'wishlists',
+  slug: "wishlists",
 
   admin: {
-    useAsTitle: 'user',
-    defaultColumns: [
-      'user',
-      'updatedAt',
-    ],
-    group: 'Магазин',
+    useAsTitle: "user",
+    defaultColumns: ["user", "updatedAt"],
+    group: "Магазин",
   },
 
   access: {
     read: ({ req }) => {
-      if (!req.user) return false
+      if (!req.user) return false;
 
-      if (
-        req.user.role === 'admin' ||
-        req.user.role === 'superadmin'
-      ) {
-        return true
+      if (req.user.role === "admin" || req.user.role === "superadmin") {
+        return true;
       }
 
       return {
         user: {
           equals: req.user.id,
         },
-      }
+      };
     },
 
     create: ({ req }) => !!req.user,
@@ -41,44 +35,44 @@ export const Wishlists: CollectionConfig = {
 
   fields: [
     {
-      name: 'user',
-      type: 'relationship',
-      relationTo: 'users',
+      name: "user",
+      type: "relationship",
+      relationTo: "users",
       required: true,
       unique: true,
       index: true,
     },
 
     {
-      name: 'items',
-      type: 'array',
+      name: "items",
+      type: "array",
       minRows: 0,
 
       fields: [
         {
-          name: 'product',
-          type: 'relationship',
-          relationTo: 'products',
+          name: "product",
+          type: "relationship",
+          relationTo: "products",
           required: true,
         },
 
         {
-          name: 'addedAt',
-          type: 'date',
+          name: "addedAt",
+          type: "date",
           defaultValue: () => new Date().toISOString(),
         },
 
         {
-          name: 'notes',
-          type: 'textarea',
+          name: "notes",
+          type: "textarea",
           maxLength: 500,
         },
       ],
     },
 
     {
-      name: 'totalItems',
-      type: 'number',
+      name: "totalItems",
+      type: "number",
       admin: {
         readOnly: true,
       },
@@ -88,10 +82,10 @@ export const Wishlists: CollectionConfig = {
   hooks: {
     beforeChange: [
       ({ data }) => {
-        data.totalItems = data.items?.length ?? 0
+        data.totalItems = data.items?.length ?? 0;
 
-        return data
+        return data;
       },
     ],
   },
-}
+};

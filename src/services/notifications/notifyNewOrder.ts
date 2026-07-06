@@ -1,13 +1,14 @@
-import type { Order } from "@/payload-types";
+import type { BasePayload } from "payload";
+import { Order } from "../../../payload-types.ts";
+import { getEmailConfig } from "../email/config.ts";
 import {
   emailService,
   orderCreatedAdminEmailTemplate,
   orderCreatedUserEmailTemplate,
-} from "@/services/email";
-import { getEmailConfig } from "@/services/email/config";
-import { emailLogger } from "@/services/email/logger";
-import { getAdminEmailAddresses } from "@/services/email/recipients/getAdminEmails";
-import { getOrderCustomerAddress } from "@/services/email/recipients/getOrderStakeholders";
+} from "../email/index.ts";
+import { emailLogger } from "../email/logger.ts";
+import { getAdminEmailAddresses } from "../email/recipients/getAdminEmails.ts";
+import { getOrderCustomerAddress } from "../email/recipients/getOrderStakeholders.ts";
 
 const DELIVERY_LABELS: Record<Order["delivery"]["method"], string> = {
   door_to_door: "Курьер до двери",
@@ -21,7 +22,10 @@ const PAYMENT_LABELS: Record<Order["payment"]["method"], string> = {
   self_pickup_cash: "Наличными при самовывозе",
 };
 
-export async function notifyNewOrder(order: Order): Promise<void> {
+export async function notifyNewOrder(
+  order: Order,
+  payload: BasePayload,
+): Promise<void> {
   const { appUrl } = getEmailConfig();
   const itemsCount = order.items?.length ?? 0;
 
@@ -48,7 +52,7 @@ export async function notifyNewOrder(order: Order): Promise<void> {
       ),
     );
 
-  const adminSend = getAdminEmailAddresses()
+  const adminSend = getAdminEmailAddresses(payload)
     .then((admins) => {
       if (admins.length === 0) return;
       return emailService.send(

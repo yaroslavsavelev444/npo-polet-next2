@@ -1,8 +1,8 @@
 // services/feedbacks.service.ts
 import { unstable_cache } from "next/cache";
 import type { Where } from "payload";
-import { env } from "@/env";
-import type { Feedback } from "@/payload-types";
+import type { Feedback } from "../../../payload-types";
+import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
 
 export interface GetFeedbacksOptions {

@@ -1,7 +1,7 @@
-import { OTP_TTL_MS } from "@/modules/auth/lib/otp";
-import { emailService, otpEmailTemplate } from "@/services/email";
-import { emailLogger } from "@/services/email/logger";
-import type { OtpEmailPurpose } from "@/services/email/templates/auth/otp-code.template";
+import { OTP_TTL_MS } from "../../modules/auth/lib/otp";
+import { emailService, otpEmailTemplate } from "../../services/email";
+import { emailLogger } from "../../services/email/logger";
+import type { OtpEmailPurpose } from "../../services/email/templates/auth/otp-code.template";
 
 /**
  * Заменяет прежний sendOtpEmail() из modules/auth/lib/email.ts — та же

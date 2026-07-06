@@ -1,9 +1,9 @@
 import type { CollectionConfig } from "payload";
-import { notifyNewOrder } from "@/services/notifications/notifyNewOrder.ts";
+import { notifyNewOrder } from "../../services/notifications/notifyNewOrder.ts";
 import {
   notifyOrderCancelled,
   notifyOrderStatusChanged,
-} from "@/services/notifications/notifyOrderStatusChanged.ts";
+} from "../../services/notifications/notifyOrderStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
 
@@ -117,7 +117,7 @@ export const Orders: CollectionConfig = {
     afterChange: [
       async ({ doc, previousDoc, operation, req }) => {
         if (operation === "create") {
-          void notifyNewOrder(doc);
+          void notifyNewOrder(doc, req.payload); // явная передача, без нового импорта getPayload
           return doc;
         }
 

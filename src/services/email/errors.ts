@@ -1,3 +1,4 @@
+// src/services/email/errors.ts
 export class EmailError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message);
@@ -14,13 +15,16 @@ export class EmailConfigError extends EmailError {
 }
 
 export class EmailDeliveryError extends EmailError {
+  public readonly attempts: number;
+
   constructor(
     message: string,
-    public readonly attempts: number,
+    attempts: number,
     options?: { cause?: unknown },
   ) {
     super(message, options);
     this.name = "EmailDeliveryError";
+    this.attempts = attempts; // явное присваивание вместо parameter property
   }
 }
 

@@ -1,5 +1,5 @@
-import { accountLockedEmailTemplate, emailService } from "@/services/email";
-import { emailLogger } from "@/services/email/logger";
+import { accountLockedEmailTemplate, emailService } from "../../services/email";
+import { emailLogger } from "../../services/email/logger";
 
 export async function notifyAccountLocked(params: {
   email: string;

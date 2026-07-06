@@ -1,11 +1,9 @@
-import { getProductHref } from "@/modules/productCard";
-import type { Product, ProductReview, User } from "@/payload-types";
-import {
-  emailService,
-  reviewStatusChangedEmailTemplate,
-} from "@/services/email";
-import { getEmailConfig } from "@/services/email/config";
-import { emailLogger } from "@/services/email/logger";
+// src/services/notifications/notifyReviewStatusChanged.ts
+import { Product, ProductReview, User } from "../../../payload-types";
+import { getProductHref } from "../../modules/productCard/lib/routing"; // было "@/modules/productCard"
+import { emailService, reviewStatusChangedEmailTemplate } from "../email";
+import { getEmailConfig } from "../email/config";
+import { emailLogger } from "../email/logger";
 
 export async function notifyReviewStatusChanged(
   review: ProductReview,

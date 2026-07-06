@@ -1,13 +1,10 @@
-import { getPayloadInstance } from "@/payload/services/getPayload";
+// src/services/email/recipients/getAdminEmails.ts
+import type { BasePayload } from "payload";
 import type { EmailAddress } from "../types";
 
-/**
- * Email всех пользователей с ролью admin/superadmin. Инкапсулирует запрос
- * к Payload — сценарии уведомлений не должны знать о схеме `users`.
- */
-export async function getAdminEmailAddresses(): Promise<EmailAddress[]> {
-  const payload = await getPayloadInstance();
-
+export async function getAdminEmailAddresses(
+  payload: BasePayload, // ← принимаем инстанс, не создаём его сами
+): Promise<EmailAddress[]> {
   const result = await payload.find({
     collection: "users",
     where: { role: { in: ["admin", "superadmin"] } },

@@ -1,9 +1,9 @@
 // ─── Orders list & cancellation (append to existing file) ──────────────────
 
 import type { Where } from "payload";
-import { CartView } from "@/modules/cart";
 import { CheckoutSubmitInput } from "@/modules/checkout";
-import type { Order } from "@/payload-types";
+import type { Order } from "../../../payload-types";
+import { CartView } from "../../modules/cart";
 import { getPayloadInstance } from "./getPayload";
 
 export interface CreateOrderInput {

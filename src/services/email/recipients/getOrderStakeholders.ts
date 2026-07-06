@@ -1,4 +1,4 @@
-import type { Order, User } from "@/payload-types";
+import type { Order, User } from "../../../../payload-types";
 import type { EmailAddress } from "../types";
 
 /** Извлекает адрес получателя заказа из уже загруженного документа Order. */

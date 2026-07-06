@@ -1,4 +1,4 @@
-import type { CheckoutPreference } from "@/payload-types";
+import type { CheckoutPreference } from "../../../payload-types";
 import { getPayloadInstance } from "./getPayload";
 
 export async function getCheckoutPreferences(

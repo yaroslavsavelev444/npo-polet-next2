@@ -1,30 +1,25 @@
-import type { CollectionConfig } from 'payload'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import type { CollectionConfig } from "payload";
+import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export const BannerAction = {
-  None: 'none',
-  Link: 'link',
-  Modal: 'modal',
-  Redirect: 'redirect',
-} as const
+  None: "none",
+  Link: "link",
+  Modal: "modal",
+  Redirect: "redirect",
+} as const;
 
-export type BannerActionType =
-  (typeof BannerAction)[keyof typeof BannerAction]
+export type BannerActionType = (typeof BannerAction)[keyof typeof BannerAction];
 
 export const BannerStatus = {
-  Draft: 'draft',
-  Active: 'active',
-  Scheduled: 'scheduled',
-  Archived: 'archived',
-} as const
+  Draft: "draft",
+  Active: "active",
+  Scheduled: "scheduled",
+  Archived: "archived",
+} as const;
 
-export type BannerStatusType =
-  (typeof BannerStatus)[keyof typeof BannerStatus]
-
-
-
+export type BannerStatusType = (typeof BannerStatus)[keyof typeof BannerStatus];
 
 // ─── Collection ───────────────────────────────────────────────────────────────
 
@@ -38,13 +33,20 @@ export type BannerStatusType =
  *  - Payload Versions + drafts позволяют готовить баннер заранее
  */
 export const Banners: CollectionConfig = {
-  slug: 'banners',
+  slug: "banners",
 
   admin: {
-    useAsTitle: 'title',
-    defaultColumns: ['title', 'status', 'action', 'priority', 'startAt', 'endAt'],
-    group: 'Контент',
-    description: 'Промо-баннеры и системные уведомления',
+    useAsTitle: "title",
+    defaultColumns: [
+      "title",
+      "status",
+      "action",
+      "priority",
+      "startAt",
+      "endAt",
+    ],
+    group: "Контент",
+    description: "Промо-баннеры и системные уведомления",
   },
 
   // Черновики — удобно готовить баннер заранее и публиковать по расписанию
@@ -63,138 +65,138 @@ export const Banners: CollectionConfig = {
   fields: [
     // ── Контент ──────────────────────────────────────────────────────────────
     {
-      name: 'title',
-      type: 'text',
+      name: "title",
+      type: "text",
       required: true,
-      label: 'Заголовок',
+      label: "Заголовок",
     },
     {
-      name: 'subtitle',
-      type: 'text',
-      label: 'Подзаголовок',
+      name: "subtitle",
+      type: "text",
+      label: "Подзаголовок",
     },
     {
-      name: 'description',
-      type: 'textarea',
-      label: 'Описание',
+      name: "description",
+      type: "textarea",
+      label: "Описание",
     },
 
     // ── Медиа ────────────────────────────────────────────────────────────────
     {
-      name: 'media',
-      type: 'relationship',
-      relationTo: 'media',
+      name: "media",
+      type: "relationship",
+      relationTo: "media",
       hasMany: true,
-      label: 'Изображения / видео',
+      label: "Изображения / видео",
     },
 
     // ── Действие (CTA) ───────────────────────────────────────────────────────
     {
-      name: 'action',
-      type: 'select',
+      name: "action",
+      type: "select",
       defaultValue: BannerAction.None,
-      label: 'Действие при клике',
+      label: "Действие при клике",
       options: [
-        { label: 'Без действия', value: BannerAction.None },
-        { label: 'Ссылка', value: BannerAction.Link },
-        { label: 'Модальное окно', value: BannerAction.Modal },
-        { label: 'Редирект', value: BannerAction.Redirect },
+        { label: "Без действия", value: BannerAction.None },
+        { label: "Ссылка", value: BannerAction.Link },
+        { label: "Модальное окно", value: BannerAction.Modal },
+        { label: "Редирект", value: BannerAction.Redirect },
       ],
     },
     {
-      name: 'actionPayload',
-      type: 'text',
-      label: 'Параметр действия',
+      name: "actionPayload",
+      type: "text",
+      label: "Параметр действия",
       admin: {
-        description: 'URL для Link/Redirect, ID модалки для Modal',
+        description: "URL для Link/Redirect, ID модалки для Modal",
         condition: (data) => data?.action && data.action !== BannerAction.None,
       },
     },
 
     // ── Расписание ───────────────────────────────────────────────────────────
     {
-      name: 'startAt',
-      type: 'date',
-      label: 'Показывать с',
+      name: "startAt",
+      type: "date",
+      label: "Показывать с",
       defaultValue: () => new Date().toISOString(),
       admin: {
-        position: 'sidebar',
-        date: { pickerAppearance: 'dayAndTime' },
+        position: "sidebar",
+        date: { pickerAppearance: "dayAndTime" },
       },
     },
     {
-      name: 'endAt',
-      type: 'date',
-      label: 'Показывать до',
+      name: "endAt",
+      type: "date",
+      label: "Показывать до",
       admin: {
-        position: 'sidebar',
-        date: { pickerAppearance: 'dayAndTime' },
-        description: 'Оставьте пустым для бессрочного показа',
+        position: "sidebar",
+        date: { pickerAppearance: "dayAndTime" },
+        description: "Оставьте пустым для бессрочного показа",
       },
     },
     {
-      name: 'repeatable',
-      type: 'checkbox',
+      name: "repeatable",
+      type: "checkbox",
       defaultValue: false,
-      label: 'Повторять после закрытия пользователем',
-      admin: { position: 'sidebar' },
+      label: "Повторять после закрытия пользователем",
+      admin: { position: "sidebar" },
     },
 
     // ── Отображение ──────────────────────────────────────────────────────────
     {
-      name: 'priority',
-      type: 'number',
+      name: "priority",
+      type: "number",
       defaultValue: 0,
-      label: 'Приоритет (чем выше, тем важнее)',
-      admin: { position: 'sidebar' },
+      label: "Приоритет (чем выше, тем важнее)",
+      admin: { position: "sidebar" },
     },
     {
-      name: 'status',
-      type: 'select',
+      name: "status",
+      type: "select",
       defaultValue: BannerStatus.Draft,
       index: true,
-      label: 'Статус',
+      label: "Статус",
       options: [
-        { label: 'Черновик', value: BannerStatus.Draft },
-        { label: 'Активен', value: BannerStatus.Active },
-        { label: 'Запланирован', value: BannerStatus.Scheduled },
-        { label: 'Архив', value: BannerStatus.Archived },
+        { label: "Черновик", value: BannerStatus.Draft },
+        { label: "Активен", value: BannerStatus.Active },
+        { label: "Запланирован", value: BannerStatus.Scheduled },
+        { label: "Архив", value: BannerStatus.Archived },
       ],
-      admin: { position: 'sidebar' },
+      admin: { position: "sidebar" },
     },
     {
-      name: 'isSystem',
-      type: 'checkbox',
+      name: "isSystem",
+      type: "checkbox",
       defaultValue: false,
-      label: 'Системный (нельзя закрыть)',
-      admin: { position: 'sidebar' },
+      label: "Системный (нельзя закрыть)",
+      admin: { position: "sidebar" },
     },
 
     // ── Таргетинг ────────────────────────────────────────────────────────────
     {
-      name: 'targeting',
-      type: 'group',
-      label: 'Таргетинг',
+      name: "targeting",
+      type: "group",
+      label: "Таргетинг",
       fields: [
         {
-          name: 'roles',
-          type: 'select',
+          name: "roles",
+          type: "select",
           hasMany: true,
-          label: 'Показывать только ролям',
+          label: "Показывать только ролям",
           admin: {
-            description: 'Оставьте пустым — баннер виден всем',
+            description: "Оставьте пустым — баннер виден всем",
           },
           options: [
-            { label: 'Пользователь', value: 'user' },
-            { label: 'Юрист', value: 'lawyer' },
-            { label: 'Администратор', value: 'admin' },
-            { label: 'Модератор', value: 'moderator' },
+            { label: "Пользователь", value: "user" },
+            { label: "Юрист", value: "lawyer" },
+            { label: "Администратор", value: "admin" },
+            { label: "Модератор", value: "moderator" },
           ],
         },
       ],
     },
   ],
-}
+};
 
 // ─── Серверный хелпер ─────────────────────────────────────────────────────────
 
@@ -206,10 +208,10 @@ export const Banners: CollectionConfig = {
  * const banners = await getActiveBanners(payload, 'user')
  */
 export async function getActiveBanners(payload: any, role?: string) {
-  const now = new Date().toISOString()
+  const now = new Date().toISOString();
 
   const { docs } = await payload.find({
-    collection: 'banners',
+    collection: "banners",
     where: {
       and: [
         { status: { equals: BannerStatus.Active } },
@@ -220,22 +222,19 @@ export async function getActiveBanners(payload: any, role?: string) {
           ],
         },
         {
-          or: [
-            { endAt: { greater_than: now } },
-            { endAt: { exists: false } },
-          ],
+          or: [{ endAt: { greater_than: now } }, { endAt: { exists: false } }],
         },
       ],
     },
-    sort: '-priority',
+    sort: "-priority",
     depth: 1,
-  })
+  });
 
-  if (!role) return docs
+  if (!role) return docs;
 
   // Фильтрация по роли: если targeting.roles пустой — баннер для всех
   return docs.filter((b: any) => {
-    const roles: string[] = b.targeting?.roles ?? []
-    return roles.length === 0 || roles.includes(role)
-  })
+    const roles: string[] = b.targeting?.roles ?? [];
+    return roles.length === 0 || roles.includes(role);
+  });
 }

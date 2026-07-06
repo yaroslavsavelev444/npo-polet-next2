@@ -46,9 +46,13 @@ export default async function ProductDetailPage({ params }: Props) {
   const cardData = mapProductToCardData(product);
   const detailData = mapProductToDetailData(product);
 
-  const relatedProducts = detailData.category
-    ? await getRelatedProducts(detailData.category.id, detailData.id)
-    : [];
+  const upsellIds = detailData.upsellProducts?.map((p: any) => p.id) || [];
+
+  const relatedProducts = await getRelatedProducts(
+    detailData.category.id,
+    detailData.id,
+    upsellIds,
+  );
 
   const canonicalUrl = `${baseURL}${getProductHref(cardData, categorySlug)}`;
   const jsonLd = buildProductJsonLd(cardData, canonicalUrl);

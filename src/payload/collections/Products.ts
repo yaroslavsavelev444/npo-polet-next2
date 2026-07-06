@@ -1,12 +1,12 @@
-import type { CollectionConfig } from 'payload'
-import { generateSlug } from '../utils/generateSlug.ts'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import type { CollectionConfig } from "payload";
+import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { generateSlug } from "../utils/generateSlug.ts";
 
 export const Products: CollectionConfig = {
-  slug: 'products',
+  slug: "products",
   admin: {
-    useAsTitle: 'title',
-    defaultColumns: ['title', 'category', 'priceForIndividual', 'status'],
+    useAsTitle: "title",
+    defaultColumns: ["title", "category", "priceForIndividual", "status"],
   },
   versions: {
     drafts: true,
@@ -20,17 +20,17 @@ export const Products: CollectionConfig = {
   fields: [
     // ─── Основная информация ───────────────────────────────────────────────
     {
-      type: 'row',
+      type: "row",
       fields: [
         {
-          name: 'title',
-          type: 'text',
+          name: "title",
+          type: "text",
           required: true,
           localized: true,
         },
         {
-          name: 'slug',
-          type: 'text',
+          name: "slug",
+          type: "text",
           unique: true,
           index: true,
           hooks: {
@@ -38,83 +38,83 @@ export const Products: CollectionConfig = {
           },
           admin: {
             readOnly: true,
-            position: 'sidebar',
-            description: 'Автоматически генерируется из названия при создании',
+            position: "sidebar",
+            description: "Автоматически генерируется из названия при создании",
           },
         },
       ],
     },
     {
-      name: 'description',
-      type: 'textarea',
+      name: "description",
+      type: "textarea",
       required: true,
       localized: true,
     },
     {
-      name: 'category',
-      type: 'relationship',
-      relationTo: 'categories',
+      name: "category",
+      type: "relationship",
+      relationTo: "categories",
       required: true,
     },
 
     // ─── Медиа ──────────────────────────────────────────────────────────────
     {
-      name: 'images',
-      type: 'relationship',
-      relationTo: 'media',
+      name: "images",
+      type: "relationship",
+      relationTo: "media",
       hasMany: true,
-      label: 'Изображения товара',
+      label: "Изображения товара",
     },
 
     // ─── Цена и скидки ─────────────────────────────────────────────────────
     {
-      type: 'group',
-      name: 'pricing',
-      label: 'Цена и скидки',
+      type: "group",
+      name: "pricing",
+      label: "Цена и скидки",
       fields: [
         {
-          name: 'priceForIndividual',
-          type: 'number',
+          name: "priceForIndividual",
+          type: "number",
           required: true,
           min: 0,
-          label: 'Цена для физ. лиц',
+          label: "Цена для физ. лиц",
         },
         {
-          name: 'discount',
-          type: 'group',
-          label: 'Скидка',
+          name: "discount",
+          type: "group",
+          label: "Скидка",
           fields: [
             {
-              name: 'isActive',
-              type: 'checkbox',
+              name: "isActive",
+              type: "checkbox",
               defaultValue: false,
             },
             {
-              name: 'type',
-              type: 'select',
+              name: "type",
+              type: "select",
               options: [
-                { label: 'Процент', value: 'percentage' },
-                { label: 'Фиксированная сумма', value: 'fixed' },
+                { label: "Процент", value: "percentage" },
+                { label: "Фиксированная сумма", value: "fixed" },
               ],
-              defaultValue: 'percentage',
+              defaultValue: "percentage",
             },
             {
-              name: 'value',
-              type: 'number',
+              name: "value",
+              type: "number",
               min: 0,
-              label: 'Значение скидки',
+              label: "Значение скидки",
             },
             {
-              name: 'validFrom',
-              type: 'date',
+              name: "validFrom",
+              type: "date",
             },
             {
-              name: 'validUntil',
-              type: 'date',
+              name: "validUntil",
+              type: "date",
             },
             {
-              name: 'minQuantity',
-              type: 'number',
+              name: "minQuantity",
+              type: "number",
               defaultValue: 1,
               min: 1,
             },
@@ -125,58 +125,62 @@ export const Products: CollectionConfig = {
 
     // ─── Остатки и статусы ─────────────────────────────────────────────────
     {
-      type: 'group',
-      name: 'inventory',
-      label: 'Склад и статусы',
+      type: "group",
+      name: "inventory",
+      label: "Склад и статусы",
       fields: [
         {
-          name: 'status',
-          type: 'select',
+          name: "status",
+          type: "select",
           options: [
-            { label: 'Доступен', value: 'available' },
-            { label: 'Предзаказ', value: 'preorder' },
-            { label: 'Нет в наличии', value: 'out_of_stock' },
-            { label: 'Снят с производства', value: 'discontinued' },
+            { label: "Доступен", value: "available" },
+            { label: "Предзаказ", value: "preorder" },
+            { label: "Нет в наличии", value: "out_of_stock" },
+            { label: "Снят с производства", value: "discontinued" },
           ],
-          defaultValue: 'available',
-          enumName: 'product_status_enum',
+          defaultValue: "available",
+          enumName: "product_status_enum",
           admin: {
-            position: 'sidebar',
+            position: "sidebar",
           },
         },
         {
-          name: 'minOrderQuantity',
-          type: 'number',
+          name: "minOrderQuantity",
+          type: "number",
           defaultValue: 1,
           min: 1,
           max: 1000,
         },
         {
-          name: 'maxOrderQuantity',
-          type: 'number',
+          name: "maxOrderQuantity",
+          type: "number",
           min: 1,
           max: 10000,
-          validate: (value : any, { siblingData }: { siblingData: any }) => {
-            if (value !== undefined && siblingData?.minOrderQuantity !== undefined && value < siblingData.minOrderQuantity) {
-              return 'Максимальное количество должно быть больше или равно минимальному'
+          validate: (value: any, { siblingData }: { siblingData: any }) => {
+            if (
+              value !== undefined &&
+              siblingData?.minOrderQuantity !== undefined &&
+              value < siblingData.minOrderQuantity
+            ) {
+              return "Максимальное количество должно быть больше или равно минимальному";
             }
-            return true
+            return true;
           },
         },
         {
-          name: 'isVisible',
-          type: 'checkbox',
+          name: "isVisible",
+          type: "checkbox",
           defaultValue: true,
           admin: {
-            position: 'sidebar',
+            position: "sidebar",
           },
         },
         {
-          name: 'showOnMainPage',
-          type: 'checkbox',
+          name: "showOnMainPage",
+          type: "checkbox",
           defaultValue: false,
           admin: {
-            position: 'sidebar',
+            position: "sidebar",
           },
         },
       ],
@@ -184,40 +188,40 @@ export const Products: CollectionConfig = {
 
     // ─── Инструкция ────────────────────────────────────────────────────────
     {
-      name: 'instruction',
-      type: 'group',
-      label: 'Инструкция',
+      name: "instruction",
+      type: "group",
+      label: "Инструкция",
       fields: [
         {
-          name: 'type',
-          type: 'select',
+          name: "type",
+          type: "select",
           options: [
-            { label: 'Файл', value: 'file' },
-            { label: 'Ссылка', value: 'link' },
+            { label: "Файл", value: "file" },
+            { label: "Ссылка", value: "link" },
           ],
-          enumName: 'instruction_type_enum',
+          enumName: "instruction_type_enum",
         },
         {
-          name: 'file',
-          type: 'relationship',
-          relationTo: 'media',
-          label: 'Файл инструкции',
+          name: "file",
+          type: "relationship",
+          relationTo: "media",
+          label: "Файл инструкции",
           admin: {
-            condition: (_, siblingData) => siblingData?.type === 'file',
+            condition: (_, siblingData) => siblingData?.type === "file",
           },
         },
         {
-          name: 'link',
-          type: 'text',
-          label: 'Ссылка на инструкцию',
+          name: "link",
+          type: "text",
+          label: "Ссылка на инструкцию",
           admin: {
-            condition: (_, siblingData) => siblingData?.type === 'link',
+            condition: (_, siblingData) => siblingData?.type === "link",
           },
           validate: (value: any) => {
             if (value && !/^https?:\/\//.test(value)) {
-              return 'Введите корректный URL (начинается с http:// или https://)'
+              return "Введите корректный URL (начинается с http:// или https://)";
             }
-            return true
+            return true;
           },
         },
       ],
@@ -225,117 +229,115 @@ export const Products: CollectionConfig = {
 
     // ─── Характеристики ────────────────────────────────────────────────────
     {
-      name: 'specifications',
-      type: 'array',
-      label: 'Характеристики',
+      name: "specifications",
+      type: "array",
+      label: "Характеристики",
       fields: [
-        { name: 'name', type: 'text', required: true },
-        { name: 'value', type: 'text', required: true },
-        { name: 'unit', type: 'text' },
-        { name: 'group', type: 'text' },
-        { name: 'isVisible', type: 'checkbox', defaultValue: true },
+        { name: "name", type: "text", required: true },
+        { name: "value", type: "text", required: true },
+        { name: "unit", type: "text" },
+        { name: "group", type: "text" },
+        { name: "isVisible", type: "checkbox", defaultValue: true },
       ],
     },
 
     // ─── Связи ─────────────────────────────────────────────────────────────
     {
-      type: 'group',
-      name: 'relations',
-      label: 'Связанные товары',
+      type: "group",
+      name: "relations",
+      label: "Связанные товары",
       fields: [
         {
-          name: 'upsellProducts',
-          type: 'relationship',
-          relationTo: 'products',
+          name: "upsellProducts",
+          type: "relationship",
+          relationTo: "products",
           hasMany: true,
-          label: 'Товары для апсейла',
+          label: "Товары для апсейла",
         },
       ],
     },
 
     // ─── Производитель и гарантия ─────────────────────────────────────────
     {
-      type: 'group',
-      name: 'brand',
-      label: 'Бренд и гарантия',
+      type: "group",
+      name: "brand",
+      label: "Бренд и гарантия",
       fields: [
         {
+          name: "manufacturer",
 
-    name:'manufacturer',
-
-    type:'text'
-
-},
+          type: "text",
+        },
         {
-          name: 'warrantyMonths',
-          type: 'number',
+          name: "warrantyMonths",
+          type: "number",
           min: 0,
           max: 120,
-          label: 'Гарантия (месяцев)',
+          label: "Гарантия (месяцев)",
         },
       ],
     },
 
     // ─── Габариты и вес ────────────────────────────────────────────────────
     {
-      name: 'dimensions',
-      type: 'group',
-      label: 'Габариты и вес',
+      name: "dimensions",
+      type: "group",
+      label: "Габариты и вес",
       fields: [
-        { name: 'weight', type: 'number', min: 0, label: 'Вес (кг)' },
-        { name: 'length', type: 'number', min: 0, label: 'Длина (см)' },
-        { name: 'width', type: 'number', min: 0, label: 'Ширина (см)' },
-        { name: 'height', type: 'number', min: 0, label: 'Высота (см)' },
+        { name: "weight", type: "number", min: 0, label: "Вес (кг)" },
+        { name: "length", type: "number", min: 0, label: "Длина (см)" },
+        { name: "width", type: "number", min: 0, label: "Ширина (см)" },
+        { name: "height", type: "number", min: 0, label: "Высота (см)" },
       ],
     },
 
     // ─── SEO ───────────────────────────────────────────────────────────────
     {
-      type: 'group',
-      name: 'seo',
-      label: 'SEO',
+      type: "group",
+      name: "seo",
+      label: "SEO",
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
       fields: [
         {
-          name: 'metaTitle',
-          type: 'text',
+          name: "metaTitle",
+          type: "text",
           localized: true,
         },
         {
-          name: 'metaDescription',
-          type: 'textarea',
+          name: "metaDescription",
+          type: "textarea",
           localized: true,
         },
         {
-          name: 'keywords',
-          type: 'array',
-          fields: [{ name: 'keyword', type: 'text' }],
+          name: "keywords",
+          type: "array",
+          fields: [{ name: "keyword", type: "text" }],
         },
       ],
     },
 
     // ─── Аналитика ─────────────────────────────────────────────────────────
     {
-      type: 'group',
-      name: 'analytics',
-      label: 'Аналитика',
+      type: "group",
+      name: "analytics",
+      label: "Аналитика",
       admin: {
         readOnly: true,
       },
       fields: [
         {
-          name: 'viewsCount',
-          type: 'number',
+          name: "viewsCount",
+          type: "number",
           defaultValue: 0,
         },
         {
-          name: 'purchasesCount',
-          type: 'number',
+          name: "purchasesCount",
+          type: "number",
           defaultValue: 0,
         },
       ],
     },
   ],
-}
+};

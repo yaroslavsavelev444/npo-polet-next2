@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "payload";
-import { env } from "@/env.ts";
-import { renderButton } from "@/services/email/templates/shared/button.ts";
 import { renderEmailLayout } from "@/services/email/templates/shared/layout.ts";
+import { env } from "../../env.ts";
+import { renderButton } from "../../services/email/templates/shared/button.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { checkUserStatus } from "../hooks/users/beforeLogin.ts";
 

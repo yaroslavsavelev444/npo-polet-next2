@@ -1,8 +1,8 @@
 // services/categories.service.ts
 import { unstable_cache } from "next/cache";
 import type { Where } from "payload";
-import { env } from "@/env";
-import type { Category } from "@/payload-types";
+import type { Category } from "../../../payload-types";
+import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
 
 export interface GetCategoriesOptions {

@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "payload";
-import { notifyReviewStatusChanged } from "@/services/notifications/notifyReviewStatusChanged.ts";
+import { notifyReviewStatusChanged } from "../../services/notifications/notifyReviewStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
 export const ProductReviews: CollectionConfig = {
