@@ -10,7 +10,8 @@
     "payload": "payload",
     "payload:types": "payload generate:types",
     "payload:importmap": "payload generate:importmap",
-    "payload:sync": "pnpm payload:types && pnpm payload:importmap"
+    "payload:sync": "pnpm payload:types && pnpm payload:importmap",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@ant-design/icons": "^6.2.5",
@@ -23,7 +24,6 @@
     "@payloadcms/ui": "^3.85.1",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-query-devtools": "^5.101.0",
-    "@types/classnames": "^2.3.4",
     "antd": "^6.4.5",
     "bullmq": "^5.79.0",
     "clsx": "^2.1.1",
@@ -37,6 +37,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.80.0",
+    "react-intersection-observer": "^10.0.3",
     "react-remove-scroll": "^2.7.2",
     "resend": "^6.14.0",
     "sonner": "^2.0.7",
@@ -52,6 +53,7 @@
     "@types/lodash": "^4.17.24",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

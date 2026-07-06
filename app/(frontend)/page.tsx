@@ -1,20 +1,19 @@
-
+import CategoryGrid from "@/modules/category/components/CategoryGrid";
 import { ContentBlockGroup } from "@/modules/contentBlocks/components/ContentBlockGroup";
 import {
   getActiveContentBlocks,
   getContentBlocksByVariant,
 } from "@/modules/contentBlocks/lib";
 import { ProductListContainer } from "@/modules/productCard/components/ProductListContainer";
-import { getCatalogData } from "@/payload/services/products.service";
 
 // Новые импорты для категорий
-import { getCachedCategories } from '@/payload/services/categories.service';
-import CategoryGrid from '@/modules/category/components/CategoryGrid';
-import type { Category } from '@/payload-types';
+import { getCachedCategories } from "@/payload/services/categories.service";
+import { getCatalogData } from "@/payload/services/products.service";
+import type { Category } from "@/payload-types";
 
 export default async function Home() {
   // Параллельная загрузка
-  const [heroResult, defaultResult, popularProductsResult, categoriesResult] = 
+  const [heroResult, defaultResult, popularProductsResult, categoriesResult] =
     await Promise.all([
       getContentBlocksByVariant("hero", 6),
       getActiveContentBlocks({ limit: 12 }),
@@ -25,7 +24,7 @@ export default async function Home() {
       }),
       getCachedCategories({
         isActive: true,
-        sort: 'order',
+        sort: "order",
         limit: 200,
         depth: 1,
       }),
@@ -43,9 +42,7 @@ export default async function Home() {
       />
 
       {/* Обычные блоки */}
-      <ContentBlockGroup
-        blocks={defaultResult.docs}
-      />
+      <ContentBlockGroup blocks={defaultResult.docs} />
 
       {/* === НОВЫЙ БЛОК: СЕТКА КАТЕГОРИЙ === */}
       {categories.length > 0 && (
@@ -53,10 +50,7 @@ export default async function Home() {
           <h2 className="mb-6 text-3xl font-bold tracking-tight">
             Категории товаров
           </h2>
-          <CategoryGrid
-            categories={categories}
-            columns={4}          
-          />
+          <CategoryGrid categories={categories} columns={4} />
         </section>
       )}
 

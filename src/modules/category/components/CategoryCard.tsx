@@ -1,7 +1,7 @@
-import Image from 'next/image';
-import Link from 'next/link';
+import Image from "next/image";
+import Link from "next/link";
 
-import type { Category, Media } from '@/payload-types';
+import type { Category, Media } from "@/payload-types";
 
 interface CategoryCardProps {
   category: Category;
@@ -13,10 +13,8 @@ interface ImageData {
   alt: string;
 }
 
-function getImageData(
-  image: Category['image'],
-): ImageData | null {
-  if (!image || typeof image !== 'object') {
+function getImageData(image: Category["image"]): ImageData | null {
+  if (!image || typeof image !== "object") {
     return null;
   }
 
@@ -28,27 +26,18 @@ function getImageData(
 
   return {
     url: media.url,
-    alt: media.alt ?? '',
+    alt: media.alt ?? "",
   };
 }
 
-function extractKeywords(
-  keywords: Category['keywords'],
-): string[] {
+function extractKeywords(keywords: Category["keywords"]): string[] {
   if (!Array.isArray(keywords)) {
     return [];
   }
 
   return keywords
-    .map((item) =>
-      typeof item === 'object'
-        ? item.keyword
-        : null,
-    )
-    .filter(
-      (item): item is string =>
-        Boolean(item),
-    )
+    .map((item) => (typeof item === "object" ? item.keyword : null))
+    .filter((item): item is string => Boolean(item))
     .slice(0, 3);
 }
 
@@ -56,22 +45,13 @@ export default function CategoryCard({
   category,
   priority = false,
 }: CategoryCardProps) {
-  const image = getImageData(
-    category.image,
-  );
+  const image = getImageData(category.image);
 
-  const keywords =
-    extractKeywords(
-      category.keywords,
-    );
+  const keywords = extractKeywords(category.keywords);
 
   const productCount =
-    typeof (category as Record<string, unknown>)
-      .productCount === 'number'
-      ? ((category as Record<
-          string,
-          unknown
-        >).productCount as number)
+    typeof (category as Record<string, unknown>).productCount === "number"
+      ? ((category as Record<string, unknown>).productCount as number)
       : null;
 
   return (
@@ -99,10 +79,9 @@ export default function CategoryCard({
         focus-visible:ring-[var(--brand-solid)]
       "
     >
-      {productCount !== null &&
-        productCount > 0 && (
-          <span
-            className="
+      {productCount !== null && productCount > 0 && (
+        <span
+          className="
               absolute
               right-3
               top-3
@@ -117,10 +96,10 @@ export default function CategoryCard({
               text-white
               shadow-md
             "
-          >
-            {productCount}
-          </span>
-        )}
+        >
+          {productCount}
+        </span>
+      )}
 
       <div
         className="
@@ -135,17 +114,10 @@ export default function CategoryCard({
         {image ? (
           <Image
             src={image.url}
-            alt={
-              image.alt ||
-              category.name
-            }
+            alt={image.alt || category.name}
             fill
             priority={priority}
-            loading={
-              priority
-                ? 'eager'
-                : 'lazy'
-            }
+            loading={priority ? "eager" : "lazy"}
             sizes="
               (max-width:640px) 50vw,
               (max-width:1024px) 33vw,
@@ -231,11 +203,10 @@ export default function CategoryCard({
               pt-2
             "
           >
-            {keywords.map(
-              (keyword) => (
-                <span
-                  key={keyword}
-                  className="
+            {keywords.map((keyword) => (
+              <span
+                key={keyword}
+                className="
                     rounded-full
                     border
                     border-[var(--border)]
@@ -245,11 +216,10 @@ export default function CategoryCard({
                     text-[11px]
                     text-[var(--text-secondary)]
                   "
-                >
-                  {keyword}
-                </span>
-              ),
-            )}
+              >
+                {keyword}
+              </span>
+            ))}
           </div>
         )}
       </div>

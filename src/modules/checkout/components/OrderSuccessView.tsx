@@ -40,7 +40,7 @@ export function OrderSuccessView({ order }: OrderSuccessViewProps) {
       <RevealFx delay={400}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Получатель */}
-          <RevealFx delay={500} asChild>
+          <RevealFx delay={500}>
             <div className="border border-[var(--border)] rounded-xl p-5 bg-[var(--surface)]">
               <h3 className="font-semibold mb-3">Получатель</h3>
               <p>
@@ -52,7 +52,7 @@ export function OrderSuccessView({ order }: OrderSuccessViewProps) {
           </RevealFx>
 
           {/* Доставка */}
-          <RevealFx delay={600} asChild>
+          <RevealFx delay={600}>
             <div className="border border-[var(--border)] rounded-xl p-5 bg-[var(--surface)]">
               <h3 className="font-semibold mb-3">Доставка</h3>
               <p className="capitalize">

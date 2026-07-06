@@ -1,13 +1,14 @@
 // app/(frontend)/categories/[categorySlug]/page.tsx
-import { notFound } from 'next/navigation';
-import type { Metadata } from 'next';
-import { getCachedCategoryBySlug } from '@/payload/services/categories.service';
-import { getCatalogData } from '@/payload/services/products.service';
-import { ProductCatalogLayout } from '@/modules/productCatalog/components/ProductCatalogLayout';
-import { Breadcrumbs } from '@/components/Breadcrumbs/Breadcrumbs';
-import { ProductListContainer } from '@/modules/productCard/components/ProductListContainer';
-import type { ProductQuery } from '@/modules/productCard/types/query';
-import { parseCatalogSearchParams } from '@/modules/productCatalog/lib/parseFilters';
+
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
+import { ProductListContainer } from "@/modules/productCard/components/ProductListContainer";
+import type { ProductQuery } from "@/modules/productCard/types/query";
+import { ProductCatalogLayout } from "@/modules/productCatalog/components/ProductCatalogLayout";
+import { parseCatalogSearchParams } from "@/modules/productCatalog/lib/parseFilters";
+import { getCachedCategoryBySlug } from "@/payload/services/categories.service";
+import { getCatalogData } from "@/payload/services/products.service";
 
 interface Props {
   params: Promise<{ categorySlug: string }>;
@@ -17,8 +18,8 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { categorySlug } = await params;
   const category = await getCachedCategoryBySlug(categorySlug);
-  
-  if (!category) return { title: 'Категория не найдена' };
+
+  if (!category) return { title: "Категория не найдена" };
 
   return {
     title: category.metaTitle || category.name,
@@ -38,11 +39,11 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const filters = parseCatalogSearchParams(rawSearchParams);
 
   const query: ProductQuery = {
-    categoryId: category.id,
+    categoryId: category.id.toString(),
     isVisible: true,
     priceFrom: filters.priceFrom,
     priceTo: filters.priceTo,
-    status: filters.status === 'all' ? undefined : filters.status,
+    status: filters.status === "all" ? undefined : filters.status,
     sort: filters.sort,
     order: filters.order,
     limit: 24,
@@ -53,19 +54,17 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const catalogResult = await getCatalogData(query);
 
   const breadcrumbItems = [
-    { title: 'Главная', href: '/' },
+    { title: "Главная", href: "/" },
+    { title: "Категории", href: "/category" },
     { title: category.name, href: `/categories/${categorySlug}` },
   ];
 
   return (
     <main className="min-h-screen pb-12">
       <div className="container mx-auto px-4 py-8">
-        <Breadcrumbs items={breadcrumbItems} variant='white'/>
+        <Breadcrumbs items={breadcrumbItems} variant="white" />
 
-        <ProductCatalogLayout
-          category={category}
-          catalogResult={catalogResult}
-        >
+        <ProductCatalogLayout category={category} catalogResult={catalogResult}>
           <ProductListContainer
             products={catalogResult.products}
             totalProducts={catalogResult.totalDocs}

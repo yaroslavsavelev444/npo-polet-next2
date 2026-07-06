@@ -1,6 +1,7 @@
 // src/modules/productCard/components/ProductListContainer.tsx
-import { ProductsSection } from './ProductsSection';
-import type { ProductCardData } from '@/modules/productCard/types';
+
+import type { ProductCardData } from "@/modules/productCard/types";
+import { ProductsSection } from "./ProductsSection";
 
 interface ProductListContainerProps {
   products: ProductCardData[];

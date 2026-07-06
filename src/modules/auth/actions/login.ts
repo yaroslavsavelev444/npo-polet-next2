@@ -60,15 +60,6 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
   let loginToken: string;
   let userId: string | number;
 
-  const users = await payload.find({
-    collection: "users",
-    limit: 1000, // или другое большое число
-    overrideAccess: true,
-  });
-
-  console.log(users.docs);
-
-  console.log("users", users);
   try {
     const loginResult = await payload.login({
       collection: "users",
@@ -77,7 +68,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 
     void notifyNewSessionLogin({
       email,
-      userName: loginResult.user.name as string,
+      userName: loginResult.user ? (loginResult.user.name as string) : "",
       deviceLabel: parseDeviceLabel(userAgent), // уже есть в modules/auth/lib/session.ts
       ip,
     });
@@ -87,7 +78,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
     }
 
     loginToken = loginResult.token;
-    userId = loginResult.user.id;
+    userId = loginResult.user ? loginResult.user.id : "";
 
     // Сбрасываем счётчик неверных попыток
     await payload.update({

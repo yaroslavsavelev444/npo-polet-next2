@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import Link from 'next/link';
-import { Flex } from '@once-ui-system/core';
-import type { Category, User } from '@/payload-types';
+import { Flex } from "@once-ui-system/core";
+import Link from "next/link";
+import { useEffect } from "react";
+import type { Category, User } from "@/payload-types";
 
 interface Props {
   isOpen: boolean;
@@ -12,14 +12,21 @@ interface Props {
   categories: Category[];
 }
 
-export default function MobileMenu({ isOpen, onClose, user, categories }: Props) {
+export default function MobileMenu({
+  isOpen,
+  onClose,
+  user,
+  categories,
+}: Props) {
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -29,10 +36,17 @@ export default function MobileMenu({ isOpen, onClose, user, categories }: Props)
       <div className="p-6 flex flex-col gap-10">
         {/* Каталог */}
         <div>
-          <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">Каталог</h3>
+          <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">
+            Каталог
+          </h3>
           <Flex vertical="center" gap={3}>
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/category/${cat.slug}`} onClick={onClose} className="block py-2 text-lg">
+              <Link
+                key={cat.id}
+                href={`/category/${cat.slug}`}
+                onClick={onClose}
+                className="block py-2 text-lg"
+              >
                 {cat.name}
               </Link>
             ))}
@@ -42,36 +56,65 @@ export default function MobileMenu({ isOpen, onClose, user, categories }: Props)
         {/* Ресурсы и О нас */}
         <div className="grid grid-cols-2 gap-8">
           <div>
-            <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">Ресурсы</h3>
+            <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">
+              Ресурсы
+            </h3>
             <Flex vertical="center" gap={3}>
-              <Link href="/faq" onClick={onClose}>FAQ</Link>
-              <Link href="/knowledge" onClick={onClose}>База знаний</Link>
+              <Link href="/faq" onClick={onClose}>
+                FAQ
+              </Link>
+              <Link href="/knowledge" onClick={onClose}>
+                База знаний
+              </Link>
             </Flex>
           </div>
           <div>
-            <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">О нас</h3>
+            <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">
+              О нас
+            </h3>
             <Flex vertical="center" gap={3}>
-              <Link href="/agreements" onClick={onClose}>Соглашения</Link>
-              <Link href="/contacts" onClick={onClose}>Контакты</Link>
+              <Link href="/agreements" onClick={onClose}>
+                Соглашения
+              </Link>
+              <Link href="/contacts" onClick={onClose}>
+                Контакты
+              </Link>
             </Flex>
           </div>
         </div>
 
         {/* Аккаунт */}
         <div>
-          <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">Аккаунт</h3>
+          <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">
+            Аккаунт
+          </h3>
           {user ? (
             <Flex vertical="center" gap="4">
-              <Link href="/profile" onClick={onClose}>Профиль</Link>
-              <Link href="/orders" onClick={onClose}>Мои заказы</Link>
-              <Link href="/reviews" onClick={onClose}>Мои отзывы</Link>
-              <Link href="/wishlist" onClick={onClose}>Избранное</Link>
-              <button onClick={() => { /* logout action */ onClose(); }} className="text-left">
+              <Link href="/profile" onClick={onClose}>
+                Профиль
+              </Link>
+              <Link href="/orders" onClick={onClose}>
+                Мои заказы
+              </Link>
+              <Link href="/reviews" onClick={onClose}>
+                Мои отзывы
+              </Link>
+              <Link href="/wishlist" onClick={onClose}>
+                Избранное
+              </Link>
+              <button
+                onClick={() => {
+                  /* logout action */ onClose();
+                }}
+                className="text-left"
+              >
                 Выйти
               </button>
             </Flex>
           ) : (
-            <Link href="/auth/login" onClick={onClose}>Войти</Link>
+            <Link href="/auth/login" onClick={onClose}>
+              Войти
+            </Link>
           )}
         </div>
       </div>

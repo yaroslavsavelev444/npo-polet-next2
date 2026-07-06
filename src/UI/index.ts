@@ -11,6 +11,7 @@ export { Empty } from "./Empty/Empty";
 export { Input } from "./Input/Input";
 export * from "./Input/Input.types";
 export { Modal } from "./Modal/Modal";
+export { Reveal } from "./Reveal/Reveal";
 export { Spinner } from "./Spinner/Spinner";
 export type { TabItem, TabsProps } from "./Tabs/Tabs";
 export { Tabs } from "./Tabs/Tabs";

@@ -1,9 +1,10 @@
 // components/ConsentList.tsx
-'use client';
+"use client";
 
-import { ConsentListItem } from '@/modules/auth/types';
-import { ConsentItem } from './ConsentItem';
-import Typography from '@/UI/Typography/Typography';
+import { ConsentListItem } from "@/modules/auth/types";
+import Typography from "@/UI/Typography/Typography";
+import { ConsentItem } from "./ConsentItem";
+
 interface ConsentListProps {
   consents: ConsentListItem[];
   checkedSlugs: Record<string, boolean>;

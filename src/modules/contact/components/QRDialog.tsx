@@ -1,23 +1,22 @@
 // src/components/contacts/QRDialog.tsx
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import QRCode from 'qrcode'
-import { Download } from 'lucide-react'
-import { Modal } from '@/UI'
-import { Button } from '@/UI'
-import { Text } from '@/UI/Typography/Typography'
-import { createVCard } from '../lib/create-vcard'
-import { downloadVCard } from '../lib/download-vcard'
-import type { Phone, Email } from '../types'
+import { Download } from "lucide-react";
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
+import { Button, Modal } from "@/UI";
+import { Text } from "@/UI/Typography/Typography";
+import { createVCard } from "../lib/create-vcard";
+import { downloadVCard } from "../lib/download-vcard";
+import type { Email, Phone } from "../types";
 
 interface QRDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  companyName: string
-  phones: Phone[]
-  emails: Email[]
-  physicalAddress?: string | null
+  isOpen: boolean;
+  onClose: () => void;
+  companyName: string;
+  phones: Phone[];
+  emails: Email[];
+  physicalAddress?: string | null;
 }
 
 export function QRDialog({
@@ -28,25 +27,25 @@ export function QRDialog({
   emails,
   physicalAddress,
 }: QRDialogProps) {
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) return;
     const vCard = createVCard({
       companyName,
       phones,
       emails,
       physicalAddress,
-    })
+    });
     QRCode.toDataURL(vCard, { width: 256, margin: 2 })
       .then(setQrDataUrl)
-      .catch(() => setQrDataUrl(null))
-  }, [isOpen, companyName, phones, emails, physicalAddress])
+      .catch(() => setQrDataUrl(null));
+  }, [isOpen, companyName, phones, emails, physicalAddress]);
 
   const handleDownload = () => {
-    downloadVCard(companyName, phones, emails, physicalAddress)
-    onClose()
-  }
+    downloadVCard(companyName, phones, emails, physicalAddress);
+    onClose();
+  };
 
   return (
     <Modal open={isOpen} onClose={onClose} title="QR-код контактов">
@@ -75,5 +74,5 @@ export function QRDialog({
         )}
       </div>
     </Modal>
-  )
+  );
 }

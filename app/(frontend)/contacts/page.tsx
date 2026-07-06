@@ -1,10 +1,14 @@
 // app/contacts/page.tsx
 
+import { ContactSection } from "@/modules/contact/components/ContactSection";
 import { getCachedSettings } from "@/payload/services/settings.service";
-import {ContactSection}  from "@/modules/contact/components/ContactSection"
 
 export default async function ContactsPage() {
-    const settings = await getCachedSettings();
+  const settings = await getCachedSettings();
 
-    return <ContactSection settings={settings} />;
+  if (!settings) {
+    return null;
+  }
+
+  return <ContactSection settings={settings} />;
 }

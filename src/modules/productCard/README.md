@@ -53,10 +53,10 @@ import type { Product } from "@/payload-types";
 const cardData = mapProductToCardData(product); // Product приходит из getCachedProducts()
 ```
 
-**Роутинг.** `/categories/[categorySlug]/products/[id]` (используется id товара,
+**Роутинг.** `/category/[categorySlug]/products/[id]` (используется id товара,
 т.к. slug/sku ещё не гарантированы в схеме). См. `lib/routing.ts`.
 Когда появится отдельный route
-`app/(frontend)/categories/[categorySlug]/products/[id]/page.tsx`, эта функция —
+`app/(frontend)/category/[categorySlug]/products/[id]/page.tsx`, эта функция —
 единственное место, которое надо будет поправить, если формат URL изменится.
 
 **Клиентское состояние (корзина/избранное).** Гибридная схема:
@@ -84,7 +84,7 @@ export async function generateMetadata({ params }): Promise<Metadata> {
   const product = await getCachedProductById(params.id);
   if (!product) return {};
   const cardData = mapProductToCardData(product);
-  const canonicalUrl = `${env.SITE_URL}/categories/${params.categorySlug}/products/${params.id}`;
+  const canonicalUrl = `${env.SITE_URL}/category/${params.categorySlug}/products/${params.id}`;
   return buildProductMetadata(cardData, {
     metaTitle: product.seo?.metaTitle,
     metaDescription: product.seo?.metaDescription,

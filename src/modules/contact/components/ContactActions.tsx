@@ -1,47 +1,47 @@
 // src/components/contacts/ContactActions.tsx
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { QrCode, Download, Share2, Copy, Check } from 'lucide-react'
-import { Button } from '@/UI'
-import { Text } from '@/UI/Typography/Typography'
-import { QRDialog } from './QRDialog'
-import type { Phone, Email } from '../types'
-import { shareContact } from '../lib/share-contact'
-import { downloadVCard } from '../lib/download-vcard'
+import { Check, Copy, Download, QrCode, Share2 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/UI";
+import { Text } from "@/UI/Typography/Typography";
+import { downloadVCard } from "../lib/download-vcard";
+import { shareContact } from "../lib/share-contact";
+import type { Email, Phone } from "../types";
+import { QRDialog } from "./QRDialog";
 
 interface ContactActionsProps {
-  companyName: string
-  phones: Phone[]
-  emails: Email[]
-  physicalAddress?: string | null
+  companyName: string;
+  phones: Phone[];
+  emails: Email[];
+  physicalAddress?: string | null;
 }
 
 export function ContactActions({
-  companyName = '',
+  companyName = "",
   phones = [],
   emails = [],
   physicalAddress = null,
 }: ContactActionsProps) {
-  const [qrOpen, setQrOpen] = useState(false)
-  const [shareCopied, setShareCopied] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const handleShare = async () => {
     try {
-      await shareContact(companyName)
+      await shareContact(companyName);
     } catch {
       // Если share не поддерживается или отменено, копируем URL (уже внутри shareContact)
-      setShareCopied(true)
-      setTimeout(() => setShareCopied(false), 2000)
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
     }
-  }
+  };
 
   return (
     <>
       <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* QR-код */}
         <Button
-          variant='outline'
+          variant="outline"
           fullWidth
           onClick={() => setQrOpen(true)}
           className="flex-col items-center py-6 h-auto"
@@ -89,9 +89,7 @@ export function ContactActions({
             Поделиться
           </Text>
           <Text size="sm" color="muted">
-            {shareCopied
-              ? 'Ссылка скопирована'
-              : 'Отправить контакты'}
+            {shareCopied ? "Ссылка скопирована" : "Отправить контакты"}
           </Text>
         </Button>
       </div>
@@ -105,5 +103,5 @@ export function ContactActions({
         physicalAddress={physicalAddress}
       />
     </>
-  )
+  );
 }

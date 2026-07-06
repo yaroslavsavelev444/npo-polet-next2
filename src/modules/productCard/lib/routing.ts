@@ -4,7 +4,7 @@
  * Резолвинг ссылки на страницу товара.
  *
  * Решение по архитектуре (зафиксировано с пользователем):
- *   /categories/[categorySlug]/products/[id]
+ *   /category/[categorySlug]/products/[id]
  *
  * Используем id товара (не slug/sku), т.к. слага/sku ещё нет в схеме Payload.
  * Приоритет источника categorySlug, как и в старом проекте:
@@ -24,5 +24,5 @@ export function getProductHref(
   const categorySlug =
     currentCategorySlug || product.category?.slug || FALLBACK_CATEGORY_SLUG;
 
-  return `/categories/${categorySlug}/products/${product.id}`;
+  return `/category/${categorySlug}/products/${product.id}`;
 }

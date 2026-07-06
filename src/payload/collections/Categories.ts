@@ -1,12 +1,12 @@
-import type { CollectionConfig } from 'payload'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
-import { generateSlug } from '../utils/generateSlug.ts'
+import type { CollectionConfig } from "payload";
+import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { generateSlug } from "../utils/generateSlug.ts";
 
 export const Categories: CollectionConfig = {
-  slug: 'categories',
+  slug: "categories",
   admin: {
-    useAsTitle: 'name',
-    defaultColumns: ['name', 'slug', 'isActive', 'order'],
+    useAsTitle: "name",
+    defaultColumns: ["name", "slug", "isActive", "order"],
   },
   access: {
     read: () => true,
@@ -16,78 +16,78 @@ export const Categories: CollectionConfig = {
   },
   fields: [
     {
-      name: 'name',
-      type: 'text',
+      name: "name",
+      type: "text",
       required: true,
       localized: true,
     },
     {
-      name: 'slug',
-      type: 'text',
+      name: "slug",
+      type: "text",
       required: true,
       unique: true,
       hooks: {
         beforeValidate: [generateSlug], // добавлен хук
       },
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
     },
     {
-      name: 'subtitle',
-      type: 'text',
+      name: "subtitle",
+      type: "text",
       localized: true,
     },
     {
-      name: 'description',
-      type: 'textarea',
+      name: "description",
+      type: "textarea",
       localized: true,
     },
     {
-      name: 'image',
-      type: 'relationship',
-      relationTo: 'media',
-      label: 'Изображение категории',
+      name: "image",
+      type: "relationship",
+      relationTo: "media",
+      label: "Изображение категории",
     },
     {
-      name: 'order',
-      type: 'number',
+      name: "order",
+      type: "number",
       defaultValue: 0,
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
     },
     {
-      name: 'isActive',
-      type: 'checkbox',
+      name: "isActive",
+      type: "checkbox",
       defaultValue: true,
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
     },
     {
-      name: 'metaTitle',
-      type: 'text',
+      name: "metaTitle",
+      type: "text",
       localized: true,
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
     },
     {
-      name: 'metaDescription',
-      type: 'textarea',
+      name: "metaDescription",
+      type: "textarea",
       localized: true,
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
     },
     {
-      name: 'keywords',
-      type: 'array',
-      fields: [{ name: 'keyword', type: 'text' }],
+      name: "keywords",
+      type: "array",
+      fields: [{ name: "keyword", type: "text" }],
       admin: {
-        position: 'sidebar',
+        position: "sidebar",
       },
     },
   ],
-}
+};

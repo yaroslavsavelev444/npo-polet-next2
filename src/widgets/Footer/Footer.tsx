@@ -29,8 +29,8 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
   {
     title: "Товары",
     links: [
-      { label: "Категории", path: "/categories" },
-      { label: "Все товары", path: "/categories/all" },
+      { label: "Категории", path: "/category" },
+      { label: "Все товары", path: "/category/all" },
     ],
   },
   {

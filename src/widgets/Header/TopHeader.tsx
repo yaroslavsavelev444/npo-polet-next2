@@ -69,7 +69,7 @@ export const TopHeader = async () => {
           </Text>
           <Text
             as="a"
-            href="/categories"
+            href="/category"
             variant="body-default-s"
             onBackground="neutral-weak"
           >
