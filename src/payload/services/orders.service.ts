@@ -1,14 +1,155 @@
-// ─── Order creation ─────────────────────────────────────────────────────────
+// ─── Orders list & cancellation (append to existing file) ──────────────────
 
-import type { CartView } from "@/modules/cart";
-import type { CheckoutSubmitInput } from "@/modules/checkout/types";
+import type { Where } from "payload";
+import { CartView } from "@/modules/cart";
+import { CheckoutSubmitInput } from "@/modules/checkout";
+import type { Order } from "@/payload-types";
 import { getPayloadInstance } from "./getPayload";
 
-interface CreateOrderInput {
+export interface CreateOrderInput {
   userId: string;
   cart: CartView;
   form: CheckoutSubmitInput;
   meta: { ip: string; userAgent: string };
+}
+
+export interface GetOrdersOptions {
+  statuses?: Order["status"][] | null;
+  page?: number;
+  limit?: number;
+}
+
+export interface GetOrdersResult {
+  docs: Order[];
+  totalDocs: number;
+  totalPages: number;
+  page: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+export async function getOrdersByUserId(
+  userId: string,
+  options: GetOrdersOptions = {},
+): Promise<GetOrdersResult> {
+  const payload = await getPayloadInstance();
+  const { statuses, page = 1, limit = 10 } = options;
+
+  const where: Where = {
+    and: [
+      { user: { equals: userId } },
+      ...(statuses && statuses.length > 0
+        ? [{ status: { in: statuses } }]
+        : []),
+    ],
+  };
+
+  const result = await payload.find({
+    collection: "orders",
+    where,
+    sort: "-createdAt",
+    page,
+    limit,
+    depth: 1,
+    overrideAccess: true,
+  });
+
+  return {
+    docs: result.docs as unknown as Order[],
+    totalDocs: result.totalDocs,
+    totalPages: result.totalPages,
+    page: result.page ?? page,
+    hasNextPage: result.hasNextPage,
+    hasPrevPage: result.hasPrevPage,
+  };
+}
+
+export async function getOrderByIdForUser(
+  orderId: string,
+  userId: string,
+): Promise<Order | null> {
+  const payload = await getPayloadInstance();
+
+  let order: Order;
+  try {
+    order = (await payload.findByID({
+      collection: "orders",
+      id: orderId,
+      depth: 2,
+      overrideAccess: true,
+    })) as unknown as Order;
+  } catch {
+    return null;
+  }
+
+  if (!order) return null;
+
+  const orderUserId =
+    typeof order.user === "object" ? order.user.id : order.user;
+  if (String(orderUserId) !== String(userId)) return null;
+
+  return order;
+}
+
+export type CancelOrderFailureReason = "not_found" | "not_cancellable";
+
+export async function cancelOrderForUser(
+  orderId: string,
+  userId: string,
+  reason: string,
+): Promise<
+  | { ok: true; status: Order["status"] }
+  | { ok: false; reason: CancelOrderFailureReason }
+> {
+  const payload = await getPayloadInstance();
+
+  let order: Order;
+  try {
+    order = (await payload.findByID({
+      collection: "orders",
+      id: orderId,
+      depth: 0,
+      overrideAccess: true,
+    })) as unknown as Order;
+  } catch {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (!order) return { ok: false, reason: "not_found" };
+
+  const orderUserId =
+    typeof order.user === "object" ? order.user.id : order.user;
+  if (String(orderUserId) !== String(userId)) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (
+    order.status === "cancelled" ||
+    order.status === "refunded" ||
+    order.status === "delivered"
+  ) {
+    return { ok: false, reason: "not_cancellable" };
+  }
+
+  await payload.update({
+    collection: "orders",
+    id: orderId,
+    data: {
+      status: "cancelled",
+      statusHistory: [
+        ...(order.statusHistory ?? []),
+        {
+          status: "cancelled",
+          changedAt: new Date().toISOString(),
+          changedBy: Number(userId),
+          comment: reason,
+        },
+      ],
+    },
+    overrideAccess: true,
+  });
+
+  return { ok: true, status: "cancelled" };
 }
 
 export async function createOrderFromCheckout({
@@ -109,7 +250,7 @@ export async function createOrderFromCheckout({
       ],
     },
     overrideAccess: true,
-    draft: false, // <-- добавлено
+    draft: false,
   });
 
   return order;

@@ -1,4 +1,9 @@
 import type { CollectionConfig } from "payload";
+import { notifyNewOrder } from "@/services/notifications/notifyNewOrder.ts";
+import {
+  notifyOrderCancelled,
+  notifyOrderStatusChanged,
+} from "@/services/notifications/notifyOrderStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
 
@@ -109,6 +114,32 @@ export const Orders: CollectionConfig = {
 
   hooks: {
     beforeChange: [generateOrderNumber],
+    afterChange: [
+      async ({ doc, previousDoc, operation, req }) => {
+        if (operation === "create") {
+          void notifyNewOrder(doc);
+          return doc;
+        }
+
+        // update: реагируем только на реальную смену статуса
+        if (previousDoc?.status === doc.status) return doc;
+
+        if (doc.status === "cancelled") {
+          // Инициатор: если запрос пришёл с ролью user (не admin/superadmin) —
+          // значит отменил сам покупатель через свой Server Action (isLoggedIn
+          // на update сейчас разрешён только admin, поэтому на практике
+          // отмена клиентом должна идти через отдельный override-access вызов
+          // из cancelOrderForUser с флагом в req.context).
+          const initiatedBy: "customer" | "admin" =
+            req.context?.initiatedByCustomer === true ? "customer" : "admin";
+          void notifyOrderCancelled(doc, initiatedBy);
+          return doc;
+        }
+
+        void notifyOrderStatusChanged(doc);
+        return doc;
+      },
+    ],
   },
 
   fields: [

@@ -1,24 +1,24 @@
-import type { NextConfig } from 'next'
-import path from 'node:path'
-import './src/env.ts'
+import path from "node:path";
+import type { NextConfig } from "next";
+import "./src/env.ts";
 
 const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
     rules: {
-      '*.md': {
+      "*.md": {
         loaders: [],
-        as: '*.empty',
+        as: "*.empty",
       },
     },
   },
   serverExternalPackages: [
-    'esbuild',
-    'esbuild-register',
-    'drizzle-kit',
-    '@payloadcms/db-postgres',
-    '@payloadcms/drizzle',
+    "esbuild",
+    "esbuild-register",
+    "drizzle-kit",
+    "@payloadcms/db-postgres",
+    "@payloadcms/drizzle",
   ],
-}
+};
 
-export default nextConfig
+export default nextConfig;

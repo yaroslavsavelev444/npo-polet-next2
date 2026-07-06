@@ -1,96 +1,104 @@
 // components/layout/Footer.tsx
-import Link from 'next/link'
-import Image from 'next/image'
-import type { Consent } from '@/payload-types'
-import { getCachedSettings } from '@/payload/services/settings.service'
-import { getCachedConsents } from '@/payload/services/consents.service'
+
+import Image from "next/image";
+import Link from "next/link";
+import { getCachedConsents } from "@/payload/services/consents.service";
+import { getCachedSettings } from "@/payload/services/settings.service";
+import type { Consent } from "@/payload-types";
 import {
   getCompanyName,
+  getLegalAddress,
   getLogoUrl,
   getPrimaryEmail,
   getPrimaryPhone,
   getSocialLinks,
-  getLegalAddress,
-} from '@/utils/settings-helpers'
+} from "@/utils/settings-helpers";
 
 export interface FooterColumn {
-  title: string
-  links: { label: string; path: string; external?: boolean }[]
+  title: string;
+  links: { label: string; path: string; external?: boolean }[];
 }
 
 export interface FooterProps {
-  columns?: FooterColumn[]
-  showBackToTop?: boolean
-  className?: string
+  columns?: FooterColumn[];
+  showBackToTop?: boolean;
+  className?: string;
 }
 
 const DEFAULT_COLUMNS: FooterColumn[] = [
   {
-    title: 'Товары',
+    title: "Товары",
     links: [
-      { label: 'Категории', path: '/categories' },
-      { label: 'Все товары', path: '/categories/all' },
+      { label: "Категории", path: "/categories" },
+      { label: "Все товары", path: "/categories/all" },
     ],
   },
   {
-    title: 'Ресурсы',
+    title: "Ресурсы",
     links: [
-      { label: 'FAQ', path: '/faq' },
-      { label: 'База знаний', path: '/knowledge' },
+      { label: "FAQ", path: "/faq" },
+      { label: "База знаний", path: "/knowledge" },
     ],
   },
   {
-    title: 'О проекте',
+    title: "О проекте",
     links: [
-      { label: 'Контакты', path: '/contacts' },
-      { label: 'Соглашения', path: '/consents' },
+      { label: "Контакты", path: "/contacts" },
+      { label: "Соглашения", path: "/consents" },
     ],
   },
   {
-    title: 'Личный кабинет',
+    title: "Личный кабинет",
     links: [
-      { label: 'Профиль', path: '/profile' },
-      { label: 'Мои отзывы', path: '/my-reviews' },
-      { label: 'Избранное', path: '/wishlist' },
+      { label: "Профиль", path: "/profile" },
+      { label: "Мои отзывы", path: "/my-reviews" },
+      { label: "Избранное", path: "/wishlist" },
     ],
   },
-]
+];
 
 export default async function Footer({
   columns = DEFAULT_COLUMNS,
   showBackToTop = true,
-  className = '',
+  className = "",
 }: FooterProps) {
   // Получаем настройки и соглашения параллельно
   const [settings, consentsResult] = await Promise.all([
     getCachedSettings(),
-    getCachedConsents({ isActive: true, sort: 'title' }),
-  ])
+    getCachedConsents({ isActive: true, sort: "title" }),
+  ]);
 
-  const companyName = getCompanyName(settings)
-  const logoUrl = getLogoUrl(settings)
-  const phone = getPrimaryPhone(settings)
-  const email = getPrimaryEmail(settings)
-  const socialLinks = getSocialLinks(settings)
-  const legalAddress = getLegalAddress(settings)
+  const companyName = getCompanyName(settings);
+  const logoUrl = getLogoUrl(settings);
+  const phone = getPrimaryPhone(settings);
+  const email = getPrimaryEmail(settings);
+  const socialLinks = getSocialLinks(settings);
+  const legalAddress = getLegalAddress(settings);
 
   // Строим ссылки на соглашения для нижней части
   const consentLinks = (consentsResult?.docs || []).map((consent: Consent) => ({
     label: consent.title,
     path: `/consents/${consent.slug}`,
-  }))
+  }));
 
   // Если соглашений нет, используем запасные ссылки (как в старом проекте)
-  const bottomLinks = consentLinks.length > 0
-    ? consentLinks
-    : [
-        { label: 'Политика конфиденциальности', path: '/consents/privacy' },
-        { label: 'Правила продажи товаров', path: '/consents/terms' },
-        { label: 'Пользовательское соглашение', path: '/consents/user-agreement' },
-        { label: 'Публичная оферта', path: '/consents/offer' },
-        { label: 'Файлы куки', path: '/consents/cookie' },
-        { label: 'Согласие на обработку данных', path: '/consents/personal-data' },
-      ]
+  const bottomLinks =
+    consentLinks.length > 0
+      ? consentLinks
+      : [
+          { label: "Политика конфиденциальности", path: "/consents/privacy" },
+          { label: "Правила продажи товаров", path: "/consents/terms" },
+          {
+            label: "Пользовательское соглашение",
+            path: "/consents/user-agreement",
+          },
+          { label: "Публичная оферта", path: "/consents/offer" },
+          { label: "Файлы куки", path: "/consents/cookie" },
+          {
+            label: "Согласие на обработку данных",
+            path: "/consents/personal-data",
+          },
+        ];
 
   return (
     <footer className={`w-full bg-black text-gray-300  ${className}`}>
@@ -100,26 +108,34 @@ export default async function Footer({
           {logoUrl ? (
             <Image
               src={logoUrl}
-              alt={companyName || 'Логотип'}
+              alt={companyName || "Логотип"}
               width={180}
               height={48}
               className="h-12 w-auto"
               priority
             />
           ) : (
-            <span className="text-2xl font-bold text-white">{companyName || 'Название компании'}</span>
+            <span className="text-2xl font-bold text-white">
+              {companyName || "Название компании"}
+            </span>
           )}
 
           <div className="mt-4 space-x-4 text-sm">
             {phone && (
-              <a href={`tel:${phone}`} className="hover:text-primary transition">
+              <a
+                href={`tel:${phone}`}
+                className="hover:text-primary transition"
+              >
                 {phone}
               </a>
             )}
             {email && (
               <>
                 <span className="text-gray-500">•</span>
-                <a href={`mailto:${email}`} className="hover:text-primary transition">
+                <a
+                  href={`mailto:${email}`}
+                  className="hover:text-primary transition"
+                >
                   {email}
                 </a>
               </>
@@ -148,15 +164,17 @@ export default async function Footer({
         <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8">
           {columns.map((col, idx) => (
             <div key={idx}>
-              <h3 className="text-white font-semibold text-lg mb-4">{col.title}</h3>
+              <h3 className="text-white font-semibold text-lg mb-4">
+                {col.title}
+              </h3>
               <ul className="space-y-2">
                 {col.links.map((link, i) => (
                   <li key={i}>
                     <Link
                       href={link.path}
                       className="text-gray-400 hover:text-primary transition text-sm"
-                      target={link.external ? '_blank' : undefined}
-                      rel={link.external ? 'noopener noreferrer' : undefined}
+                      target={link.external ? "_blank" : undefined}
+                      rel={link.external ? "noopener noreferrer" : undefined}
                     >
                       {link.label}
                     </Link>
@@ -192,7 +210,6 @@ export default async function Footer({
               <a
                 href="#top"
                 className="inline-flex items-center gap-1 text-gray-500 hover:text-primary transition ml-2"
-                style={{ scrollBehavior: 'smooth' }}
               >
                 <span>Наверх</span>
                 <svg
@@ -203,7 +220,11 @@ export default async function Footer({
                   stroke="currentColor"
                   strokeWidth={2}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 15l7-7 7 7"
+                  />
                 </svg>
               </a>
             )}
@@ -211,5 +232,5 @@ export default async function Footer({
         </div>
       </div>
     </footer>
-  )
+  );
 }

@@ -1,144 +1,123 @@
-'use server'
+"use server";
 
-import { cookies } from 'next/headers'
-import { registerSchema, acceptedConsentSchema } from '../schemas/register.schema'
-import { getRequestMeta, actionError, actionSuccess } from '../lib/utils'
-import { RATE_LIMITS } from '../lib/rateLimit'
-import { createOtp } from '../lib/OtpStore'
-import { sendOtpEmail } from '../lib/email'
-import { createSession } from '../lib/session'
-import type { RegisterResult } from '../types'
-import { getPayloadInstance } from '@/payload/services/getPayload'
+import { cookies } from "next/headers";
+import { getPayloadInstance } from "@/payload/services/getPayload";
+import { sendOtpEmail } from "../lib/email";
+import { createOtp } from "../lib/OtpStore";
+import { RATE_LIMITS } from "../lib/rateLimit";
+import { createSession } from "../lib/session";
+import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import {
+  AcceptedConsentInput,
+  acceptedConsentSchema,
+  registerSchema,
+} from "../schemas/register.schema";
+import type { RegisterResult } from "../types";
 
-/**
- * Server Action: регистрация нового пользователя.
- *
- * Поток:
- * 1. Валидация (zod)
- * 2. Rate limit по IP
- * 3. Проверка обязательных согласий
- * 4. payload.create('users') — создание пользователя
- * 5. payload.login() — выдача JWT cookie (Payload сам ставит httpOnly cookie)
- * 6. Создание Session записи
- * 7. UserConsents записи
- * 8. OTP генерация + отправка
- *
- * Почему login сразу после create?
- * Чтобы verifyOtpAction мог идентифицировать пользователя через
- * стандартный payload.auth() — тот же путь что и при логине.
- * twoFAVerified: false + middleware → пользователь попадает только на /auth/verify-otp.
- */
-export async function registerAction(
-  _prevState: unknown,
-  formData: FormData,
-) {
+export async function registerAction(_prevState: unknown, formData: FormData) {
   // 1. Валидация
   const raw = {
-    email: formData.get('email'),
-    password: formData.get('password'),
-    confirmPassword: formData.get('confirmPassword'),
-    name: formData.get('name'),
-    consentsJson: formData.get('consentsJson'),
-  }
+    email: formData.get("email"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+    name: formData.get("name"),
+    consentsJson: formData.get("consentsJson"),
+  };
 
-  const parsed = registerSchema.safeParse(raw)
+  const parsed = registerSchema.safeParse(raw);
   if (!parsed.success) {
-    return actionError('Проверьте введённые данные', parsed.error.flatten().fieldErrors)
+    return actionError(
+      "Проверьте введённые данные",
+      parsed.error.flatten().fieldErrors,
+    );
   }
 
-  const { email, password, name, consentsJson } = parsed.data
+  const { email, password, name, consentsJson } = parsed.data;
 
-  let acceptedConsents: Array<{ consentId: string; slug: string; version: string }>
+  // Парсим согласия, убеждаясь, что consentId — число
+  let acceptedConsents: AcceptedConsentInput[];
   try {
-    const rawConsents = JSON.parse(consentsJson)
-    acceptedConsents = rawConsents.map((c: unknown) => acceptedConsentSchema.parse(c))
+    const rawConsents = JSON.parse(consentsJson);
+    acceptedConsents = rawConsents.map((c: unknown) =>
+      acceptedConsentSchema.parse(c),
+    );
   } catch {
-    return actionError('Некорректные данные согласий')
+    return actionError("Некорректные данные согласий");
   }
 
-  const { ip, userAgent } = await getRequestMeta()
+  const { ip, userAgent } = await getRequestMeta();
 
   // 2. Rate limit
-  const rl = await RATE_LIMITS.register(ip)
-  if (!rl.allowed) {
-    return actionError('Слишком много попыток. Попробуйте позже.')
-  }
+  const rl = await RATE_LIMITS.register(ip);
+  // if (!rl.allowed) {
+  //   return actionError("Слишком много попыток. Попробуйте позже.");
+  // }
 
-  const payload = await getPayloadInstance()
+  const payload = await getPayloadInstance();
 
   // 3. Проверяем обязательные согласия
   const { docs: requiredConsents } = await payload.find({
-    collection: 'consents',
+    collection: "consents",
     where: {
-      and: [
-        { isRequired: { equals: true } },
-        { isActive: { equals: true } },
-      ],
+      and: [{ isRequired: { equals: true } }, { isActive: { equals: true } }],
     },
     overrideAccess: true,
-  })
+  });
 
-  const requiredSlugs = requiredConsents.map((c) => c.slug as string)
-  const acceptedSlugs = acceptedConsents.map((c) => c.slug)
-  const missing = requiredSlugs.filter((s) => !acceptedSlugs.includes(s))
+  const requiredSlugs = requiredConsents.map((c) => c.slug as string);
+  const acceptedSlugs = acceptedConsents.map((c) => c.slug);
+  const missing = requiredSlugs.filter((s) => !acceptedSlugs.includes(s));
 
   if (missing.length > 0) {
-    return actionError('Необходимо принять все обязательные соглашения', {
-      consents: [`Не приняты: ${missing.join(', ')}`],
-    })
+    return actionError("Необходимо принять все обязательные соглашения", {
+      consents: [`Не приняты: ${missing.join(", ")}`],
+    });
   }
 
-  // 4. Создаём пользователя
-  let user: Awaited<ReturnType<typeof payload.create<'users'>>>
+  // 4. Создаём пользователя (тип выводится автоматически)
+  let user: Awaited<ReturnType<typeof payload.create>>;
   try {
     user = await payload.create({
-      collection: 'users',
+      collection: "users",
       data: {
         email,
         password,
         name,
-        role: 'user',
-        status: 'active',
+        role: "user",
+        status: "active",
         twoFAVerified: false,
         emailVerified: false,
       },
       overrideAccess: true,
-    })
+    });
   } catch (err: unknown) {
     if (isPayloadDuplicateError(err)) {
-      return actionError('Не удалось создать аккаунт. Проверьте данные.')
+      return actionError("Не удалось создать аккаунт. Проверьте данные.");
     }
-    throw err
+    throw err;
   }
 
-  // 5. Сразу логиним — Payload ставит httpOnly cookie 'payload-token'
-  // После этого verifyOtpAction сможет идентифицировать пользователя
-  // через payload.auth() как при обычном логине.
-  // twoFAVerified: false — middleware будет редиректить на /auth/verify-otp
-  let loginToken: string | undefined
+  // 5. Логиним пользователя
+  let loginToken: string | undefined;
   try {
     const loginResult = await payload.login({
-      collection: 'users',
+      collection: "users",
       data: { email, password },
-    })
-    loginToken = loginResult.token
+    });
+    loginToken = loginResult.token;
 
-    // Payload.login в Server Action не ставит cookie автоматически —
-    // нужно поставить вручную
     if (loginToken) {
-      const cookieStore = await cookies()
-      cookieStore.set('payload-token', loginToken, {
+      const cookieStore = await cookies();
+      cookieStore.set("payload-token", loginToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 7 * 24 * 60 * 60, // 7 дней
-      })
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60,
+      });
     }
   } catch (err) {
-    console.error('[register] Login after create failed:', err)
-    // Не блокируем — пользователь создан, OTP будет отправлен
-    // Но без JWT verifyOtp не сработает → логируем
+    console.error("[register] Login after create failed:", err);
   }
 
   // 6. Создаём сессию
@@ -146,55 +125,84 @@ export async function registerAction(
     userId: String(user.id),
     ip,
     userAgent,
-  })
+  });
 
-  const cookieStore = await cookies()
-  cookieStore.set('session-id', String(session.id), {
+  const cookieStore = await cookies();
+  cookieStore.set("session-id", String(session.id), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
     maxAge: 7 * 24 * 60 * 60,
-  })
+  });
 
-  // 7. Сохраняем согласия
+  console.log("acceptedConsents", acceptedConsents);
+
+  const allConsents = await payload.find({
+    collection: "consents",
+
+    limit: 100,
+
+    overrideAccess: true,
+  });
+
+  console.log(
+    "DB consents",
+
+    allConsents.docs.map((c) => ({
+      id: c.id,
+
+      slug: c.slug,
+
+      title: c.title,
+    })),
+  );
+
   await Promise.all(
     acceptedConsents.map((c) =>
       payload.create({
-        collection: 'user-consents',
+        collection: "user-consents",
+
         data: {
           user: user.id,
+
           consent: c.consentId,
+
           consentSlug: c.slug,
+
           version: c.version,
+
           acceptedAt: new Date().toISOString(),
+
           ip,
+
           userAgent,
         },
+
         overrideAccess: true,
       }),
     ),
-  )
+  );
 
   // 8. OTP для верификации email
   const otp = await createOtp(payload, {
     userId: String(user.id),
-    type: 'email_verify',
+    type: "email_verify",
     ip,
-  })
+  });
 
-  await sendOtpEmail({ to: email, otp, type: 'email_verify' })
+  await sendOtpEmail({ to: email, otp, type: "email_verify" });
 
-  return actionSuccess<RegisterResult>({ requiresOtp: true })
+  return actionSuccess<RegisterResult>({ requiresOtp: true });
 }
 
 function isPayloadDuplicateError(err: unknown): boolean {
   if (err instanceof Error) {
     return (
-      err.message.includes('duplicate') ||
-      err.message.includes('unique') ||
-      err.message.includes('already exists')
-    )
+      err.message.includes("duplicate") ||
+      err.message.includes("unique") ||
+      err.message.includes("already exists")
+    );
   }
-  return false
+  return false;
 }

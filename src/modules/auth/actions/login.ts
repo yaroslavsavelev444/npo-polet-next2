@@ -1,14 +1,16 @@
-'use server'
+"use server";
 
-import { cookies } from 'next/headers'
-import { loginSchema } from '../schemas/login.schema'
-import { getRequestMeta, actionError, actionSuccess } from '../lib/utils'
-import { RATE_LIMITS } from '../lib/rateLimit'
-import { createOtp } from '../lib/OtpStore'
-import { createSession } from '../lib/session'
-import { sendOtpEmail } from '../lib/email'
-import type { LoginResult } from '../types'
-import { getPayloadInstance } from '@/payload/services/getPayload'
+import { cookies } from "next/headers";
+import { getPayloadInstance } from "@/payload/services/getPayload";
+import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
+import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
+import { sendOtpEmail } from "../lib/email";
+import { createOtp } from "../lib/OtpStore";
+import { RATE_LIMITS } from "../lib/rateLimit";
+import { createSession, parseDeviceLabel } from "../lib/session";
+import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import { loginSchema } from "../schemas/login.schema";
+import type { LoginResult } from "../types";
 
 /**
  * Server Action: вход пользователя.
@@ -29,51 +31,67 @@ import { getPayloadInstance } from '@/payload/services/getPayload'
  * Cookie НЕ ставится автоматически в контексте Server Action (только в Route Handler).
  * Поэтому ставим вручную через next/headers cookies().
  */
-export async function loginAction(
-  _prevState: unknown,
-  formData: FormData,
-) {
+export async function loginAction(_prevState: unknown, formData: FormData) {
   const parsed = loginSchema.safeParse({
-    email: formData.get('email'),
-    password: formData.get('password'),
-  })
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
 
   if (!parsed.success) {
-    return actionError('Проверьте введённые данные', parsed.error.flatten().fieldErrors)
+    return actionError(
+      "Проверьте введённые данные",
+      parsed.error.flatten().fieldErrors,
+    );
   }
 
-  const { email, password } = parsed.data
-  const { ip, userAgent } = await getRequestMeta()
+  const { email, password } = parsed.data;
+  const { ip, userAgent } = await getRequestMeta();
 
-  const rl = await RATE_LIMITS.login(ip)
-  if (!rl.allowed) {
-    return actionError('Слишком много попыток входа. Попробуйте через час.')
-  }
+  const rl = await RATE_LIMITS.login(ip);
+  // if (!rl.allowed) {
+  //   return actionError("Слишком много попыток входа. Попробуйте через час.");
+  // }
 
-  const payload = await getPayloadInstance()
+  const payload = await getPayloadInstance();
 
   // payload.login() — Payload проверяет пароль через bcrypt
   // Возвращает { token: string, user, exp }
   // Не передаём req — в Server Action он не нужен для получения token
-  let loginToken: string
-  let userId: string | number
+  let loginToken: string;
+  let userId: string | number;
 
+  const users = await payload.find({
+    collection: "users",
+    limit: 1000, // или другое большое число
+    overrideAccess: true,
+  });
+
+  console.log(users.docs);
+
+  console.log("users", users);
   try {
     const loginResult = await payload.login({
-      collection: 'users',
+      collection: "users",
       data: { email, password },
-    })
+    });
+
+    void notifyNewSessionLogin({
+      email,
+      userName: loginResult.user.name as string,
+      deviceLabel: parseDeviceLabel(userAgent), // уже есть в modules/auth/lib/session.ts
+      ip,
+    });
 
     if (!loginResult.token) {
-      throw new Error('No token returned')
+      throw new Error("No token returned");
     }
 
-    loginToken = loginResult.token
-    userId = loginResult.user.id
+    loginToken = loginResult.token;
+    userId = loginResult.user.id;
 
     // Сбрасываем счётчик неверных попыток
     await payload.update({
-      collection: 'users',
+      collection: "users",
       id: userId,
       data: {
         loginAttempts: 0,
@@ -81,48 +99,48 @@ export async function loginAction(
         lastLoginAt: new Date().toISOString(),
       },
       overrideAccess: true,
-    })
+    });
   } catch (err: unknown) {
-    await handleFailedLogin(payload, email)
-    return actionError('Неверный email или пароль')
+    await handleFailedLogin(payload, email);
+    return actionError("Неверный email или пароль");
   }
 
   // Ставим JWT cookie вручную
   // Имя 'payload-token' — стандартное имя которое использует Payload
-  const cookieStore = await cookies()
-  cookieStore.set('payload-token', loginToken, {
+  const cookieStore = await cookies();
+  cookieStore.set("payload-token", loginToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
     maxAge: 7 * 24 * 60 * 60, // 7 дней
-  })
+  });
 
   // Генерируем OTP для второго фактора
   const otp = await createOtp(payload, {
     userId: String(userId),
-    type: 'login_2fa',
+    type: "login_2fa",
     ip,
-  })
+  });
 
-  await sendOtpEmail({ to: email, otp, type: 'login_2fa' })
+  await sendOtpEmail({ to: email, otp, type: "login_2fa" });
 
   // Создаём сессию
   const session = await createSession(payload, {
     userId: String(userId),
     ip,
     userAgent,
-  })
+  });
 
-  cookieStore.set('session-id', String(session.id), {
+  cookieStore.set("session-id", String(session.id), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
     maxAge: 7 * 24 * 60 * 60,
-  })
+  });
 
-  return actionSuccess<LoginResult>({ requiresOtp: true })
+  return actionSuccess<LoginResult>({ requiresOtp: true });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -133,29 +151,50 @@ async function handleFailedLogin(
 ) {
   try {
     const { docs } = await payload.find({
-      collection: 'users',
+      collection: "users",
       where: { email: { equals: email } },
       limit: 1,
       overrideAccess: true,
-    })
+    });
 
-    if (docs.length === 0) return
+    if (docs.length === 0) return;
 
-    const user = docs[0]
-    const attempts = (user.loginAttempts ?? 0) + 1
-    const MAX_ATTEMPTS = 10
+    const user = docs[0];
+    const attempts = (user.loginAttempts ?? 0) + 1;
+
+    const MAX_ATTEMPTS = 10;
+
+    const isLocked = attempts >= MAX_ATTEMPTS;
+
+    const lockUntil = isLocked
+      ? new Date(Date.now() + 15 * 60 * 1000).toISOString()
+      : null;
 
     await payload.update({
-      collection: 'users',
+      collection: "users",
+
       id: user.id,
+
       data: {
         loginAttempts: attempts,
-        ...(attempts >= MAX_ATTEMPTS
-          ? { lockUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString() }
-          : {}),
+
+        ...(isLocked && {
+          lockUntil,
+        }),
       },
+
       overrideAccess: true,
-    })
+    });
+
+    if (isLocked) {
+      void notifyAccountLocked({
+        email: user.email as string,
+
+        userName: user.name as string,
+
+        lockedUntil: lockUntil!,
+      });
+    }
   } catch {
     // Не раскрываем существование пользователя
   }
