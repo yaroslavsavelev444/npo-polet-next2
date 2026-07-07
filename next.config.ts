@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 import "./src/env.ts";
 
 const nextConfig: NextConfig = {
-  // standalone-сборка нужна для лёгкого Docker-образа (см. Dockerfile ниже)
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
@@ -18,6 +17,14 @@ const nextConfig: NextConfig = {
         pathname: "/media/**",
       },
     ],
+  },
+
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@": path.resolve(__dirname, "src"),
+    };
+    return config;
   },
 
   async headers() {
@@ -47,10 +54,6 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  turbopack: {
-    root: path.resolve(__dirname),
-    rules: { "*.md": { loaders: [], as: "*.empty" } },
-  },
   serverExternalPackages: [
     "esbuild",
     "esbuild-register",
