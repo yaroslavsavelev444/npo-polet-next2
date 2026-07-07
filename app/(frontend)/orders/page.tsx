@@ -9,7 +9,10 @@ import {
   OrdersPagination,
 } from "@/modules/orders";
 
-export const metadata = { title: "Мои заказы" };
+export const metadata = {
+  title: "Мои заказысрфе",
+  robots: { index: false, follow: false },
+};
 
 interface PageProps {
   searchParams: Promise<{ status?: string; page?: string }>;

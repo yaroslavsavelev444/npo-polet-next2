@@ -5,6 +5,7 @@ import CategoryFilters from "@/modules/category/components/CategoryFilters";
 import CategoryGrid from "@/modules/category/components/CategoryGrid";
 import { getCachedCategories } from "@/payload/services/categories.service";
 import type { Category } from "@/payload-types";
+import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Каталог категорий",
@@ -115,6 +116,12 @@ export default async function CategoriesPage({
     <main className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       {/* Filters */}
       <Breadcrumbs items={breadcrumbItems} variant="white" />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(buildBreadcrumbSchema(breadcrumbItems)),
+        }}
+      />
       <Suspense fallback={<FiltersSkeleton />}>
         <CategoryFilters
           totalCount={allCategories.length}

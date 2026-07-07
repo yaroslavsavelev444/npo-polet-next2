@@ -4,6 +4,10 @@ import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { OrderSuccessView } from "@/modules/checkout/components/OrderSuccessView";
 import { formatPrice } from "@/modules/productCard";
 import { getCachedOrderByOrderNumberForUser } from "@/payload/services/orders.service";
+export const metadata = {
+  title: "Заказы",
+  robots: { index: false, follow: false },
+};
 
 export default async function OrderConfirmationPage({
   params,

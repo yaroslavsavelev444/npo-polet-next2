@@ -13,7 +13,7 @@ interface ImageData {
   alt: string;
 }
 
-function getImageData(image: Category["image"]): ImageData | null {
+export function getImageData(image: Category["image"]): ImageData | null {
   if (!image || typeof image !== "object") {
     return null;
   }

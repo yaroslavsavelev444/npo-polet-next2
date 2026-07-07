@@ -8,8 +8,13 @@ import "./globals.css";
 import { Column, Flex, Meta } from "@once-ui-system/core";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
+import { getCachedSettings } from "@/payload/services/settings.service";
 import { Providers } from "@/providers/Providers";
 import { baseURL, home } from "@/resources/content";
+import {
+  buildOrganizationSchema,
+  buildWebsiteSchema,
+} from "@/shared/lib/seo/schema";
 import { cn } from "@/utils/cn";
 import Footer from "@/widgets/Footer/Footer";
 import { HeaderSpacer } from "@/widgets/Header/HeaderSpacer";
@@ -37,6 +42,8 @@ export async function generateMetadata() {
   });
 }
 
+const settings = await getCachedSettings();
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -60,6 +67,19 @@ export default async function RootLayout({
           padding="0"
           horizontal="center"
         >
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(buildOrganizationSchema(settings)),
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(buildWebsiteSchema()),
+            }}
+          />
+
           <StickyHeader />
           <HeaderSpacer />
           <Flex zIndex={0} fillWidth padding="l" horizontal="center" flex={1}>

@@ -1,21 +1,25 @@
+import { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import { redirect }         from "next/navigation";
-import { getPayload }       from "payload";
-import config               from "@/payloadconfig";
+import { redirect } from "next/navigation";
+import { getPayload } from "payload";
 import { getUserActiveSessions } from "@/modules/auth/lib/session";
-import { ProfileClient }    from "@/modules/profile/components/ProfileClient";
 import {
-  updateAccountAction,
   changePasswordAction,
-  revokeSessionAction,
-  refreshSessionsAction,
   logoutAction,
+  refreshSessionsAction,
+  revokeSessionAction,
+  updateAccountAction,
 } from "@/modules/profile/actions";
+import { ProfileClient } from "@/modules/profile/components/ProfileClient";
 import type {
-  ProfileUser,
   ProfileSession,
+  ProfileUser,
 } from "@/modules/profile/types/profile.types";
-
+import config from "@/payloadconfig";
+export const metadata: Metadata = {
+  title: "Профиль",
+  robots: { index: false, follow: false },
+};
 /**
  * /profile — Server Component.
  *
@@ -29,7 +33,7 @@ export default async function ProfilePage() {
   const cookieStore = await cookies();
   if (!cookieStore.get("payload-token")) redirect("/auth/login");
 
-  const h       = await headers();
+  const h = await headers();
   const payload = await getPayload({ config });
   const { user } = await payload.auth({ headers: h });
   if (!user) redirect("/auth/login");
@@ -40,39 +44,37 @@ export default async function ProfilePage() {
 
   const rawSessions = await getUserActiveSessions(payload, String(user.id));
   const sessions: ProfileSession[] = rawSessions.map((s) => ({
-    id:           String(s.id),
-    deviceLabel:  (s.deviceLabel ?? "Устройство") as string,
-    ip:           s.ip as string | undefined,
-    createdAt:    s.createdAt as string,
+    id: String(s.id),
+    deviceLabel: (s.deviceLabel ?? "Устройство") as string,
+    ip: s.ip as string | undefined,
+    createdAt: s.createdAt as string,
     lastActiveAt: s.lastActiveAt as string,
-    isCurrent:    String(s.id) === currentSessionId,
+    isCurrent: String(s.id) === currentSessionId,
   }));
 
   const profileUser: ProfileUser = {
-    id:            String(user.id),
-    name:          user.name as string,
-    email:         user.email as string,
-    role:          user.role as string,
-    status:        user.status as string,
+    id: String(user.id),
+    name: user.name as string,
+    email: user.email as string,
+    role: user.role as string,
+    status: user.status as string,
     emailVerified: user.emailVerified as boolean | undefined,
-    lastLoginAt:   user.lastLoginAt as string | undefined,
+    lastLoginAt: user.lastLoginAt as string | undefined,
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-         <main className="max-w-5xl mx-auto py-10 px-4">
-
-
+    <main className="max-w-5xl mx-auto py-10 px-4">
       <ProfileClient
         user={profileUser}
         sessions={sessions}
         actions={{
-          updateAccount:   updateAccountAction,
-          changePassword:  changePasswordAction,
-          revokeSession:   revokeSessionAction,
+          updateAccount: updateAccountAction,
+          changePassword: changePasswordAction,
+          revokeSession: revokeSessionAction,
           refreshSessions: refreshSessionsAction,
-          logout:          logoutAction,
+          logout: logoutAction,
         }}
       />
     </main>

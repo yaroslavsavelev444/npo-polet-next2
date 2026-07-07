@@ -1,0 +1,45 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: npo-polet-app
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - media_data:/app/media
+    networks: [internal]
+
+  postgres:
+    image: postgres:17
+    container_name: npo-polet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: npo_polet
+      POSTGRES_USER: npo_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [internal]
+
+  redis:
+    image: redis:8
+    container_name: npo-polet-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:
+
+networks:
+  internal:
+    driver: bridge

@@ -3,12 +3,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
+import { getImageData } from "@/modules/category/components/CategoryCard";
 import { ProductListContainer } from "@/modules/productCard/components/ProductListContainer";
 import type { ProductQuery } from "@/modules/productCard/types/query";
 import { ProductCatalogLayout } from "@/modules/productCatalog/components/ProductCatalogLayout";
 import { parseCatalogSearchParams } from "@/modules/productCatalog/lib/parseFilters";
 import { getCachedCategoryBySlug } from "@/payload/services/categories.service";
 import { getCatalogData } from "@/payload/services/products.service";
+import { baseURL } from "@/resources/content";
 
 interface Props {
   params: Promise<{ categorySlug: string }>;
@@ -24,6 +26,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: category.metaTitle || category.name,
     description: category.metaDescription || category.description,
+    alternates: { canonical: `${baseURL}/category/${categorySlug}` },
+    openGraph: {
+      title: category.metaTitle || category.name,
+      description:
+        category.metaDescription || category.description || undefined,
+      url: `${baseURL}/category/${categorySlug}`,
+      type: "website",
+      images: getImageData(category.image)?.url
+        ? [{ url: getImageData(category.image)!.url }]
+        : undefined,
+    },
   };
 }
 

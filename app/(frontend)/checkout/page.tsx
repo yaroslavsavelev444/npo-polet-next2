@@ -3,7 +3,10 @@ import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { CheckoutPageClient } from "@/modules/checkout";
 import { buildCheckoutView } from "@/modules/checkout/lib/build-checkout-view";
 
-export const metadata = { title: "Оформление заказа" };
+export const metadata = {
+  title: "Оформление заказа",
+  robots: { index: false, follow: false },
+};
 
 export default async function CheckoutPage() {
   const user = await getCurrentUser();
