@@ -90,10 +90,10 @@ export function OrderSuccessView({ order }: OrderSuccessViewProps) {
               <span>Сумма товаров</span>
               <span>{formatPrice(order.pricing.subtotal)}</span>
             </div>
-            {order.pricing.discount > 0 && (
+            {(order.pricing.discount ?? 0) > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Скидка</span>
-                <span>- {formatPrice(order.pricing.discount)}</span>
+                <span>- {formatPrice(order.pricing.discount ?? 0)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-semibold pt-3 border-t">

@@ -3,16 +3,9 @@ import { redirect } from "next/navigation";
 import { getPayload } from "payload";
 import { OtpForm } from "@/modules/auth/components/OtpForm";
 import { isTwoFAVerified } from "@/modules/auth/lib/twoFA";
+import { isUser } from "@/modules/auth/lib/typeGuards";
 import config from "@/payloadconfig";
 
-/**
- * Server Component: страница верификации OTP при входе.
- *
- * Сюда редиректит middleware, если пользователь авторизован (есть JWT),
- * но ещё не прошёл 2FA (twoFAVerified: false).
- *
- * Считываем email пользователя на сервере для OtpForm.
- */
 export default async function VerifyOtpPage() {
   const cookieStore = await cookies();
   const payloadToken = cookieStore.get("payload-token");
@@ -26,7 +19,7 @@ export default async function VerifyOtpPage() {
 
   const { user } = await payload.auth({ headers: h });
 
-  if (!user) {
+  if (!user || !isUser(user)) {
     redirect("/auth/login");
   }
 

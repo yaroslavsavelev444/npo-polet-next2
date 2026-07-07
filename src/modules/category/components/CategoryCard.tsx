@@ -49,9 +49,10 @@ export default function CategoryCard({
 
   const keywords = extractKeywords(category.keywords);
 
+  const categoryRecord = category as unknown as Record<string, unknown>;
   const productCount =
-    typeof (category as Record<string, unknown>).productCount === "number"
-      ? ((category as Record<string, unknown>).productCount as number)
+    typeof categoryRecord.productCount === "number"
+      ? (categoryRecord.productCount as number)
       : null;
 
   return (

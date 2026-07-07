@@ -46,12 +46,12 @@ export const Discounts: CollectionConfig = {
     // would never be visible to shoppers until a redeploy.
     afterChange: [
       () => {
-        revalidateTag("discounts");
+        revalidateTag("discounts", "max");
       },
     ],
     afterDelete: [
       () => {
-        revalidateTag("discounts");
+        revalidateTag("discounts", "max");
       },
     ],
   },
@@ -158,8 +158,8 @@ export const Discounts: CollectionConfig = {
     },
   ],
   timestamps: true,
-  dbIndexes: [
-    { fields: { isActive: 1, startAt: 1, endAt: 1 } },
-    { fields: { priority: 1, createdAt: -1 } },
-  ],
+  // indexes: [
+  //   { fields: { isActive: 1, startAt: 1, endAt: 1 } },
+  //   { fields: { priority: 1, createdAt: -1 } },
+  // ],
 };

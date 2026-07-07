@@ -12,6 +12,9 @@ export interface ProductSpecificationItem {
   unit: string | null;
   group: string | null;
 }
+export interface ProductUpsellRef {
+  id: string;
+}
 
 export interface ProductInstructionData {
   type: "file" | "link";
@@ -56,4 +59,5 @@ export interface ProductDetailData {
   brand: ProductBrandInfo;
   dimensions: ProductDimensionsInfo;
   instruction: ProductInstructionData | null;
+  upsellProducts: ProductUpsellRef[];
 }

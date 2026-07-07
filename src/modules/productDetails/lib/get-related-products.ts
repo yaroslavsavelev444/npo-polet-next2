@@ -1,6 +1,7 @@
 import type { ProductCardData } from "@/modules/productCard";
 import { mapProductToCardData } from "@/modules/productCard";
 import { getCachedProducts } from "@/payload/services/products.service";
+import type { Product } from "@/payload-types";
 
 const RELATED_PRODUCTS_LIMIT = 8;
 
@@ -9,22 +10,19 @@ export async function getRelatedProducts(
   excludeProductId: string,
   upsellIds: string[] = [],
 ): Promise<ProductCardData[]> {
-  // Если есть явно указанные связанные товары – используем их
   if (upsellIds.length > 0) {
     const { docs } = await getCachedProducts({
       ids: upsellIds,
       isVisible: true,
       limit: RELATED_PRODUCTS_LIMIT,
     });
-    // Возвращаем в том порядке, в котором они были указаны в админке
-    const productMap = new Map(docs.map((p) => [p.id, p]));
+    const productMap = new Map(docs.map((p) => [String(p.id), p]));
     return upsellIds
       .map((id) => productMap.get(id))
-      .filter(Boolean)
+      .filter((p): p is Product => Boolean(p))
       .map(mapProductToCardData);
   }
 
-  // Fallback: товары из той же категории (как было)
   const { docs } = await getCachedProducts({
     category: categoryId,
     isVisible: true,

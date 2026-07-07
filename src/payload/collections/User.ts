@@ -14,7 +14,8 @@ export const Users: CollectionConfig = {
     verify: false,
     forgotPassword: {
       generateEmailSubject: () => "Восстановление пароля",
-      generateEmailHTML: ({ token }) => {
+      generateEmailHTML: (args) => {
+        const token = args?.token ?? "";
         const resetUrl = `${env.NODE_ENV ?? "http://localhost:3000"}/auth/password-reset?token=${token}`;
         const bodyHtml = `
         <h1 style="margin:0 0 16px;font-size:18px;color:#18181B;">Восстановление пароля</h1>

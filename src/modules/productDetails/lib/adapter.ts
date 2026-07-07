@@ -12,12 +12,21 @@ import type {
   ProductDimensionsInfo,
   ProductInstructionData,
   ProductSpecificationItem,
+  ProductUpsellRef,
 } from "../types";
 
 function isPopulatedMedia(
   value: number | Media | null | undefined,
 ): value is Media {
   return typeof value === "object" && value !== null;
+}
+function mapUpsellProducts(
+  upsellProducts: (number | Product)[] | null | undefined,
+): ProductUpsellRef[] {
+  if (!upsellProducts) return [];
+  return upsellProducts.map((p) => ({
+    id: String(typeof p === "object" ? p.id : p),
+  }));
 }
 
 function isPopulatedCategory(
@@ -142,6 +151,8 @@ export function mapProductToDetailData(product: Product): ProductDetailData {
     maxOrderQuantity: product.inventory?.maxOrderQuantity ?? 9999,
     specifications: mapSpecifications(product.specifications),
     brand,
+    upsellProducts: mapUpsellProducts(product.relations?.upsellProducts),
+
     dimensions,
     instruction: mapInstruction(product.instruction),
   };

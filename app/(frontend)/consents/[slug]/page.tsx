@@ -23,13 +23,9 @@ export async function generateMetadata({
     return { title: "Соглашение не найдено" };
   }
 
-  const seo = consent.seo as
-    | { title?: string; description?: string }
-    | undefined;
-
   return Meta.generate({
-    title: seo?.title || consent.title,
-    description: seo?.description || consent.title,
+    title: consent.title,
+    description: consent.description || consent.title,
     baseURL,
     path: `/consents/${slug}`,
     image: "/og/consents.jpg",

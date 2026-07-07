@@ -16,7 +16,6 @@ interface ProductListContainerProps {
 
 export function ProductListContainer({
   products,
-  totalProducts,
   title,
   description,
   emptyMessage = "Товары не найдены",
@@ -27,7 +26,6 @@ export function ProductListContainer({
   return (
     <ProductsSection
       products={products}
-      totalProducts={totalProducts}
       title={title}
       description={description}
       emptyMessage={emptyMessage}

@@ -26,7 +26,7 @@ export function ConsentCard({ consent }: ConsentCardProps) {
         <h3 className="text-[1rem] font-bold leading-snug text-[var(--text-primary)]">
           {consent.title}
         </h3>
-        {consent.excerpt && (
+        {consent.description && (
           <p
             className="text-sm leading-relaxed text-[var(--text-secondary)]"
             style={{
@@ -36,7 +36,7 @@ export function ConsentCard({ consent }: ConsentCardProps) {
               overflow: "hidden",
             }}
           >
-            {consent.excerpt}
+            {consent.description}
           </p>
         )}
       </div>

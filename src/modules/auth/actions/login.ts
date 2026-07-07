@@ -47,7 +47,8 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
   const { email, password } = parsed.data;
   const { ip, userAgent } = await getRequestMeta();
 
-  const rl = await RATE_LIMITS.login(ip);
+  await RATE_LIMITS.login(ip);
+
   // if (!rl.allowed) {
   //   return actionError("Слишком много попыток входа. Попробуйте через час.");
   // }
@@ -91,7 +92,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
       },
       overrideAccess: true,
     });
-  } catch (err: unknown) {
+  } catch {
     await handleFailedLogin(payload, email);
     return actionError("Неверный email или пароль");
   }
@@ -154,36 +155,27 @@ async function handleFailedLogin(
     const attempts = (user.loginAttempts ?? 0) + 1;
 
     const MAX_ATTEMPTS = 10;
-
     const isLocked = attempts >= MAX_ATTEMPTS;
-
-    const lockUntil = isLocked
-      ? new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    const lockUntilDate = isLocked
+      ? new Date(Date.now() + 15 * 60 * 1000)
       : null;
 
     await payload.update({
       collection: "users",
-
       id: user.id,
-
       data: {
         loginAttempts: attempts,
-
-        ...(isLocked && {
-          lockUntil,
-        }),
+        ...(isLocked &&
+          lockUntilDate && { lockUntil: lockUntilDate.toISOString() }),
       },
-
       overrideAccess: true,
     });
 
-    if (isLocked) {
+    if (isLocked && lockUntilDate) {
       void notifyAccountLocked({
         email: user.email as string,
-
         userName: user.name as string,
-
-        lockedUntil: lockUntil!,
+        lockedUntil: lockUntilDate,
       });
     }
   } catch {

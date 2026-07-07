@@ -46,13 +46,11 @@ export default async function ProductDetailPage({ params }: Props) {
   const cardData = mapProductToCardData(product);
   const detailData = mapProductToDetailData(product);
 
-  const upsellIds = detailData.upsellProducts?.map((p: any) => p.id) || [];
+  const upsellIds = detailData.upsellProducts.map((p) => p.id);
 
-  const relatedProducts = await getRelatedProducts(
-    detailData.category.id,
-    detailData.id,
-    upsellIds,
-  );
+  const relatedProducts = detailData.category
+    ? await getRelatedProducts(detailData.category.id, detailData.id, upsellIds)
+    : [];
 
   const canonicalUrl = `${baseURL}${getProductHref(cardData, categorySlug)}`;
   const jsonLd = buildProductJsonLd(cardData, canonicalUrl);
@@ -75,7 +73,6 @@ export default async function ProductDetailPage({ params }: Props) {
     <main className="min-h-screen pb-16">
       <script
         type="application/ld+json"
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD структурированные данные
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 

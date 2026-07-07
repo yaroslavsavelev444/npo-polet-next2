@@ -95,22 +95,21 @@ export const Companies: CollectionConfig = {
     ],
   },
 
-  dbIndexes: [
-    {
-      fields: {
-        taxNumber: 1,
-        user: 1,
-      },
-      options: {
-        unique: true,
-      },
-    },
-
-    {
-      fields: {
-        companyName: "text",
-        taxNumber: "text",
-      },
-    },
-  ],
+  // indexes: [
+  //   {
+  //     fields: {
+  //       taxNumber: 1,
+  //       user: 1,
+  //     },
+  //     options: {
+  //       unique: true,
+  //     },
+  //   },
+  //   {
+  //     fields: {
+  //       companyName: "text",
+  //       taxNumber: "text",
+  //     },
+  //   },
+  // ],
 };

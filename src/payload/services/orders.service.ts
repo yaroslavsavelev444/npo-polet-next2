@@ -193,7 +193,7 @@ export async function createOrderFromCheckout({
   const order = await payload.create({
     collection: "orders",
     data: {
-      // orderNumber: "",
+      orderNumber: "",
       user: Number(userId),
       status: "pending",
       recipient: {

@@ -11,14 +11,12 @@ export const Admins: CollectionConfig = {
   },
 
   auth: {
-    tokenExpiration: 60 * 60 * 8, // 8ч — короче, чем сессия покупателя (7д)
+    tokenExpiration: 60 * 60 * 8,
     maxLoginAttempts: 5,
     lockTime: 15 * 60 * 1000,
     cookies: {
-      name: "admin-token", // отдельное имя — не пересекается с payload-token покупателей
       secure: true,
       sameSite: "Strict",
-      // domain НЕ указываем -> host-only cookie, живёт только на admin.npo-polet.ru
     },
   },
 

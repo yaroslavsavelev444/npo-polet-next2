@@ -82,8 +82,8 @@ export function ContactSection({ settings }: { settings: Setting }) {
       {/* Кнопки действий */}
       <ContactActions
         companyName={settings.companyName}
-        phones={settings.phones}
-        emails={settings.emails}
+        phones={settings.phones ?? []}
+        emails={settings.emails ?? []}
         physicalAddress={settings.physicalAddress}
       />
     </Block>

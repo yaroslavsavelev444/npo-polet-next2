@@ -1,4 +1,3 @@
-// src/modules/productCatalog/lib/parseFilters.ts
 import { z } from "zod";
 import type { FilterState, SortState } from "../types/filters";
 
@@ -22,14 +21,24 @@ const catalogFiltersSchema = z.object({
 });
 
 export function parseCatalogSearchParams(
-  searchParams: any,
+  searchParams: Record<string, string | string[] | undefined>,
 ): FilterState & SortState & { page: number } {
   try {
-    return catalogFiltersSchema.parse(searchParams);
+    const parsed = catalogFiltersSchema.parse(searchParams);
+    return {
+      priceFrom: parsed.priceFrom,
+      priceTo: parsed.priceTo,
+      status: parsed.status,
+      inStock: parsed.inStock,
+      field: parsed.sort,
+      sort: parsed.sort,
+      order: parsed.order,
+      page: parsed.page,
+    };
   } catch {
-    // Fallback на безопасные значения
     return {
       status: "all",
+      field: "createdAt",
       sort: "createdAt",
       order: "desc",
       page: 1,

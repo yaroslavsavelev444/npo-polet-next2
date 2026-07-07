@@ -27,7 +27,7 @@ export interface GetFeedbacksOptions {
 
 function buildFeedbacksWhere(options: GetFeedbacksOptions): Where {
   const where: Where = {};
-  const conditions: any[] = [];
+  const conditions: Where[] = [];
 
   if (options.status) {
     conditions.push({ status: { equals: options.status } });
@@ -157,7 +157,7 @@ export async function createFeedback(data: {
   title: string;
   description: string;
   email?: string;
-  user?: number; // Payload user ID
+  user?: number;
 }): Promise<Feedback> {
   const payload = await getPayloadInstance();
 
@@ -167,11 +167,10 @@ export async function createFeedback(data: {
       type: data.type,
       title: data.title,
       description: data.description,
-      email: data.email || "",
+      userEmail: data.email || "",
       user: data.user || undefined,
       status: "new",
       priority: "medium",
-      // Поля assignedTo, tags и другие можно не передавать — они останутся пустыми
     },
   });
 

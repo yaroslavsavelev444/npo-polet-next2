@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPayload } from "payload";
 import { getUserActiveSessions } from "@/modules/auth/lib/session";
+import { isUser } from "@/modules/auth/lib/typeGuards";
 import {
   changePasswordAction,
   logoutAction,
@@ -36,7 +37,7 @@ export default async function ProfilePage() {
   const h = await headers();
   const payload = await getPayload({ config });
   const { user } = await payload.auth({ headers: h });
-  if (!user) redirect("/auth/login");
+  if (!user || !isUser(user)) redirect("/auth/login");
 
   // ─── Data fetching ──────────────────────────────────────────────────────────
 
