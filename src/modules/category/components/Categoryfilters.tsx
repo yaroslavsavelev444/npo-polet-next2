@@ -1,14 +1,18 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo, useTransition } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Button, Space, Typography } from 'antd';
-import { CloseOutlined, SortAscendingOutlined, SortDescendingOutlined } from '@ant-design/icons';
+import {
+  CloseOutlined,
+  SortAscendingOutlined,
+  SortDescendingOutlined,
+} from "@ant-design/icons";
+import { Button, Space, Typography } from "antd";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useMemo, useTransition } from "react";
 
 const { Text } = Typography;
 
-export type SortField = 'order' | 'name' | 'createdAt';
-export type SortOrder = 'asc' | 'desc';
+export type SortField = "order" | "name" | "createdAt";
+export type SortOrder = "asc" | "desc";
 
 interface CategoryFiltersProps {
   totalCount: number;
@@ -16,36 +20,44 @@ interface CategoryFiltersProps {
 }
 
 const SORT_OPTIONS: ReadonlyArray<{ value: SortField; label: string }> = [
-  { value: 'order', label: 'По умолчанию' },
-  { value: 'name', label: 'По алфавиту' },
-  { value: 'createdAt', label: 'По дате' },
+  { value: "order", label: "По умолчанию" },
+  { value: "name", label: "По алфавиту" },
+  { value: "createdAt", label: "По дате" },
 ];
 
-export default function CategoryFilters({ totalCount, filteredCount }: CategoryFiltersProps) {
+export default function CategoryFilters({
+  totalCount,
+  filteredCount,
+}: CategoryFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   // Читаем параметры сортировки из URL
-  const sortBy = (searchParams.get('sort') ?? 'order') as SortField;
-  const sortOrder = (searchParams.get('order') ?? 'asc') as SortOrder;
+  const sortBy = (searchParams.get("sort") ?? "order") as SortField;
+  const sortOrder = (searchParams.get("order") ?? "asc") as SortOrder;
 
-  const hasActiveFilters = useMemo(() => sortBy !== 'order', [sortBy]);
+  const hasActiveFilters = useMemo(() => sortBy !== "order", [sortBy]);
 
   const updateParams = useCallback(
     (updates: Partial<Record<string, string>>) => {
       const params = new URLSearchParams(searchParams.toString());
 
       Object.entries(updates).forEach(([key, value]) => {
-        if (!value || value === '' || (key === 'sort' && value === 'order') || (key === 'order' && value === 'asc')) {
+        if (
+          !value ||
+          value === "" ||
+          (key === "sort" && value === "order") ||
+          (key === "order" && value === "asc")
+        ) {
           params.delete(key);
         } else {
           params.set(key, value);
         }
       });
 
-      params.delete('page'); // сбрасываем пагинацию
+      params.delete("page"); // сбрасываем пагинацию
 
       const query = params.toString();
       const url = query ? `${pathname}?${query}` : pathname;
@@ -54,7 +66,7 @@ export default function CategoryFilters({ totalCount, filteredCount }: CategoryF
         router.push(url, { scroll: false });
       });
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams],
   );
 
   const handleSortClick = useCallback(
@@ -63,13 +75,13 @@ export default function CategoryFilters({ totalCount, filteredCount }: CategoryF
         // Переключаем направление
         updateParams({
           sort: field,
-          order: sortOrder === 'asc' ? 'desc' : 'asc',
+          order: sortOrder === "asc" ? "desc" : "asc",
         });
         return;
       }
-      updateParams({ sort: field, order: 'asc' });
+      updateParams({ sort: field, order: "asc" });
     },
-    [sortBy, sortOrder, updateParams]
+    [sortBy, sortOrder, updateParams],
   );
 
   const handleReset = useCallback(() => {
@@ -88,15 +100,31 @@ export default function CategoryFilters({ totalCount, filteredCount }: CategoryF
             return (
               <Button
                 key={option.value}
-                type={active ? 'primary' : 'default'}
+                type={active ? "primary" : "default"}
                 onClick={() => handleSortClick(option.value)}
                 icon={
                   active ? (
-                    sortOrder === 'asc' ? <SortAscendingOutlined /> : <SortDescendingOutlined />
+                    sortOrder === "asc" ? (
+                      <SortAscendingOutlined />
+                    ) : (
+                      <SortDescendingOutlined />
+                    )
                   ) : undefined
                 }
-                className={active ? '' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-light)] hover:text-[var(--text-primary)]'}
-                style={active ? { backgroundColor: 'var(--primary)', borderColor: 'var(--primary)', color: '#fff' } : {}}
+                className={
+                  active
+                    ? ""
+                    : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-light)] hover:text-[var(--text-primary)]"
+                }
+                style={
+                  active
+                    ? {
+                        backgroundColor: "var(--primary)",
+                        borderColor: "var(--primary)",
+                        color: "#fff",
+                      }
+                    : {}
+                }
               >
                 {option.label}
               </Button>
