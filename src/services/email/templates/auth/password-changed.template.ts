@@ -1,7 +1,7 @@
-import type { EmailTemplate, RenderedEmail } from "../../types";
-import { renderButton } from "../shared/button";
-import { formatDate } from "../shared/formatters";
-import { renderEmailLayout } from "../shared/layout";
+import type { EmailTemplate, RenderedEmail } from "../../types.ts";
+import { renderButton } from "../shared/button.ts";
+import { formatDate } from "../shared/formatters.ts";
+import { renderEmailLayout } from "../shared/layout.ts";
 
 export interface PasswordChangedEmailData {
   userName: string;

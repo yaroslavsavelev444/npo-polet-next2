@@ -1,27 +1,26 @@
-export { getEmailConfig } from "./config";
-export { EmailService, emailService } from "./EmailService";
+export { getEmailConfig } from "./config.ts";
+export { EmailService, emailService } from "./EmailService.ts";
 export {
   EmailConfigError,
   EmailDeliveryError,
   EmailError,
   EmailTemplateError,
-} from "./errors";
-export { getAdminEmailAddresses } from "./recipients/getAdminEmails";
-export { accountLockedEmailTemplate } from "./templates/auth/account-locked.template";
-export { newSessionLoginEmailTemplate } from "./templates/auth/new-session-login.template";
+} from "./errors.ts";
+export { getAdminEmailAddresses } from "./recipients/getAdminEmails.ts";
+export { accountLockedEmailTemplate } from "./templates/auth/account-locked.template.ts";
+export { newSessionLoginEmailTemplate } from "./templates/auth/new-session-login.template.ts";
 export type {
   OtpEmailData,
   OtpEmailPurpose,
-} from "./templates/auth/otp-code.template";
-export { otpEmailTemplate } from "./templates/auth/otp-code.template";
-export { passwordChangedEmailTemplate } from "./templates/auth/password-changed.template";
-export { orderCancelledEmailTemplate } from "./templates/orders/order-cancelled.template";
-export { orderCreatedAdminEmailTemplate } from "./templates/orders/order-created-admin.template";
-export { orderCreatedUserEmailTemplate } from "./templates/orders/order-created-user.template";
-export { orderStatusChangedEmailTemplate } from "./templates/orders/order-status-changed.template";
-export { emailTemplates } from "./templates/registry";
-
-export { reviewStatusChangedEmailTemplate } from "./templates/reviews/review-status-changed.template";
+} from "./templates/auth/otp-code.template.ts";
+export { otpEmailTemplate } from "./templates/auth/otp-code.template.ts";
+export { passwordChangedEmailTemplate } from "./templates/auth/password-changed.template.ts";
+export { orderCancelledEmailTemplate } from "./templates/orders/order-cancelled.template.ts";
+export { orderCreatedAdminEmailTemplate } from "./templates/orders/order-created-admin.template.ts";
+export { orderCreatedUserEmailTemplate } from "./templates/orders/order-created-user.template.ts";
+export { orderStatusChangedEmailTemplate } from "./templates/orders/order-status-changed.template.ts";
+export { emailTemplates } from "./templates/registry.ts";
+export { reviewStatusChangedEmailTemplate } from "./templates/reviews/review-status-changed.template.ts";
 
 export type {
   EmailAddress,
@@ -29,4 +28,4 @@ export type {
   RenderedEmail,
   SendEmailOptions,
   SendEmailResult,
-} from "./types";
+} from "./types.ts";

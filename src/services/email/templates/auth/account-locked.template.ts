@@ -1,6 +1,6 @@
-import type { EmailTemplate, RenderedEmail } from "../../types";
-import { formatDate } from "../shared/formatters";
-import { renderEmailLayout } from "../shared/layout";
+import type { EmailTemplate, RenderedEmail } from "../../types.ts";
+import { formatDate } from "../shared/formatters.ts";
+import { renderEmailLayout } from "../shared/layout.ts";
 
 export interface AccountLockedEmailData {
   userName: string;

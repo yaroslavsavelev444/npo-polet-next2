@@ -1,5 +1,5 @@
-import type { EmailTemplate, RenderedEmail } from "../../types";
-import { renderEmailLayout } from "../shared/layout";
+import type { EmailTemplate, RenderedEmail } from "../../types.ts";
+import { renderEmailLayout } from "../shared/layout.ts";
 
 export type OtpEmailPurpose = "email_verify" | "login_2fa";
 

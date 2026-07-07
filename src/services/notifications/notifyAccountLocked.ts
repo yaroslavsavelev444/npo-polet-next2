@@ -1,5 +1,8 @@
-import { accountLockedEmailTemplate, emailService } from "../../services/email";
-import { emailLogger } from "../../services/email/logger";
+import {
+  accountLockedEmailTemplate,
+  emailService,
+} from "../../services/email/index.ts";
+import { emailLogger } from "../../services/email/logger.ts";
 
 export async function notifyAccountLocked(params: {
   email: string;

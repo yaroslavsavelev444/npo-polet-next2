@@ -1,8 +1,8 @@
-import type { EmailTemplate, RenderedEmail } from "../../types";
-import { renderButton, renderRow } from "../shared/button";
-import { escapeHtml } from "../shared/escapeHtml";
-import { formatRub } from "../shared/formatters";
-import { renderEmailLayout } from "../shared/layout";
+import type { EmailTemplate, RenderedEmail } from "../../types.ts";
+import { renderButton, renderRow } from "../shared/button.ts";
+import { escapeHtml } from "../shared/escapeHtml.ts";
+import { formatRub } from "../shared/formatters.ts";
+import { renderEmailLayout } from "../shared/layout.ts";
 
 export interface OrderCreatedUserEmailData {
   recipientName: string;

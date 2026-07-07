@@ -1,5 +1,5 @@
 import type { BasePayload } from "payload";
-import { Order } from "../../../payload-types.ts";
+import type { Order } from "../../../payload-types.ts";
 import { getEmailConfig } from "../email/config.ts";
 import {
   emailService,

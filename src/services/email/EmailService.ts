@@ -1,13 +1,13 @@
-import { getEmailConfig } from "./config";
-import { EmailDeliveryError, EmailTemplateError } from "./errors";
-import { emailLogger } from "./logger";
-import { getEmailTransporter } from "./transport";
+import { getEmailConfig } from "./config.ts";
+import { EmailDeliveryError, EmailTemplateError } from "./errors.ts";
+import { emailLogger } from "./logger.ts";
+import { getEmailTransporter } from "./transport.ts";
 import type {
   EmailAddress,
   EmailTemplate,
   SendEmailOptions,
   SendEmailResult,
-} from "./types";
+} from "./types.ts";
 
 function normalizeRecipients(
   to: EmailAddress | EmailAddress[],

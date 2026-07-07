@@ -1,9 +1,9 @@
+import { getEmailConfig } from "../../services/email/config.ts";
 import {
   emailService,
   newSessionLoginEmailTemplate,
-} from "../../services/email";
-import { getEmailConfig } from "../../services/email/config";
-import { emailLogger } from "../../services/email/logger";
+} from "../../services/email/index.ts";
+import { emailLogger } from "../../services/email/logger.ts";
 
 export async function notifyNewSessionLogin(params: {
   email: string;

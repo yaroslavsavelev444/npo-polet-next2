@@ -1,7 +1,6 @@
-import type { Order, User } from "../../../../payload-types";
-import type { EmailAddress } from "../types";
+import type { Order, User } from "../../../../payload-types.ts";
+import type { EmailAddress } from "../types.ts";
 
-/** Извлекает адрес получателя заказа из уже загруженного документа Order. */
 export function getOrderCustomerAddress(order: Order): EmailAddress {
   return { email: order.recipient.email, name: order.recipient.fullName };
 }

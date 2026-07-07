@@ -1,9 +1,8 @@
-// src/services/email/recipients/getAdminEmails.ts
 import type { BasePayload } from "payload";
-import type { EmailAddress } from "../types";
+import type { EmailAddress } from "../types.ts";
 
 export async function getAdminEmailAddresses(
-  payload: BasePayload, // ← принимаем инстанс, не создаём его сами
+  payload: BasePayload,
 ): Promise<EmailAddress[]> {
   const result = await payload.find({
     collection: "users",

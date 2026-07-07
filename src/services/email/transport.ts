@@ -1,5 +1,5 @@
 import nodemailer, { type Transporter } from "nodemailer";
-import { getEmailConfig } from "./config";
+import { getEmailConfig } from "./config.ts";
 
 let cachedTransporter: Transporter | null = null;
 

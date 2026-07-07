@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EmailConfigError } from "./errors";
+import { EmailConfigError } from "./errors.ts";
 
 const booleanFromEnv = (defaultValue: boolean) =>
   z

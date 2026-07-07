@@ -1,7 +1,7 @@
-import type { EmailTemplate, RenderedEmail } from "../../types";
-import { renderButton } from "../shared/button";
-import { escapeHtml } from "../shared/escapeHtml";
-import { renderEmailLayout } from "../shared/layout";
+import type { EmailTemplate, RenderedEmail } from "../../types.ts";
+import { renderButton } from "../shared/button.ts";
+import { escapeHtml } from "../shared/escapeHtml.ts";
+import { renderEmailLayout } from "../shared/layout.ts";
 
 export interface ReviewStatusChangedEmailData {
   userName: string;

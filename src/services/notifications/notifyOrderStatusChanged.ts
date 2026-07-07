@@ -1,13 +1,13 @@
-import type { Order } from "../../../payload-types";
+import type { Order } from "../../../payload-types.ts";
+import { getEmailConfig } from "../../services/email/config.ts";
 import {
   emailService,
   orderCancelledEmailTemplate,
   orderStatusChangedEmailTemplate,
-} from "../../services/email";
-import { getEmailConfig } from "../../services/email/config";
-import { emailLogger } from "../../services/email/logger";
-import { getOrderCustomerAddress } from "../../services/email/recipients/getOrderStakeholders";
-import type { TrackedOrderStatus } from "../../services/email/templates/orders/order-status-changed.template";
+} from "../../services/email/index.ts";
+import { emailLogger } from "../../services/email/logger.ts";
+import { getOrderCustomerAddress } from "../../services/email/recipients/getOrderStakeholders.ts";
+import type { TrackedOrderStatus } from "../../services/email/templates/orders/order-status-changed.template.ts";
 
 const TRACKED_STATUSES: TrackedOrderStatus[] = [
   "confirmed",
