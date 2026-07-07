@@ -1,9 +1,9 @@
-import { cookies, headers } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import config from '@/payloadconfig'
-import { OtpForm } from '@/modules/auth/components/OtpForm'
-import { isTwoFAVerified } from '@/modules/auth/lib/twoFA'
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { getPayload } from "payload";
+import { OtpForm } from "@/modules/auth/components/OtpForm";
+import { isTwoFAVerified } from "@/modules/auth/lib/twoFA";
+import config from "@/payloadconfig";
 
 /**
  * Server Component: страница верификации OTP при входе.
@@ -14,26 +14,25 @@ import { isTwoFAVerified } from '@/modules/auth/lib/twoFA'
  * Считываем email пользователя на сервере для OtpForm.
  */
 export default async function VerifyOtpPage() {
-  const cookieStore = await cookies()
-  const payloadToken = cookieStore.get('payload-token')
+  const cookieStore = await cookies();
+  const payloadToken = cookieStore.get("payload-token");
 
   if (!payloadToken) {
-    redirect('/auth/login')
+    redirect("/auth/login");
   }
 
-  const payload = await getPayload({ config })
-  const h = await headers()
+  const payload = await getPayload({ config });
+  const h = await headers();
 
-  const { user } = await payload.auth({ headers: h })
+  const { user } = await payload.auth({ headers: h });
 
   if (!user) {
-    redirect('/auth/login')
+    redirect("/auth/login");
   }
 
   if (isTwoFAVerified(user)) {
-  redirect('/profile')
-}
-
+    redirect("/profile");
+  }
 
   return (
     <OtpForm
@@ -42,5 +41,5 @@ export default async function VerifyOtpPage() {
       title="Подтверждение входа"
       description="Введите код, отправленный на"
     />
-  )
+  );
 }
