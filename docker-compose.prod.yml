@@ -7,12 +7,16 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        DATABASE_URI: ${DATABASE_URI}
-        PAYLOAD_SECRET: ${PAYLOAD_SECRET}
-    image: npo-polet-next2:${IMAGE_TAG:-latest}
-    container_name: npo-polet-app-prod
+        - DATABASE_URI
+        - PAYLOAD_SECRET
+    image: polet-next:${IMAGE_TAG:-latest}     # ← изменили имя
+    container_name: polet-next-app-prod
     restart: unless-stopped
     env_file: .env.production
+    environment:
+      - DATABASE_URI
+      - PAYLOAD_SECRET
+      - POSTGRES_PASSWORD
     ports:
       - "127.0.0.1:3004:3004"   # только localhost — наружу смотрит Nginx
     depends_on:
