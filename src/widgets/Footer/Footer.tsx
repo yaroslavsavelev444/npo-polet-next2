@@ -35,10 +35,7 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
   },
   {
     title: "Ресурсы",
-    links: [
-      { label: "FAQ", path: "/faq" },
-      { label: "База знаний", path: "/knowledge" },
-    ],
+    links: [{ label: "База знаний", path: "/knowledge" }],
   },
   {
     title: "О проекте",

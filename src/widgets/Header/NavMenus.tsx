@@ -19,10 +19,7 @@ export default function NavMenus({ categories }: Props) {
       />
       <DropdownMenu
         trigger="Ресурсы"
-        items={[
-          { label: "FAQ", href: "/faq" },
-          { label: "База знаний", href: "/knowledge" },
-        ]}
+        items={[{ label: "База знаний", href: "/knowledge" }]}
       />
       <DropdownMenu
         trigger="О нас"

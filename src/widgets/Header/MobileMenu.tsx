@@ -57,19 +57,6 @@ export default function MobileMenu({
         <div className="grid grid-cols-2 gap-8">
           <div>
             <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">
-              Ресурсы
-            </h3>
-            <Flex vertical="center" gap={3}>
-              <Link href="/faq" onClick={onClose}>
-                FAQ
-              </Link>
-              <Link href="/knowledge" onClick={onClose}>
-                База знаний
-              </Link>
-            </Flex>
-          </div>
-          <div>
-            <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">
               О нас
             </h3>
             <Flex vertical="center" gap={3}>
