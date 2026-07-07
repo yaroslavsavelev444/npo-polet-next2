@@ -2,6 +2,7 @@ import { postgresAdapter } from "@payloadcms/db-postgres";
 import { ru } from "@payloadcms/translations/languages/ru";
 import path from "path";
 import { buildConfig } from "payload";
+import { Admins } from "./src/payload/collections/Admins.ts";
 import { Banners } from "./src/payload/collections/Banners.ts";
 import { Carts } from "./src/payload/collections/Carts.ts";
 import { Categories } from "./src/payload/collections/Categories.ts";
@@ -25,6 +26,7 @@ import { Users } from "./src/payload/collections/User.ts";
 import { UserConsents } from "./src/payload/collections/UserConsents.ts"; // добавили
 import { Wishlists } from "./src/payload/collections/Wishlists.ts";
 import { Settings } from "./src/payload/globals/Settings.ts";
+
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET!,
 
@@ -32,10 +34,13 @@ export default buildConfig({
     supportedLanguages: { ru },
     fallbackLanguage: "ru",
   },
-
   admin: {
-    user: Users.slug,
+    user: Admins.slug,
   },
+
+  cors: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean),
+  csrf: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean),
+
   globals: [Settings],
   localization: {
     locales: ["ru", "en"],
@@ -43,6 +48,7 @@ export default buildConfig({
   },
 
   collections: [
+    Admins,
     Users,
     Media,
     Categories,

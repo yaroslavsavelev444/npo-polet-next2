@@ -1,36 +1,56 @@
+# docker-compose.prod.yml
+name: npo-polet-next2   # явное имя проекта — исключает коллизии сетей/контейнеров с comersi/*, polet-app-prod
+
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: npo-polet-app
+      args:
+        DATABASE_URI: ${DATABASE_URI}
+        PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+    image: npo-polet-next2:${IMAGE_TAG:-latest}
+    container_name: npo-polet-app-prod
     restart: unless-stopped
     env_file: .env.production
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3004:3004"   # только localhost — наружу смотрит Nginx
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - media_data:/app/media
     networks: [internal]
 
   postgres:
     image: postgres:17
-    container_name: npo-polet-postgres
+    container_name: npo-polet-postgres-prod
     restart: unless-stopped
     environment:
       POSTGRES_DB: npo_polet
       POSTGRES_USER: npo_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U npo_user -d npo_polet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks: [internal]
+    # без ports: — нет конфликта с уже занятыми 27017-27022/5432 на хосте
 
   redis:
-    image: redis:8
-    container_name: npo-polet-redis
+    image: redis:8-alpine
+    container_name: npo-polet-redis-prod
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - redis_data:/data
     networks: [internal]
@@ -42,4 +62,5 @@ volumes:
 
 networks:
   internal:
+    name: npo-polet-next2-internal
     driver: bridge
