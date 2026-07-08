@@ -1,10 +1,12 @@
 // app/(frontend)/contacts/page.tsx — добавить
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import type { Metadata } from "next";
 import { ContactSection } from "@/modules/contact/components/ContactSection";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import { baseURL } from "@/resources/content";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getCachedSettings();
   const title = "Контакты";

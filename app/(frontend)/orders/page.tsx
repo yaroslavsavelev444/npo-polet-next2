@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import type { OrderFilterGroup } from "@/modules/orders";
@@ -8,8 +11,7 @@ import {
   OrdersPageClient,
   OrdersPagination,
 } from "@/modules/orders";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 export const metadata = {
   title: "Мои заказысрфе",
   robots: { index: false, follow: false },

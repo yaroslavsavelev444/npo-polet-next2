@@ -1,10 +1,9 @@
-import { ConsentListItem } from "@/modules/auth/types";
-import { getPayloadInstance } from "@/payload/services/getPayload";
-import config from "@/payloadconfig";
-import { RegisterPageClient } from "./RegisterPageClient";
-
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+import { ConsentListItem } from "@/modules/auth/types";
+import { getPayloadInstance } from "@/payload/services/getPayload";
+import { RegisterPageClient } from "./RegisterPageClient";
 
 /**
  * Server Component: загружает список согласий через Payload Local API.

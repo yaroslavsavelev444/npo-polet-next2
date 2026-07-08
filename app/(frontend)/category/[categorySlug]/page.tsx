@@ -1,4 +1,6 @@
 // app/(frontend)/categories/[categorySlug]/page.tsx
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -11,8 +13,7 @@ import { parseCatalogSearchParams } from "@/modules/productCatalog/lib/parseFilt
 import { getCachedCategoryBySlug } from "@/payload/services/categories.service";
 import { getCatalogData } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 interface Props {
   params: Promise<{ categorySlug: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

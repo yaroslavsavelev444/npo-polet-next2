@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -16,8 +19,7 @@ import type {
   ProfileUser,
 } from "@/modules/profile/types/profile.types";
 import { getPayloadInstance } from "@/payload/services/getPayload";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Профиль",
   robots: { index: false, follow: false },

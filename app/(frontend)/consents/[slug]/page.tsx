@@ -1,4 +1,6 @@
 // app/(frontend)/consents/[slug]/page.tsx
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import { Column, Heading, Meta, Schema } from "@once-ui-system/core";
 import type { ItemType } from "antd/es/breadcrumb/Breadcrumb";
@@ -8,8 +10,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
 import { ConsentContent, ConsentDocumentDownload } from "@/modules/consents";
 import { getCachedConsentBySlug } from "@/payload/services/consents.service";
 import { baseURL } from "@/resources/content";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 type ConsentPageProps = {
   params: Promise<{ slug: string }>;
 };

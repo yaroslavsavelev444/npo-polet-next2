@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { OtpForm } from "@/modules/auth/components/OtpForm";
@@ -5,8 +8,6 @@ import { isTwoFAVerified } from "@/modules/auth/lib/twoFA";
 import { isUser } from "@/modules/auth/lib/typeGuards";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 export default async function VerifyOtpPage() {
   const cookieStore = await cookies();
   const payloadToken = cookieStore.get("payload-token");

@@ -1,11 +1,13 @@
 // app/(frontend)/cart/page.tsx
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { CartPageClient } from "@/modules/cart/components/CartPageClient";
 import { buildCartView } from "@/modules/cart/lib/build-cart-view";
 import { getCartByUserId } from "@/payload/services/carts.service";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 export const metadata = {
   title: "Корзина",
   robots: { index: false, follow: false },

@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
@@ -18,8 +21,7 @@ import {
 } from "@/modules/productDetails";
 import { getCachedProductById } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 interface Props {
   params: Promise<{ categorySlug: string; id: string }>;
 }

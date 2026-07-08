@@ -1,11 +1,11 @@
-import { CheckCircle2 } from "lucide-react";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { OrderSuccessView } from "@/modules/checkout/components/OrderSuccessView";
-import { formatPrice } from "@/modules/productCard";
 import { getCachedOrderByOrderNumberForUser } from "@/payload/services/orders.service";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 export const metadata = {
   title: "Заказы",
   robots: { index: false, follow: false },

@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
@@ -6,8 +9,7 @@ import CategoryGrid from "@/modules/category/components/CategoryGrid";
 import { getCachedCategories } from "@/payload/services/categories.service";
 import type { Category } from "@/payload-types";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Каталог категорий",
   description: "Все категории товаров нашего магазина",
