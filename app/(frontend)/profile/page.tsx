@@ -17,6 +17,7 @@ import type {
 } from "@/modules/profile/types/profile.types";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const metadata: Metadata = {
   title: "Профиль",
   robots: { index: false, follow: false },

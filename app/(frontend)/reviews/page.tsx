@@ -1,6 +1,7 @@
 // app/(frontend)/reviews/page.tsx
 import { noIndexMetadata, PagePlaceholder } from "@/modules/pagePlaceholder";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const metadata = noIndexMetadata;
 
 export default function ReviewsPage() {

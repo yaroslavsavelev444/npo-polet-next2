@@ -4,6 +4,7 @@ import config from "@/payloadconfig";
 import { RegisterPageClient } from "./RegisterPageClient";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /**
  * Server Component: загружает список согласий через Payload Local API.

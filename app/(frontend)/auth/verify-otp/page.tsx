@@ -6,6 +6,7 @@ import { isUser } from "@/modules/auth/lib/typeGuards";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export default async function VerifyOtpPage() {
   const cookieStore = await cookies();
   const payloadToken = cookieStore.get("payload-token");

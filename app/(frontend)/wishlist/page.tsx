@@ -4,6 +4,7 @@ import { WishlistPageClient } from "@/modules/wishlist/components/WishlistPageCl
 import { buildWishlistView } from "@/modules/wishlist/lib/build-wishlist-view";
 import { getWishlistByUserId } from "@/payload/services/wishlists.service";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const metadata = {
   title: "Избранное",
   robots: { index: false, follow: false },

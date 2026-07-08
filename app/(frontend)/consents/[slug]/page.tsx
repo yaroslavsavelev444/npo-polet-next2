@@ -9,6 +9,7 @@ import { ConsentContent, ConsentDocumentDownload } from "@/modules/consents";
 import { getCachedConsentBySlug } from "@/payload/services/consents.service";
 import { baseURL } from "@/resources/content";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 type ConsentPageProps = {
   params: Promise<{ slug: string }>;
 };

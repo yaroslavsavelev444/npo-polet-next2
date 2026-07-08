@@ -19,6 +19,7 @@ import {
 import { getCachedProductById } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 interface Props {
   params: Promise<{ categorySlug: string; id: string }>;
 }

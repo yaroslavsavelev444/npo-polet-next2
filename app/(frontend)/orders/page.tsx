@@ -9,6 +9,7 @@ import {
   OrdersPagination,
 } from "@/modules/orders";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const metadata = {
   title: "Мои заказысрфе",
   robots: { index: false, follow: false },

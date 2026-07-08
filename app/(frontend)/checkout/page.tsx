@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { CheckoutPageClient } from "@/modules/checkout";
 import { buildCheckoutView } from "@/modules/checkout/lib/build-checkout-view";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const metadata = {
   title: "Оформление заказа",
   robots: { index: false, follow: false },
