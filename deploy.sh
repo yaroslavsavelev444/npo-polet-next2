@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 ### ── CONFIG ──────────────────────────────────────────────────────────────
 PROJECT_DIR="/home/y4s/polet-next"
-BRANCH="main"
+BRANCH="master"
 COMPOSE_FILE="docker-compose.prod.yml"
 COMPOSE_PROJECT="polet-next"
 HEALTH_URL="http://127.0.0.1:3004/api/health"
