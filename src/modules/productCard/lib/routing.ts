@@ -1,3 +1,4 @@
+// src/modules/productCard/lib/routing.ts
 /**
  * modules/productCard/lib/routing.ts
  *
@@ -13,7 +14,7 @@
  *      например в блоке "похожие товары")
  */
 
-import type { ProductCardData } from "../types";
+import type { ProductCardData } from "../types/index.ts";
 
 const FALLBACK_CATEGORY_SLUG = "all";
 

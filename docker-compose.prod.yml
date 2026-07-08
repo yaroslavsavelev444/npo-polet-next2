@@ -3,7 +3,7 @@ name: polet-next
 services:
   postgres:
     image: postgres:17
-    container_name: npo-polet-postgres-prod
+    container_name: polet-next-postgres-prod
     restart: unless-stopped
     environment:
       POSTGRES_DB: npo_polet
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:8-alpine
-    container_name: npo-polet-redis-prod
+    container_name: polet-next-redis-prod
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -31,10 +31,8 @@ services:
       - redis_data:/data
     networks: [internal]
 
-  # Одноразовый служебный контейнер: миграции и bootstrap-admin.
-  # Никогда не запускается через `up`/`up -d` без имени — только
-  # `docker compose --profile tools run --rm migrate <команда>`.
-  # Не имеет restart-политики намеренно: это команда, а не сервис.
+  # Одноразовый служебный контейнер: миграции и graph-guard.
+  # Запускается ТОЛЬКО через `--profile tools run --rm migrate <команда>`.
   migrate:
     build:
       context: .
@@ -54,16 +52,12 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
-      # Ключевая правка: build-контейнер (next build внутри target=builder,
-      # который наследуется в runner) присоединяется к сети compose, где
-      # к этому моменту уже поднят и промигрирован Postgres. Благодаря этому
-      # "Collecting page data" получает реальное соединение вместо ENOTFOUND.
       network: polet-next-internal
       args:
         DATABASE_URI: ${DATABASE_URI}
         PAYLOAD_SECRET: ${PAYLOAD_SECRET}
     image: polet-next:${IMAGE_TAG:-latest}
-    container_name: npo-polet-app-prod
+    container_name: polet-next-app-prod
     restart: unless-stopped
     env_file: .env.production
     ports:

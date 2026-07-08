@@ -6,14 +6,17 @@ PROJECT_DIR="/home/y4s/polet-next"
 BRANCH="master"
 COMPOSE_FILE="docker-compose.prod.yml"
 COMPOSE_PROJECT="polet-next"
+ENV_FILE=".env.production"
 HEALTH_URL="http://127.0.0.1:3004/api/health"
 MAX_WAIT=120
 SLEEP=3
-LOG_FILE="/var/log/npo-polet-deploy.log"
-LOCK_FILE="/tmp/npo-polet-deploy.lock"
+LOG_DIR="$PROJECT_DIR/logs"
+LOG_FILE="$LOG_DIR/deploy.log"
+LOCK_FILE="/tmp/polet-next-deploy.lock"
 STATE_FILE="$PROJECT_DIR/.last_successful_commit"
 KEEP_IMAGES=3
 
+mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 log()  { echo "[$(date '+%F %T')] $*"; }
@@ -24,7 +27,13 @@ flock -n 200 || fail "Другой деплой уже выполняется (l
 
 cd "$PROJECT_DIR" || fail "Директория проекта не найдена: $PROJECT_DIR"
 
-compose() { docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" "$@"; }
+# Критическая правка: --env-file прокидывается ЯВНО в каждый вызов compose.
+# Без этого Compose не подставит ${POSTGRES_PASSWORD}/${DATABASE_URI}/${PAYLOAD_SECRET}
+# в сам YAML (build args, environment, image) — только внутрь контейнера через
+# env_file:, а это разные механизмы. Отсюда были варнинги "variable is not set".
+compose() {
+  docker compose --env-file "$ENV_FILE" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" "$@"
+}
 
 wait_for_ready() {
     local start elapsed
@@ -68,9 +77,6 @@ rollback() {
     git reset --hard "$prev"
     export IMAGE_TAG="$prev"
 
-    # Откат НЕ трогает БД и НЕ откатывает миграции — код проектируется
-    # backward-compatible (expand-first), поэтому предыдущий образ работает
-    # со схемой, накатанной более новой миграцией, без потери данных.
     compose build app || { log "❌ Откат: сборка не удалась"; exit 1; }
     compose up -d app --remove-orphans || { log "❌ Откат: запуск не удался"; exit 1; }
 
@@ -90,7 +96,7 @@ log "=== 🚀 Деплой начат ==="
 command -v docker >/dev/null || fail "docker не установлен"
 command -v git    >/dev/null || fail "git не установлен"
 command -v curl   >/dev/null || fail "curl не установлен"
-[[ -f .env.production ]] || fail ".env.production отсутствует"
+[[ -f "$ENV_FILE" ]] || fail "$ENV_FILE отсутствует"
 
 CURRENT_COMMIT=$(git rev-parse HEAD)
 log "Текущий коммит: $CURRENT_COMMIT"
@@ -109,31 +115,21 @@ echo "$CURRENT_COMMIT" > "$STATE_FILE.rollback_candidate"
 git reset --hard "$NEW_COMMIT"
 export IMAGE_TAG="$NEW_COMMIT"
 
-# ── Шаг 1: инфраструктура ВСЕГДА поднимается первой ────────────────────────
-# Идемпотентно: если postgres/redis уже работают — no-op.
 log "Поднятие Postgres и Redis..."
 compose up -d postgres redis
 wait_for_postgres || fail "Postgres недоступен — деплой остановлен ДО любых миграций/сборки"
 
-# ── Шаг 2: миграции — ПЕРЕД сборкой приложения ──────────────────────────────
-# Не разрушительны: payload migrate применяет только новые файлы миграций
-# из src/migrations, никогда не пересоздаёт схему и не трогает существующие
-# данные. Гарантирует, что к моменту next build схема БД актуальна, и
-# build-time запросы Payload не упадут на "relation does not exist".
 log "Проверка графа импортов payload.config.ts (guard script)..."
-compose --profile tools run --rm --entrypoint sh migrate \
-  -c "node scripts/verify-payload-graph.mjs" \
+compose --profile tools build migrate || fail "Не удалось собрать образ для миграций/guard"
+compose --profile tools run --rm --entrypoint node migrate scripts/verify-payload-graph.mjs \
   || fail "payload.config.ts граф невалиден — сборка остановлена до миграций"
 
 log "Применение миграций Payload..."
-compose --profile tools build migrate || fail "Не удалось собрать образ для миграций"
 compose --profile tools run --rm migrate || fail "Миграции не применились — деплой остановлен ДО сборки приложения"
 
-# ── Шаг 3: сборка приложения (next build с доступом к промигрированной БД) ──
 log "Сборка образа приложения с тегом: $IMAGE_TAG"
 compose build app || fail "Сборка Docker-образа приложения не удалась"
 
-# ── Шаг 4: переключение трафика ─────────────────────────────────────────────
 log "Запуск обновлённого контейнера приложения..."
 compose up -d app --remove-orphans || fail "docker compose up не удался"
 
