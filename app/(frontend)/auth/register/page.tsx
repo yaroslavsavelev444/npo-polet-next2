@@ -1,14 +1,16 @@
-import { getPayload } from "payload";
 import { ConsentListItem } from "@/modules/auth/types";
+import { getPayloadInstance } from "@/payload/services/getPayload";
 import config from "@/payloadconfig";
 import { RegisterPageClient } from "./RegisterPageClient";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Server Component: загружает список согласий через Payload Local API.
  * Нет клиентского fetch — данные готовы при рендере.
  */
 export default async function RegisterPage() {
-  const payload = await getPayload({ config });
+  const payload = await getPayloadInstance();
 
   const { docs: consents } = await payload.find({
     collection: "consents",

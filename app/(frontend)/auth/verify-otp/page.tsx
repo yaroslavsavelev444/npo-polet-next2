@@ -1,11 +1,11 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getPayload } from "payload";
 import { OtpForm } from "@/modules/auth/components/OtpForm";
 import { isTwoFAVerified } from "@/modules/auth/lib/twoFA";
 import { isUser } from "@/modules/auth/lib/typeGuards";
-import config from "@/payloadconfig";
+import { getPayloadInstance } from "@/payload/services/getPayload";
 
+export const dynamic = "force-dynamic";
 export default async function VerifyOtpPage() {
   const cookieStore = await cookies();
   const payloadToken = cookieStore.get("payload-token");
@@ -14,7 +14,7 @@ export default async function VerifyOtpPage() {
     redirect("/auth/login");
   }
 
-  const payload = await getPayload({ config });
+  const payload = await getPayloadInstance();
   const h = await headers();
 
   const { user } = await payload.auth({ headers: h });

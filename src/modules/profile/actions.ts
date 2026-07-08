@@ -3,12 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getPayload } from "payload";
 import {
   getUserActiveSessions,
   invalidateSession,
 } from "@/modules/auth/lib/session";
-import config from "@/payloadconfig";
+import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordChanged";
 import {
   ChangePasswordPayload,
@@ -20,7 +19,7 @@ import {
 
 async function getAuthedUser() {
   const h = await headers();
-  const payload = await getPayload({ config });
+  const payload = await getPayloadInstance();
   const { user } = await payload.auth({ headers: h });
   if (!user) redirect("/auth/login");
   return { payload, user };
@@ -48,7 +47,7 @@ export async function changePasswordAction(
   data: ChangePasswordPayload,
 ): Promise<void> {
   const h = await headers();
-  const payload = await getPayload({ config });
+  const payload = await getPayloadInstance();
 
   // Payload's built-in login verifies the old password
   const { user } = await payload.auth({ headers: h });

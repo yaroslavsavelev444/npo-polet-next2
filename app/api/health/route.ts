@@ -1,14 +1,14 @@
 // app/api/health/route.ts
+
 import { NextResponse } from "next/server";
-import { getPayload } from "payload";
-import config from "@/payloadconfig";
+import { getPayloadInstance } from "@/payload/services/getPayload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const payload = await getPayload({ config });
+    const payload = await getPayloadInstance();
     // Лёгкий запрос — подтверждает, что БД доступна и Payload инициализирован
     await payload.findGlobal({
       slug: "settings",

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPayload } from "payload";
 import { getActiveSession } from "@/modules/auth/lib/session";
 import { isUser } from "@/modules/auth/lib/typeGuards";
-import config from "@/payloadconfig";
+import { getPayloadInstance } from "@/payload/services/getPayload";
 import { isTwoFAVerified } from "../lib/twoFA";
 
 export async function GET(req: NextRequest) {
-  const payload = await getPayload({ config });
+  const payload = await getPayloadInstance();
 
   let user: Awaited<ReturnType<typeof payload.auth>>["user"];
 

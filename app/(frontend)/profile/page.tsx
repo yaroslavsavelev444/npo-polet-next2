@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getPayload } from "payload";
 import { getUserActiveSessions } from "@/modules/auth/lib/session";
 import { isUser } from "@/modules/auth/lib/typeGuards";
 import {
@@ -16,7 +15,8 @@ import type {
   ProfileSession,
   ProfileUser,
 } from "@/modules/profile/types/profile.types";
-import config from "@/payloadconfig";
+import { getPayloadInstance } from "@/payload/services/getPayload";
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Профиль",
   robots: { index: false, follow: false },
@@ -35,7 +35,7 @@ export default async function ProfilePage() {
   if (!cookieStore.get("payload-token")) redirect("/auth/login");
 
   const h = await headers();
-  const payload = await getPayload({ config });
+  const payload = await getPayloadInstance();
   const { user } = await payload.auth({ headers: h });
   if (!user || !isUser(user)) redirect("/auth/login");
 

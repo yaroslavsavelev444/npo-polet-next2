@@ -1,10 +1,9 @@
 import { headers } from "next/headers";
-import { getPayload } from "payload";
-import config from "@/payloadconfig";
+import { getPayloadInstance } from "@/payload/services/getPayload";
 import { isUser } from "./typeGuards";
 
 export async function getCurrentUser() {
-  const payload = await getPayload({ config });
+  const payload = await getPayloadInstance();
 
   try {
     const { user } = await payload.auth({
