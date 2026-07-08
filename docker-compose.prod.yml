@@ -52,7 +52,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
-      network: polet-next-internal
+      # network: polet-next-internal
       args:
         DATABASE_URI: ${DATABASE_URI}
         PAYLOAD_SECRET: ${PAYLOAD_SECRET}
