@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ### ── CONFIG ──────────────────────────────────────────────────────────────
-PROJECT_DIR="/var/www/polet-next"
+PROJECT_DIR="/home/y4s/polet-next"
 BRANCH="main"
 COMPOSE_FILE="docker-compose.prod.yml"
 COMPOSE_PROJECT="polet-next"
