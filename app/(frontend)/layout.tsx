@@ -42,13 +42,13 @@ export async function generateMetadata() {
   });
 }
 
-const settings = await getCachedSettings();
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const settings = await getCachedSettings();
+
   return (
     <Providers>
       <Flex

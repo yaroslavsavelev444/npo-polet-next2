@@ -1,14 +1,13 @@
 // app/(frontend)/sitemap.ts
+export const dynamic = "force-dynamic";
+export const revalidate = 3600;
+
 import type { MetadataRoute } from "next";
 import { getCachedCategories } from "@/payload/services/categories.service";
 import { getCachedConsents } from "@/payload/services/consents.service";
 import { getCachedProducts } from "@/payload/services/products.service";
 import type { Category } from "@/payload-types";
 import { baseURL } from "@/resources/content";
-
-// Инвалидируется вместе с revalidateTag('products'/'categories'/'consents'),
-// раз в час — достаточно для каталога, не создаёт лишней нагрузки на БД.
-export const revalidate = 3600;
 
 const STATIC_ROUTES: Array<{
   path: string;
