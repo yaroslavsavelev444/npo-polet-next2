@@ -77,6 +77,6 @@ server {
         include /etc/nginx/proxy_params_npo.conf;
     }
 
-    access_log /var/log/nginx/npo-polet-next2.access.log;
-    error_log  /var/log/nginx/npo-polet-next2.error.log;
+    access_log /var/log/nginx/polet-next.access.log;
+    error_log  /var/log/nginx/polet-next.error.log;
 }

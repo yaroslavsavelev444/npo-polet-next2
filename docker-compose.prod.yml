@@ -1,33 +1,6 @@
-# docker-compose.prod.yml
-name: npo-polet-next2   # явное имя проекта — исключает коллизии сетей/контейнеров с comersi/*, polet-app-prod
+name: polet-next
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - DATABASE_URI
-        - PAYLOAD_SECRET
-    image: polet-next:${IMAGE_TAG:-latest}     # ← изменили имя
-    container_name: polet-next-app-prod
-    restart: unless-stopped
-    env_file: .env.production
-    environment:
-      - DATABASE_URI
-      - PAYLOAD_SECRET
-      - POSTGRES_PASSWORD
-    ports:
-      - "127.0.0.1:3004:3004"   # только localhost — наружу смотрит Nginx
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - media_data:/app/media
-    networks: [internal]
-
   postgres:
     image: postgres:17
     container_name: npo-polet-postgres-prod
@@ -38,13 +11,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U npo_user -d npo_polet"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks: [internal]
-    # без ports: — нет конфликта с уже занятыми 27017-27022/5432 на хосте
 
   redis:
     image: redis:8-alpine
@@ -52,11 +24,57 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     volumes:
       - redis_data:/data
+    networks: [internal]
+
+  # Одноразовый служебный контейнер: миграции и bootstrap-admin.
+  # Никогда не запускается через `up`/`up -d` без имени — только
+  # `docker compose --profile tools run --rm migrate <команда>`.
+  # Не имеет restart-политики намеренно: это команда, а не сервис.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base-builder
+    image: polet-next-migrate:${IMAGE_TAG:-latest}
+    env_file: .env.production
+    command: ["pnpm", "payload", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    profiles: ["tools"]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+      # Ключевая правка: build-контейнер (next build внутри target=builder,
+      # который наследуется в runner) присоединяется к сети compose, где
+      # к этому моменту уже поднят и промигрирован Postgres. Благодаря этому
+      # "Collecting page data" получает реальное соединение вместо ENOTFOUND.
+      network: polet-next-internal
+      args:
+        DATABASE_URI: ${DATABASE_URI}
+        PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+    image: polet-next:${IMAGE_TAG:-latest}
+    container_name: npo-polet-app-prod
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "127.0.0.1:3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_data:/app/media
     networks: [internal]
 
 volumes:
@@ -66,5 +84,5 @@ volumes:
 
 networks:
   internal:
-    name: npo-polet-next2-internal
+    name: polet-next-internal
     driver: bridge
