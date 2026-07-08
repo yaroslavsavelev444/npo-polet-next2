@@ -8,7 +8,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
 import { ConsentContent, ConsentDocumentDownload } from "@/modules/consents";
 import { getCachedConsentBySlug } from "@/payload/services/consents.service";
 import { baseURL } from "@/resources/content";
-
+export const dynamic = "force-dynamic";
 type ConsentPageProps = {
   params: Promise<{ slug: string }>;
 };

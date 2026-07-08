@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { WishlistPageClient } from "@/modules/wishlist/components/WishlistPageClient";
 import { buildWishlistView } from "@/modules/wishlist/lib/build-wishlist-view";
 import { getWishlistByUserId } from "@/payload/services/wishlists.service";
-
+export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Избранное",
   robots: { index: false, follow: false },

@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { OrderSuccessView } from "@/modules/checkout/components/OrderSuccessView";
 import { formatPrice } from "@/modules/productCard";
 import { getCachedOrderByOrderNumberForUser } from "@/payload/services/orders.service";
+export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Заказы",
   robots: { index: false, follow: false },

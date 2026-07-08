@@ -6,7 +6,7 @@ import CategoryGrid from "@/modules/category/components/CategoryGrid";
 import { getCachedCategories } from "@/payload/services/categories.service";
 import type { Category } from "@/payload-types";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
-
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Каталог категорий",
   description: "Все категории товаров нашего магазина",

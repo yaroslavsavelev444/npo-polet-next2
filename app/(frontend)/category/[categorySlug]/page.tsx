@@ -11,7 +11,7 @@ import { parseCatalogSearchParams } from "@/modules/productCatalog/lib/parseFilt
 import { getCachedCategoryBySlug } from "@/payload/services/categories.service";
 import { getCatalogData } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
-
+export const dynamic = "force-dynamic";
 interface Props {
   params: Promise<{ categorySlug: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

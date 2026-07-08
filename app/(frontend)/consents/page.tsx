@@ -3,7 +3,7 @@ import { Column, Heading, Meta, Schema, Text } from "@once-ui-system/core";
 import { AutoBreadcrumbs } from "@/components/Breadcrumbs/AutoBreadcrumbs";
 import { ConsentsList } from "@/modules/consents";
 import { baseURL } from "@/resources/content";
-
+export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   return Meta.generate({
     title: "Соглашения",

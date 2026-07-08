@@ -18,7 +18,7 @@ import {
 } from "@/modules/productDetails";
 import { getCachedProductById } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
-
+export const dynamic = "force-dynamic";
 interface Props {
   params: Promise<{ categorySlug: string; id: string }>;
 }

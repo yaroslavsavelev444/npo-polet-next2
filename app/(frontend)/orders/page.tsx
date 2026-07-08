@@ -8,7 +8,7 @@ import {
   OrdersPageClient,
   OrdersPagination,
 } from "@/modules/orders";
-
+export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Мои заказысрфе",
   robots: { index: false, follow: false },
