@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import { useActionState } from 'react'
-import Link from 'next/link'
-import { forgotPasswordAction } from '../actions/initiatePasswordReset'
+import Link from "next/link";
+import { useActionState } from "react";
+import { forgotPasswordAction } from "../actions/initiatePasswordReset";
 
 /**
  * Форма запроса сброса пароля.
@@ -10,26 +10,31 @@ import { forgotPasswordAction } from '../actions/initiatePasswordReset'
  * существует ли email в системе (защита от email enumeration).
  */
 export function ForgotPasswordForm() {
-  const [state, action, isPending] = useActionState(forgotPasswordAction, null)
+  const [state, action, isPending] = useActionState(forgotPasswordAction, null);
 
   if (state?.success) {
     return (
       <div className="w-full max-w-md mx-auto">
         <div className="rounded-lg bg-green-50 border border-green-200 p-6 text-center">
           <div className="mb-3 text-3xl">✉️</div>
-          <h2 className="text-lg font-semibold text-green-800 mb-2">Письмо отправлено</h2>
+          <h2 className="text-lg font-semibold text-green-800 mb-2">
+            Письмо отправлено
+          </h2>
           <p className="text-sm text-green-700">{state.data.message}</p>
           <p className="mt-3 text-xs text-green-600">
             Проверьте папку «Спам», если письмо не пришло.
           </p>
         </div>
         <div className="mt-4 text-center">
-          <Link href="/auth/login" className="text-sm text-blue-600 hover:text-blue-500">
+          <Link
+            href="/auth/login"
+            className="text-sm text-blue-600 hover:text-blue-500"
+          >
             ← Вернуться к входу
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -52,7 +57,10 @@ export function ForgotPasswordForm() {
         )}
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Email
           </label>
           <input
@@ -68,7 +76,9 @@ export function ForgotPasswordForm() {
             placeholder="name@example.com"
           />
           {state?.fieldErrors?.email && (
-            <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email[0]}</p>
+            <p className="mt-1 text-xs text-red-600">
+              {state.fieldErrors.email[0]}
+            </p>
           )}
         </div>
 
@@ -80,15 +90,18 @@ export function ForgotPasswordForm() {
                      focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60
                      disabled:cursor-not-allowed transition-colors"
         >
-          {isPending ? 'Отправка...' : 'Отправить ссылку'}
+          {isPending ? "Отправка..." : "Отправить ссылку"}
         </button>
 
         <div className="text-center">
-          <Link href="/auth/login" className="text-sm text-gray-500 hover:text-gray-700">
+          <Link
+            href="/auth/login"
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
             ← Вернуться к входу
           </Link>
         </div>
       </form>
     </div>
-  )
+  );
 }
