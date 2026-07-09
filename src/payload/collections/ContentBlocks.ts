@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import xss from "xss";
+import { getRelationshipUser } from "../access/getRelationshipUser.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
 export const ContentBlocks: CollectionConfig = {
@@ -39,11 +40,14 @@ export const ContentBlocks: CollectionConfig = {
         }
 
         // Автозаполнение createdBy / updatedBy
-        if (req?.user?.id) {
+        const author = getRelationshipUser(req);
+
+        if (author) {
           if (!data.createdBy) {
-            data.createdBy = req.user.id;
+            data.createdBy = author;
           }
-          data.updatedBy = req.user.id;
+
+          data.updatedBy = author;
         }
 
         return data;

@@ -1,6 +1,7 @@
 // import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { createHash } from "node:crypto";
 import type { CollectionConfig } from "payload";
+import { getRelationshipUser } from "../access/getRelationshipUser.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -13,7 +14,7 @@ import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
  *  2. Инкрементируем patch-версию (semver)
  *  3. Обновляем checksum SHA-256
  */
-const versioningHook = async ({ data, originalDoc, operation }: any) => {
+const versioningHook = async ({ data, originalDoc, operation, req }: any) => {
   // Срабатывает только при обновлении существующего документа
   if (operation !== "update" || !originalDoc) return data;
 
@@ -47,7 +48,12 @@ const versioningHook = async ({ data, originalDoc, operation }: any) => {
 
   data.lastUpdatedAt = new Date().toISOString();
 
-  // Убираем служебное поле, чтобы не сохранять в БД
+  const author = getRelationshipUser(req);
+
+  if (author) {
+    data.lastUpdatedBy = author;
+  }
+
   delete data._changeDescription;
 
   return data;

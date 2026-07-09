@@ -4,6 +4,7 @@ import type { Where } from "payload";
 import { CheckoutSubmitInput } from "@/modules/checkout";
 import type { Order } from "../../../payload-types";
 import { CartView } from "../../modules/cart";
+import { createRelationshipUser } from "../access/createRelationshipUser";
 import { getPayloadInstance } from "./getPayload";
 
 export interface CreateOrderInput {
@@ -141,7 +142,7 @@ export async function cancelOrderForUser(
         {
           status: "cancelled",
           changedAt: new Date().toISOString(),
-          changedBy: Number(userId),
+          changedBy: createRelationshipUser("users", userId),
           comment: reason,
         },
       ],

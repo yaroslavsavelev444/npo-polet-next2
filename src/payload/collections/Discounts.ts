@@ -2,7 +2,7 @@
 
 import { revalidateTag } from "next/cache.js";
 import type { CollectionConfig } from "payload";
-
+import { getRelationshipUser } from "../access/getRelationshipUser.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
 export const DiscountType = {
@@ -35,11 +35,14 @@ export const Discounts: CollectionConfig = {
   hooks: {
     beforeChange: [
       ({ req, data }) => {
-        if (req.user) {
-          data.updatedBy = req.user.id;
-          if (!data.createdBy) data.createdBy = req.user.id;
+        const author = getRelationshipUser(req);
+        if (author) {
+          if (!data.createdBy) {
+            data.createdBy = author;
+          }
+
+          data.updatedBy = author;
         }
-        return data;
       },
     ],
     // Discounts are cached with revalidate:false — without this, admin edits

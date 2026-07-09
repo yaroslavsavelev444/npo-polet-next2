@@ -501,7 +501,15 @@ export interface Order {
     | {
         status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
         changedAt?: string | null;
-        changedBy?: (number | null) | User;
+        changedBy?:
+          | ({
+              relationTo: 'users';
+              value: number | User;
+            } | null)
+          | ({
+              relationTo: 'admins';
+              value: number | Admin;
+            } | null);
         comment?: string | null;
         id?: string | null;
       }[]
@@ -578,8 +586,8 @@ export interface Discount {
   code?: string | null;
   totalUses?: number | null;
   totalDiscountAmount?: number | null;
-  createdBy?: (number | null) | User;
-  updatedBy?: (number | null) | User;
+  createdBy?: (number | null) | Admin;
+  updatedBy?: (number | null) | Admin;
   isCurrentlyActive?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -629,7 +637,15 @@ export interface Consent {
   version?: string | null;
   checksum?: string | null;
   lastUpdatedAt?: string | null;
-  lastUpdatedBy?: (number | null) | User;
+  lastUpdatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: number | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: number | User;
+      } | null);
   /**
    * Заполняется автоматически при каждом изменении
    */
@@ -892,8 +908,24 @@ export interface ContentBlock {
     | number
     | boolean
     | null;
-  createdBy?: (number | null) | User;
-  updatedBy?: (number | null) | User;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: number | User;
+      } | null)
+    | ({
+        relationTo: 'admins';
+        value: number | Admin;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: number | User;
+      } | null)
+    | ({
+        relationTo: 'admins';
+        value: number | Admin;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
