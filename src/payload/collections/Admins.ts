@@ -18,7 +18,7 @@ export const Admins: CollectionConfig = {
     lockTime: 15 * 60 * 1000,
 
     cookies: {
-      name: "payload-admin-token",
+      // name: "payload-admin-token",
 
       secure: process.env.NODE_ENV === "production",
 
