@@ -58,7 +58,7 @@ export default async function Home() {
       <ProductListContainer
         products={popularProductsResult.products}
         totalProducts={popularProductsResult.totalDocs}
-        title="Популярные товарыы"
+        title="Популярные товары"
       />
     </div>
   );
