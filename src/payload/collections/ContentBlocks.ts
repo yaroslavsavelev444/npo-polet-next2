@@ -160,13 +160,13 @@ export const ContentBlocks: CollectionConfig = {
     {
       name: "createdBy",
       type: "relationship",
-      relationTo: "users",
+      relationTo: ["users", "admins"],
       admin: { readOnly: true, position: "sidebar" },
     },
     {
       name: "updatedBy",
       type: "relationship",
-      relationTo: "users",
+      relationTo: ["users", "admins"],
       admin: { readOnly: true, position: "sidebar" },
     },
   ],

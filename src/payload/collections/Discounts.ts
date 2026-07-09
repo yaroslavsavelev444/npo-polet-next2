@@ -129,13 +129,13 @@ export const Discounts: CollectionConfig = {
     {
       name: "createdBy",
       type: "relationship",
-      relationTo: "users",
+      relationTo: "admins",
       admin: { readOnly: true },
     },
     {
       name: "updatedBy",
       type: "relationship",
-      relationTo: "users",
+      relationTo: "admins",
       admin: { readOnly: true },
     },
     {

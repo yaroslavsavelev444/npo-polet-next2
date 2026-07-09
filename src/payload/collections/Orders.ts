@@ -427,7 +427,11 @@ export const Orders: CollectionConfig = {
           type: "date",
           defaultValue: () => new Date().toISOString(),
         },
-        { name: "changedBy", type: "relationship", relationTo: "users" },
+        {
+          name: "changedBy",
+          type: "relationship",
+          relationTo: ["users", "admins"],
+        },
         { name: "comment", type: "text" },
       ],
     },

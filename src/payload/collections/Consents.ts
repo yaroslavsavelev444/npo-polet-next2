@@ -176,7 +176,7 @@ export const Consents: CollectionConfig = {
     {
       name: "lastUpdatedBy",
       type: "relationship",
-      relationTo: "users",
+      relationTo: ["admins", "users"],
       label: "Изменил",
       admin: {
         readOnly: true,
