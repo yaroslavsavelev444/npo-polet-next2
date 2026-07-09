@@ -18,4 +18,4 @@ export const PATCH = REST_PATCH(config);
 export const PUT = REST_PUT(config);
 export const OPTIONS = REST_OPTIONS(config);
 
-throw new Error("ROUTE HIT");
+console.log("PAYLOAD API HIT");
