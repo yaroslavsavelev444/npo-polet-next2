@@ -12,11 +12,17 @@ export const Admins: CollectionConfig = {
 
   auth: {
     tokenExpiration: 60 * 60 * 8,
+
     maxLoginAttempts: 5,
+
     lockTime: 15 * 60 * 1000,
+
     cookies: {
-      secure: true,
-      sameSite: "Strict",
+      name: "payload-admin-token",
+
+      secure: process.env.NODE_ENV === "production",
+
+      sameSite: "Lax",
     },
   },
 
