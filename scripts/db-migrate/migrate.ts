@@ -87,7 +87,7 @@
 //   console.log(`   Пропущено (уже существуют): ${skipped}`);
 //   console.log(`   Ошибок: ${failed}`);
 // }
-
+//
 // migrateUsersFromFile().catch((err) => {
 //   console.error("💥 Критическая ошибка:", err);
 //   process.exit(1);
