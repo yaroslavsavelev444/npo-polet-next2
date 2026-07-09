@@ -1,5 +1,6 @@
 # /etc/nginx/sites-available/test.npo-polet.ru.conf
-upstream npo_polet_next2 {
+
+upstream polet_next {
     server 127.0.0.1:3004;
     keepalive 32;
 }
@@ -30,6 +31,7 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/test.npo-polet.ru/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/test.npo-polet.ru/privkey.pem;
+
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_session_cache shared:SSL_npo:10m;
@@ -43,37 +45,43 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 
-    client_max_body_size 25m;   # загрузка медиа в Payload
+    client_max_body_size 25m;
 
     gzip on;
     gzip_comp_level 5;
     gzip_min_length 512;
-    gzip_types text/plain text/css application/json application/javascript
-               text/xml application/xml image/svg+xml;
+    gzip_types
+        text/plain
+        text/css
+        application/json
+        application/javascript
+        text/xml
+        application/xml
+        image/svg+xml;
 
-    # rate limiting на аутентификационные и admin API — защита от брутфорса на уровне прокси
+    # Защита login endpoint от брутфорса
     limit_req_zone $binary_remote_addr zone=npo_auth:10m rate=10r/m;
 
     location ~* ^/api/(admins|users)/login {
         limit_req zone=npo_auth burst=5 nodelay;
-        proxy_pass http://npo_polet_next2;
+        proxy_pass http://polet_next;
         include /etc/nginx/proxy_params_npo.conf;
     }
 
     location ~* ^/(_next/static)/ {
-        proxy_pass http://npo_polet_next2;
+        proxy_pass http://polet_next;
         proxy_set_header Host $host;
         add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location /media/ {
-        proxy_pass http://npo_polet_next2;
+        proxy_pass http://polet_next;
         proxy_set_header Host $host;
         add_header Cache-Control "public, max-age=604800";
     }
 
     location / {
-        proxy_pass http://npo_polet_next2;
+        proxy_pass http://polet_next;
         include /etc/nginx/proxy_params_npo.conf;
     }
 
