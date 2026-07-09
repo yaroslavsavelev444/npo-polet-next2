@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "biome check .",
     "payload": "payload",
     "payload:verify-graph": "tsx scripts/verify-payload-graph.mjs",
     "payload:types": "payload generate:types",
