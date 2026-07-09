@@ -172,5 +172,5 @@
 //   };
 //   return statusMap[oldStatus] || "available";
 // }
-
+//
 // migrateProductsFromFile().catch(console.error);
