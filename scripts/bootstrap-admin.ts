@@ -10,7 +10,7 @@ async function main() {
   if (!email || !password) {
     console.error(
       "❌ Задайте ADMIN_BOOTSTRAP_EMAIL и ADMIN_BOOTSTRAP_PASSWORD как env-переменные для запуска",
-    );
+    ); //
     process.exit(1);
   }
 
