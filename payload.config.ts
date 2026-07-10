@@ -31,7 +31,7 @@ import { Settings } from "./src/payload/globals/Settings.ts";
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET!,
-  serverURL: process.env.PAYLOAD_SERVER_URL || "http://localhost:3000",
+  serverURL: "http://localhost:3000",
   i18n: {
     supportedLanguages: { ru },
     fallbackLanguage: "ru",

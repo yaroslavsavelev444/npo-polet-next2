@@ -8,31 +8,12 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   images: {
-    formats: ["image/avif", "image/webp"],
-
     remotePatterns: [
       {
         protocol: "http",
         hostname: "localhost",
-        port: "3000",
-        pathname: "/api/media/**",
-      },
-      {
-        protocol: "http",
-        hostname: "127.0.0.1",
-        port: "3000",
-        pathname: "/api/media/**",
-      },
-
-      {
-        protocol: "https",
-        hostname: "test.npo-polet.ru",
-        pathname: "/api/media/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.test.npo-polet.ru",
-        pathname: "/api/media/**",
+        port: "", // Leave blank if no specific port is used in your image URLs
+        pathname: "/api/media/file/**", // Optional: restrict to specific paths
       },
     ],
   },
