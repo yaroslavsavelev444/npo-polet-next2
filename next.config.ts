@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
 
   images: {
     formats: ["image/avif", "image/webp"],
+    // Критично для локальной разработки: Payload отдаёт медиа с того же
+    // Next.js-сервера (localhost/127.0.0.1), а Next.js по умолчанию
+    // блокирует image-optimizer от обращения к private/loopback IP как
+    // защиту от SSRF (images.dangerouslyAllowLocalIP=false по умолчанию).
+    // В проде serverURL указывает на реальный публичный домен
+    // (test.npo-polet.ru), поэтому там private IP никогда не возникнет —
+    // включаем флаг СТРОГО только для dev, чтобы не ослаблять защиту в бою.
+    dangerouslyAllowLocalIP: process.env.NODE_ENV !== "production",
     remotePatterns: [
       // Dev: реальный URL медиа включает явный порт (:3000),
       // поэтому port должен быть "3000", а не "" ("" означает
