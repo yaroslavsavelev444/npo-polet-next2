@@ -71,6 +71,26 @@ services:
       - media_data:/app/media
     networks: [internal]
 
+  # Отдельный long-running процесс: обрабатывает отложенные заявки на удаление
+  # после 14-дневного периода. Не запускаем его внутри Next.js, чтобы рестарты
+  # веб-приложения не теряли работу очереди.
+  account-deletion-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base-builder
+    image: polet-next-migrate:${IMAGE_TAG:-latest}
+    container_name: polet-next-account-deletion-worker-prod
+    restart: unless-stopped
+    env_file: .env.production
+    command: ["pnpm", "worker:account-deletion"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [internal]
+
 volumes:
   postgres_data:
   redis_data:

@@ -86,7 +86,7 @@ export async function getOrderByIdForUser(
   if (!order) return null;
 
   const orderUserId =
-    typeof order.user === "object" ? order.user.id : order.user;
+    order.user && typeof order.user === "object" ? order.user.id : order.user;
   if (String(orderUserId) !== String(userId)) return null;
 
   return order;
@@ -119,7 +119,7 @@ export async function cancelOrderForUser(
   if (!order) return { ok: false, reason: "not_found" };
 
   const orderUserId =
-    typeof order.user === "object" ? order.user.id : order.user;
+    order.user && typeof order.user === "object" ? order.user.id : order.user;
   if (String(orderUserId) !== String(userId)) {
     return { ok: false, reason: "not_found" };
   }

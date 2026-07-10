@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { LogOut } from "lucide-react";
+import Link from "next/link";
 import type { ProfileUser, UpdateAccountPayload } from "../types/profile.types";
 import { Block, Button, Input } from "@/UI";
 
@@ -101,6 +102,13 @@ export function AccountTab({ user, onUpdate, onLogoutRequest }: AccountTabProps)
           >
             Выйти из аккаунта
           </Button>
+
+          <Link
+            href="/profile/delete-account"
+            className="mt-2 text-center text-sm text-[var(--error)] underline underline-offset-4 hover:opacity-80"
+          >
+            Удаление аккаунта и персональных данных
+          </Link>
         </div>
       </div>
     </Block>

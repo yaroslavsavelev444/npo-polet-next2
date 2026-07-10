@@ -90,6 +90,7 @@ export interface Config {
     'product-reviews': ProductReview;
     sessions: Session;
     'user-consents': UserConsent;
+    'account-deletion-requests': AccountDeletionRequest;
     'checkout-preferences': CheckoutPreference;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -120,6 +121,7 @@ export interface Config {
     'product-reviews': ProductReviewsSelect<false> | ProductReviewsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     'user-consents': UserConsentsSelect<false> | UserConsentsSelect<true>;
+    'account-deletion-requests': AccountDeletionRequestsSelect<false> | AccountDeletionRequestsSelect<true>;
     'checkout-preferences': CheckoutPreferencesSelect<false> | CheckoutPreferencesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -427,7 +429,10 @@ export interface Order {
    * Генерируется автоматически
    */
   orderNumber: string;
-  user: number | User;
+  /**
+   * Пусто у заказов, обезличенных после удаления аккаунта
+   */
+  user?: (number | null) | User;
   status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   recipient: {
     fullName: string;
@@ -1015,6 +1020,37 @@ export interface UserConsent {
   createdAt: string;
 }
 /**
+ * Заявки на удаление аккаунта. Доступны только уполномоченным сотрудникам.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "account-deletion-requests".
+ */
+export interface AccountDeletionRequest {
+  id: number;
+  user?: (number | null) | User;
+  /**
+   * Односторонний HMAC для минимального журнала исполнения
+   */
+  subjectReference: string;
+  status: 'pending' | 'cancelled' | 'executing' | 'completed' | 'failed';
+  requestedAt: string;
+  scheduledFor: string;
+  cancelledAt?: string | null;
+  executedAt?: string | null;
+  /**
+   * Защита от параллельного выполнения worker-ами
+   */
+  executionLeaseUntil?: string | null;
+  executionAttempts?: number | null;
+  /**
+   * Технический код без персональных данных
+   */
+  lastErrorCode?: string | null;
+  retentionJustification: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Сохранённые получатель/адрес для автозаполнения оформления заказа
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1153,6 +1189,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'user-consents';
         value: number | UserConsent;
+      } | null)
+    | ({
+        relationTo: 'account-deletion-requests';
+        value: number | AccountDeletionRequest;
       } | null)
     | ({
         relationTo: 'checkout-preferences';
@@ -1946,6 +1986,25 @@ export interface UserConsentsSelect<T extends boolean = true> {
   acceptedAt?: T;
   ip?: T;
   userAgent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "account-deletion-requests_select".
+ */
+export interface AccountDeletionRequestsSelect<T extends boolean = true> {
+  user?: T;
+  subjectReference?: T;
+  status?: T;
+  requestedAt?: T;
+  scheduledFor?: T;
+  cancelledAt?: T;
+  executedAt?: T;
+  executionLeaseUntil?: T;
+  executionAttempts?: T;
+  lastErrorCode?: T;
+  retentionJustification?: T;
   updatedAt?: T;
   createdAt?: T;
 }

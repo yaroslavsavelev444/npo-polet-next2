@@ -12,6 +12,7 @@
     "payload:types": "payload generate:types",
     "payload:importmap": "payload generate:importmap",
     "payload:sync": "pnpm payload:types && pnpm payload:importmap",
+    "worker:account-deletion": "tsx src/modules/account-deletion/worker.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

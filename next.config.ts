@@ -3,19 +3,36 @@ import type { NextConfig } from "next";
 import "./src/env.ts";
 
 const nextConfig: NextConfig = {
-  // standalone-сборка нужна для лёгкого Docker-образа (см. Dockerfile ниже)
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
 
   images: {
     formats: ["image/avif", "image/webp"],
+
     remotePatterns: [
-      { protocol: "https", hostname: "npo-polet.ru", pathname: "/media/**" },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "3000",
+        pathname: "/api/media/**",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
+        port: "3000",
+        pathname: "/api/media/**",
+      },
+
       {
         protocol: "https",
-        hostname: "www.npo-polet.ru",
-        pathname: "/media/**",
+        hostname: "test.npo-polet.ru",
+        pathname: "/api/media/**",
+      },
+      {
+        protocol: "https",
+        hostname: "www.test.npo-polet.ru",
+        pathname: "/api/media/**",
       },
     ],
   },
@@ -51,6 +68,7 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname),
     rules: { "*.md": { loaders: [], as: "*.empty" } },
   },
+
   serverExternalPackages: [
     "esbuild",
     "esbuild-register",

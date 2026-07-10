@@ -2,6 +2,8 @@ import { postgresAdapter } from "@payloadcms/db-postgres";
 import { ru } from "@payloadcms/translations/languages/ru";
 import path from "path";
 import { buildConfig } from "payload";
+import { migrations } from "./src/migrations/index.ts";
+import { AccountDeletionRequests } from "./src/payload/collections/AccountDeletionRequests.ts";
 import { Admins } from "./src/payload/collections/Admins.ts";
 import { Banners } from "./src/payload/collections/Banners.ts";
 import { Carts } from "./src/payload/collections/Carts.ts";
@@ -29,7 +31,7 @@ import { Settings } from "./src/payload/globals/Settings.ts";
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET!,
-
+  serverURL: process.env.PAYLOAD_SERVER_URL || "http://localhost:3000",
   i18n: {
     supportedLanguages: { ru },
     fallbackLanguage: "ru",
@@ -70,6 +72,7 @@ export default buildConfig({
     ProductReviews, // добавили
     Sessions, // добавили
     UserConsents, // добавили
+    AccountDeletionRequests,
     CheckoutPreferences,
   ],
 
@@ -77,6 +80,7 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URI,
     },
+    prodMigrations: migrations,
   }),
 
   typescript: {

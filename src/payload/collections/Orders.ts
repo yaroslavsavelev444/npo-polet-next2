@@ -160,9 +160,11 @@ export const Orders: CollectionConfig = {
       name: "user",
       type: "relationship",
       relationTo: "users",
-      required: true,
       index: true,
-      admin: { position: "sidebar" },
+      admin: {
+        position: "sidebar",
+        description: "Пусто у заказов, обезличенных после удаления аккаунта",
+      },
     },
 
     {
