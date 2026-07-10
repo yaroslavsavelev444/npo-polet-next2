@@ -16,7 +16,7 @@ export const Users: CollectionConfig = {
       generateEmailSubject: () => "Восстановление пароля",
       generateEmailHTML: (args) => {
         const token = args?.token ?? "";
-        const resetUrl = `${env.NODE_ENV ?? "http://localhost:3000"}/auth/password-reset?token=${token}`;
+        const resetUrl = `${env.NEXT_PUBLIC_APP_URL}/auth/password-reset?token=${token}`;
         const bodyHtml = `
         <h1 style="margin:0 0 16px;font-size:18px;color:#18181B;">Восстановление пароля</h1>
         <p style="margin:0 0 20px;color:#52525B;">

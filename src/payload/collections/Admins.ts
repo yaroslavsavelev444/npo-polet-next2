@@ -18,6 +18,10 @@ export const Admins: CollectionConfig = {
     lockTime: 15 * 60 * 1000,
 
     cookies: {
+      // Критично: без этого admins и users пишут JWT в одну и ту же
+      // cookie "payload-token", и они друг друга затирают — именно это
+      // вызывало 403 "недостаточно прав" для superadmin, 400 на logout
+      // и вечный скелетон в Media/Settings.
       // name: "payload-admin-token",
 
       secure: process.env.NODE_ENV === "production",

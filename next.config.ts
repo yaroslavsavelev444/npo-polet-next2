@@ -8,12 +8,35 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
+      // Dev: реальный URL медиа включает явный порт (:3000),
+      // поэтому port должен быть "3000", а не "" ("" означает
+      // "URL БЕЗ порта" и никогда не совпадёт с localhost:3000).
       {
         protocol: "http",
         hostname: "localhost",
-        port: "", // Leave blank if no specific port is used in your image URLs
-        pathname: "/api/media/file/**", // Optional: restrict to specific paths
+        port: "3000",
+        pathname: "/api/media/**",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
+        port: "3000",
+        pathname: "/api/media/**",
+      },
+      // Прод: без этих паттернов картинки в проде всегда будут падать
+      // с "hostname not configured", независимо от того, что исправлено
+      // в serverURL.
+      {
+        protocol: "https",
+        hostname: "test.npo-polet.ru",
+        pathname: "/api/media/**",
+      },
+      {
+        protocol: "https",
+        hostname: "www.test.npo-polet.ru",
+        pathname: "/api/media/**",
       },
     ],
   },

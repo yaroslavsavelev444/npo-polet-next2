@@ -2,6 +2,7 @@ import { postgresAdapter } from "@payloadcms/db-postgres";
 import { ru } from "@payloadcms/translations/languages/ru";
 import path from "path";
 import { buildConfig } from "payload";
+import { env } from "./src/env.ts";
 import { migrations } from "./src/migrations/index.ts";
 import { AccountDeletionRequests } from "./src/payload/collections/AccountDeletionRequests.ts";
 import { Admins } from "./src/payload/collections/Admins.ts";
@@ -31,7 +32,10 @@ import { Settings } from "./src/payload/globals/Settings.ts";
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET!,
-  serverURL: "http://localhost:3000",
+  // Критично: абсолютные URL медиа (Setting.logo.url и т.д.) строятся
+  // Payload'ом из этого значения. Хардкод "localhost:3000" ломал бы
+  // абсолютные ссылки на медиа в проде (см. NEXT_PUBLIC_APP_URL в .env.production).
+  serverURL: env.NEXT_PUBLIC_APP_URL,
   i18n: {
     supportedLanguages: { ru },
     fallbackLanguage: "ru",

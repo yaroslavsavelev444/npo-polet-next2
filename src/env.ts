@@ -28,9 +28,12 @@ const serverSchema = z.object({
  * Схема для клиентских переменных (должны иметь префикс NEXT_PUBLIC_)
  */
 const clientSchema = z.object({
-  //   NEXT_PUBLIC_PAYLOAD_URL: z.string().url(),
-  //   NEXT_PUBLIC_APP_URL: z.string().url(),
-  // другие публичные переменные, если есть
+  // Единственный источник правды для абсолютного адреса приложения.
+  // Используется: payload.config.ts (serverURL для абсолютных URL медиа),
+  // письма (ссылки восстановления пароля и т.д.), email/config.ts.
+  // В dev по умолчанию localhost:3000, в проде ОБЯЗАН быть переопределён
+  // на реальный домен (https://test.npo-polet.ru) через .env.production.
+  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
 
 /**
@@ -49,8 +52,7 @@ function buildEnv() {
   };
 
   const clientEnv = {
-    // NEXT_PUBLIC_PAYLOAD_URL: process.env.NEXT_PUBLIC_PAYLOAD_URL,
-    // NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   };
 
   // Парсим серверные переменные (только если запущено на сервере)
