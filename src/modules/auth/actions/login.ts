@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
 import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
-import { sendOtpEmail } from "../lib/email";
+import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
 import { createOtp } from "../lib/OtpStore";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { createSession, parseDeviceLabel } from "../lib/session";
@@ -115,7 +115,21 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
     ip,
   });
 
-  await sendOtpEmail({ to: email, otp, type: "login_2fa" });
+  // notifyOtpCode (централизованный EmailService/Nodemailer) намеренно
+  // пробрасывает ошибку доставки (см. её докстринг), чтобы вызывающий код
+  // не притворялся, что письмо ушло. Но payload-token cookie уже выставлена
+  // строкой выше — на клиенте это de facto "полу-авторизованное" состояние,
+  // ожидающее 2FA, и форма логина не умеет откатывать эту cookie при ошибке.
+  // Поэтому не роняем весь Server Action (это и вызывало падение рендера в
+  // проде): логируем сбой и всё равно пропускаем пользователя на экран
+  // ввода OTP — там есть кнопка «отправить код повторно»
+  // (resendOtpAction), которой можно будет воспользоваться, когда почтовый
+  // сервис восстановится.
+  try {
+    await notifyOtpCode({ to: email, code: otp, purpose: "login_2fa" });
+  } catch (err) {
+    console.error("[login] Не удалось отправить OTP-код:", err);
+  }
 
   // Создаём сессию
   const session = await createSession(payload, {

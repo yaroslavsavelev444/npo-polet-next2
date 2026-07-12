@@ -44,8 +44,16 @@ export default buildConfig({
     user: Admins.slug,
   },
 
-  cors: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean),
-  csrf: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean),
+  // ALLOWED_ORIGINS теперь проходит через src/env.ts: там же на старте
+  // процесса проверяется, что при заданном ADMIN_HOSTNAME соответствующий
+  // https-origin обязательно в этом списке (иначе Payload будет молча
+  // отклонять JWT из cookie для запросов с админки — 403/400, см. env.ts).
+  cors: env.ALLOWED_ORIGINS.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  csrf: env.ALLOWED_ORIGINS.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 
   globals: [Settings],
   localization: {

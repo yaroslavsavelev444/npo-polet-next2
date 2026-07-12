@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { getPayloadInstance } from "@/payload/services/getPayload";
-import { sendOtpEmail } from "../lib/email";
+import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
 import { createOtp } from "../lib/OtpStore";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { createSession } from "../lib/session";
@@ -191,7 +191,29 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
     ip,
   });
 
-  await sendOtpEmail({ to: email, otp, type: "email_verify" });
+  // Аккаунт, cookie-сессия и согласия уже созданы к этому моменту — это
+  // необратимые побочные эффекты, которые Server Action не откатывает.
+  // Раньше сбой отправки письма ронял весь рендер /auth/register (падение
+  // происходило ещё раньше, при импорте modules/auth/lib/email.ts: там
+  // `new Resend(process.env.RESEND_API_KEY)` вызывался на уровне модуля и
+  // бросал исключение при отсутствующем ключе — модуль удалён, письма OTP
+  // идут через centralized EmailService/Nodemailer). notifyOtpCode
+  // намеренно прокидывает ошибку доставки дальше (см. её докстринг) — мы
+  // ловим её здесь, логируем и всё равно пропускаем пользователя на экран
+  // ввода кода: там есть кнопка «отправить код повторно» (resendOtpAction),
+  // которой можно будет воспользоваться, когда почтовый сервис
+  // восстановится. Возврат ошибки вместо этого не дал бы форме
+  // регистрации перейти на экран OTP (см. RegisterForm.tsx — она
+  // навигирует дальше только при success), оставив уже созданный аккаунт
+  // в тупике.
+  try {
+    await notifyOtpCode({ to: email, code: otp, purpose: "email_verify" });
+  } catch (err) {
+    console.error(
+      "[register] Не удалось отправить код подтверждения email:",
+      err,
+    );
+  }
 
   return actionSuccess<RegisterResult>({ requiresOtp: true });
 }

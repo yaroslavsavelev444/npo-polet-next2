@@ -17,13 +17,20 @@ export const Admins: CollectionConfig = {
 
     lockTime: 15 * 60 * 1000,
 
+    // ВАЖНО: в установленной версии Payload (3.85.1) имя auth-cookie задаётся
+    // ТОЛЬКО глобально, через `cookiePrefix` в payload.config.ts (по умолчанию
+    // "payload" → cookie "payload-token"), и одинаково для ВСЕХ auth-коллекций
+    // сразу — `auth.cookies` каждой отдельной коллекции такого свойства не
+    // имеет (см. IncomingAuthType в node_modules/payload/dist/auth/types.d.ts).
+    // То есть развести admins и users по разным именам cookie на уровне
+    // коллекции в этой версии Payload архитектурно невозможно — и это не
+    // баг: раз admin.npo-polet.ru и test.npo-polet.ru/npo-polet.ru — разные
+    // хосты, а cookie здесь ставится без Domain (host-only), браузер и так
+    // хранит её отдельно для каждого хоста и коллизии со стороны customer-
+    // сессии не будет. Настоящая причина 403 на Settings/Media и 400 на
+    // logout — не эта cookie, а ALLOWED_ORIGINS/CSRF в payload.config.ts,
+    // см. подробный комментарий там.
     cookies: {
-      // Критично: без этого admins и users пишут JWT в одну и ту же
-      // cookie "payload-token", и они друг друга затирают — именно это
-      // вызывало 403 "недостаточно прав" для superadmin, 400 на logout
-      // и вечный скелетон в Media/Settings.
-      // name: "payload-admin-token",
-
       secure: process.env.NODE_ENV === "production",
 
       sameSite: "Lax",
