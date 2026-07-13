@@ -39,6 +39,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Payload (upload.staticDir: 'media') пишет сюда загруженные файлы. Каталог
+# должен существовать и принадлежать nextjs ДО первого монтирования named
+# volume media_data:/app/media — Docker инициализирует содержимое и владельца
+# пустого volume копированием из этого пути в образе. Без этого volume
+# создаётся как root:root, и запись падает с EACCES под non-root USER nextjs.
+RUN mkdir -p ./media && chown nextjs:nodejs ./media
+
 USER nextjs
 EXPOSE 3004
 ENV PORT=3004
