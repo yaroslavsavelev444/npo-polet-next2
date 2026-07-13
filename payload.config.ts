@@ -14,6 +14,7 @@ import { Companies } from "./src/payload/collections/Companies.ts";
 import { Consents } from "./src/payload/collections/Consents.ts";
 import { ContentBlocks } from "./src/payload/collections/ContentBlocks.ts";
 import { Discounts } from "./src/payload/collections/Discounts.ts";
+import { Faq } from "./src/payload/collections/Faq.ts";
 import { Feedbacks } from "./src/payload/collections/Feedbacks.ts";
 import { KnowledgeTopics } from "./src/payload/collections/KnowledgeTopics.ts";
 import { Media } from "./src/payload/collections/Media.ts";
@@ -31,72 +32,73 @@ import { Wishlists } from "./src/payload/collections/Wishlists.ts";
 import { Settings } from "./src/payload/globals/Settings.ts";
 
 export default buildConfig({
-  secret: process.env.PAYLOAD_SECRET!,
-  // Критично: абсолютные URL медиа (Setting.logo.url и т.д.) строятся
-  // Payload'ом из этого значения. Хардкод "localhost:3000" ломал бы
-  // абсолютные ссылки на медиа в проде (см. NEXT_PUBLIC_APP_URL в .env.production).
-  serverURL: env.NEXT_PUBLIC_APP_URL,
-  i18n: {
-    supportedLanguages: { ru },
-    fallbackLanguage: "ru",
-  },
-  admin: {
-    user: Admins.slug,
-  },
+	secret: process.env.PAYLOAD_SECRET!,
+	// Критично: абсолютные URL медиа (Setting.logo.url и т.д.) строятся
+	// Payload'ом из этого значения. Хардкод "localhost:3000" ломал бы
+	// абсолютные ссылки на медиа в проде (см. NEXT_PUBLIC_APP_URL в .env.production).
+	serverURL: env.NEXT_PUBLIC_APP_URL,
+	i18n: {
+		supportedLanguages: { ru },
+		fallbackLanguage: "ru",
+	},
+	admin: {
+		user: Admins.slug,
+	},
 
-  // ALLOWED_ORIGINS теперь проходит через src/env.ts: там же на старте
-  // процесса проверяется, что при заданном ADMIN_HOSTNAME соответствующий
-  // https-origin обязательно в этом списке (иначе Payload будет молча
-  // отклонять JWT из cookie для запросов с админки — 403/400, см. env.ts).
-  cors: env.ALLOWED_ORIGINS.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
-  csrf: env.ALLOWED_ORIGINS.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+	// ALLOWED_ORIGINS теперь проходит через src/env.ts: там же на старте
+	// процесса проверяется, что при заданном ADMIN_HOSTNAME соответствующий
+	// https-origin обязательно в этом списке (иначе Payload будет молча
+	// отклонять JWT из cookie для запросов с админки — 403/400, см. env.ts).
+	cors: env.ALLOWED_ORIGINS.split(",")
+		.map((origin) => origin.trim())
+		.filter(Boolean),
+	csrf: env.ALLOWED_ORIGINS.split(",")
+		.map((origin) => origin.trim())
+		.filter(Boolean),
 
-  globals: [Settings],
-  localization: {
-    locales: ["ru", "en"],
-    defaultLocale: "ru",
-  },
+	globals: [Settings],
+	localization: {
+		locales: ["ru", "en"],
+		defaultLocale: "ru",
+	},
 
-  collections: [
-    Admins,
-    Users,
-    Media,
-    Categories,
-    Products,
-    Carts,
-    Orders,
-    Consents,
-    Feedbacks,
-    Banners,
-    PickupPoints,
-    TransportCompanies,
-    Discounts,
-    Companies,
-    KnowledgeTopics,
-    Wishlists,
-    Notifications,
-    ContentBlocks,
-    OtpCodes, // добавили
-    ProductReviews, // добавили
-    Sessions, // добавили
-    UserConsents, // добавили
-    AccountDeletionRequests,
-    CheckoutPreferences,
-  ],
+	collections: [
+		Admins,
+		Users,
+		Media,
+		Categories,
+		Products,
+		Carts,
+		Orders,
+		Consents,
+		Feedbacks,
+		Banners,
+		PickupPoints,
+		TransportCompanies,
+		Discounts,
+		Companies,
+		KnowledgeTopics,
+		Faq,
+		Wishlists,
+		Notifications,
+		ContentBlocks,
+		OtpCodes, // добавили
+		ProductReviews, // добавили
+		Sessions, // добавили
+		UserConsents, // добавили
+		AccountDeletionRequests,
+		CheckoutPreferences,
+	],
 
-  db: postgresAdapter({
-    pool: {
-      connectionString: process.env.DATABASE_URI,
-    },
-    push: false,
-    prodMigrations: migrations,
-  }),
+	db: postgresAdapter({
+		pool: {
+			connectionString: process.env.DATABASE_URI,
+		},
+		push: false,
+		prodMigrations: migrations,
+	}),
 
-  typescript: {
-    outputFile: path.resolve(process.cwd(), "payload-types.ts"),
-  },
+	typescript: {
+		outputFile: path.resolve(process.cwd(), "payload-types.ts"),
+	},
 });

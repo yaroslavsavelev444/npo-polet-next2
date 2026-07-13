@@ -1,0 +1,181 @@
+# Миграция данных из старой MongoDB
+
+Переносит данные из старой системы (MongoDB/Mongoose) в текущую
+(Payload/Postgres). Рассчитана на многократный безопасный запуск в течение
+переходного периода, пока старая система ещё принимает изменения.
+
+## Запуск
+
+```bash
+LEGACY_MONGODB_URI="mongodb://<host>:27017/polet?directConnection=true" \
+  pnpm migrate:legacy
+```
+
+Флаги:
+
+- `--dry-run` — ничего не пишет в новую БД, только считает, что было бы
+  создано/обновлено/пропущено. Безопасно гонять сколько угодно раз для
+  проверки перед реальным прогоном.
+- `--only=users,products` — выполнить только указанные миграции (+ их
+  зависимости). Полный список slug'ов: `pnpm migrate:legacy --help`.
+- `--verbose` — подробный DEBUG-лог.
+
+## Подключение к старой MongoDB
+
+Старая Mongo — реплика-сет (`mongo1`/`mongo2`/`mongo3`) в отдельном
+docker-compose проекте на том же VPS (соседняя папка). Имена `mongo1` и
+т.д. резолвятся только внутри ЕГО docker-сети, поэтому:
+
+1. **`LEGACY_MONGODB_URI` обязан использовать `directConnection=true`** —
+   это отключает discovery остальных членов реплика-сета через их
+   внутренние docker-имена (иначе драйвер попытается достучаться до
+   `mongo2`/`mongo3` и зависнет).
+2. `mongo1` в старом `docker-compose.yml` публикует порт на хост VPS
+   (`"27017:27017"`), поэтому для подключения снаружи его сети достаточно
+   любого адреса, по которому виден этот порт:
+   - Скрипт запускается **прямо на хосте VPS** (не в докере) — обычно
+     `mongodb://127.0.0.1:27017/polet?directConnection=true`.
+   - Скрипт запускается **внутри контейнера нового проекта** — нужен IP
+     хоста/шлюза docker-сети (`docker network inspect`) либо
+     `docker network connect` к сети старого проекта.
+
+Если подключение не удаётся, скрипт печатает эту инструкцию прямо в
+консоль (см. `lib/legacyMongo.ts`).
+
+Postgres нового проекта поднимается как обычно через `getPayload({config})`
+— переменные `DATABASE_URI`/`PAYLOAD_SECRET` берутся из `.env`/окружения
+процесса, как и для любого другого `payload`-скрипта в проекте.
+
+## Идемпотентность и повторные запуски
+
+Каждая перенесённая запись получает поле `legacyId` (hex-строка старого
+`_id`, добавлено во все целевые коллекции — см. `src/payload/fields/
+legacyId.ts`). Это единственный якорь, на котором держится вся логика:
+
+- **Новая запись в старой БД** → создаётся (create).
+- **Запись уже перенесена и не изменилась** (сравниваются те поля, которые
+  реально пишет миграция) → пропускается (`unchanged`), без обращения к
+  БД на запись — важно, чтобы `afterChange`-хуки (кэш-инвалидация,
+  уведомления) не срабатывали впустую на каждый повторный прогон.
+- **Запись уже перенесена, но изменилась в старой БД** → обновляется
+  (update) точечно, только по переданным полям.
+- **Запись удалена в старой БД** → в новой БД **не трогается** (сознательное
+  решение — иначе риск случайно снести данные, с которыми уже работают
+  через новую систему после частичного перехода). При необходимости ручной
+  сверки: `--dry-run` покажет текущие counts, а прямой SQL/consultation по
+  `legacyId` полям позволяет найти "осиротевшие" записи вручную.
+
+Порядок выполнения — по зависимостям (`dependsOn` в каждом
+`*.migration.ts`), не по порядку в массиве `migrations/index.ts`:
+
+```
+users, categories, pickupPoints, transportCompanies, consents, faq   (без зависимостей)
+  └─ products (зависит от categories)
+       └─ companies (зависит от users)
+       └─ discounts (зависит от categories, products)
+       └─ userConsents (зависит от users, consents)
+       └─ carts, wishlists (зависят от users, products)
+       └─ orders (зависит от users, products, pickupPoints, transportCompanies, companies, discounts)
+```
+
+Резолв связей между сущностями (например `Product.category`) идёт через
+кэшированную в памяти карту `legacyId -> новый id`, строится один раз за
+прогон при первом обращении к каждой коллекции (`ctx.getIdMap`). Именно
+поэтому нельзя мигрировать `products` без предварительного (в этом же
+прогоне) прогона `categories` — карта будет неполной.
+
+## Пароли пользователей
+
+Старые пароли — bcrypt, Payload использует PBKDF2-SHA256 с отдельными
+`hash`/`salt` — форматы несовместимы, прямой перенос хеша невозможен.
+Вместо принудительного сброса пароля всем пользователям:
+
+1. При миграции каждому пользователю ставится случайный (никому не
+   известный) пароль в штатное поле Payload, а настоящий bcrypt-хеш кладётся
+   в скрытое поле `legacyPasswordHash` (`access.read/create/update: () =>
+   false` — недоступно через обычный API, только серверному коду с
+   `overrideAccess: true`).
+2. При первом логине после миграции `payload.login()` с новым (неизвестным)
+   паролем закономерно падает; `loginAction` (`src/modules/auth/actions/
+   login.ts`) в `catch`-блоке пробует `tryLegacyPasswordFallback` (`src/
+   modules/auth/lib/legacyPasswordFallback.ts`) — сверяет введённый пароль с
+   `legacyPasswordHash` через bcrypt. При совпадении пароль сразу
+   перехешируется в формат Payload, `legacyPasswordHash` очищается, и
+   логин продолжается штатно.
+3. Персонал (`role: admin/superadmin` в старой `users`) **не мигрируется** —
+   в новой архитектуре у него отдельная коллекция `admins`, заводится
+   вручную.
+
+## Уведомления и кэш при массовом переносе
+
+`orders.migration.ts` передаёт `context: { isMigration: true }` в
+`create`/`update` — `afterChange`-хук `Orders` проверяет этот флаг и не
+рассылает "новый заказ"/"статус изменён" на тысячах перенесённых
+исторических заказов (см. `src/payload/collections/Orders.ts`). Хуки
+инвалидации кэша (`revalidateTag`) у остальных коллекций срабатывают как
+обычно — это дёшево и корректно: если ничего не изменилось, `upsertByLegacyId`
+вообще не делает `update`, значит хук не срабатывает.
+
+## Media / файлы — вне области этой миграции
+
+По решению (см. обсуждение) все поля, ссылающиеся на файлы в старой системе
+(`Category.image`, `Product.images`, `Product.instruction.file` и т.д.),
+**пропускаются** — в новой системе принципиально другое хранилище файлов.
+Соответствующие поля в новых записях останутся пустыми; медиа
+предполагается прикрепить вручную позже.
+
+## Известные расхождения схем (сознательно, не баги)
+
+Полный список полей без аналога в новой схеме — по сущностям:
+
+| Сущность | Отброшено | Причина |
+|---|---|---|
+| Users | `activations`, `tokens`, `passwordChangeHistory`, `lastSanction` (история) | Нет аналога / другая архитектура auth; переносится только текущее `status`/`blockedUntil` |
+| Categories | `image`, `createdBy`/`updatedBy` | Файлы вне области; полей created/updatedBy в новой схеме нет вовсе |
+| Products | `images`, `instruction.file`, `customAttributes`, `relatedProducts`, `crossSellProducts`, `rating`, `sku`, `createdBy`/`updatedBy` | Файлы вне области; `sku` в новой архитектуре не существует ни в Products, ни в Orders; `relatedProducts`/`crossSellProducts` — по решению, оставлен только `upsellProducts`; персонал не мигрируется |
+| PickupPoints | `address.postalCode/country`, `contact.email`, `description`, `isMain`, `orderIndex` | Новая схема уже (нет соответствующих полей) |
+| Discounts | `createdBy`/`updatedBy` | Указывают только на `admins`, персонал не мигрируется |
+| Consents | `history[].author` | В новой схеме у истории версий нет поля автора |
+| Orders | `pricing.tax`, `pricing.priceWithoutDiscount`, `items[].sku/weight/dimensions`, `delivery.carrier`, `cancellation`, `tags`, `companyCreated`, `companySelection`, `statusHistory[].metadata`, `appliedDiscounts[].{type,condition,appliedAt}`, `attachments` | Новая модель заказа сознательно уже; файлы вне области |
+| Wishlists | `settings` (notifyOnPriceDrop/notifyOnRestock/sortBy) | Поля нет в новой схеме |
+
+Маппинг значений enum (согласовано отдельно):
+
+- `OrderStatus`: старые `packed`/`ready_for_pickup`/`awaiting_invoice` добавлены в новый enum как есть (см. `src/payload/collections/Orders.ts`).
+- `PaymentMethod`: `courier_cash`/`pickup_point_cash` → `invoice`, с пометкой об этом в `internalNotes` заказа (в новой схеме нет способов оплаты наличными не-self-pickup).
+- `ProductStatus`: `unavailable` → `out_of_stock`, `archived` → `discontinued`.
+- `source`: `api` → `web` (в новой схеме нет отдельного значения `api`).
+
+## Структура
+
+```
+scripts/db-migrate/
+  run.ts                  — CLI-точка входа (pnpm migrate:legacy)
+  lib/
+    legacyMongo.ts         — подключение к старой Mongo
+    legacyCollections.ts   — имена коллекций в старой Mongo
+  core/                    — переиспользуемый движок (не специфичен для сущностей)
+    types.ts               — defineMigration, MigrationContext, MigrationStats
+    runner.ts              — топологическая сортировка по dependsOn, отчёт
+    upsert.ts               — upsertByLegacyId, resolveRef(s)
+    hash.ts                 — сравнение "изменилось ли"
+    logger.ts
+  migrations/
+    <entity>.migration.ts  — по одному файлу на сущность
+    index.ts                — реестр всех миграций
+```
+
+## Как добавить новую миграцию
+
+1. Добавить `legacyId` в целевую Payload-коллекцию (см. `src/payload/
+   fields/legacyId.ts`, паттерн уже применён везде) и сгенерировать
+   Payload-миграцию (`pnpm payload migrate:create <имя>`) — **после
+   генерации проверить `.ts`-импорты в `src/migrations/index.ts` и в самом
+   файле миграции**: `payload migrate:create` перезаписывает их без
+   расширения `.ts` и как value-import вместо `import type` для
+   `MigrateUpArgs`/`MigrateDownArgs` — без ручной правки миграция не
+   запустится (`ERR_MODULE_NOT_FOUND` / `does not provide an export`).
+2. Создать `migrations/<entity>.migration.ts` через `defineMigration({slug,
+   dependsOn, run})`, используя `upsertByLegacyId`/`resolveRef(s)` из `core/
+   index.ts`.
+3. Зарегистрировать в `migrations/index.ts`.

@@ -83,6 +83,7 @@ export interface Config {
     discounts: Discount;
     companies: Company;
     'knowledge-topics': KnowledgeTopic;
+    faq: Faq;
     wishlists: Wishlist;
     notifications: Notification;
     'content-blocks': ContentBlock;
@@ -114,6 +115,7 @@ export interface Config {
     discounts: DiscountsSelect<false> | DiscountsSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
     'knowledge-topics': KnowledgeTopicsSelect<false> | KnowledgeTopicsSelect<true>;
+    faq: FaqSelect<false> | FaqSelect<true>;
     wishlists: WishlistsSelect<false> | WishlistsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     'content-blocks': ContentBlocksSelect<false> | ContentBlocksSelect<true>;
@@ -227,6 +229,11 @@ export interface User {
   twoFAVerifiedAt?: string | null;
   emailVerified?: boolean | null;
   lastLoginAt?: string | null;
+  legacyPasswordHash?: string | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -315,6 +322,10 @@ export interface Category {
         id?: string | null;
       }[]
     | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -392,6 +403,10 @@ export interface Product {
     viewsCount?: number | null;
     purchasesCount?: number | null;
   };
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -416,6 +431,10 @@ export interface Cart {
         id?: string | null;
       }[]
     | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -433,7 +452,17 @@ export interface Order {
    * Пусто у заказов, обезличенных после удаления аккаунта
    */
   user?: (number | null) | User;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  status:
+    | 'pending'
+    | 'confirmed'
+    | 'processing'
+    | 'packed'
+    | 'shipped'
+    | 'ready_for_pickup'
+    | 'delivered'
+    | 'cancelled'
+    | 'refunded'
+    | 'awaiting_invoice';
   recipient: {
     fullName: string;
     phone: string;
@@ -504,7 +533,17 @@ export interface Order {
   internalNotes?: string | null;
   statusHistory?:
     | {
-        status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+        status:
+          | 'pending'
+          | 'confirmed'
+          | 'processing'
+          | 'packed'
+          | 'shipped'
+          | 'ready_for_pickup'
+          | 'delivered'
+          | 'cancelled'
+          | 'refunded'
+          | 'awaiting_invoice';
         changedAt?: string | null;
         changedBy?:
           | ({
@@ -522,6 +561,10 @@ export interface Order {
   source?: ('web' | 'mobile' | 'admin') | null;
   ipAddress?: string | null;
   userAgent?: string | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -542,6 +585,10 @@ export interface TransportCompany {
    * Показывать при оформлении заказа
    */
   isActive?: boolean | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -564,6 +611,10 @@ export interface PickupPoint {
    * Показывать при оформлении заказа
    */
   isActive?: boolean | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -594,6 +645,10 @@ export interface Discount {
   createdBy?: (number | null) | Admin;
   updatedBy?: (number | null) | Admin;
   isCurrentlyActive?: boolean | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -611,6 +666,10 @@ export interface Company {
   contactPerson?: string | null;
   phone?: string | null;
   email?: string | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -668,6 +727,10 @@ export interface Consent {
    * Заполните перед сохранением — попадёт в историю версий и будет очищено
    */
   _changeDescription?: string | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -824,6 +887,34 @@ export interface KnowledgeTopic {
   createdAt: string;
 }
 /**
+ * Часто задаваемые вопросы, сгруппированные по темам
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faq".
+ */
+export interface Faq {
+  id: number;
+  title: string;
+  description?: string | null;
+  order?: number | null;
+  isActive?: boolean | null;
+  questions?:
+    | {
+        question: string;
+        answer: string;
+        order?: number | null;
+        isActive?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "wishlists".
  */
@@ -839,6 +930,10 @@ export interface Wishlist {
       }[]
     | null;
   totalItems?: number | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1016,6 +1111,10 @@ export interface UserConsent {
   acceptedAt: string;
   ip?: string | null;
   userAgent?: string | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1163,6 +1262,10 @@ export interface PayloadLockedDocument {
         value: number | KnowledgeTopic;
       } | null)
     | ({
+        relationTo: 'faq';
+        value: number | Faq;
+      } | null)
+    | ({
         relationTo: 'wishlists';
         value: number | Wishlist;
       } | null)
@@ -1287,6 +1390,8 @@ export interface UsersSelect<T extends boolean = true> {
   twoFAVerifiedAt?: T;
   emailVerified?: T;
   lastLoginAt?: T;
+  legacyPasswordHash?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -1379,6 +1484,7 @@ export interface CategoriesSelect<T extends boolean = true> {
         keyword?: T;
         id?: T;
       };
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1470,6 +1576,7 @@ export interface ProductsSelect<T extends boolean = true> {
         viewsCount?: T;
         purchasesCount?: T;
       };
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -1488,6 +1595,7 @@ export interface CartsSelect<T extends boolean = true> {
         addedAt?: T;
         id?: T;
       };
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1591,6 +1699,7 @@ export interface OrdersSelect<T extends boolean = true> {
   source?: T;
   ipAddress?: T;
   userAgent?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1622,6 +1731,7 @@ export interface ConsentsSelect<T extends boolean = true> {
         id?: T;
       };
   _changeDescription?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1720,6 +1830,7 @@ export interface PickupPointsSelect<T extends boolean = true> {
         lng?: T;
       };
   isActive?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1733,6 +1844,7 @@ export interface TransportCompaniesSelect<T extends boolean = true> {
   website?: T;
   trackingUrlTemplate?: T;
   isActive?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1762,6 +1874,7 @@ export interface DiscountsSelect<T extends boolean = true> {
   createdBy?: T;
   updatedBy?: T;
   isCurrentlyActive?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1778,6 +1891,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   contactPerson?: T;
   phone?: T;
   email?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1848,6 +1962,28 @@ export interface KnowledgeTopicsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "faq_select".
+ */
+export interface FaqSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  order?: T;
+  isActive?: T;
+  questions?:
+    | T
+    | {
+        question?: T;
+        answer?: T;
+        order?: T;
+        isActive?: T;
+        id?: T;
+      };
+  legacyId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "wishlists_select".
  */
 export interface WishlistsSelect<T extends boolean = true> {
@@ -1861,6 +1997,7 @@ export interface WishlistsSelect<T extends boolean = true> {
         id?: T;
       };
   totalItems?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1986,6 +2123,7 @@ export interface UserConsentsSelect<T extends boolean = true> {
   acceptedAt?: T;
   ip?: T;
   userAgent?: T;
+  legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
 }

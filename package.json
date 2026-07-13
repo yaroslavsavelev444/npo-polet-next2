@@ -13,6 +13,7 @@
     "payload:importmap": "payload generate:importmap",
     "payload:sync": "pnpm payload:types && pnpm payload:importmap",
     "worker:account-deletion": "tsx src/modules/account-deletion/worker.ts",
+    "migrate:legacy": "node --experimental-strip-types scripts/db-migrate/run.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -27,10 +28,13 @@
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-query-devtools": "^5.101.0",
     "antd": "^6.4.5",
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.79.0",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
     "ioredis": "^5.11.1",
     "lodash": "^4.18.1",
+    "mongodb": "^7.5.0",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "nodemailer": "^9.0.3",
@@ -61,6 +65,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

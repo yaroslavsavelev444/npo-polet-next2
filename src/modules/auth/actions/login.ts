@@ -5,6 +5,7 @@ import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
 import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
+import { tryLegacyPasswordFallback } from "../lib/legacyPasswordFallback";
 import { createOtp } from "../lib/OtpStore";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { createSession, parseDeviceLabel } from "../lib/session";
@@ -32,167 +33,184 @@ import type { LoginResult } from "../types";
  * Поэтому ставим вручную через next/headers cookies().
  */
 export async function loginAction(_prevState: unknown, formData: FormData) {
-  const parsed = loginSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-  });
+	const parsed = loginSchema.safeParse({
+		email: formData.get("email"),
+		password: formData.get("password"),
+	});
 
-  if (!parsed.success) {
-    return actionError(
-      "Проверьте введённые данные",
-      parsed.error.flatten().fieldErrors,
-    );
-  }
+	if (!parsed.success) {
+		return actionError(
+			"Проверьте введённые данные",
+			parsed.error.flatten().fieldErrors,
+		);
+	}
 
-  const { email, password } = parsed.data;
-  const { ip, userAgent } = await getRequestMeta();
+	const { email, password } = parsed.data;
+	const { ip, userAgent } = await getRequestMeta();
 
-  await RATE_LIMITS.login(ip);
+	await RATE_LIMITS.login(ip);
 
-  // if (!rl.allowed) {
-  //   return actionError("Слишком много попыток входа. Попробуйте через час.");
-  // }
+	// if (!rl.allowed) {
+	//   return actionError("Слишком много попыток входа. Попробуйте через час.");
+	// }
 
-  const payload = await getPayloadInstance();
+	const payload = await getPayloadInstance();
 
-  // payload.login() — Payload проверяет пароль через bcrypt
-  // Возвращает { token: string, user, exp }
-  // Не передаём req — в Server Action он не нужен для получения token
-  let loginToken: string;
-  let userId: string | number;
+	// payload.login() — Payload проверяет пароль через bcrypt
+	// Возвращает { token: string, user, exp }
+	// Не передаём req — в Server Action он не нужен для получения token
+	let loginToken: string;
+	let userId: string | number;
 
-  try {
-    const loginResult = await payload.login({
-      collection: "users",
-      data: { email, password },
-    });
+	const attemptLogin = () =>
+		payload.login({ collection: "users", data: { email, password } });
 
-    void notifyNewSessionLogin({
-      email,
-      userName: loginResult.user ? (loginResult.user.name as string) : "",
-      deviceLabel: parseDeviceLabel(userAgent), // уже есть в modules/auth/lib/session.ts
-      ip,
-    });
+	try {
+		let loginResult: Awaited<ReturnType<typeof attemptLogin>>;
 
-    if (!loginResult.token) {
-      throw new Error("No token returned");
-    }
+		try {
+			loginResult = await attemptLogin();
+		} catch (err) {
+			// payload.login() отклоняет пароль, если он захеширован ещё старой
+			// системой (bcrypt) — Payload использует PBKDF2 и не умеет сверять
+			// bcrypt-хеши напрямую. Пробуем legacy-fallback: если пароль совпал
+			// со старым хешем, tryLegacyPasswordFallback уже перехешировал его
+			// в формат Payload, и повторный payload.login() пройдёт как обычно.
+			const migrated = await tryLegacyPasswordFallback(
+				payload,
+				email,
+				password,
+			);
+			if (!migrated) throw err;
+			loginResult = await attemptLogin();
+		}
 
-    loginToken = loginResult.token;
-    userId = loginResult.user ? loginResult.user.id : "";
+		void notifyNewSessionLogin({
+			email,
+			userName: loginResult.user ? (loginResult.user.name as string) : "",
+			deviceLabel: parseDeviceLabel(userAgent), // уже есть в modules/auth/lib/session.ts
+			ip,
+		});
 
-    // Сбрасываем счётчик неверных попыток
-    await payload.update({
-      collection: "users",
-      id: userId,
-      data: {
-        loginAttempts: 0,
-        lockUntil: null,
-        lastLoginAt: new Date().toISOString(),
-      },
-      overrideAccess: true,
-    });
-  } catch {
-    await handleFailedLogin(payload, email);
-    return actionError("Неверный email или пароль");
-  }
+		if (!loginResult.token) {
+			throw new Error("No token returned");
+		}
 
-  // Ставим JWT cookie вручную
-  // Имя 'payload-token' — стандартное имя которое использует Payload
-  const cookieStore = await cookies();
-  cookieStore.set("payload-token", loginToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 7 * 24 * 60 * 60, // 7 дней
-  });
+		loginToken = loginResult.token;
+		userId = loginResult.user ? loginResult.user.id : "";
 
-  // Генерируем OTP для второго фактора
-  const otp = await createOtp(payload, {
-    userId: String(userId),
-    type: "login_2fa",
-    ip,
-  });
+		// Сбрасываем счётчик неверных попыток
+		await payload.update({
+			collection: "users",
+			id: userId,
+			data: {
+				loginAttempts: 0,
+				lockUntil: null,
+				lastLoginAt: new Date().toISOString(),
+			},
+			overrideAccess: true,
+		});
+	} catch {
+		await handleFailedLogin(payload, email);
+		return actionError("Неверный email или пароль");
+	}
 
-  // notifyOtpCode (централизованный EmailService/Nodemailer) намеренно
-  // пробрасывает ошибку доставки (см. её докстринг), чтобы вызывающий код
-  // не притворялся, что письмо ушло. Но payload-token cookie уже выставлена
-  // строкой выше — на клиенте это de facto "полу-авторизованное" состояние,
-  // ожидающее 2FA, и форма логина не умеет откатывать эту cookie при ошибке.
-  // Поэтому не роняем весь Server Action (это и вызывало падение рендера в
-  // проде): логируем сбой и всё равно пропускаем пользователя на экран
-  // ввода OTP — там есть кнопка «отправить код повторно»
-  // (resendOtpAction), которой можно будет воспользоваться, когда почтовый
-  // сервис восстановится.
-  try {
-    await notifyOtpCode({ to: email, code: otp, purpose: "login_2fa" });
-  } catch (err) {
-    console.error("[login] Не удалось отправить OTP-код:", err);
-  }
+	// Ставим JWT cookie вручную
+	// Имя 'payload-token' — стандартное имя которое использует Payload
+	const cookieStore = await cookies();
+	cookieStore.set("payload-token", loginToken, {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === "production",
+		sameSite: "lax",
+		path: "/",
+		maxAge: 7 * 24 * 60 * 60, // 7 дней
+	});
 
-  // Создаём сессию
-  const session = await createSession(payload, {
-    userId: String(userId),
-    ip,
-    userAgent,
-  });
+	// Генерируем OTP для второго фактора
+	const otp = await createOtp(payload, {
+		userId: String(userId),
+		type: "login_2fa",
+		ip,
+	});
 
-  cookieStore.set("session-id", String(session.id), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 7 * 24 * 60 * 60,
-  });
+	// notifyOtpCode (централизованный EmailService/Nodemailer) намеренно
+	// пробрасывает ошибку доставки (см. её докстринг), чтобы вызывающий код
+	// не притворялся, что письмо ушло. Но payload-token cookie уже выставлена
+	// строкой выше — на клиенте это de facto "полу-авторизованное" состояние,
+	// ожидающее 2FA, и форма логина не умеет откатывать эту cookie при ошибке.
+	// Поэтому не роняем весь Server Action (это и вызывало падение рендера в
+	// проде): логируем сбой и всё равно пропускаем пользователя на экран
+	// ввода OTP — там есть кнопка «отправить код повторно»
+	// (resendOtpAction), которой можно будет воспользоваться, когда почтовый
+	// сервис восстановится.
+	try {
+		await notifyOtpCode({ to: email, code: otp, purpose: "login_2fa" });
+	} catch (err) {
+		console.error("[login] Не удалось отправить OTP-код:", err);
+	}
 
-  return actionSuccess<LoginResult>({ requiresOtp: true });
+	// Создаём сессию
+	const session = await createSession(payload, {
+		userId: String(userId),
+		ip,
+		userAgent,
+	});
+
+	cookieStore.set("session-id", String(session.id), {
+		httpOnly: true,
+		secure: process.env.NODE_ENV === "production",
+		sameSite: "lax",
+		path: "/",
+		maxAge: 7 * 24 * 60 * 60,
+	});
+
+	return actionSuccess<LoginResult>({ requiresOtp: true });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function handleFailedLogin(
-  payload: Awaited<ReturnType<typeof getPayloadInstance>>,
-  email: string,
+	payload: Awaited<ReturnType<typeof getPayloadInstance>>,
+	email: string,
 ) {
-  try {
-    const { docs } = await payload.find({
-      collection: "users",
-      where: { email: { equals: email } },
-      limit: 1,
-      overrideAccess: true,
-    });
+	try {
+		const { docs } = await payload.find({
+			collection: "users",
+			where: { email: { equals: email } },
+			limit: 1,
+			overrideAccess: true,
+		});
 
-    if (docs.length === 0) return;
+		if (docs.length === 0) return;
 
-    const user = docs[0];
-    const attempts = (user.loginAttempts ?? 0) + 1;
+		const user = docs[0];
+		const attempts = (user.loginAttempts ?? 0) + 1;
 
-    const MAX_ATTEMPTS = 10;
-    const isLocked = attempts >= MAX_ATTEMPTS;
-    const lockUntilDate = isLocked
-      ? new Date(Date.now() + 15 * 60 * 1000)
-      : null;
+		const MAX_ATTEMPTS = 10;
+		const isLocked = attempts >= MAX_ATTEMPTS;
+		const lockUntilDate = isLocked
+			? new Date(Date.now() + 15 * 60 * 1000)
+			: null;
 
-    await payload.update({
-      collection: "users",
-      id: user.id,
-      data: {
-        loginAttempts: attempts,
-        ...(isLocked &&
-          lockUntilDate && { lockUntil: lockUntilDate.toISOString() }),
-      },
-      overrideAccess: true,
-    });
+		await payload.update({
+			collection: "users",
+			id: user.id,
+			data: {
+				loginAttempts: attempts,
+				...(isLocked &&
+					lockUntilDate && { lockUntil: lockUntilDate.toISOString() }),
+			},
+			overrideAccess: true,
+		});
 
-    if (isLocked && lockUntilDate) {
-      void notifyAccountLocked({
-        email: user.email as string,
-        userName: user.name as string,
-        lockedUntil: lockUntilDate,
-      });
-    }
-  } catch {
-    // Не раскрываем существование пользователя
-  }
+		if (isLocked && lockUntilDate) {
+			void notifyAccountLocked({
+				email: user.email as string,
+				userName: user.name as string,
+				lockedUntil: lockUntilDate,
+			});
+		}
+	} catch {
+		// Не раскрываем существование пользователя
+	}
 }

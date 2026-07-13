@@ -3,113 +3,119 @@
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
+import { legacyIdField } from "../fields/legacyId.ts";
+import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
 export const Companies: CollectionConfig = {
-  slug: "companies",
+	slug: "companies",
 
-  admin: {
-    useAsTitle: "companyName",
-    defaultColumns: ["companyName", "taxNumber", "contactPerson", "createdAt"],
-    group: "Клиенты",
-  },
+	admin: {
+		useAsTitle: "companyName",
+		defaultColumns: ["companyName", "taxNumber", "contactPerson", "createdAt"],
+		group: "Клиенты",
+	},
 
-  access: {
-    read: ({ req }) => {
-      if (!req.user) return false;
+	access: {
+		read: ({ req }) => {
+			if (!req.user) return false;
 
-      if (req.user.role === "admin" || req.user.role === "superadmin") {
-        return true;
-      }
+			if (req.user.role === "admin" || req.user.role === "superadmin") {
+				return true;
+			}
 
-      return {
-        user: {
-          equals: req.user.id,
-        },
-      };
-    },
+			return {
+				user: {
+					equals: req.user.id,
+				},
+			};
+		},
 
-    create: isLoggedIn,
-    update: isLoggedIn,
-    delete: isAdminOrSuperAdmin,
-  },
+		create: isLoggedIn,
+		update: isLoggedIn,
+		delete: isAdminOrSuperAdmin,
+	},
 
-  fields: [
-    {
-      name: "user",
-      type: "relationship",
-      relationTo: "users",
-      required: true,
-      index: true,
-    },
+	fields: [
+		{
+			name: "user",
+			type: "relationship",
+			relationTo: "users",
+			required: true,
+			index: true,
+		},
 
-    {
-      name: "companyName",
-      type: "text",
-      required: true,
-      index: true,
-    },
+		{
+			name: "companyName",
+			type: "text",
+			required: true,
+			index: true,
+		},
 
-    {
-      name: "legalAddress",
-      type: "textarea",
-      required: true,
-    },
+		{
+			name: "legalAddress",
+			type: "textarea",
+			required: true,
+		},
 
-    {
-      name: "companyAddress",
-      type: "textarea",
-    },
+		{
+			name: "companyAddress",
+			type: "textarea",
+		},
 
-    {
-      name: "taxNumber",
-      type: "text",
-      required: true,
-      index: true,
-    },
+		{
+			name: "taxNumber",
+			type: "text",
+			required: true,
+			index: true,
+		},
 
-    {
-      name: "contactPerson",
-      type: "text",
-    },
+		{
+			name: "contactPerson",
+			type: "text",
+		},
 
-    {
-      name: "phone",
-      type: "text",
-    },
+		{
+			name: "phone",
+			type: "text",
+		},
 
-    {
-      name: "email",
-      type: "email",
-    },
-  ],
+		{
+			name: "email",
+			type: "email",
+		},
 
-  hooks: {
-    beforeChange: [
-      ({ data }) => {
-        if (data?.taxNumber) {
-          data.taxNumber = data.taxNumber.replace(/\s/g, "");
-        }
+		legacyIdField,
+	],
 
-        return data;
-      },
-    ],
-  },
+	hooks: {
+		beforeChange: [
+			({ data }) => {
+				if (data?.taxNumber) {
+					data.taxNumber = data.taxNumber.replace(/\s/g, "");
+				}
 
-  // indexes: [
-  //   {
-  //     fields: {
-  //       taxNumber: 1,
-  //       user: 1,
-  //     },
-  //     options: {
-  //       unique: true,
-  //     },
-  //   },
-  //   {
-  //     fields: {
-  //       companyName: "text",
-  //       taxNumber: "text",
-  //     },
-  //   },
-  // ],
+				return data;
+			},
+		],
+		afterChange: [createRevalidateCacheHook("companies")],
+		afterDelete: [createRevalidateCacheHook("companies")],
+	},
+
+	// indexes: [
+	//   {
+	//     fields: {
+	//       taxNumber: 1,
+	//       user: 1,
+	//     },
+	//     options: {
+	//       unique: true,
+	//     },
+	//   },
+	//   {
+	//     fields: {
+	//       companyName: "text",
+	//       taxNumber: "text",
+	//     },
+	//   },
+	// ],
 };

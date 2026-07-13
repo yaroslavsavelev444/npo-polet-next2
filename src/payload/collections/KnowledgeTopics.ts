@@ -1,136 +1,133 @@
-import type { CollectionConfig } from 'payload'
-import { HeadingBlock } from './blocks/HeadingBlock.ts'
-import { ImageBlock } from './blocks/ImageBlock.ts'
-import { LinkBlock } from './blocks/LinkBlock.ts'
-import { TextBlock } from './blocks/TextBlock.ts'
+import type { CollectionConfig } from "payload";
+import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
+import { HeadingBlock } from "./blocks/HeadingBlock.ts";
+import { ImageBlock } from "./blocks/ImageBlock.ts";
+import { LinkBlock } from "./blocks/LinkBlock.ts";
+import { TextBlock } from "./blocks/TextBlock.ts";
 
 export const KnowledgeTopics: CollectionConfig = {
-  slug: 'knowledge-topics',
+	slug: "knowledge-topics",
 
-  admin: {
-    useAsTitle: 'title',
-    defaultColumns: [
-      'title',
-      'slug',
-      'published',
-      'position',
-      'updatedAt',
-    ],
-    group: 'Контент',
-  },
+	admin: {
+		useAsTitle: "title",
+		defaultColumns: ["title", "slug", "published", "position", "updatedAt"],
+		group: "Контент",
+	},
 
-  access: {
-    read: () => true,
-  },
+	access: {
+		read: () => true,
+	},
 
-  fields: [
-    {
-      name: 'title',
-      type: 'text',
-      required: true,
-      index: true,
-    },
+	hooks: {
+		// getCachedKnowledgeTopics кэширует список с revalidate:false — без
+		// этого хука изменения статей не появлялись бы на сайте до редеплоя.
+		afterChange: [createRevalidateCacheHook("knowledge-topics")],
+		afterDelete: [createRevalidateCacheHook("knowledge-topics")],
+	},
 
-    {
-      name: 'slug',
-      type: 'text',
-      required: true,
-      unique: true,
-      index: true,
-    },
+	fields: [
+		{
+			name: "title",
+			type: "text",
+			required: true,
+			index: true,
+		},
 
-    {
-      name: 'description',
-      type: 'textarea',
-    },
+		{
+			name: "slug",
+			type: "text",
+			required: true,
+			unique: true,
+			index: true,
+		},
 
-    {
-      name: 'image',
-      type: 'relationship',
-      relationTo: 'media',
-    },
+		{
+			name: "description",
+			type: "textarea",
+		},
 
-    {
-      name: 'position',
-      type: 'number',
-      defaultValue: 0,
-      index: true,
-    },
+		{
+			name: "image",
+			type: "relationship",
+			relationTo: "media",
+		},
 
-    {
-      name: 'featured',
-      type: 'checkbox',
-      defaultValue: false,
-    },
+		{
+			name: "position",
+			type: "number",
+			defaultValue: 0,
+			index: true,
+		},
 
-    {
-      name: 'published',
-      type: 'checkbox',
-      defaultValue: true,
-      index: true,
-    },
+		{
+			name: "featured",
+			type: "checkbox",
+			defaultValue: false,
+		},
 
-    {
-      name: 'publishedAt',
-      type: 'date',
-    },
+		{
+			name: "published",
+			type: "checkbox",
+			defaultValue: true,
+			index: true,
+		},
 
-    {
-      name: 'author',
-      type: 'relationship',
-      relationTo: 'users',
-    },
+		{
+			name: "publishedAt",
+			type: "date",
+		},
 
-    {
-      name: 'content',
-      type: 'blocks',
-      blocks: [
-        HeadingBlock,
-        TextBlock,
-        ImageBlock,
-        LinkBlock,
-      ],
-    },
+		{
+			name: "author",
+			type: "relationship",
+			relationTo: "users",
+		},
 
-    {
-      name: 'readingTime',
-      type: 'number',
-      admin: {
-        readOnly: true,
-      },
-    },
+		{
+			name: "content",
+			type: "blocks",
+			blocks: [HeadingBlock, TextBlock, ImageBlock, LinkBlock],
+		},
 
-    {
-      name: 'tags',
-      type: 'array',
-      fields: [
-        {
-          name: 'tag',
-          type: 'text',
-        },
-      ],
-    },
+		{
+			name: "readingTime",
+			type: "number",
+			admin: {
+				readOnly: true,
+			},
+		},
 
-    {
-      name: 'seo',
-      type: 'group',
-      fields: [
-        {
-          name: 'metaTitle',
-          type: 'text',
-        },
+		{
+			name: "tags",
+			type: "array",
+			fields: [
+				{
+					name: "tag",
+					type: "text",
+				},
+			],
+		},
 
-        {
-          name: 'metaDescription',
-          type: 'textarea',
-        },
+		{
+			name: "seo",
+			type: "group",
+			fields: [
+				{
+					name: "metaTitle",
+					type: "text",
+				},
 
-        {
-          name: 'ogImage',
-          type: 'relationship',
-          relationTo: 'media',
-        },
-      ],
-    },
-  ],
-}
+				{
+					name: "metaDescription",
+					type: "textarea",
+				},
+
+				{
+					name: "ogImage",
+					type: "relationship",
+					relationTo: "media",
+				},
+			],
+		},
+	],
+};
