@@ -55,11 +55,19 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
 
   const payload = await getPayloadInstance();
 
-  // 3. Проверяем обязательные согласия
+  // 3. Проверяем обязательные согласия.
+  // Критерии должны совпадать с теми, по которым страница регистрации
+  // решает, какие согласия показывать пользователю (см. RegisterPage),
+  // иначе бэкенд может требовать принятия согласий, которые фронт
+  // никогда не показал как чекбокс (needsAcceptance: false).
   const { docs: requiredConsents } = await payload.find({
     collection: "consents",
     where: {
-      and: [{ isRequired: { equals: true } }, { isActive: { equals: true } }],
+      and: [
+        { isRequired: { equals: true } },
+        { isActive: { equals: true } },
+        { needsAcceptance: { equals: true } },
+      ],
     },
     overrideAccess: true,
   });
