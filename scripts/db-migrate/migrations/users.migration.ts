@@ -72,35 +72,22 @@ export default defineMigration({
 					emailVerified: true,
 					twoFAVerified: false,
 				},
+				// password и legacyPasswordHash пишутся ТОЛЬКО при создании
+				// (createOnlyData, см. core/upsert.ts) и никогда не входят в
+				// сравнение hasChanges / update:
+				// - password обязателен для Payload на create() auth-коллекции,
+				//   но при повторных прогонах нельзя каждый раз генерировать
+				//   новый случайный пароль и затирать им уже реальный;
+				// - legacyPasswordHash по той же причине нельзя постоянно
+				//   переустанавливать из старых данных: после первого успешного
+				//   входа пользователя (см. legacyPasswordFallback.ts) это поле
+				//   намеренно очищается — повторный прогон не должен "воскрешать"
+				//   старый bcrypt-хеш для уже мигрировавшего пользователя.
+				createOnlyData: {
+					password: placeholderPassword,
+					...(old.password ? { legacyPasswordHash: old.password } : {}),
+				},
 			});
-
-			// password и legacyPasswordHash сознательно НЕ входят в data выше и
-			// проставляются отдельным update только при первом создании записи:
-			// - password не должен участвовать в hasChanges — иначе при каждом
-			//   повторном прогоне сравнение решало бы, что "пароль изменился"
-			//   (мы каждый раз генерируем новый случайный placeholder), и заново
-			//   его перезаписывало;
-			// - legacyPasswordHash по той же причине нельзя постоянно
-			//   переустанавливать из старых данных: после первого успешного входа
-			//   пользователя (см. legacyPasswordFallback.ts) это поле намеренно
-			//   очищается — повторный прогон миграции не должен "воскрешать"
-			//   старый bcrypt-хеш и снова включать fallback для уже
-			//   мигрировавшего пользователя.
-			if (
-				result.action === "created" &&
-				result.id !== undefined &&
-				!ctx.dryRun
-			) {
-				await ctx.payload.update({
-					collection: "users",
-					id: result.id,
-					data: {
-						password: placeholderPassword,
-						...(old.password ? { legacyPasswordHash: old.password } : {}),
-					},
-					overrideAccess: true,
-				});
-			}
 
 			if (result.action === "failed") {
 				stats.failed++;

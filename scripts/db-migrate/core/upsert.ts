@@ -39,8 +39,25 @@ export async function upsertByLegacyId(params: {
 	 * пользователя, и не рассылали письма/пуши на тысячах перенесённых записей.
 	 */
 	context?: Record<string, unknown>;
+	/**
+	 * Поля, которые пишутся ТОЛЬКО при создании записи и никогда не участвуют
+	 * в сравнении hasChanges / в update. Нужно для полей вроде password —
+	 * Payload требует его сразу на create() для auth-коллекций, но при
+	 * повторных прогонах миграции нельзя каждый раз генерировать новый
+	 * случайный пароль и затирать им уже реальный (после первого логина
+	 * пользователя через legacyPasswordFallback).
+	 */
+	createOnlyData?: Record<string, unknown>;
 }): Promise<UpsertResult> {
-	const { ctx, collection, legacyId, data, extraWhere, context } = params;
+	const {
+		ctx,
+		collection,
+		legacyId,
+		data,
+		extraWhere,
+		context,
+		createOnlyData,
+	} = params;
 	const { dryRun } = ctx;
 	// Payload типизирует find/create/update по конкретному slug'у коллекции —
 	// для универсальной по коллекциям миграционной утилиты это неразрешимо
@@ -73,7 +90,7 @@ export async function upsertByLegacyId(params: {
 			if (dryRun) return { action: "created" };
 			const created = await payload.create({
 				collection,
-				data: { ...data, legacyId },
+				data: { ...data, ...createOnlyData, legacyId },
 				overrideAccess: true,
 				depth: 0,
 				context,

@@ -16,6 +16,23 @@ export const createRevalidateCacheHook =
 	(...tags: string[]) =>
 	() => {
 		for (const tag of tags) {
-			revalidateTag(tag, { expire: 0 });
+			try {
+				revalidateTag(tag, { expire: 0 });
+			} catch (err) {
+				// revalidateTag требует активный Next.js request store (Route
+				// Handler/Server Action). Payload-хуки могут сработать и вне
+				// такого контекста — например, из scripts/db-migrate/run.ts,
+				// обычного standalone Node-процесса без единого HTTP-запроса.
+				// В этом случае Next бросает
+				// "Invariant: static generation store missing" — это не
+				// повод ронять саму запись в БД (кэш просто останется как
+				// есть до следующего реального изменения через приложение).
+				// Любую ДРУГУЮ ошибку пробрасываем дальше — это уже
+				// по-настоящему неожиданно.
+				const message = err instanceof Error ? err.message : String(err);
+				if (!message.includes("static generation store missing")) {
+					throw err;
+				}
+			}
 		}
 	};
