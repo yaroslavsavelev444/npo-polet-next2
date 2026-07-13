@@ -72,6 +72,14 @@ const nextConfig: NextConfig = {
     rules: { "*.md": { loaders: [], as: "*.empty" } },
   },
 
+  experimental: {
+    // По умолчанию Next.js буферизует тело запроса через proxy лимитом 10MB
+    // и молча обрезает всё, что больше, без ошибки клиенту. Загрузка
+    // видео-фона Hero через /api/media (Payload REST) легко превышает это,
+    // поэтому лимит поднят под короткие сжатые ролики.
+    proxyClientMaxBodySize: "30mb",
+  },
+
   serverExternalPackages: [
     "esbuild",
     "esbuild-register",

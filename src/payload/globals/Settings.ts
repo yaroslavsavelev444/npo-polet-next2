@@ -1,4 +1,5 @@
 // src/globals/Settings.ts
+import { revalidateTag } from "next/cache.js";
 import type { GlobalConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { seoField } from "../fields/seo.ts";
@@ -16,6 +17,16 @@ export const Settings: GlobalConfig = {
     // req.user.collection === 'admins', что и есть реальная граница между
     // персоналом и покупателями в этом проекте.
     update: isAdminOrSuperAdmin,
+  },
+  hooks: {
+    // getCachedSettings кэширует global с revalidate:false — без этого хука
+    // правки в настройках (включая фон Hero) не были бы видны на сайте
+    // до редеплоя.
+    afterChange: [
+      () => {
+        revalidateTag("settings", "max");
+      },
+    ],
   },
   fields: [
     // ── Основная информация ──
@@ -249,6 +260,57 @@ export const Settings: GlobalConfig = {
           type: "checkbox",
           label: "Отключить возможность заказать товар",
           defaultValue: false,
+        },
+      ],
+    },
+
+    // ── Фон первого экрана (Hero) ──
+    {
+      name: "heroBackground",
+      type: "group",
+      label: "Фон первого экрана (Hero)",
+      fields: [
+        {
+          name: "type",
+          type: "select",
+          label: "Тип фона",
+          defaultValue: "none",
+          options: [
+            { label: "Нет (стандартный фон)", value: "none" },
+            { label: "Изображение", value: "image" },
+            { label: "Видео", value: "video" },
+          ],
+        },
+        {
+          name: "image",
+          type: "upload",
+          relationTo: "media",
+          label: "Фоновое изображение",
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === "image",
+            description: "Горизонтальное изображение, не менее 1920×1080px.",
+          },
+        },
+        {
+          name: "video",
+          type: "upload",
+          relationTo: "media",
+          label: "Фоновое видео",
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === "video",
+            description:
+              "MP4/WebM без звука, короткий зацикленный ролик. Для быстрой загрузки желательно сжать файл (H.264, до ~8МБ).",
+          },
+        },
+        {
+          name: "videoPoster",
+          type: "upload",
+          relationTo: "media",
+          label: "Постер видео",
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === "video",
+            description: "Показывается, пока видео ещё грузится, и на медленном интернете.",
+          },
         },
       ],
     },

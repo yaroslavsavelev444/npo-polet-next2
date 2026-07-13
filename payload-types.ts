@@ -255,7 +255,7 @@ export interface Media {
   alt?: string | null;
   caption?: string | null;
   isPublic?: boolean | null;
-  type?: ('certificate' | 'instruction' | 'license' | 'passport' | 'product' | 'other') | null;
+  type?: ('certificate' | 'instruction' | 'license' | 'passport' | 'product' | 'hero' | 'other') | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -2132,6 +2132,21 @@ export interface Setting {
     disableRegistration?: boolean | null;
     disableOrdering?: boolean | null;
   };
+  heroBackground?: {
+    type?: ('none' | 'image' | 'video') | null;
+    /**
+     * Горизонтальное изображение, не менее 1920×1080px.
+     */
+    image?: (number | null) | Media;
+    /**
+     * MP4/WebM без звука, короткий зацикленный ролик. Для быстрой загрузки желательно сжать файл (H.264, до ~8МБ).
+     */
+    video?: (number | null) | Media;
+    /**
+     * Показывается, пока видео ещё грузится, и на медленном интернете.
+     */
+    videoPoster?: (number | null) | Media;
+  };
   workingHours?: string | null;
   map?: string | null;
   seo?: {
@@ -2198,6 +2213,14 @@ export interface SettingsSelect<T extends boolean = true> {
     | {
         disableRegistration?: T;
         disableOrdering?: T;
+      };
+  heroBackground?:
+    | T
+    | {
+        type?: T;
+        image?: T;
+        video?: T;
+        videoPoster?: T;
       };
   workingHours?: T;
   map?: T;

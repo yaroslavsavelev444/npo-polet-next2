@@ -58,6 +58,38 @@ export function getWorkingHours(Setting: Setting | null): string | null {
   return Setting?.workingHours || null
 }
 
+export interface HeroBackground {
+  imageUrl: string | null
+  videoUrl: string | null
+  posterUrl: string | null
+  hasMedia: boolean
+}
+
+function mediaUrl(media: unknown): string | null {
+  if (!media || typeof media !== 'object') return null
+  const url = (media as { url?: string | null }).url
+  return url ?? null
+}
+
+/**
+ * Разбирает Setting.heroBackground в плоский набор URL для HeroMediaBackground
+ */
+export function getHeroBackground(Setting: Setting | null): HeroBackground {
+  const heroBackground = Setting?.heroBackground
+  const type = heroBackground?.type
+
+  const imageUrl = type === 'image' ? mediaUrl(heroBackground?.image) : null
+  const videoUrl = type === 'video' ? mediaUrl(heroBackground?.video) : null
+  const posterUrl = type === 'video' ? mediaUrl(heroBackground?.videoPoster) : null
+
+  return {
+    imageUrl,
+    videoUrl,
+    posterUrl,
+    hasMedia: Boolean(imageUrl || videoUrl),
+  }
+}
+
 /**
  * Получить юридический адрес
  */
