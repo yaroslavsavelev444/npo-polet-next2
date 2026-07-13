@@ -132,6 +132,19 @@ const SOURCE_MAP: Record<string, string> = {
 	api: "web",
 };
 
+// door_to_door/pickup_point/self_pickup — единственные валидные значения в
+// новой схеме (см. src/payload/collections/Orders.ts). У части старых
+// заказов встречаются значения вне этого набора (пустое/legacy) — вместо
+// падения всего заказа подставляем самый безопасный вариант (не требует
+// адреса/транспортной компании) и явно логируем исходное значение, чтобы
+// решить вручную по конкретным заказам.
+const VALID_DELIVERY_METHODS = new Set([
+	"door_to_door",
+	"pickup_point",
+	"self_pickup",
+]);
+const FALLBACK_DELIVERY_METHOD = "self_pickup";
+
 export default defineMigration({
 	slug: "orders",
 	dependsOn: [
@@ -229,14 +242,16 @@ export default defineMigration({
 			const statusHistory: Array<{
 				status: string;
 				changedAt?: string;
-				changedBy?: string | number;
+				changedBy?: { relationTo: "users"; value: string | number };
 				comment?: string;
 			}> = [];
 			for (const h of old.statusHistory ?? []) {
 				// changedBy почти всегда персонал в старой системе — персонал не
 				// мигрируется, поэтому ссылка часто останется неразрешённой, это
-				// ожидаемо (см. users.migration.ts).
-				const changedBy = h.changedBy
+				// ожидаемо (см. users.migration.ts). relationTo в новой схеме
+				// полиморфный (["users", "admins"]) — Payload ждёт значение вида
+				// {relationTo, value}, а не голый id.
+				const changedById = h.changedBy
 					? await resolveRef(ctx, "users", h.changedBy.toString())
 					: undefined;
 				statusHistory.push({
@@ -244,7 +259,10 @@ export default defineMigration({
 					changedAt: h.changedAt
 						? new Date(h.changedAt).toISOString()
 						: undefined,
-					changedBy,
+					changedBy:
+						changedById !== undefined
+							? { relationTo: "users", value: changedById }
+							: undefined,
 					comment: h.comment,
 				});
 			}
@@ -265,6 +283,14 @@ export default defineMigration({
 					discountPercent: d.discountPercent,
 					discountAmount: d.discountAmount,
 				});
+			}
+
+			let deliveryMethod = old.delivery?.method;
+			if (!deliveryMethod || !VALID_DELIVERY_METHODS.has(deliveryMethod)) {
+				log.warn(
+					`Заказ ${old.orderNumber} (${legacyId}): delivery.method="${deliveryMethod}" не входит в новый набор значений, подставлен "${FALLBACK_DELIVERY_METHOD}"`,
+				);
+				deliveryMethod = FALLBACK_DELIVERY_METHOD;
 			}
 
 			const paymentMethod =
@@ -289,7 +315,7 @@ export default defineMigration({
 						contactPerson: old.recipient?.contactPerson,
 					},
 					delivery: {
-						method: old.delivery?.method,
+						method: deliveryMethod,
 						address: old.delivery?.address
 							? {
 									street: old.delivery.address.street,
