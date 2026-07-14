@@ -1,6 +1,6 @@
 'use server'
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { z } from 'zod'
 import { actionError, actionSuccess } from '../lib/utils'
 import { verifyOtpCode } from '../lib/OtpStore'
@@ -55,9 +55,14 @@ export async function verifyOtpAction(
   // Получаем пользователя из JWT
   let userId: string
   try {
-    const { user } = await payload.auth({
-      headers: new Headers({ cookie: `payload-token=${payloadToken.value}` }),
-    })
+    // Передаём реальные заголовки запроса (не только cookie) — Payload's
+    // cookie-стратегия извлечения JWT сверяет Origin/Sec-Fetch-Site со
+    // списком csrf (см. payload.config.ts: csrf строится из ALLOWED_ORIGINS)
+    // и молча возвращает null, если синтетический Headers содержит только
+    // cookie без этих заголовков (см. node_modules/payload/dist/auth/
+    // extractJWT.js). Из-за этого валидный токен не проходил проверку и
+    // verifyOtpAction всегда получал user: null после успешного логина.
+    const { user } = await payload.auth({ headers: await headers() })
     if (!user) {
       return actionError('Сессия истекла. Войдите снова.')
     }

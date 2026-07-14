@@ -48,6 +48,7 @@ export async function tryLegacyPasswordFallback(
 		data: {
 			password,
 			legacyPasswordHash: null,
+			legacyPasswordMigrated: true,
 		},
 		overrideAccess: true,
 	});

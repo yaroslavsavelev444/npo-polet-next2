@@ -230,6 +230,7 @@ export interface User {
   emailVerified?: boolean | null;
   lastLoginAt?: string | null;
   legacyPasswordHash?: string | null;
+  legacyPasswordMigrated?: boolean | null;
   /**
    * ID документа в старой базе (заполняется только миграцией)
    */
@@ -1393,6 +1394,7 @@ export interface UsersSelect<T extends boolean = true> {
   emailVerified?: T;
   lastLoginAt?: T;
   legacyPasswordHash?: T;
+  legacyPasswordMigrated?: T;
   legacyId?: T;
   updatedAt?: T;
   createdAt?: T;

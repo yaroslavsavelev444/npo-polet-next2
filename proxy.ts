@@ -140,11 +140,24 @@ async function fetchSessionStatus(
       url.searchParams.set("sessionId", sessionId);
     }
 
+    // Передаём cookies чтобы Route Handler видел payload-token.
+    // Origin/Sec-Fetch-Site тоже обязательны: Payload's cookie-стратегия
+    // извлечения JWT сверяет их со списком payload.config.csrf (см.
+    // node_modules/payload/dist/auth/extractJWT.js) и молча возвращает null,
+    // если ни Origin, ни Sec-Fetch-Site не переданы — а это серверный fetch
+    // (не браузерный), поэтому Sec-Fetch-Site сам собой не появится, его
+    // нужно прокинуть из исходного запроса (fallback "same-origin" —
+    // безопасен: это внутренний вызов нашего же proxy к нашему же API,
+    // а не запрос, контролируемый третьей стороной).
+    const proxiedHeaders = new Headers({
+      cookie: req.headers.get("cookie") ?? "",
+      "sec-fetch-site": req.headers.get("sec-fetch-site") ?? "same-origin",
+    });
+    const originHeader = req.headers.get("origin");
+    if (originHeader) proxiedHeaders.set("origin", originHeader);
+
     const res = await fetch(url, {
-      headers: {
-        // Передаём cookies чтобы Route Handler видел payload-token
-        cookie: req.headers.get("cookie") ?? "",
-      },
+      headers: proxiedHeaders,
       cache: "no-store",
     });
 

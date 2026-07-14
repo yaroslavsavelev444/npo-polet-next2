@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
@@ -40,9 +40,9 @@ export async function resendOtpAction(_prevState: unknown, formData: FormData) {
   let userEmail: string;
   let userId: string;
   try {
-    const { user } = await payload.auth({
-      headers: new Headers({ cookie: `payload-token=${payloadToken.value}` }),
-    });
+    // См. verifyOtp.ts: нужны реальные заголовки запроса (Origin/Sec-Fetch-Site),
+    // иначе Payload's cookie-CSRF проверка молча отклоняет валидный токен.
+    const { user } = await payload.auth({ headers: await headers() });
     if (!user) {
       return actionError("Сессия истекла. Войдите снова.");
     }

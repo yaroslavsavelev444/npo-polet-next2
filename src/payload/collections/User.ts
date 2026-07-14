@@ -237,6 +237,26 @@ export const Users: CollectionConfig = {
 				update: () => false,
 			},
 		},
+		// Единственный надёжный признак того, что bcrypt-фоллбек для этого
+		// пользователя уже сработал (см. legacyPasswordFallback.ts). Отличать
+		// "уже мигрировал" от "хеш ещё не перенесён из старой БД" по одному
+		// только пустому legacyPasswordHash нельзя — оба состояния выглядят
+		// одинаково (null), а миграция должна уметь безопасно доносить
+		// legacyPasswordHash при повторном прогоне для пользователей, которым
+		// он не попал при первом переносе (например, поле добавили в схему
+		// уже после первого прогона users.migration.ts) — не трогая при этом
+		// тех, кто уже реально сменил пароль через фоллбек.
+		{
+			name: "legacyPasswordMigrated",
+			type: "checkbox",
+			defaultValue: false,
+			admin: { hidden: true },
+			access: {
+				read: () => false,
+				create: () => false,
+				update: () => false,
+			},
+		},
 		legacyIdField,
 	],
 };

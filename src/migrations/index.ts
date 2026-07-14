@@ -5,6 +5,7 @@ import * as migration_20260710_100650_drop_legacy_audit_columns from './20260710
 import * as migration_20260710_120000_account_deletion_requests from './20260710_120000_account_deletion_requests.ts';
 import * as migration_20260713_080049_hero_background from './20260713_080049_hero_background.ts';
 import * as migration_20260713_093858_legacy_data_migration_support from './20260713_093858_legacy_data_migration_support.ts';
+import * as migration_20260714_115946_legacy_password_migrated_flag from './20260714_115946_legacy_password_migrated_flag.ts';
 
 export const migrations = [
   {
@@ -40,6 +41,11 @@ export const migrations = [
   {
     up: migration_20260713_093858_legacy_data_migration_support.up,
     down: migration_20260713_093858_legacy_data_migration_support.down,
-    name: '20260713_093858_legacy_data_migration_support'
+    name: '20260713_093858_legacy_data_migration_support',
+  },
+  {
+    up: migration_20260714_115946_legacy_password_migrated_flag.up,
+    down: migration_20260714_115946_legacy_password_migrated_flag.down,
+    name: '20260714_115946_legacy_password_migrated_flag'
   },
 ];

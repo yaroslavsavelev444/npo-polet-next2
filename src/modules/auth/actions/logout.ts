@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { revokeAllUserSessions, revokeSession } from "../lib/session";
@@ -41,9 +41,9 @@ export async function logoutAllAction() {
   if (payloadToken) {
     try {
       const payload = await getPayloadInstance();
-      const { user } = await payload.auth({
-        headers: new Headers({ cookie: `payload-token=${payloadToken.value}` }),
-      });
+      // См. verifyOtp.ts: нужны реальные заголовки запроса, иначе Payload's
+      // cookie-CSRF проверка молча отклоняет валидный токен.
+      const { user } = await payload.auth({ headers: await headers() });
 
       if (user) {
         await revokeAllUserSessions(payload, String(user.id), "logout_all");
@@ -79,9 +79,9 @@ export async function revokeSessionAction(
   }
 
   const payload = await getPayloadInstance();
-  const { user } = await payload.auth({
-    headers: new Headers({ cookie: `payload-token=${payloadToken.value}` }),
-  });
+  // См. verifyOtp.ts: нужны реальные заголовки запроса, иначе Payload's
+  // cookie-CSRF проверка молча отклоняет валидный токен.
+  const { user } = await payload.auth({ headers: await headers() });
 
   if (!user) {
     return { success: false, error: "Сессия истекла" };

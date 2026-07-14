@@ -7,6 +7,7 @@ import {
 	emptyStats,
 	upsertByLegacyId,
 } from "../core/index.ts";
+import type { MigrationContext } from "../core/index.ts";
 import { LEGACY_COLLECTIONS } from "../lib/legacyCollections.ts";
 
 interface LegacyUser {
@@ -104,8 +105,65 @@ export default defineMigration({
 			}
 
 			stats[result.action]++;
+
+			// upsertByLegacyId никогда не применяет createOnlyData к уже
+			// существующей записи (см. core/upsert.ts) — это осознанно (иначе
+			// повторный прогон мог бы затирать реальный пароль, который
+			// пользователь уже установил через фоллбек). Но это же правило
+			// означает, что если legacyPasswordHash не долетел при первом
+			// прогоне (например, поле добавили в схему уже после него), он
+			// НИКОГДА не будет донесён последующими прогонами. Здесь —
+			// единственное безопасное место для бэкафилла: только для
+			// записей, которые (по нашему собственному, а не унаследованному
+			// от старой БД признаку legacyPasswordMigrated) точно ещё не
+			// проходили фоллбек.
+			if (
+				!ctx.dryRun &&
+				(result.action === "updated" || result.action === "unchanged") &&
+				old.password &&
+				result.id !== undefined
+			) {
+				await backfillLegacyPasswordHash(ctx, result.id, old.password);
+			}
 		}
 
 		return stats;
 	},
 });
+
+/**
+ * Донасаживает legacyPasswordHash для уже существующей (по legacyId) записи,
+ * если он ещё не был перенесён и пользователь точно ещё не проходил
+ * bcrypt-фоллбек (см. legacyPasswordFallback.ts, где legacyPasswordMigrated
+ * выставляется в true одновременно с очисткой хеша). Если оба условия не
+ * выполняются — запись не трогаем вообще, чтобы не воскрешать умышленно
+ * очищенный хеш и не перезаписывать уже сменённый пользователем пароль.
+ */
+async function backfillLegacyPasswordHash(
+	ctx: MigrationContext,
+	userId: string | number,
+	legacyBcryptHash: string,
+): Promise<void> {
+	const existing = await ctx.payload.findByID({
+		collection: "users",
+		id: userId,
+		overrideAccess: true,
+		depth: 0,
+		select: { legacyPasswordHash: true, legacyPasswordMigrated: true },
+	});
+
+	if (existing.legacyPasswordMigrated || existing.legacyPasswordHash) {
+		return;
+	}
+
+	await ctx.payload.update({
+		collection: "users",
+		id: userId,
+		data: { legacyPasswordHash: legacyBcryptHash },
+		overrideAccess: true,
+		depth: 0,
+	});
+	ctx.log.warn(
+		`legacyPasswordHash донесён повторным прогоном для пользователя id=${userId} (не был перенесён при создании)`,
+	);
+}
