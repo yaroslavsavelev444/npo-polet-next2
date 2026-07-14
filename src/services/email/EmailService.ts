@@ -69,7 +69,7 @@ export class EmailService {
 
     const transporter = getEmailTransporter();
     const from = formatAddress({
-      email: config.EMAIL_FROM_ADDRESS,
+      email: config.EMAIL_FROM_ADDRESS, //
       name: config.EMAIL_FROM_NAME,
     });
     const to = recipients.map(formatAddress).join(", ");
