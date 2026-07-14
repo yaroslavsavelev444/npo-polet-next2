@@ -8,6 +8,7 @@ interface Props {
   settings: Setting | null;
   cartItemCount: number;
   wishlistProductIds: string[];
+  unreadNotificationCount: number;
 }
 
 export default function NavbarShell({
@@ -16,6 +17,7 @@ export default function NavbarShell({
   settings,
   cartItemCount,
   wishlistProductIds,
+  unreadNotificationCount,
 }: Props) {
   return (
     <Flex
@@ -46,6 +48,7 @@ export default function NavbarShell({
           settings={settings}
           cartItemCount={cartItemCount}
           wishlistProductIds={wishlistProductIds}
+          unreadNotificationCount={unreadNotificationCount}
         />
       </Flex>
     </Flex>

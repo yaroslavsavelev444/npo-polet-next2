@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { registerAction } from '../actions/register';
 import { AuthAlert } from './AuthAlert';
+import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import type { AcceptedConsentInput } from '../schemas/register.schema';
 import Typography, { Heading } from '@/UI/Typography/Typography';
 import { Input } from '@/UI/Input/Input';
@@ -32,6 +33,7 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
   const [state, action, isPending] = useActionState(registerAction, null);
   const [checkedSlugs, setCheckedSlugs] = useState<Record<string, boolean>>({});
   const [emailValue, setEmailValue] = useState('');
+  const [passwordValue, setPasswordValue] = useState('');
 
   const requiredConsents = consents.filter((c) => c.isRequired);
   const allRequiredChecked = requiredConsents.every((c) => checkedSlugs[c.slug]);
@@ -98,19 +100,23 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
           fullWidth
         />
 
-        <Input
-          id="password"
-          name="password"
-          label="Пароль"
-          type="password"
-          autoComplete="new-password"
-          required
-          disabled={isPending}
-          placeholder="Минимум 8 символов"
-          helperText="Минимум 8 символов, буквы и цифры"
-          errorMessage={getFieldError(state, 'password')}
-          fullWidth
-        />
+        <div>
+          <Input
+            id="password"
+            name="password"
+            label="Пароль"
+            type="password"
+            autoComplete="new-password"
+            required
+            disabled={isPending}
+            placeholder="Минимум 8 символов"
+            value={passwordValue}
+            onChange={(e) => setPasswordValue(e.target.value)}
+            errorMessage={getFieldError(state, 'password')}
+            fullWidth
+          />
+          <PasswordStrengthMeter password={passwordValue} />
+        </div>
 
         <Input
           id="confirmPassword"

@@ -8,6 +8,7 @@ import {
   invalidateSession,
 } from "@/modules/auth/lib/session";
 import { getPayloadInstance } from "@/payload/services/getPayload";
+import { notify } from "@/services/notifications/notificationCenter";
 import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordChanged";
 import {
   ChangePasswordPayload,
@@ -39,6 +40,7 @@ export async function updateAccountAction(
     overrideAccess: false,
     user,
   });
+  void notify(payload, user.id, "profile_updated", {});
 
   revalidatePath("/profile");
 }
@@ -75,6 +77,7 @@ export async function changePasswordAction(
     email: user.email as string,
     userName: user.name as string,
   });
+  void notify(payload, user.id, "password_changed", {});
 
   revalidatePath("/profile");
 }

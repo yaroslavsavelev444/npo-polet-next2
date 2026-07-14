@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { getPayloadInstance } from "@/payload/services/getPayload";
+import { notify } from "@/services/notifications/notificationCenter";
 import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
 import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
@@ -114,12 +115,10 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 		return actionError(message, undefined, code);
 	}
 
-	void notifyNewSessionLogin({
-		email,
-		userName,
-		deviceLabel: parseDeviceLabel(userAgent),
-		ip,
-	});
+	const deviceLabel = parseDeviceLabel(userAgent);
+
+	void notifyNewSessionLogin({ email, userName, deviceLabel, ip });
+	void notify(payload, userId, "login_new_device", { deviceLabel, ip });
 
 	// lastLoginAt — наше поле, которое Payload не знает и не обновляет само
 	// (в отличие от loginAttempts/lockUntil, которые он сам сбрасывает при
@@ -240,6 +239,11 @@ async function notifyLockedOnce(
 			userName: user.name as string,
 			lockedUntil: lockUntil,
 		});
+		const minutesLeft = Math.max(
+			1,
+			Math.ceil((lockUntil.getTime() - Date.now()) / 60000),
+		);
+		void notify(payload, user.id, "account_locked", { minutesLeft });
 	} catch (err) {
 		logUnexpectedAuthError("login.notifyLockedOnce", err);
 	}

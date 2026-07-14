@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { getPayloadInstance } from "@/payload/services/getPayload";
+import { notify } from "@/services/notifications/notificationCenter";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
 import {
   isFieldTakenError,
@@ -109,6 +110,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       },
       overrideAccess: true,
     });
+    void notify(payload, user.id, "welcome", {});
   } catch (err: unknown) {
     if (isFieldTakenError(err, "email")) {
       return actionError(

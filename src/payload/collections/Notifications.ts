@@ -1,6 +1,5 @@
 import type { CollectionConfig } from 'payload'
 import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
-import { isLoggedIn } from '../access/isLoggedIn.ts'
 
 export const Notifications: CollectionConfig = {
   slug: 'notifications',
@@ -37,7 +36,18 @@ export const Notifications: CollectionConfig = {
     },
 
     create: isAdminOrSuperAdmin,
-    update: isLoggedIn,
+    // `isLoggedIn` раньше пускало ЛЮБОГО авторизованного пользователя
+    // патчить чужие уведомления (PATCH /api/notifications/:id без проверки
+    // владельца) — латентная дыра, безвредная пока коллекция не была
+    // подключена ни к какому клиенту. Теперь бэлл в шапке дергает её
+    // напрямую, так что сужаем update до владельца записи, по аналогии с read.
+    update: ({ req }) => {
+      if (!req.user) return false
+      if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+        return true
+      }
+      return { user: { equals: req.user.id } }
+    },
     delete: isAdminOrSuperAdmin,
   },
 
@@ -66,6 +76,11 @@ export const Notifications: CollectionConfig = {
         'discount',
         'product',
         'login_from_new_device',
+        // Добавлено для системы уведомлений (см. notificationCenter.ts):
+        // security — вход/пароль/блокировка по попыткам, account — действия
+        // администратора и изменения профиля.
+        'security',
+        'account',
       ],
       index: true,
     },

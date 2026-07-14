@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { notify } from "../../services/notifications/notificationCenter.ts";
 import { notifyNewOrder } from "../../services/notifications/notifyNewOrder.ts";
 import {
 	notifyOrderCancelled,
@@ -7,6 +8,16 @@ import {
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
+
+/** Заказы после удаления аккаунта обезличиваются (user становится пустым) — для них in-app уведомление создавать некому. */
+function getOrderUserId(doc: { user?: unknown }): number | null {
+	const { user } = doc;
+	if (typeof user === "number") return user;
+	if (user && typeof user === "object" && "id" in user) {
+		return Number((user as { id: unknown }).id);
+	}
+	return null;
+}
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
@@ -130,8 +141,16 @@ export const Orders: CollectionConfig = {
 				// реальным получателям.
 				if (req.context?.isMigration) return doc;
 
+				const userId = getOrderUserId(doc);
+
 				if (operation === "create") {
 					void notifyNewOrder(doc, req.payload); // явная передача, без нового импорта getPayload
+					if (userId) {
+						void notify(req.payload, userId, "order_created", {
+							orderNumber: doc.orderNumber,
+							itemsCount: doc.items?.length ?? 0,
+						});
+					}
 					return doc;
 				}
 
@@ -147,10 +166,22 @@ export const Orders: CollectionConfig = {
 					const initiatedBy: "customer" | "admin" =
 						req.context?.initiatedByCustomer === true ? "customer" : "admin";
 					void notifyOrderCancelled(doc, initiatedBy);
+					if (userId) {
+						void notify(req.payload, userId, "order_cancelled", {
+							orderNumber: doc.orderNumber,
+							initiatedBy,
+						});
+					}
 					return doc;
 				}
 
 				void notifyOrderStatusChanged(doc);
+				if (userId) {
+					void notify(req.payload, userId, "order_status_changed", {
+						orderNumber: doc.orderNumber,
+						status: doc.status,
+					});
+				}
 				return doc;
 			},
 		],

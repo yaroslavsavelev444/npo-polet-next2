@@ -1,10 +1,42 @@
-import type { CollectionConfig, FieldAccess } from "payload";
+import type { CollectionAfterChangeHook, CollectionConfig, FieldAccess } from "payload";
 import { env } from "../../env.ts";
+import { notify } from "../../services/notifications/notificationCenter.ts";
 import { renderButton } from "../../services/email/templates/shared/button.ts";
 import { renderEmailLayout } from "../../services/email/templates/shared/layout.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { checkUserStatus } from "../hooks/users/beforeLogin.ts";
+
+/**
+ * Реагирует на изменение status администратором (поле доступно на update
+ * только staff, см. staffOnlyFieldAccess ниже) — уведомляет пользователя о
+ * блокировке/приостановке/восстановлении доступа. beforeLogin-хук
+ * (checkUserStatus) не подходит для этого: он вызывается только в момент
+ * логина уже заблокированного юзера, а здесь нужна реакция В МОМЕНТ, когда
+ * админ поменял статус, независимо от того, залогинен ли пользователь.
+ */
+const notifyOnStatusChange: CollectionAfterChangeHook = async ({
+	doc,
+	previousDoc,
+	operation,
+	req,
+}) => {
+	if (operation !== "update" || req.context?.isMigration) return doc;
+	if (previousDoc?.status === doc.status) return doc;
+
+	if (doc.status === "blocked") {
+		void notify(req.payload, doc.id, "account_blocked", {});
+	} else if (doc.status === "suspended") {
+		void notify(req.payload, doc.id, "account_suspended", {});
+	} else if (
+		doc.status === "active" &&
+		(previousDoc?.status === "blocked" || previousDoc?.status === "suspended")
+	) {
+		void notify(req.payload, doc.id, "account_reactivated", {});
+	}
+
+	return doc;
+};
 
 // `isAdminOrSuperAdmin` из ../access/isAdminOrSuperAdmin.ts типизирован как
 // `Access` (коллекционный контроль доступа) и не может напрямую переиспользоваться
@@ -90,6 +122,7 @@ export const Users: CollectionConfig = {
 
 	hooks: {
 		beforeLogin: [checkUserStatus],
+		afterChange: [notifyOnStatusChange],
 	},
 
 	fields: [

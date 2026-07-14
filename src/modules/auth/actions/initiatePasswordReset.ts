@@ -1,6 +1,7 @@
 "use server";
 
 import { getPayloadInstance } from "@/payload/services/getPayload";
+import { notify } from "@/services/notifications/notificationCenter";
 import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordChanged";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { revokeAllUserSessions } from "../lib/session";
@@ -114,6 +115,7 @@ export async function resetPasswordAction(
       email: result.user.email as string,
       userName: result.user.name as string,
     });
+    void notify(payload, userId, "password_changed", {});
     // Сбрасываем 2FA флаг — при следующем входе потребуется заново
     await payload.update({
       collection: "users",

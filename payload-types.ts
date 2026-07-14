@@ -955,6 +955,8 @@ export interface Notification {
         | 'discount'
         | 'product'
         | 'login_from_new_device'
+        | 'security'
+        | 'account'
       )
     | null;
   title: string;

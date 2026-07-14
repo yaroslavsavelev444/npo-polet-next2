@@ -1,4 +1,6 @@
 import type { CollectionConfig } from "payload";
+import { getProductHref } from "../../modules/productCard/lib/routing.ts";
+import { notify } from "../../services/notifications/notificationCenter.ts";
 import { notifyReviewStatusChanged } from "../../services/notifications/notifyReviewStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 
@@ -66,6 +68,26 @@ export const ProductReviews: CollectionConfig = {
             overrideAccess: true,
           });
           void notifyReviewStatusChanged(populated);
+
+          if (populated.status === "approved" || populated.status === "rejected") {
+            const user = populated.user;
+            const product = populated.product;
+            if (typeof user === "object" && typeof product === "object") {
+              const productUrl = getProductHref({ id: String(product.id), category: null });
+              void notify(
+                req.payload,
+                user.id,
+                populated.status === "approved" ? "review_approved" : "review_rejected",
+                {
+                  productTitle: product.title,
+                  productUrl,
+                  ...(populated.status === "rejected" && {
+                    reason: populated.rejectionReason,
+                  }),
+                },
+              );
+            }
+          }
         }
         return doc;
       },

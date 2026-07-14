@@ -3,6 +3,7 @@
 import { Flex } from "@once-ui-system/core";
 import { useState } from "react";
 import { CartIcon } from "@/modules/cart/components/CartIcon";
+import { NotificationBell } from "@/modules/notifications";
 import { WishlistIcon } from "@/modules/wishlist";
 import type { Category, Setting, User } from "@/payload-types";
 import Logo from "./Logo";
@@ -17,6 +18,7 @@ interface Props {
   settings: Setting | null;
   cartItemCount: number;
   wishlistProductIds: string[];
+  unreadNotificationCount: number;
 }
 
 export default function NavbarClientIsland({
@@ -25,6 +27,7 @@ export default function NavbarClientIsland({
   settings,
   cartItemCount,
   wishlistProductIds,
+  unreadNotificationCount,
 }: Props) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -34,8 +37,13 @@ export default function NavbarClientIsland({
         {/* LEFT */}
         <Logo settings={settings} />
 
-        {/* CENTER - Desktop Search */}
-        <Flex flex={1} horizontal="center" className="hidden md:flex">
+        {/* CENTER - Desktop Search. !-модификатор обязателен: базовые стили
+            @once-ui-system/core грузятся раньше Tailwind (см. layout.tsx) и
+            задают этому Flex display:flex с более высоким приоритетом, чем
+            у обычного Tailwind-класса `hidden` — без !important поиск не
+            скрывался на мобильных и выталкивал иконки (в т.ч. колокольчик)
+            за пределы экрана. */}
+        <Flex flex={1} horizontal="center" className="!hidden md:!flex">
           <SearchInput expanded />
         </Flex>
 
@@ -47,6 +55,7 @@ export default function NavbarClientIsland({
           </div>
           {user && <WishlistIcon initialProductIds={wishlistProductIds} />}
           {user && <CartIcon initialCount={cartItemCount} />}
+          {user && <NotificationBell initialUnreadCount={unreadNotificationCount} />}
           <UserMenu user={user} />
 
           {/* Burger */}

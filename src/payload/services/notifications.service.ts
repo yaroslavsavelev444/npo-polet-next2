@@ -116,3 +116,91 @@ export const getCachedNotificationsByUser = (
     revalidate: false,
   })();
 };
+
+// ─── Бэлл в шапке: список/счётчик/прочтение ────────────────────────────────
+//
+// Намеренно БЕЗ unstable_cache выше: это персональные, часто меняющиеся
+// данные (открыл бэлл → часть непрочитанных тут же становится прочитанной),
+// а Next Data Cache — общий на сервер кеш по тегам, не per-request и не
+// per-user, и плохо подходит для "счётчик должен быть точным прямо сейчас".
+// Свежесть на клиенте обеспечивает React Query (см. modules/notifications).
+
+export interface NotificationsPageResult {
+  docs: Notification[];
+  hasNextPage: boolean;
+  nextPage: number | null;
+  totalDocs: number;
+}
+
+export async function listNotificationsPage(
+  userId: string | number,
+  { page = 1, limit = 15 }: { page?: number; limit?: number } = {},
+): Promise<NotificationsPageResult> {
+  const payload = await getPayloadInstance();
+  const result = await payload.find({
+    collection: "notifications",
+    where: { user: { equals: userId } },
+    sort: "-createdAt",
+    page,
+    limit,
+    overrideAccess: true,
+  });
+
+  return {
+    docs: result.docs as unknown as Notification[],
+    hasNextPage: result.hasNextPage,
+    nextPage: result.nextPage ?? null,
+    totalDocs: result.totalDocs,
+  };
+}
+
+export async function getUnreadNotificationCount(
+  userId: string | number,
+): Promise<number> {
+  const payload = await getPayloadInstance();
+  const { totalDocs } = await payload.count({
+    collection: "notifications",
+    where: {
+      and: [{ user: { equals: userId } }, { isRead: { equals: false } }],
+    },
+    overrideAccess: true,
+  });
+  return totalDocs;
+}
+
+/** Помечает прочитанными указанные уведомления, но только принадлежащие userId — защита от чужих id в теле запроса. */
+export async function markNotificationsReadForUser(
+  userId: string | number,
+  ids: Array<number | string>,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const payload = await getPayloadInstance();
+  const result = await payload.update({
+    collection: "notifications",
+    where: {
+      and: [
+        { user: { equals: userId } },
+        { id: { in: ids } },
+        { isRead: { equals: false } },
+      ],
+    },
+    data: { isRead: true },
+    overrideAccess: true,
+  });
+  return result.docs.length;
+}
+
+export async function markAllNotificationsReadForUser(
+  userId: string | number,
+): Promise<number> {
+  const payload = await getPayloadInstance();
+  const result = await payload.update({
+    collection: "notifications",
+    where: {
+      and: [{ user: { equals: userId } }, { isRead: { equals: false } }],
+    },
+    data: { isRead: true },
+    overrideAccess: true,
+  });
+  return result.docs.length;
+}
