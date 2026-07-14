@@ -1,8 +1,5 @@
 import type { CollectionAfterChangeHook, CollectionConfig, FieldAccess } from "payload";
-import { env } from "../../env.ts";
 import { notify } from "../../services/notifications/notificationCenter.ts";
-import { renderButton } from "../../services/email/templates/shared/button.ts";
-import { renderEmailLayout } from "../../services/email/templates/shared/layout.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { checkUserStatus } from "../hooks/users/beforeLogin.ts";
@@ -67,27 +64,13 @@ export const Users: CollectionConfig = {
 		// только встроенный механизм Payload.
 		maxLoginAttempts: 10,
 		lockTime: 15 * 60 * 1000,
-		forgotPassword: {
-			generateEmailSubject: () => "Восстановление пароля",
-			generateEmailHTML: (args) => {
-				const token = args?.token ?? "";
-				const resetUrl = `${env.NEXT_PUBLIC_APP_URL}/auth/password-reset?token=${token}`;
-				const bodyHtml = `
-        <h1 style="margin:0 0 16px;font-size:18px;color:#18181B;">Восстановление пароля</h1>
-        <p style="margin:0 0 20px;color:#52525B;">
-          Вы запросили восстановление пароля. Ссылка действительна 1 час.
-        </p>
-        ${renderButton("Установить новый пароль", resetUrl)}
-        <p style="margin:20px 0 0;color:#71717A;font-size:13px;">
-          Если вы не запрашивали восстановление — проигнорируйте это письмо.
-        </p>
-      `;
-				return renderEmailLayout({
-					previewText: "Восстановление пароля",
-					bodyHtml,
-				});
-			},
-		},
+		// generateEmailSubject/generateEmailHTML сюда намеренно не возвращаем:
+		// forgotPasswordAction вызывает payload.forgotPassword с
+		// disableEmail: true и шлёт письмо сам через notifyPasswordReset
+		// (см. её докстринг) — эти колбэки Payload вызывает только из
+		// собственного email-адаптера, который при disableEmail: true не
+		// выполняется вообще, так что здесь они были бы мёртвым кодом.
+		forgotPassword: {},
 	},
 
 	admin: {

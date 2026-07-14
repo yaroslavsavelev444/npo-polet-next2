@@ -3,6 +3,7 @@
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordChanged";
+import { notifyPasswordReset } from "@/services/notifications/notifyPasswordReset";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { revokeAllUserSessions } from "../lib/session";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
@@ -14,11 +15,14 @@ import {
 /**
  * Server Action: запрос сброса пароля.
  *
- * Используем ЧИСТЫЙ Payload flow:
- * payload.forgotPassword() → Payload сам:
- *   - генерирует reset-токен
- *   - сохраняет его (хешированный) в БД
- *   - отправляет email со ссылкой /auth/reset-password?token=xxx
+ * payload.forgotPassword({ disableEmail: true }) — генерирует reset-токен
+ * и сохраняет его (хешированный) в БД, но НЕ шлёт письмо сам: у Payload
+ * есть собственный, полностью независимый email-адаптер (payload.config.ts
+ * → email:), который в этом проекте не настроен, поэтому без disableEmail
+ * Payload молча писал в консоль ("Email attempted without being
+ * configured") вместо реальной отправки — письма никогда не уходили.
+ * Письмо отправляем сами через notifyPasswordReset — тот же централизованный
+ * EmailService/Nodemailer, что и все остальные письма в проекте.
  *
  * Всегда возвращаем success — защита от email enumeration.
  */
@@ -47,15 +51,17 @@ export async function forgotPasswordAction(
 
   const payload = await getPayloadInstance();
 
-  // Payload forgotPassword:
-  // - если email найден → генерирует токен + отправляет письмо
-  // - если не найден → ничего не делает (тихо)
-  // Оба случая не раскрываем клиенту
-  await payload.forgotPassword({
+  // Возвращает token, если email найден, иначе null — оба случая не
+  // раскрываем клиенту (см. actionSuccess ниже, единый для обоих веток).
+  const token = await payload.forgotPassword({
     collection: "users",
     data: { email },
-    // disableEmail: false — Payload сам отправляет письмо
+    disableEmail: true,
   });
+
+  if (token) {
+    await notifyPasswordReset({ email, token });
+  }
 
   // Всегда возвращаем success
   return actionSuccess({

@@ -12,7 +12,10 @@ const booleanFromEnv = (defaultValue: boolean) =>
 const emailEnvSchema = z.object({
   SMTP_HOST: z.string().min(1, "SMTP_HOST обязателен"),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
-  SMTP_SECURE: booleanFromEnv(false),
+  // Не coerce'им в boolean сразу здесь: дефолт для secure зависит от порта
+  // (см. ниже), поэтому "задан ли явно SMTP_SECURE" нужно знать отдельно
+  // от его значения.
+  SMTP_SECURE: z.string().optional(),
   SMTP_USER: z.string().min(1, "SMTP_USER обязателен"),
   SMTP_PASSWORD: z.string().min(1, "SMTP_PASSWORD обязателен"),
   EMAIL_FROM_ADDRESS: z
@@ -59,10 +62,20 @@ export function getEmailConfig(): EmailConfig {
     );
   }
 
+  // SMTP_SECURE не задан явно → выводим из порта: 465 — implicit TLS
+  // (соединение сразу зашифровано), иначе (587/25 — STARTTLS) не шифруем
+  // сразу. Порт 465 с secure:false ломает TLS-рукопожатие ещё на этапе
+  // connect — именно так провалилась реальная отправка на проде (SMTP_PORT
+  // = 465 в .env.production, SMTP_SECURE отсутствовал, дефолт был false).
+  const smtpSecure =
+    parsed.data.SMTP_SECURE !== undefined
+      ? parsed.data.SMTP_SECURE === "true"
+      : parsed.data.SMTP_PORT === 465;
+
   cachedConfig = {
     SMTP_HOST: parsed.data.SMTP_HOST,
     SMTP_PORT: parsed.data.SMTP_PORT,
-    smtpSecure: parsed.data.SMTP_SECURE,
+    smtpSecure,
     SMTP_USER: parsed.data.SMTP_USER,
     SMTP_PASSWORD: parsed.data.SMTP_PASSWORD,
     EMAIL_FROM_ADDRESS: parsed.data.EMAIL_FROM_ADDRESS,
