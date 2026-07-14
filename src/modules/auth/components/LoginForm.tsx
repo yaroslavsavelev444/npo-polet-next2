@@ -3,6 +3,7 @@
 import { useActionState, useEffect } from 'react';
 import Link from 'next/link';
 import { loginAction } from '../actions/login';
+import { AuthAlert } from './AuthAlert';
 import Input from '@/UI/Input/Input';
 import Button from '@/UI/Button/Button';
 
@@ -41,12 +42,7 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
       <form action={action} className="space-y-4">
         {/* Общая ошибка */}
         {state && !state.success && (
-          <div
-            role="alert"
-            className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700"
-          >
-            {state.error}
-          </div>
+          <AuthAlert message={state.error} code={state.code} />
         )}
 
         <Input

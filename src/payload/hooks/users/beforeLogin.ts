@@ -1,29 +1,28 @@
 import type { CollectionBeforeLoginHook } from 'payload'
+import {
+  AccountBlockedError,
+  AccountSuspendedError,
+} from '@/modules/auth/lib/accountStatusErrors'
 
 /**
- * Вызывается Payload перед проверкой пароля при login.
- * Блокирует вход если:
- * - аккаунт заблокирован навсегда (status: blocked)
- * - аккаунт временно заблокирован (lockUntil ещё не прошёл)
+ * Вызывается Payload перед выдачей токена — но ПОСЛЕ проверки пароля и
+ * встроенной проверки Payload на lockUntil (см. checkLoginPermission в
+ * node_modules/payload/dist/auth/operations/login.js: она вызывается сразу
+ * после чтения пользователя и до сверки пароля, поэтому временную
+ * блокировку по числу попыток Payload обрабатывает сам через
+ * auth.maxLoginAttempts/auth.lockTime — см. Users.auth в
+ * src/payload/collections/User.ts — и до этого хука такой пользователь
+ * вообще не доходит). Здесь остаётся только наша бизнес-логика поверх
+ * статуса аккаунта, которую Payload не знает:
+ * - аккаунт заблокирован администратором (status: blocked)
  * - аккаунт приостановлен (status: suspended)
  */
 export const checkUserStatus: CollectionBeforeLoginHook = async ({ user }) => {
-  // Временная блокировка после превышения попыток
-  if (user.lockUntil && new Date(user.lockUntil) > new Date()) {
-    const minutesLeft = Math.ceil(
-      (new Date(user.lockUntil).getTime() - Date.now()) / 60000,
-    )
-    throw new Error(
-      `Аккаунт временно заблокирован. Попробуйте через ${minutesLeft} мин.`,
-    )
-  }
-
-  // Перманентная блокировка администратором
   if (user.status === 'blocked') {
-    throw new Error('Ваш аккаунт заблокирован. Обратитесь в поддержку.')
+    throw new AccountBlockedError()
   }
 
   if (user.status === 'suspended') {
-    throw new Error('Ваш аккаунт приостановлен. Обратитесь в поддержку.')
+    throw new AccountSuspendedError()
   }
 }

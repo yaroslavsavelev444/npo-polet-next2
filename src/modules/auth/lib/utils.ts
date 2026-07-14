@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { OtpType } from '../types'
+import { AuthErrorCode, OtpType } from '../types'
 
 
 /** Извлекает IP и User-Agent из входящего запроса. */
@@ -13,9 +13,18 @@ export async function getRequestMeta() {
   return { ip, userAgent }
 }
 
-/** Единый формат ошибки для Server Actions. */
-export function actionError(message: string, fieldErrors?: Record<string, string[]>) {
-  return { success: false as const, error: message, fieldErrors }
+/**
+ * Единый формат ошибки для Server Actions. `code` — необязательная
+ * категория (см. AuthErrorCode) для UI, которая позволяет форме показывать
+ * разное оформление (например предупреждение для временной блокировки
+ * вместо обычной ошибки для неверного пароля), не парся текст сообщения.
+ */
+export function actionError(
+  message: string,
+  fieldErrors?: Record<string, string[]>,
+  code?: AuthErrorCode,
+) {
+  return { success: false as const, error: message, fieldErrors, code }
 }
 
 export function actionSuccess<T>(data: T) {

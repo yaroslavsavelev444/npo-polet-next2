@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { registerAction } from '../actions/register';
+import { AuthAlert } from './AuthAlert';
 import type { AcceptedConsentInput } from '../schemas/register.schema';
 import Typography, { Heading } from '@/UI/Typography/Typography';
 import { Input } from '@/UI/Input/Input';
@@ -66,12 +67,7 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
       <form action={handleSubmit} className="space-y-4">
         {/* Общая ошибка */}
         {state && !state.success && (
-          <div
-            role="alert"
-            className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700"
-          >
-            {state.error}
-          </div>
+          <AuthAlert message={state.error} code={state.code} />
         )}
 
         <Input

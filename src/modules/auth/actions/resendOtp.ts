@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
-import { createOtp } from "../lib/OtpStore";
+import { safeCreateOtp } from "../lib/errorHandling";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
 import type { OtpType } from "../types";
@@ -60,11 +60,16 @@ export async function resendOtpAction(_prevState: unknown, formData: FormData) {
     return actionError("Слишком много запросов. Подождите несколько минут.");
   }
 
-  const otp = await createOtp(payload, {
-    userId,
-    type: type as OtpType,
-    ip,
-  });
+  const otp = await safeCreateOtp(
+    payload,
+    { userId, type: type as OtpType, ip },
+    "resendOtp.createOtp",
+  );
+  if (!otp) {
+    return actionError(
+      "Не удалось отправить код. Попробуйте ещё раз через несколько минут.",
+    );
+  }
 
   // В отличие от login.ts/register.ts, здесь безопасно вернуть actionError:
   // это отдельное действие на уже отрисованном экране OTP (кнопка «отправить

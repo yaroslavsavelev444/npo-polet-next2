@@ -3,7 +3,11 @@
 import { cookies } from "next/headers";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
-import { createOtp } from "../lib/OtpStore";
+import {
+  isFieldTakenError,
+  logUnexpectedAuthError,
+  safeCreateOtp,
+} from "../lib/errorHandling";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { createSession } from "../lib/session";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
@@ -29,6 +33,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
     return actionError(
       "Проверьте введённые данные",
       parsed.error.flatten().fieldErrors,
+      "validation",
     );
   }
 
@@ -42,16 +47,20 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       acceptedConsentSchema.parse(c),
     );
   } catch {
-    return actionError("Некорректные данные согласий");
+    return actionError("Некорректные данные согласий", undefined, "validation");
   }
 
   const { ip, userAgent } = await getRequestMeta();
 
   // 2. Rate limit
   const rl = await RATE_LIMITS.register(ip);
-  // if (!rl.allowed) {
-  //   return actionError("Слишком много попыток. Попробуйте позже.");
-  // }
+  if (!rl.allowed) {
+    return actionError(
+      "Слишком много попыток регистрации. Попробуйте позже.",
+      undefined,
+      "rate_limited",
+    );
+  }
 
   const payload = await getPayloadInstance();
 
@@ -77,9 +86,11 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
   const missing = requiredSlugs.filter((s) => !acceptedSlugs.includes(s));
 
   if (missing.length > 0) {
-    return actionError("Необходимо принять все обязательные соглашения", {
-      consents: [`Не приняты: ${missing.join(", ")}`],
-    });
+    return actionError(
+      "Необходимо принять все обязательные соглашения",
+      { consents: [`Не приняты: ${missing.join(", ")}`] },
+      "validation",
+    );
   }
 
   // 4. Создаём пользователя (тип выводится автоматически)
@@ -99,10 +110,24 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       overrideAccess: true,
     });
   } catch (err: unknown) {
-    if (isPayloadDuplicateError(err)) {
-      return actionError("Не удалось создать аккаунт. Проверьте данные.");
+    if (isFieldTakenError(err, "email")) {
+      return actionError(
+        "Пользователь с таким email уже зарегистрирован.",
+        undefined,
+        "email_taken",
+      );
     }
-    throw err;
+    // Любая другая ошибка создания (неожиданная валидация Payload, сбой БД
+    // и т.п.) раньше пробрасывалась дальше (`throw err`) и роняла рендер
+    // Server Action в error boundary. Показываем нейтральное сообщение и
+    // логируем причину для разбора — учётка при этом не создаётся, так что
+    // ничего откатывать не нужно.
+    logUnexpectedAuthError("register.createUser", err);
+    return actionError(
+      "Не удалось создать аккаунт. Попробуйте позже.",
+      undefined,
+      "server_error",
+    );
   }
 
   // 5. Логиним пользователя
@@ -125,79 +150,67 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       });
     }
   } catch (err) {
-    console.error("[register] Login after create failed:", err);
+    logUnexpectedAuthError("register.loginAfterCreate", err);
   }
 
-  // 6. Создаём сессию
-  const session = await createSession(payload, {
-    userId: String(user.id),
-    ip,
-    userAgent,
-  });
-
+  // 6. Создаём сессию — необязательный для дальнейшего флоу артефакт
+  // (verifyOtpAction работает и без cookie session-id), поэтому сбой здесь
+  // не должен ронять уже состоявшуюся регистрацию.
   const cookieStore = await cookies();
-  cookieStore.set("session-id", String(session.id), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 7 * 24 * 60 * 60,
-  });
+  try {
+    const session = await createSession(payload, {
+      userId: String(user.id),
+      ip,
+      userAgent,
+    });
 
-  console.log("acceptedConsents", acceptedConsents);
+    cookieStore.set("session-id", String(session.id), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60,
+    });
+  } catch (err) {
+    logUnexpectedAuthError("register.createSession", err);
+  }
 
-  const allConsents = await payload.find({
-    collection: "consents",
-
-    limit: 100,
-
-    overrideAccess: true,
-  });
-
-  console.log(
-    "DB consents",
-
-    allConsents.docs.map((c) => ({
-      id: c.id,
-
-      slug: c.slug,
-
-      title: c.title,
-    })),
-  );
-
+  // 7. Фиксируем принятые согласия
   await Promise.all(
     acceptedConsents.map((c) =>
       payload.create({
         collection: "user-consents",
-
         data: {
           user: user.id,
-
           consent: c.consentId,
-
           consentSlug: c.slug,
-
           version: c.version,
-
           acceptedAt: new Date().toISOString(),
-
           ip,
-
           userAgent,
         },
-
         overrideAccess: true,
       }),
     ),
   );
 
-  // 8. OTP для верификации email
-  const otp = await createOtp(payload, {
-    userId: String(user.id),
-    type: "email_verify",
-    ip,
-  });
+  // 8. OTP для верификации email. Без самой OTP-записи пользователю нечего
+  // будет ввести на следующем экране, поэтому (в отличие от отправки письма
+  // ниже) сбой здесь должен остановить флоу — но не откатывать уже
+  // созданный аккаунт/сессию/согласия, это необратимые побочные эффекты
+  // (см. также комментарий у notifyOtpCode ниже).
+  const otp = await safeCreateOtp(
+    payload,
+    { userId: String(user.id), type: "email_verify", ip },
+    "register.createOtp",
+  );
+  if (!otp) {
+    return actionError(
+      "Аккаунт создан, но не удалось отправить код подтверждения. Войдите, чтобы запросить код повторно.",
+      undefined,
+      "server_error",
+    );
+  }
 
   // Аккаунт, cookie-сессия и согласия уже созданы к этому моменту — это
   // необратимые побочные эффекты, которые Server Action не откатывает.
@@ -217,22 +230,8 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
   try {
     await notifyOtpCode({ to: email, code: otp, purpose: "email_verify" });
   } catch (err) {
-    console.error(
-      "[register] Не удалось отправить код подтверждения email:",
-      err,
-    );
+    logUnexpectedAuthError("register.notifyOtpCode", err);
   }
 
   return actionSuccess<RegisterResult>({ requiresOtp: true });
-}
-
-function isPayloadDuplicateError(err: unknown): boolean {
-  if (err instanceof Error) {
-    return (
-      err.message.includes("duplicate") ||
-      err.message.includes("unique") ||
-      err.message.includes("already exists")
-    );
-  }
-  return false;
 }

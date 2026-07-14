@@ -44,9 +44,29 @@ export interface ConsentListItem {
 
 // ─── Action Results ───────────────────────────────────────────────────────────
 
+/**
+ * Категория ошибки регистрации/логина — UI (см. AuthAlert.tsx) использует её,
+ * чтобы показывать разное оформление и, где уместно, разный текст, не
+ * дублируя классификацию из errorHandling.ts на клиенте.
+ */
+export type AuthErrorCode =
+  | "validation"
+  | "invalid_credentials"
+  | "account_locked"
+  | "account_blocked"
+  | "account_suspended"
+  | "email_taken"
+  | "rate_limited"
+  | "server_error";
+
 export type ActionResult<T = void> =
   | { success: true; data: T }
-  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+  | {
+      success: false;
+      error: string;
+      fieldErrors?: Record<string, string[]>;
+      code?: AuthErrorCode;
+    };
 
 export interface RegisterResult {
   requiresOtp: boolean;

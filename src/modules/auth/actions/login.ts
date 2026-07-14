@@ -5,8 +5,13 @@ import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
 import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
+import {
+  classifyLoginError,
+  logUnexpectedAuthError,
+  safeCreateOtp,
+} from "../lib/errorHandling";
 import { tryLegacyPasswordFallback } from "../lib/legacyPasswordFallback";
-import { createOtp } from "../lib/OtpStore";
+import { redis } from "../lib/redis";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { createSession, parseDeviceLabel } from "../lib/session";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
@@ -19,13 +24,15 @@ import type { LoginResult } from "../types";
  * Поток:
  * 1. Валидация
  * 2. Rate limit по IP
- * 3. payload.login() — проверяет пароль, возвращает JWT token
+ * 3. payload.login() — проверяет пароль, возвращает JWT token. Блокировку
+ *    по числу попыток (loginAttempts/lockUntil) и её сброс на успешный вход
+ *    Payload делает сам (auth.maxLoginAttempts/lockTime в Users.ts) — здесь
+ *    её больше не дублируем (см. errorHandling.ts).
  * 4. Вручную ставим cookie payload-token (в Server Actions Payload не ставит сам)
- * 5. Сбрасываем loginAttempts
- * 6. Генерируем OTP login_2fa + отправляем email
- * 7. Создаём Session запись
- * 8. Ставим session-id cookie
- * 9. Возвращаем requiresOtp: true
+ * 5. Генерируем OTP login_2fa + отправляем email
+ * 6. Создаём Session запись
+ * 7. Ставим session-id cookie
+ * 8. Возвращаем requiresOtp: true
  *
  * ВАЖНО про cookie в Server Actions:
  * payload.login() возвращает { token, user } — token это JWT строка.
@@ -42,17 +49,21 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 		return actionError(
 			"Проверьте введённые данные",
 			parsed.error.flatten().fieldErrors,
+			"validation",
 		);
 	}
 
 	const { email, password } = parsed.data;
 	const { ip, userAgent } = await getRequestMeta();
 
-	await RATE_LIMITS.login(ip);
-
-	// if (!rl.allowed) {
-	//   return actionError("Слишком много попыток входа. Попробуйте через час.");
-	// }
+	const rl = await RATE_LIMITS.login(ip);
+	if (!rl.allowed) {
+		return actionError(
+			"Слишком много попыток входа. Попробуйте через час.",
+			undefined,
+			"rate_limited",
+		);
+	}
 
 	const payload = await getPayloadInstance();
 
@@ -61,6 +72,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 	// Не передаём req — в Server Action он не нужен для получения token
 	let loginToken: string;
 	let userId: string | number;
+	let userName = "";
 
 	const attemptLogin = () =>
 		payload.login({ collection: "users", data: { email, password } });
@@ -85,34 +97,44 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 			loginResult = await attemptLogin();
 		}
 
-		void notifyNewSessionLogin({
-			email,
-			userName: loginResult.user ? (loginResult.user.name as string) : "",
-			deviceLabel: parseDeviceLabel(userAgent), // уже есть в modules/auth/lib/session.ts
-			ip,
-		});
-
 		if (!loginResult.token) {
 			throw new Error("No token returned");
 		}
 
 		loginToken = loginResult.token;
 		userId = loginResult.user ? loginResult.user.id : "";
+		userName = loginResult.user ? (loginResult.user.name as string) : "";
+	} catch (err) {
+		const { code, message } = classifyLoginError(err);
 
-		// Сбрасываем счётчик неверных попыток
+		if (code === "account_locked") {
+			void notifyLockedOnce(payload, email);
+		}
+
+		return actionError(message, undefined, code);
+	}
+
+	void notifyNewSessionLogin({
+		email,
+		userName,
+		deviceLabel: parseDeviceLabel(userAgent),
+		ip,
+	});
+
+	// lastLoginAt — наше поле, которое Payload не знает и не обновляет само
+	// (в отличие от loginAttempts/lockUntil, которые он сам сбрасывает при
+	// успешном входе). Ошибка здесь не должна превращать успешный вход в
+	// "неверный email или пароль" — поэтому в отдельном try/catch, не в
+	// общем блоке классификации ошибок логина выше.
+	try {
 		await payload.update({
 			collection: "users",
 			id: userId,
-			data: {
-				loginAttempts: 0,
-				lockUntil: null,
-				lastLoginAt: new Date().toISOString(),
-			},
+			data: { lastLoginAt: new Date().toISOString() },
 			overrideAccess: true,
 		});
-	} catch {
-		await handleFailedLogin(payload, email);
-		return actionError("Неверный email или пароль");
+	} catch (err) {
+		logUnexpectedAuthError("login.updateLastLoginAt", err);
 	}
 
 	// Ставим JWT cookie вручную
@@ -126,12 +148,23 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 		maxAge: 7 * 24 * 60 * 60, // 7 дней
 	});
 
-	// Генерируем OTP для второго фактора
-	const otp = await createOtp(payload, {
-		userId: String(userId),
-		type: "login_2fa",
-		ip,
-	});
+	// Генерируем OTP для второго фактора. В отличие от отправки письма ниже,
+	// без самой OTP-записи пользователю нечего вводить на следующем экране —
+	// поэтому при сбое не пускаем дальше и просим повторить вход (cookie уже
+	// стоит, но это безопасное полу-авторизованное состояние: без валидного
+	// OTP verifyOtpAction ничего не подтвердит).
+	const otp = await safeCreateOtp(
+		payload,
+		{ userId: String(userId), type: "login_2fa", ip },
+		"login.createOtp",
+	);
+	if (!otp) {
+		return actionError(
+			"Не удалось начать вход. Попробуйте ещё раз через несколько минут.",
+			undefined,
+			"server_error",
+		);
+	}
 
 	// notifyOtpCode (централизованный EmailService/Nodemailer) намеренно
 	// пробрасывает ошибку доставки (см. её докстринг), чтобы вызывающий код
@@ -146,30 +179,42 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 	try {
 		await notifyOtpCode({ to: email, code: otp, purpose: "login_2fa" });
 	} catch (err) {
-		console.error("[login] Не удалось отправить OTP-код:", err);
+		logUnexpectedAuthError("login.notifyOtpCode", err);
 	}
 
-	// Создаём сессию
-	const session = await createSession(payload, {
-		userId: String(userId),
-		ip,
-		userAgent,
-	});
+	// Создаём сессию — необязательный для дальнейшего флоу артефакт
+	// (verifyOtpAction работает и без cookie session-id, см. её код), поэтому
+	// сбой здесь не должен блокировать вход целиком.
+	try {
+		const session = await createSession(payload, {
+			userId: String(userId),
+			ip,
+			userAgent,
+		});
 
-	cookieStore.set("session-id", String(session.id), {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		sameSite: "lax",
-		path: "/",
-		maxAge: 7 * 24 * 60 * 60,
-	});
+		cookieStore.set("session-id", String(session.id), {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "lax",
+			path: "/",
+			maxAge: 7 * 24 * 60 * 60,
+		});
+	} catch (err) {
+		logUnexpectedAuthError("login.createSession", err);
+	}
 
 	return actionSuccess<LoginResult>({ requiresOtp: true });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function handleFailedLogin(
+/**
+ * Уведомление о блокировке аккаунта должно уйти один раз за окно блокировки,
+ * а не на каждую следующую попытку входа локнутым пользователем (иначе — спам
+ * писем). Дедуплицируем через Redis SETNX с TTL, привязанным к lockTime
+ * (см. auth.lockTime в Users.ts).
+ */
+async function notifyLockedOnce(
 	payload: Awaited<ReturnType<typeof getPayloadInstance>>,
 	email: string,
 ) {
@@ -179,38 +224,23 @@ async function handleFailedLogin(
 			where: { email: { equals: email } },
 			limit: 1,
 			overrideAccess: true,
+			showHiddenFields: true,
 		});
-
-		if (docs.length === 0) return;
 
 		const user = docs[0];
-		const attempts = (user.loginAttempts ?? 0) + 1;
+		if (!user?.lockUntil) return;
 
-		const MAX_ATTEMPTS = 10;
-		const isLocked = attempts >= MAX_ATTEMPTS;
-		const lockUntilDate = isLocked
-			? new Date(Date.now() + 15 * 60 * 1000)
-			: null;
+		const lockUntil = new Date(user.lockUntil);
+		const dedupeKey = `locked-notified:${user.id}:${lockUntil.getTime()}`;
+		const firstTime = await redis.set(dedupeKey, "1", "PX", 15 * 60 * 1000, "NX");
+		if (!firstTime) return;
 
-		await payload.update({
-			collection: "users",
-			id: user.id,
-			data: {
-				loginAttempts: attempts,
-				...(isLocked &&
-					lockUntilDate && { lockUntil: lockUntilDate.toISOString() }),
-			},
-			overrideAccess: true,
+		await notifyAccountLocked({
+			email: user.email as string,
+			userName: user.name as string,
+			lockedUntil: lockUntil,
 		});
-
-		if (isLocked && lockUntilDate) {
-			void notifyAccountLocked({
-				email: user.email as string,
-				userName: user.name as string,
-				lockedUntil: lockUntilDate,
-			});
-		}
-	} catch {
-		// Не раскрываем существование пользователя
+	} catch (err) {
+		logUnexpectedAuthError("login.notifyLockedOnce", err);
 	}
 }

@@ -23,6 +23,18 @@ export const Users: CollectionConfig = {
 		tokenExpiration: 7 * 24 * 60 * 60,
 		cookies: { secure: process.env.NODE_ENV === "production", sameSite: "Lax" },
 		verify: false,
+		// Задаём явно (иначе Payload берёт свои дефолты 5 попыток / 10 минут):
+		// поля loginAttempts/lockUntil ниже в fields — те же самые, которые
+		// использует встроенный механизм блокировки Payload (см. коллизию имён
+		// в getAuthFields.js/accountLock.js) — раньше поверх них ещё крутилась
+		// собственная ручная блокировка в loginAction (handleFailedLogin),
+		// которая читала эти поля через payload.find() без showHiddenFields и
+		// получала undefined (Payload прячет hidden-поля при чтении) — из-за
+		// этого счётчик каждый раз сбрасывался обратно к 1, и блокировка по
+		// факту не работала вообще. Ручная реализация удалена, используется
+		// только встроенный механизм Payload.
+		maxLoginAttempts: 10,
+		lockTime: 15 * 60 * 1000,
 		forgotPassword: {
 			generateEmailSubject: () => "Восстановление пароля",
 			generateEmailHTML: (args) => {
