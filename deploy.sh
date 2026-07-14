@@ -102,7 +102,21 @@ CURRENT_COMMIT=$(git rev-parse HEAD)
 log "Текущий коммит: $CURRENT_COMMIT"
 
 log "Получение обновлений из origin/$BRANCH..."
-git fetch origin "$BRANCH"
+# git fetch по HTTPS время от времени падает на транзиентных сетевых сбоях
+# (например "gnutls_handshake() failed" при рукопожатии с GitHub) — сам по
+# себе не признак проблемы с кодом, но без ретрая любой такой блип уводит
+# весь деплой в откат. Три попытки с паузой отличают реальную недоступность
+# от разовой сетевой заминки.
+fetch_ok=0
+for attempt in 1 2 3; do
+    if git fetch origin "$BRANCH"; then
+        fetch_ok=1
+        break
+    fi
+    log "⚠️  git fetch не удался (попытка $attempt/3), повтор через 5с..."
+    sleep 5
+done
+[[ "$fetch_ok" == "1" ]] || fail "git fetch origin $BRANCH не удался после 3 попыток"
 NEW_COMMIT=$(git rev-parse "origin/$BRANCH")
 
 if [[ "$CURRENT_COMMIT" == "$NEW_COMMIT" && "${FORCE:-0}" != "1" ]]; then

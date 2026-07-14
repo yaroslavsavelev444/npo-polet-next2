@@ -2,7 +2,7 @@ import type { CollectionBeforeLoginHook } from 'payload'
 import {
   AccountBlockedError,
   AccountSuspendedError,
-} from '@/modules/auth/lib/accountStatusErrors'
+} from '../../../modules/auth/lib/accountStatusErrors.ts'
 
 /**
  * Вызывается Payload перед выдачей токена — но ПОСЛЕ проверки пароля и
