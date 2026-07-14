@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
-import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
 import {
   classifyLoginError,
@@ -14,7 +13,7 @@ import {
 import { tryLegacyPasswordFallback } from "../lib/legacyPasswordFallback";
 import { redis } from "../lib/redis";
 import { RATE_LIMITS } from "../lib/rateLimit";
-import { createSession, parseDeviceLabel } from "../lib/session";
+import { createSession } from "../lib/session";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
 import { loginSchema } from "../schemas/login.schema";
 import type { LoginResult } from "../types";
@@ -73,7 +72,6 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 	// Не передаём req — в Server Action он не нужен для получения token
 	let loginToken: string;
 	let userId: string | number;
-	let userName = "";
 
 	const attemptLogin = () =>
 		payload.login({ collection: "users", data: { email, password } });
@@ -104,7 +102,6 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 
 		loginToken = loginResult.token;
 		userId = loginResult.user ? loginResult.user.id : "";
-		userName = loginResult.user ? (loginResult.user.name as string) : "";
 	} catch (err) {
 		const { code, message } = classifyLoginError(err);
 
@@ -115,10 +112,10 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 		return actionError(message, undefined, code);
 	}
 
-	const deviceLabel = parseDeviceLabel(userAgent);
-
-	void notifyNewSessionLogin({ email, userName, deviceLabel, ip });
-	void notify(payload, userId, "login_new_device", { deviceLabel, ip });
+	// Уведомление о новом входе (email + in-app) отправляется только ПОСЛЕ
+	// успешного прохождения OTP (см. verifyOtpAction) — до этого момента вход
+	// не завершён, а раньше эти письма/уведомления уходили сразу после
+	// проверки пароля, то есть одновременно с письмом с самим OTP-кодом.
 
 	// lastLoginAt — наше поле, которое Payload не знает и не обновляет само
 	// (в отличие от loginAttempts/lockUntil, которые он сам сбрасывает при

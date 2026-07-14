@@ -2,11 +2,14 @@
 
 import { cookies, headers } from 'next/headers'
 import { z } from 'zod'
-import { actionError, actionSuccess } from '../lib/utils'
+import { actionError, actionSuccess, getRequestMeta } from '../lib/utils'
 import { verifyOtpCode } from '../lib/OtpStore'
-import { getActiveSession } from '../lib/session'
+import { getActiveSession, parseDeviceLabel } from '../lib/session'
+import { isUser } from '../lib/typeGuards'
 import type { OtpVerifyResult } from '../types'
 import { getPayloadInstance } from '@/payload/services/getPayload'
+import { notify } from '@/services/notifications/notificationCenter'
+import { notifyNewSessionLogin } from '@/services/notifications/notifyNewSessionLogin'
 
 const verifyOtpSchema = z.object({
   code: z
@@ -54,6 +57,8 @@ export async function verifyOtpAction(
 
   // Получаем пользователя из JWT
   let userId: string
+  let userEmail: string
+  let userName: string
   try {
     // Передаём реальные заголовки запроса (не только cookie) — Payload's
     // cookie-стратегия извлечения JWT сверяет Origin/Sec-Fetch-Site со
@@ -63,10 +68,12 @@ export async function verifyOtpAction(
     // extractJWT.js). Из-за этого валидный токен не проходил проверку и
     // verifyOtpAction всегда получал user: null после успешного логина.
     const { user } = await payload.auth({ headers: await headers() })
-    if (!user) {
+    if (!user || !isUser(user)) {
       return actionError('Сессия истекла. Войдите снова.')
     }
     userId = String(user.id)
+    userEmail = user.email
+    userName = user.name
   } catch {
     return actionError('Не удалось проверить сессию. Войдите снова.')
   }
@@ -109,6 +116,18 @@ export async function verifyOtpAction(
     },
     overrideAccess: true,
   })
+
+  // ── Уведомление о входе ──────────────────────────────────────────────────
+  // Раньше уходило из loginAction сразу после проверки пароля — то есть
+  // одновременно с письмом с OTP-кодом, хотя фактический вход завершается
+  // только здесь, после успешной проверки кода. Отправляем только для
+  // login_2fa: email_verify — это подтверждение регистрации, не вход.
+  if (type === 'login_2fa') {
+    const { ip, userAgent } = await getRequestMeta()
+    const deviceLabel = parseDeviceLabel(userAgent)
+    void notifyNewSessionLogin({ email: userEmail, userName, deviceLabel, ip })
+    void notify(payload, userId, 'login_new_device', { deviceLabel, ip })
+  }
 
   // ── Обновляем lastActiveAt сессии ────────────────────────────────────────
   if (sessionId) {

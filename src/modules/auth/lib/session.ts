@@ -1,4 +1,5 @@
 import type { BasePayload } from 'payload'
+import { isUser } from './typeGuards'
 
 // ─── Константы ────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,56 @@ export async function getActiveSession(payload: BasePayload, sessionId: string) 
   } catch {
     return null
   }
+}
+
+export interface SessionStatus {
+  userId: string
+  email: string
+  twoFAVerified: boolean
+}
+
+/**
+ * Единая проверка "авторизован ли запрос и пройдена ли 2FA" — используется и
+ * в /api/auth/session-status (для клиентских проверок вроде FeedbackButton),
+ * и напрямую в proxy.ts. Раньше proxy.ts не мог вызвать Payload Local API
+ * (считалось, что Proxy работает в Edge Runtime) и поэтому делал HTTP-запрос
+ * к самому себе через публичный домен — начиная с Next.js 15.5 Proxy по
+ * умолчанию выполняется в Node.js runtime (см. node_modules/next/dist/docs/
+ * .../file-conventions/proxy.md, раздел "Runtime"), и это ограничение больше
+ * не действует. Самозапрос через nginx был единственным источником сбоя:
+ * при неудаче (в т.ч. transient) вызывающий код удалял payload-token —
+ * отсюда терялась только что установленная сессия сразу после логина.
+ */
+export async function resolveSessionStatus(
+  payload: BasePayload,
+  headers: Headers,
+  sessionId?: string | null,
+): Promise<SessionStatus | null> {
+  let user: Awaited<ReturnType<typeof payload.auth>>['user']
+  try {
+    const auth = await payload.auth({ headers })
+    user = auth.user
+  } catch {
+    return null
+  }
+
+  if (!user || !isUser(user)) return null
+
+  if (sessionId) {
+    const session = await getActiveSession(payload, sessionId)
+    if (!session) return null
+  }
+
+  if (user.status === 'blocked' || user.status === 'suspended') return null
+
+  const TWO_FA_TTL_MS = 24 * 60 * 60 * 1000
+  const verifiedAt = user.twoFAVerifiedAt
+    ? new Date(user.twoFAVerifiedAt).getTime()
+    : 0
+  const twoFAVerified =
+    user.twoFAVerified === true && Date.now() - verifiedAt < TWO_FA_TTL_MS
+
+  return { userId: String(user.id), email: user.email, twoFAVerified }
 }
 
 export async function updateSessionActivity(payload: BasePayload, sessionId: string) {

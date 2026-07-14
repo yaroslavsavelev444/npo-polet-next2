@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveSessionStatus } from "./src/modules/auth/lib/session.ts";
+import { getPayloadInstance } from "./src/payload/services/getPayload.ts";
 
 // ── Защищённые пути (требуют авторизацию и 2FA) ──────────────────────────────
 const PROTECTED_PATHS = ["/profile", "/orders", "/leave-review"];
@@ -74,7 +76,7 @@ export async function proxy(req: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
       // Токен есть — проверяем сессию и статус 2FA
-      const status = await fetchSessionStatus(req, sessionId);
+      const status = await checkSessionStatus(req, sessionId);
       if (!status) {
         // Сессия невалидна — чистим куки и на логин
         const response = NextResponse.redirect(new URL("/auth/login", req.url));
@@ -101,10 +103,8 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── 5. Проверяем статус сессии через Route Handler ─────────────────────────
-  // Middleware работает в Edge Runtime — не имеет доступа к Payload Local API.
-  // Поэтому делаем fetch к /api/auth/session-status (Node.js runtime).
-  const status = await fetchSessionStatus(req, sessionId);
+  // ── 5. Проверяем статус сессии ───────────────────────────────────────────
+  const status = await checkSessionStatus(req, sessionId);
 
   if (!status) {
     // JWT есть, но сессия отозвана или истекла → чистим куки и на логин
@@ -128,45 +128,29 @@ export async function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-// ── fetchSessionStatus ────────────────────────────────────────────────────────
+// ── checkSessionStatus ─────────────────────────────────────────────────────────
+//
+// Раньше здесь был fetch() к /api/auth/session-status через публичный домен —
+// из предположения, что Proxy выполняется в Edge Runtime и не имеет доступа к
+// Payload Local API. Начиная с Next.js 15.5 Proxy по умолчанию выполняется в
+// Node.js runtime (см. node_modules/next/dist/docs/.../file-conventions/
+// proxy.md, раздел "Runtime") — то есть то же окружение, что и у Server
+// Actions/Route Handlers, и Local API доступна напрямую.
+//
+// Самозапрос через nginx был единственным источником бага "Сессия не
+// найдена" сразу после логина: он проходил через тот же процесс (proxy →
+// nginx → тот же контейнер), но был подвержен транзиентным сбоям — и при
+// любом сбое (включая сетевой, не только "сессия правда невалидна") вызывающий
+// код удалял payload-token/session-id, вместе с которыми терялся только что
+// начатый вход. Прямой вызов Local API убирает саму возможность такого сбоя.
 
-async function fetchSessionStatus(
+async function checkSessionStatus(
   req: NextRequest,
   sessionId: string | undefined,
 ): Promise<{ twoFAVerified: boolean } | null> {
-  try {
-    const url = new URL("/api/auth/session-status", req.url);
-    if (sessionId) {
-      url.searchParams.set("sessionId", sessionId);
-    }
-
-    // Передаём cookies чтобы Route Handler видел payload-token.
-    // Origin/Sec-Fetch-Site тоже обязательны: Payload's cookie-стратегия
-    // извлечения JWT сверяет их со списком payload.config.csrf (см.
-    // node_modules/payload/dist/auth/extractJWT.js) и молча возвращает null,
-    // если ни Origin, ни Sec-Fetch-Site не переданы — а это серверный fetch
-    // (не браузерный), поэтому Sec-Fetch-Site сам собой не появится, его
-    // нужно прокинуть из исходного запроса (fallback "same-origin" —
-    // безопасен: это внутренний вызов нашего же proxy к нашему же API,
-    // а не запрос, контролируемый третьей стороной).
-    const proxiedHeaders = new Headers({
-      cookie: req.headers.get("cookie") ?? "",
-      "sec-fetch-site": req.headers.get("sec-fetch-site") ?? "same-origin",
-    });
-    const originHeader = req.headers.get("origin");
-    if (originHeader) proxiedHeaders.set("origin", originHeader);
-
-    const res = await fetch(url, {
-      headers: proxiedHeaders,
-      cache: "no-store",
-    });
-
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    // При любой ошибке сети/timeout — возвращаем null → редирект на логин
-    return null;
-  }
+  const payload = await getPayloadInstance();
+  const status = await resolveSessionStatus(payload, req.headers, sessionId);
+  return status ? { twoFAVerified: status.twoFAVerified } : null;
 }
 
 // ── Matcher ───────────────────────────────────────────────────────────────────
