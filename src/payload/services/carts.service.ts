@@ -108,3 +108,12 @@ export async function getCartItemCount(userId: string): Promise<number> {
   if (!cart?.items) return 0;
   return cart.items.reduce((sum, item) => sum + item.quantity, 0);
 }
+
+/** Product IDs currently in the cart — hydrates the client-side membership store. */
+export async function getCartProductIds(userId: string): Promise<string[]> {
+  const cart = await getCartByUserId(userId);
+  if (!cart?.items) return [];
+  return cart.items.map((item) =>
+    String(typeof item.product === "object" ? item.product.id : item.product),
+  );
+}

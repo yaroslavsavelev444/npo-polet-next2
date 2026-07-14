@@ -8,31 +8,30 @@
  */
 
 import { Star } from "lucide-react";
-import { Text } from "@once-ui-system/core";
 import { formatReviewsCount } from "../lib/format";
 import type { ProductRatingProps } from "../types";
 
 export function ProductRating({ rating, reviewsCount }: ProductRatingProps) {
   if (reviewsCount === 0) {
     return (
-      <Text variant="body-default-xs" onBackground="neutral-weak">
+      <span className="text-xs leading-none text-[var(--text-muted)]">
         Нет отзывов
-      </Text>
+      </span>
     );
   }
 
   return (
     <div className="flex items-center gap-1">
       <Star
-        className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
+        className="h-3.5 w-3.5 fill-[var(--warning)] text-[var(--warning)]"
         aria-hidden="true"
       />
-      <Text variant="label-default-s" onBackground="neutral-strong">
+      <span className="text-xs font-semibold leading-none text-[var(--text-primary)]">
         {rating.toFixed(1)}
-      </Text>
-      <Text variant="body-default-xs" onBackground="neutral-weak">
+      </span>
+      <span className="text-xs leading-none text-[var(--text-muted)]">
         {formatReviewsCount(reviewsCount)}
-      </Text>
+      </span>
     </div>
   );
 }

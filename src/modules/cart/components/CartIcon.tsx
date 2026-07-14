@@ -5,18 +5,25 @@ import Link from 'next/link'
 import { useEffect } from 'react'
 import { ShoppingCart } from 'lucide-react'
 import { useCartStore } from '@/shared/store/cart.store'
+import { useCartItemsStore } from '@/shared/store/cartItems.store'
 
 interface CartIconProps {
   initialCount: number
+  initialProductIds: string[]
 }
 
-export function CartIcon({ initialCount }: CartIconProps) {
+export function CartIcon({ initialCount, initialProductIds }: CartIconProps) {
   const itemCount = useCartStore((s) => s.itemCount)
   const hydrate = useCartStore((s) => s.hydrate)
+  const hydrateItems = useCartItemsStore((s) => s.hydrate)
 
   useEffect(() => {
     hydrate(initialCount)
   }, [initialCount, hydrate])
+
+  useEffect(() => {
+    hydrateItems(initialProductIds)
+  }, [initialProductIds, hydrateItems])
 
   return (
     <Link

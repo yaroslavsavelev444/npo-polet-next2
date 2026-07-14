@@ -11,9 +11,6 @@ interface ProductHeaderProps {
 }
 
 export function ProductHeader({ product, cardData }: ProductHeaderProps) {
-  const isOutOfStock =
-    product.status === "out_of_stock" || product.status === "discontinued";
-
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
@@ -41,10 +38,8 @@ export function ProductHeader({ product, cardData }: ProductHeaderProps) {
 
       <ProductQuantitySelector
         product={cardData}
-        productId={product.id}
         minOrderQuantity={product.minOrderQuantity}
         maxOrderQuantity={product.maxOrderQuantity}
-        isOutOfStock={isOutOfStock}
       />
     </div>
   );

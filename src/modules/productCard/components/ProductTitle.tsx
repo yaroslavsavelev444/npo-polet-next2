@@ -7,19 +7,15 @@
  * (не требует JS, доступнее).
  */
 
-import { Text } from "@once-ui-system/core";
 import type { ProductTitleProps } from "../types";
 
 export function ProductTitle({ title }: ProductTitleProps) {
   return (
-    <Text
-      as="h3"
-      variant="body-default-m"
-      onBackground="neutral-strong"
+    <h3
       title={title}
-      className="line-clamp-2 min-h-[2.6em] break-words"
+      className="line-clamp-2 min-h-[2.6em] break-words text-sm leading-[1.3] text-[var(--text-secondary)]"
     >
       {title}
-    </Text>
+    </h3>
   );
 }

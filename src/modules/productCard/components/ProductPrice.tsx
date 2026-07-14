@@ -5,7 +5,6 @@
  * интерактивности и может рендериться на сервере (часть SSR-shell карточки).
  */
 
-import { Text } from "@once-ui-system/core";
 import { formatPrice } from "../lib/format";
 import type { ProductPriceProps } from "../types";
 
@@ -15,22 +14,14 @@ export function ProductPrice({
   hasDiscount,
 }: ProductPriceProps) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Text
-        variant="heading-strong-m"
-        onBackground={hasDiscount ? "danger-strong" : "neutral-strong"}
-        className="leading-none"
-      >
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <span className="text-lg font-bold leading-none tracking-tight text-[var(--text-primary)] sm:text-xl">
         {formatPrice(finalPrice)}
-      </Text>
+      </span>
       {hasDiscount && (
-        <Text
-          variant="body-default-s"
-          onBackground="neutral-weak"
-          className="leading-none line-through opacity-70"
-        >
+        <span className="text-sm leading-none text-[var(--text-muted)] line-through">
           {formatPrice(originalPrice)}
-        </Text>
+        </span>
       )}
     </div>
   );

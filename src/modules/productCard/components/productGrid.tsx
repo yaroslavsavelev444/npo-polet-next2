@@ -9,6 +9,14 @@ interface ProductGridProps {
   className?: string;
 }
 
+/**
+ * Shared with loading-state fallbacks (e.g. ProductCatalogLayout's Suspense
+ * boundary) so the skeleton grid never reflows into a different column
+ * count once real data arrives.
+ */
+export const PRODUCT_GRID_CLASSNAME =
+  'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 xl:gap-6';
+
 export function ProductGrid({
   products,
   showQuickView,
@@ -16,11 +24,7 @@ export function ProductGrid({
   className,
 }: ProductGridProps) {
   return (
-    <div
-      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
-        className || ''
-      }`}
-    >
+    <div className={`${PRODUCT_GRID_CLASSNAME} ${className || ''}`}>
       {products.map((product) => (
         <ProductCard
           key={product.id}

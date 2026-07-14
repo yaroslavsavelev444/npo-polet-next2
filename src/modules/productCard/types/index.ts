@@ -83,11 +83,11 @@ export interface ProductImageProps {
   productId: string;
   hasDiscount: boolean;
   discountPercentage: number | null;
+  status: ProductAvailabilityStatus;
   priority?: boolean;
 }
 
 export interface ProductActionsProps {
-  productId: string;
   showQuickView: boolean;
   onQuickView?: () => void;
 }
@@ -112,8 +112,6 @@ export interface ProductStatusBadgeProps {
 }
 
 export interface ProductQuantitySelectorProps {
-  productId: string;
   minOrderQuantity: number;
   maxOrderQuantity: number;
-  isOutOfStock: boolean;
 }

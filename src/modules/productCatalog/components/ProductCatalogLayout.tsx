@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import { Button, Badge } from 'antd';
 import { FilterOutlined, SortAscendingOutlined } from '@ant-design/icons';
+import { PRODUCT_GRID_CLASSNAME, ProductCardSkeleton } from '@/modules/productCard';
 import { FiltersSidebar } from './FiltersSidebar';
 import { InfoPanel } from './InfoPanel';
 import { MobileFiltersDrawer } from './MobileFiltersDrawer';
@@ -72,7 +73,15 @@ export function ProductCatalogLayout({
             </Button>
           </div>
 
-          <Suspense fallback={<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{' '.repeat(6).split('').map((_, i) => <div key={i} className="h-80 bg-muted animate-pulse rounded-2xl" />)}</div>}>
+          <Suspense
+            fallback={
+              <div className={PRODUCT_GRID_CLASSNAME}>
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
+              </div>
+            }
+          >
             {children}
           </Suspense>
         </div>

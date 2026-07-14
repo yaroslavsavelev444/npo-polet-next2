@@ -7,6 +7,7 @@ interface Props {
   categories: Category[];
   settings: Setting | null;
   cartItemCount: number;
+  cartProductIds: string[];
   wishlistProductIds: string[];
   unreadNotificationCount: number;
 }
@@ -16,6 +17,7 @@ export default function NavbarShell({
   categories,
   settings,
   cartItemCount,
+  cartProductIds,
   wishlistProductIds,
   unreadNotificationCount,
 }: Props) {
@@ -47,6 +49,7 @@ export default function NavbarShell({
           categories={categories}
           settings={settings}
           cartItemCount={cartItemCount}
+          cartProductIds={cartProductIds}
           wishlistProductIds={wishlistProductIds}
           unreadNotificationCount={unreadNotificationCount}
         />

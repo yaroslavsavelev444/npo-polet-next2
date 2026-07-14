@@ -69,7 +69,7 @@ export default async function ProfilePage() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <main className="max-w-5xl mx-auto py-10 px-4">
+    <main className="w-full max-w-3xl mx-auto py-10 px-4 sm:py-14">
       <ProfileClient
         user={profileUser}
         sessions={sessions}

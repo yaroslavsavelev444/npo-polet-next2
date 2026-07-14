@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Input } from "@/UI";
+import { formatRuPhoneInput, isValidRuPhone } from "../lib/phone";
 import type { CheckoutRecipientInput } from "../types";
 
-const PHONE_RE = /^\+?\d{10,15}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface Props {
@@ -12,9 +13,11 @@ interface Props {
 }
 
 export function RecipientForm({ value, onChange }: Props) {
+  const [phoneTouched, setPhoneTouched] = useState(false);
+
   const phoneError =
-    value.phone && !PHONE_RE.test(value.phone)
-      ? "Некорректный формат телефона"
+    phoneTouched && value.phone && !isValidRuPhone(value.phone)
+      ? "Укажите номер телефона полностью, например +7 (999) 123-45-67"
       : undefined;
   const emailError =
     value.email && !EMAIL_RE.test(value.email)
@@ -39,9 +42,13 @@ export function RecipientForm({ value, onChange }: Props) {
           <Input
             label="Телефон"
             type="tel"
+            inputMode="tel"
             value={value.phone}
-            onChange={(e) => onChange({ ...value, phone: e.target.value })}
-            placeholder="+79991234567"
+            onChange={(e) =>
+              onChange({ ...value, phone: formatRuPhoneInput(e.target.value) })
+            }
+            onBlur={() => setPhoneTouched(true)}
+            placeholder="+7 (999) 123-45-67"
             errorMessage={phoneError}
             required
           />

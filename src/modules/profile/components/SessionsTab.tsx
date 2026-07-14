@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { SessionCard } from "./SessionCard";
 import type { ProfileSession } from "../types/profile.types";
 import { Block, Button, Empty, Spinner } from "@/UI";
+import { appToast } from "@/shared/lib/toast";
 
 
 interface SessionsTabProps {
@@ -23,6 +24,10 @@ export function SessionsTab({ sessions, onRevoke, onRefresh }: SessionsTabProps)
     setRevokingId(id);
     try {
       await onRevoke(id);
+    } catch (error) {
+      appToast.error(
+        error instanceof Error ? error.message : "Не удалось завершить сессию",
+      );
     } finally {
       setRevokingId(null);
     }

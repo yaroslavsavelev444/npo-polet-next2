@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
-import { getCartItemCount } from "@/payload/services/carts.service";
+import { getCartItemCount, getCartProductIds } from "@/payload/services/carts.service";
 import { getCachedCategories } from "@/payload/services/categories.service";
 import { getUnreadNotificationCount } from "@/payload/services/notifications.service";
 import { getCachedSettings } from "@/payload/services/settings.service";
@@ -13,13 +13,14 @@ export default async function Navbar() {
     getCachedSettings(),
   ]);
 
-  const [cartItemCount, wishlistProductIds, unreadNotificationCount] = user
+  const [cartItemCount, cartProductIds, wishlistProductIds, unreadNotificationCount] = user
     ? await Promise.all([
         getCartItemCount(String(user.id)),
+        getCartProductIds(String(user.id)),
         getWishlistProductIds(String(user.id)),
         getUnreadNotificationCount(user.id),
       ])
-    : [0, [] as string[], 0];
+    : [0, [] as string[], [] as string[], 0];
 
   const categories = categoriesResult?.docs || [];
 
@@ -29,6 +30,7 @@ export default async function Navbar() {
       categories={categories}
       settings={settings}
       cartItemCount={cartItemCount}
+      cartProductIds={cartProductIds}
       wishlistProductIds={wishlistProductIds}
       unreadNotificationCount={unreadNotificationCount}
     />

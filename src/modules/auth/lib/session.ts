@@ -215,6 +215,9 @@ export async function invalidateSession(
       const session = await payload.findByID({
         collection: 'sessions',
         id: sessionId,
+        // depth: 0 — иначе relationship "user" возвращается как populated-объект,
+        // и сравнение String(session.user) с userId ниже всегда ложно
+        depth: 0,
         overrideAccess: true,
       });
       if (!session) return false;

@@ -59,14 +59,12 @@ export function ProfileClient({ user: initialUser, sessions: initialSessions, ac
 
   return (
     <>
-        <Block
-  title="Настройки профиля"
-  variant="default"
-  size="lg"
-  className="w-full" // чтобы блок растягивался на всю ширину родителя
->
-
-
+      <Block
+        title="Настройки профиля"
+        variant="elevated"
+        size="xl"
+        className="w-full"
+      >
         <ProfileTabs active={activeTab} onChange={setActiveTab} />
 
         <div
@@ -76,7 +74,7 @@ export function ProfileClient({ user: initialUser, sessions: initialSessions, ac
         >
           {activeTab === "account" && (
             <AccountTab
-              key={user.id + user.email} 
+              key={user.id + user.email}
               user={user}
               onUpdate={handleUpdateAccount}
               onLogoutRequest={() => setLogoutOpen(true)}

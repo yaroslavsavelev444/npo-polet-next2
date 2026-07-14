@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { appToast } from "@/shared/lib/toast";
 import { Button } from "@/UI";
 import { submitOrderAction } from "../actions/checkout.actions";
+import { formatRuPhoneInput, isValidRuPhone, normalizeRuPhone } from "../lib/phone";
 import {
   getAvailablePaymentMethods,
   getDefaultPaymentMethod,
@@ -38,7 +39,7 @@ export function CheckoutPageClient({
 
   const [recipient, setRecipient] = useState<CheckoutRecipientInput>({
     fullName: initialView.savedRecipient?.fullName ?? user.name ?? "",
-    phone: initialView.savedRecipient?.phone ?? "",
+    phone: formatRuPhoneInput(initialView.savedRecipient?.phone ?? ""),
     email: initialView.savedRecipient?.email ?? user.email ?? "",
     saveRecipient: Boolean(initialView.savedRecipient),
   });
@@ -84,7 +85,7 @@ export function CheckoutPageClient({
     setErrorMessage(null);
     startSubmitting(async () => {
       const result = await submitOrderAction({
-        recipient,
+        recipient: { ...recipient, phone: normalizeRuPhone(recipient.phone) },
         delivery,
         company: company.isCompany ? company : undefined,
         paymentMethod,
@@ -105,7 +106,7 @@ export function CheckoutPageClient({
   const isValid =
     initialView.cart.validation.isValid &&
     recipient.fullName &&
-    recipient.phone &&
+    isValidRuPhone(recipient.phone) &&
     recipient.email;
 
   return (

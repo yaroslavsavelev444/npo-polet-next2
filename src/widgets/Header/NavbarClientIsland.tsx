@@ -17,6 +17,7 @@ interface Props {
   categories: Category[];
   settings: Setting | null;
   cartItemCount: number;
+  cartProductIds: string[];
   wishlistProductIds: string[];
   unreadNotificationCount: number;
 }
@@ -26,6 +27,7 @@ export default function NavbarClientIsland({
   categories,
   settings,
   cartItemCount,
+  cartProductIds,
   wishlistProductIds,
   unreadNotificationCount,
 }: Props) {
@@ -54,7 +56,7 @@ export default function NavbarClientIsland({
             <NavMenus categories={categories} />
           </div>
           {user && <WishlistIcon initialProductIds={wishlistProductIds} />}
-          {user && <CartIcon initialCount={cartItemCount} />}
+          {user && <CartIcon initialCount={cartItemCount} initialProductIds={cartProductIds} />}
           {user && <NotificationBell initialUnreadCount={unreadNotificationCount} />}
           <UserMenu user={user} />
 

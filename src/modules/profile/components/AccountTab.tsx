@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldAlert, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ProfileUser, UpdateAccountPayload } from "../types/profile.types";
 import { Block, Button, Input } from "@/UI";
@@ -102,12 +102,32 @@ export function AccountTab({ user, onUpdate, onLogoutRequest }: AccountTabProps)
           >
             Выйти из аккаунта
           </Button>
+        </div>
+
+        <div className="mt-6 border-t border-[var(--border)] pt-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Опасная зона
+          </p>
 
           <Link
             href="/profile/delete-account"
-            className="mt-2 text-center text-sm text-[var(--error)] underline underline-offset-4 hover:opacity-80"
+            className="mt-3 flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--error)]/25 bg-[var(--error)]/5 p-4 text-left transition-colors hover:border-[var(--error)]/50 hover:bg-[var(--error)]/10"
           >
-            Удаление аккаунта и персональных данных
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--error)]/10 text-[var(--error)]">
+              <ShieldAlert className="h-4 w-4" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-[var(--text-primary)]">
+                Удаление аккаунта
+              </span>
+              <span className="block text-xs text-[var(--text-secondary)]">
+                Безвозвратно удалит профиль и персональные данные
+              </span>
+            </span>
+            <ChevronRight
+              className="h-4 w-4 shrink-0 text-[var(--error)]"
+              aria-hidden
+            />
           </Link>
         </div>
       </div>

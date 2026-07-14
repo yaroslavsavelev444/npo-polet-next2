@@ -1,18 +1,24 @@
 import { z } from "zod";
 import { validateInn } from "./validate-inn";
+import { RU_PHONE_E164_RE } from "./phone";
 
+// Все поля адреса опциональны на уровне базовой схемы — обязательность
+// зависит от выбранного способа доставки и проверяется в superRefine ниже,
+// иначе валидация адреса срабатывала бы даже для самовывоза.
 const addressSchema = z.object({
-  street: z.string().min(3, "Укажите улицу и дом"),
-  city: z.string().min(2, "Укажите город"),
-  postalCode: z.string().regex(/^\d{6}$/, "Индекс должен содержать 6 цифр"),
-  country: z.string().min(1),
+  street: z.string().optional().default(""),
+  city: z.string().optional().default(""),
+  postalCode: z.string().optional().default(""),
+  country: z.string().optional().default("Россия"),
 });
 
 export const checkoutSchema = z
   .object({
     recipient: z.object({
       fullName: z.string().trim().min(4, "Укажите ФИО получателя"),
-      phone: z.string().regex(/^\+?\d{10,15}$/, "Некорректный формат телефона"),
+      phone: z
+        .string()
+        .regex(RU_PHONE_E164_RE, "Укажите корректный номер телефона"),
       email: z.string().email("Некорректный email"),
       saveRecipient: z.boolean(),
     }),
@@ -40,13 +46,30 @@ export const checkoutSchema = z
     notes: z.string().max(1000).optional(),
   })
   .superRefine((data, ctx) => {
-    // Delivery-method-specific requirements
+    // Delivery-method-specific requirements — только для выбранного способа,
+    // остальные способы не проверяются вовсе (self_pickup не требует адреса).
     if (data.delivery.method === "door_to_door") {
-      if (!data.delivery.address)
+      const street = data.delivery.address?.street?.trim() ?? "";
+      const city = data.delivery.address?.city?.trim() ?? "";
+      const postalCode = data.delivery.address?.postalCode ?? "";
+
+      if (street.length < 3)
         ctx.addIssue({
           code: "custom",
-          path: ["delivery", "address"],
-          message: "Укажите адрес доставки",
+          path: ["delivery", "address", "street"],
+          message: "Укажите улицу и дом",
+        });
+      if (city.length < 2)
+        ctx.addIssue({
+          code: "custom",
+          path: ["delivery", "address", "city"],
+          message: "Укажите город",
+        });
+      if (!/^\d{6}$/.test(postalCode))
+        ctx.addIssue({
+          code: "custom",
+          path: ["delivery", "address", "postalCode"],
+          message: "Индекс должен содержать 6 цифр",
         });
       if (!data.delivery.transportCompanyId)
         ctx.addIssue({
@@ -56,7 +79,7 @@ export const checkoutSchema = z
         });
     }
     if (data.delivery.method === "pickup_point") {
-      if (!data.delivery.address?.city)
+      if (!data.delivery.address?.city?.trim())
         ctx.addIssue({
           code: "custom",
           path: ["delivery", "address", "city"],

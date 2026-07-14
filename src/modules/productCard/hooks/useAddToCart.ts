@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { addToCartAction } from '@/modules/cart/actions/cart.actions'
 import { useCartStore } from '@/shared/store/cart.store'
+import { useCartItemsStore } from '@/shared/store/cartItems.store'
 import type { ProductCardData } from '../types'
 import { appToast } from '@/shared/lib/toast'
 
@@ -17,6 +18,7 @@ export function useAddToCart(): UseAddToCartResult {
   const router = useRouter()
   const [isAdding, setIsAdding] = useState(false)
   const setItemCount = useCartStore((s) => s.setItemCount)
+  const markInCart = useCartItemsStore((s) => s.add)
 
   const addToCart = useCallback(
     async (product: ProductCardData, quantity: number) => {
@@ -35,15 +37,15 @@ export function useAddToCart(): UseAddToCartResult {
         }
 
         setItemCount(result.data.summary.totalItems)
-                  appToast.success(`«${product.title}» добавлен в корзину (${quantity} шт.)`)
-
+        markInCart(product.id)
+        appToast.success(`«${product.title}» добавлен в корзину (${quantity} шт.)`)
       } catch {
         appToast.warning('Не удалось добавить товар в корзину. Попробуйте ещё раз.')
       } finally {
         setIsAdding(false)
       }
     },
-    [appToast, router, setItemCount],
+    [router, setItemCount, markInCart],
   )
 
   return { isAdding, addToCart }

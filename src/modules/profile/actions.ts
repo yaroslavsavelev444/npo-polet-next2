@@ -84,7 +84,10 @@ export async function changePasswordAction(
 
 export async function revokeSessionAction(sessionId: string): Promise<void> {
   const { payload, user } = await getAuthedUser();
-  await invalidateSession(payload, sessionId, String(user.id));
+  const ok = await invalidateSession(payload, sessionId, String(user.id));
+  if (!ok) {
+    throw new Error("Не удалось завершить сессию");
+  }
   revalidatePath("/profile");
 }
 
