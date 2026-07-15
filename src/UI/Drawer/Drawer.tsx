@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { cn } from "@/utils/cn";
@@ -63,12 +63,21 @@ export function Drawer({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Портал в document.body недоступен при SSR. Раньше это проверялось через
+  // `typeof window === "undefined"` прямо в рендере — сервер рендерил null,
+  // а клиент на первом же проходе гидратации уже видел window и сразу
+  // рендерил портал, из-за чего React ловил hydration mismatch. mounted
+  // выставляется в эффекте, то есть ПОСЛЕ гидратации — на ней оба прохода
+  // (сервер и первый клиентский рендер) синхронно возвращают null.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const drawerSize =
     placement === "left" || placement === "right"
       ? { width: typeof size === "number" ? `${size}px` : size }
       : { height: typeof size === "number" ? `${size}px` : size };
 
-  if (typeof window === "undefined") return null;
+  if (!mounted) return null;
 
   return createPortal(
     <div

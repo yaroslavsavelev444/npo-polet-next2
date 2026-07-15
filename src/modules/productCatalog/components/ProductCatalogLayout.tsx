@@ -1,94 +1,87 @@
-'use client';
+"use client";
 
-import { Suspense, useState } from 'react';
-import { Button, Badge } from 'antd';
-import { FilterOutlined, SortAscendingOutlined } from '@ant-design/icons';
-import { PRODUCT_GRID_CLASSNAME, ProductCardSkeleton } from '@/modules/productCard';
-import { FiltersSidebar } from './FiltersSidebar';
-import { InfoPanel } from './InfoPanel';
-import { MobileFiltersDrawer } from './MobileFiltersDrawer';
-import { MobileSortDrawer } from './MobileSortDrawer';
-import type { ProductCatalogResult } from '../types/filters';
+import { useState } from "react";
+import type {
+	CatalogFilters,
+	PriceBounds,
+	ProductsPageResponse,
+} from "../types/filters";
+import { CatalogProductGrid } from "./CatalogProductGrid";
+import { CatalogToolbar } from "./CatalogToolbar";
+import { DesktopFiltersSidebar } from "./DesktopFiltersSidebar";
+import { MobileFiltersSheet } from "./MobileFiltersSheet";
+import { MobileSortSheet } from "./MobileSortSheet";
+
+interface CategorySummary {
+	name: string;
+	description?: string | null;
+}
 
 interface ProductCatalogLayoutProps {
-  category: any;
-  catalogResult: ProductCatalogResult;
-  children: React.ReactNode; // ProductListContainer или ProductsSection
+	category: CategorySummary;
+	categoryId: string;
+	filters: CatalogFilters;
+	priceBounds: PriceBounds;
+	initialPage: ProductsPageResponse;
 }
 
 export function ProductCatalogLayout({
-  category,
-  catalogResult,
-  children,
+	category,
+	categoryId,
+	filters,
+	priceBounds,
+	initialPage,
 }: ProductCatalogLayoutProps) {
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [mobileSortOpen, setMobileSortOpen] = useState(false);
+	const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+	const [mobileSortOpen, setMobileSortOpen] = useState(false);
 
-  const activeFiltersCount = 
-    (catalogResult.pagination.totalPages > 0 ? 0 : 0) + // логика подсчёта по необходимости
-    0; // можно улучшить позже
+	return (
+		<div className="flex flex-col gap-8">
+			<header className="flex flex-col gap-2">
+				<h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
+					{category.name}
+				</h1>
+				{category.description && (
+					<p className="max-w-2xl text-base text-[var(--text-secondary)]">
+						{category.description}
+					</p>
+				)}
+			</header>
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">{category.name}</h1>
-        {category.description && (
-          <p className="text-muted-foreground text-lg">{category.description}</p>
-        )}
-      </div>
+			<CatalogToolbar
+				totalDocs={initialPage.totalDocs}
+				onOpenFilters={() => setMobileFiltersOpen(true)}
+				onOpenSort={() => setMobileSortOpen(true)}
+			/>
 
-      <InfoPanel
-        totalProducts={catalogResult.totalDocs}
-        activeFiltersCount={activeFiltersCount}
-      />
+			<div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+				<aside className="hidden shrink-0 lg:block lg:w-72">
+					<div className="sticky top-[calc(var(--sticky-header-height)+1.5rem)]">
+						<DesktopFiltersSidebar priceBounds={priceBounds} />
+					</div>
+				</aside>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Desktop Filters */}
-        <div className="hidden lg:block w-80 shrink-0">
-          <div className="sticky top-24">
-            <FiltersSidebar />
-          </div>
-        </div>
+				<div className="min-w-0 flex-1">
+					<CatalogProductGrid
+						categoryId={categoryId}
+						filters={filters}
+						initialPage={initialPage}
+					/>
+				</div>
+			</div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Mobile controls */}
-          <div className="lg:hidden flex gap-3 mb-6">
-            <Button
-              icon={<FilterOutlined />}
-              onClick={() => setMobileFiltersOpen(true)}
-              className="flex-1"
-              size="large"
-            >
-              Фильтры {activeFiltersCount > 0 && <Badge count={activeFiltersCount} className="ml-1" />}
-            </Button>
-
-            <Button
-              icon={<SortAscendingOutlined />}
-              onClick={() => setMobileSortOpen(true)}
-              className="flex-1"
-              size="large"
-            >
-              Сортировка
-            </Button>
-          </div>
-
-          <Suspense
-            fallback={
-              <div className={PRODUCT_GRID_CLASSNAME}>
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <ProductCardSkeleton key={i} />
-                ))}
-              </div>
-            }
-          >
-            {children}
-          </Suspense>
-        </div>
-      </div>
-
-      <MobileFiltersDrawer open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} />
-      <MobileSortDrawer open={mobileSortOpen} onClose={() => setMobileSortOpen(false)} />
-    </div>
-  );
+			<MobileFiltersSheet
+				open={mobileFiltersOpen}
+				onClose={() => setMobileFiltersOpen(false)}
+				priceBounds={priceBounds}
+				resultCount={initialPage.totalDocs}
+			/>
+			<MobileSortSheet
+				open={mobileSortOpen}
+				onClose={() => setMobileSortOpen(false)}
+			/>
+		</div>
+	);
 }
+
+export default ProductCatalogLayout;

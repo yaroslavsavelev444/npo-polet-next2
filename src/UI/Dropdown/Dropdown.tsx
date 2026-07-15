@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useState,
   useRef,
   useEffect,
@@ -155,11 +156,11 @@ export function Dropdown({
           {items.map((item, idx) => {
             const enabledIdx = enabledItems.findIndex((i) => i.key === item.key);
             return (
-              <>
+              <Fragment key={item.key}>
                 {item.dividerBefore && (
-                  <li key={`${item.key}-divider`} aria-hidden className="h-px bg-[var(--border)] my-1 mx-2" />
+                  <li aria-hidden className="h-px bg-[var(--border)] my-1 mx-2" />
                 )}
-                <li key={item.key} role="option" aria-selected={selectedKey === item.key}>
+                <li role="option" aria-selected={selectedKey === item.key}>
                   <button
                     id={`dd-item-${item.key}`}
                     ref={(el) => { if (enabledIdx >= 0) itemRefs.current[enabledIdx] = el; }}
@@ -182,7 +183,7 @@ export function Dropdown({
                     )}
                   </button>
                 </li>
-              </>
+              </Fragment>
             );
           })}
         </ul>

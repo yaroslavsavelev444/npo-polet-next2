@@ -1,16 +1,26 @@
 "use client";
 
+import { ClipboardPaste } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import Button from "@/UI/Button/Button";
+import Card from "@/UI/Card/Card";
+import Typography, { Heading } from "@/UI/Typography/Typography";
 import { resendOtpAction } from "../actions/resendOtp";
 import { verifyOtpAction } from "../actions/verifyOtp";
 import type { OtpType } from "../types";
+import { AuthAlert } from "./AuthAlert";
+import { CodeInput } from "./CodeInput";
+
+const OTP_LENGTH = 6;
+const RESEND_COOLDOWN_SECONDS = 30;
+const EMPTY_CODE = " ".repeat(OTP_LENGTH);
 
 interface OtpFormProps {
-  type: OtpType;
-  email: string;
-  title: string;
-  description: string;
+	type: OtpType;
+	email: string;
+	title: string;
+	description: string;
 }
 
 /**
@@ -18,147 +28,209 @@ interface OtpFormProps {
  * Используется и для подтверждения входа (login_2fa),
  * и для верификации email (email_verify).
  *
- * Автофокус + автосабмит при вводе 6 цифр.
+ * Автофокус + автосабмит при вводе 6 цифр, поддержка вставки (Ctrl/Cmd+V,
+ * контекстное меню, кнопка «Вставить из буфера»), автозаполнение OTP на
+ * мобильных (autoComplete="one-time-code").
  */
 export function OtpForm({ type, email, title, description }: OtpFormProps) {
-  const router = useRouter();
-  const formRef = useRef<HTMLFormElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+	const router = useRouter();
+	const formRef = useRef<HTMLFormElement>(null);
 
-  const [verifyState, verifyAction, isVerifying] = useActionState(
-    verifyOtpAction,
-    null,
-  );
-  const [resendState, resendAction, isResending] = useActionState(
-    resendOtpAction,
-    null,
-  );
+	const [code, setCode] = useState(EMPTY_CODE);
+	const [shakeSignal, setShakeSignal] = useState(0);
+	const [cooldown, setCooldown] = useState(0);
+	const [clipboardError, setClipboardError] = useState<string | null>(null);
 
-  // Редирект после успешной верификации
-  useEffect(() => {
-    if (verifyState?.success) {
-      router.push(verifyState.data.redirectTo);
-      router.refresh();
-    }
-  }, [verifyState, router]);
+	const [verifyState, verifyAction, isVerifying] = useActionState(
+		verifyOtpAction,
+		null,
+	);
+	const [resendState, resendAction, isResending] = useActionState(
+		resendOtpAction,
+		null,
+	);
 
-  // Автофокус при маунте
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+	const compactCode = code.replace(/\s/g, "");
 
-  // Автосабмит при вводе 6 цифр
-  function handleCodeInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-    e.target.value = val;
-    if (val.length === 6) {
-      // Небольшая задержка чтобы пользователь увидел ввод
-      setTimeout(() => formRef.current?.requestSubmit(), 100);
-    }
-  }
+	// Редирект после успешной верификации
+	useEffect(() => {
+		if (verifyState?.success) {
+			router.push(verifyState.data.redirectTo);
+			router.refresh();
+		}
+	}, [verifyState, router]);
 
-  const maskedEmail = maskEmail(email);
+	// Неверный код — очищаем поля, трясём группу и возвращаем фокус на первую ячейку
+	useEffect(() => {
+		if (verifyState && !verifyState.success) {
+			setCode(EMPTY_CODE);
+			setShakeSignal((n) => n + 1);
+		}
+	}, [verifyState]);
 
-  return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {description}{" "}
-          <span className="font-medium text-gray-700">{maskedEmail}</span>
-        </p>
-      </div>
+	// Кулдаун повторной отправки: стартует сразу (код только что отправлен
+	// предыдущим шагом) и перезапускается при каждой успешной пересылке —
+	// защищает от случайного двойного клика, не дублируя серверный rate-limit.
+	useEffect(() => {
+		setCooldown(RESEND_COOLDOWN_SECONDS);
+	}, []);
 
-      <form ref={formRef} action={verifyAction} className="space-y-4">
-        {/* Скрытые поля */}
-        <input type="hidden" name="type" value={type} />
+	useEffect(() => {
+		if (resendState?.success) {
+			setCode(EMPTY_CODE);
+			setCooldown(RESEND_COOLDOWN_SECONDS);
+		}
+	}, [resendState]);
 
-        {/* Ошибка верификации */}
-        {verifyState && !verifyState.success && (
-          <div
-            role="alert"
-            className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700"
-          >
-            {verifyState.error}
-          </div>
-        )}
+	useEffect(() => {
+		if (cooldown <= 0) return;
+		const timer = setInterval(
+			() => setCooldown((c) => Math.max(0, c - 1)),
+			1000,
+		);
+		return () => clearInterval(timer);
+	}, [cooldown]);
 
-        {/* Успех повторной отправки */}
-        {resendState?.success && (
-          <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
-            Код отправлен повторно
-          </div>
-        )}
+	function handleComplete() {
+		// Небольшая задержка — пользователь успевает увидеть введённую цифру
+		setTimeout(() => formRef.current?.requestSubmit(), 100);
+	}
 
-        <div>
-          <label
-            htmlFor="code"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Код подтверждения
-          </label>
-          <input
-            ref={inputRef}
-            id="code"
-            name="code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            required
-            disabled={isVerifying}
-            onChange={handleCodeInput}
-            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-center
-                       text-2xl font-mono tracking-[0.5em] placeholder-gray-300
-                       focus:border-blue-500 focus:outline-none focus:ring-1
-                       focus:ring-blue-500 disabled:opacity-50"
-            placeholder="______"
-          />
-          {/* {verifyState?.fieldErrors?.code && (
-            <p className="mt-1 text-xs text-red-600">{verifyState.fieldErrors.code[0]}</p>
-          )} */}
-          <p className="mt-1 text-xs text-gray-400">
-            Код действителен 10 минут
-          </p>
-        </div>
+	async function handlePasteFromClipboard() {
+		setClipboardError(null);
 
-        <button
-          type="submit"
-          disabled={isVerifying}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold
-                     text-white hover:bg-blue-500 focus:outline-none focus:ring-2
-                     focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60
-                     disabled:cursor-not-allowed transition-colors"
-        >
-          {isVerifying ? "Проверка..." : "Подтвердить"}
-        </button>
-      </form>
+		if (!navigator.clipboard?.readText) {
+			setClipboardError(
+				"Автовставка недоступна в этом браузере. Вставьте код вручную (Cmd/Ctrl+V).",
+			);
+			return;
+		}
 
-      {/* Повторная отправка */}
-      <div className="mt-4 text-center">
-        <form action={resendAction}>
-          <input type="hidden" name="type" value={type} />
-          <button
-            type="submit"
-            disabled={isResending || isVerifying}
-            className="text-sm text-blue-600 hover:text-blue-500 disabled:opacity-50
-                       disabled:cursor-not-allowed"
-          >
-            {isResending ? "Отправка..." : "Отправить код повторно"}
-          </button>
-        </form>
-        {resendState && !resendState.success && (
-          <p className="mt-1 text-xs text-red-600">{resendState.error}</p>
-        )}
-      </div>
-    </div>
-  );
+		try {
+			const text = await navigator.clipboard.readText();
+			const digits = text.replace(/\D/g, "").slice(0, OTP_LENGTH);
+			if (!digits) {
+				setClipboardError("В буфере обмена нет кода подтверждения.");
+				return;
+			}
+			setCode(digits.padEnd(OTP_LENGTH, " "));
+		} catch (err) {
+			setClipboardError(
+				err instanceof DOMException && err.name === "NotAllowedError"
+					? "Нет доступа к буферу обмена. Разрешите доступ в настройках браузера или вставьте код вручную."
+					: "Не удалось прочитать буфер обмена. Вставьте код вручную.",
+			);
+		}
+	}
+
+	const maskedEmail = maskEmail(email);
+
+	return (
+		<div className="w-full max-w-md mx-auto animate-[fade-in-up_300ms_ease-out]">
+			<Card variant="elevated" size="lg">
+				<div className="mb-6 text-center">
+					<Heading level={1} className="mb-1.5">
+						{title}
+					</Heading>
+					<Typography variant="body-sm" color="secondary">
+						{description}{" "}
+						<span className="font-medium text-[var(--text-primary)]">
+							{maskedEmail}
+						</span>
+					</Typography>
+				</div>
+
+				<form ref={formRef} action={verifyAction} className="space-y-5">
+					<input type="hidden" name="type" value={type} />
+					<input type="hidden" name="code" value={compactCode} readOnly />
+
+					{verifyState && !verifyState.success && (
+						<AuthAlert message={verifyState.error} code={verifyState.code} />
+					)}
+					{resendState?.success && (
+						<AuthAlert message={resendState.data.message} severity="success" />
+					)}
+					{resendState && !resendState.success && (
+						<AuthAlert message={resendState.error} code={resendState.code} />
+					)}
+
+					<div className="flex flex-col items-center gap-3">
+						<CodeInput
+							value={code}
+							onChange={setCode}
+							onComplete={handleComplete}
+							disabled={isVerifying}
+							error={!!(verifyState && !verifyState.success)}
+							autoFocus
+							shakeSignal={shakeSignal}
+							length={OTP_LENGTH}
+						/>
+
+						<button
+							type="button"
+							onClick={handlePasteFromClipboard}
+							disabled={isVerifying}
+							className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]
+                         hover:text-[var(--primary)] transition-colors duration-150
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+						>
+							<ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
+							Вставить из буфера
+						</button>
+
+						{clipboardError && (
+							<p
+								role="alert"
+								className="text-xs text-[var(--error)] text-center animate-[fade-in-up_150ms_ease-out]"
+							>
+								{clipboardError}
+							</p>
+						)}
+
+						<Typography variant="caption" color="muted">
+							Код действителен 10 минут
+						</Typography>
+					</div>
+
+					<Button
+						type="submit"
+						variant="primary"
+						size="md"
+						fullWidth
+						loading={isVerifying}
+						disabled={isVerifying || compactCode.length !== OTP_LENGTH}
+					>
+						Подтвердить
+					</Button>
+				</form>
+
+				<div className="mt-5 text-center">
+					<form action={resendAction}>
+						<input type="hidden" name="type" value={type} />
+						<button
+							type="submit"
+							disabled={isResending || isVerifying || cooldown > 0}
+							className="text-sm font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]
+                         disabled:text-[var(--text-muted)] disabled:cursor-not-allowed
+                         transition-colors duration-150"
+						>
+							{isResending
+								? "Отправка..."
+								: cooldown > 0
+									? `Отправить код повторно (${cooldown}с)`
+									: "Отправить код повторно"}
+						</button>
+					</form>
+				</div>
+			</Card>
+		</div>
+	);
 }
 
 // Маскируем email для отображения: na***@example.com
 function maskEmail(email: string): string {
-  const [local, domain] = email.split("@");
-  if (!local || !domain) return email;
-  const visible = local.slice(0, 2);
-  return `${visible}***@${domain}`;
+	const [local, domain] = email.split("@");
+	if (!local || !domain) return email;
+	const visible = local.slice(0, 2);
+	return `${visible}***@${domain}`;
 }

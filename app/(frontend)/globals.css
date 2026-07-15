@@ -2,9 +2,8 @@
 @import "./theme.css";
 
 :root {
-  --foreground: #ECEDEE;
-  --sticky-header-height: 124px;
-
+	--foreground: #ecedee;
+	--sticky-header-height: 124px;
 }
 
 @theme inline {
@@ -14,32 +13,75 @@
   --font-mono: var(--font-geist-mono);
 }
 
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+	background: var(--background);
+	color: var(--foreground);
+	font-family: Arial, Helvetica, sans-serif;
 }
 
 /* Анимация появления выпадающего меню поиска (src/modules/search) */
 @keyframes dropdown-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
+	from {
+		opacity: 0;
+		transform: translateY(-6px) scale(0.98);
+	}
 
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* Появление алертов/баннеров снизу вверх (AuthAlert, OtpForm) */
+@keyframes fade-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Простое появление (без сдвига) — таймер, статичные подсказки */
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+/* Тряска группы полей OTP при неверном коде (src/modules/auth) */
+@keyframes shake {
+	10%,
+	90% {
+		transform: translateX(-1px);
+	}
+
+	20%,
+	80% {
+		transform: translateX(2px);
+	}
+
+	30%,
+	50%,
+	70% {
+		transform: translateX(-4px);
+	}
+
+	40%,
+	60% {
+		transform: translateX(4px);
+	}
 }
 
 .ant-breadcrumb,
-
 .ant-breadcrumb a,
-
 .ant-breadcrumb-link {
-
-  color: white !important;
-
+	color: white !important;
 }
