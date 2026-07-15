@@ -5,6 +5,8 @@ export { Button } from "./Button/Button";
 export * from "./Button/Button.types";
 export { Card } from "./Card/Card";
 export * from "./Card/Card.types";
+export type { FilterChipProps } from "./Chip/FilterChip";
+export { FilterChip } from "./Chip/FilterChip";
 export { Drawer } from "./Drawer/Drawer";
 export { Dropdown } from "./Dropdown/Dropdown";
 export { Empty } from "./Empty/Empty";

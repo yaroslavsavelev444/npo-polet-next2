@@ -1,33 +1,11 @@
 "use client";
 
-import { ArrowUpDown, SlidersHorizontal, X } from "lucide-react";
+import { ArrowUpDown, SlidersHorizontal } from "lucide-react";
 import { formatPrice } from "@/modules/productCard";
-import { Badge } from "@/UI";
+import { Badge, FilterChip } from "@/UI";
 import { useProductFilters } from "../hooks/useProductFilters";
 import { pluralizeProducts, statusLabel } from "../lib/catalogOptions";
 import { SortMenu } from "./SortMenu";
-
-function FilterChip({
-	label,
-	onRemove,
-}: {
-	label: string;
-	onRemove: () => void;
-}) {
-	return (
-		<span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] py-1 pl-3 pr-1.5 text-xs font-medium text-[var(--text-secondary)]">
-			{label}
-			<button
-				type="button"
-				onClick={onRemove}
-				aria-label={`Убрать фильтр: ${label}`}
-				className="flex h-4 w-4 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
-			>
-				<X size={11} aria-hidden />
-			</button>
-		</span>
-	);
-}
 
 interface CatalogToolbarProps {
 	totalDocs: number;
@@ -65,7 +43,7 @@ export function CatalogToolbar({
 					<button
 						type="button"
 						onClick={onOpenFilters}
-						className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-light)]"
+						className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 !py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-light)]"
 					>
 						<SlidersHorizontal size={14} aria-hidden />
 						Фильтры
@@ -78,7 +56,7 @@ export function CatalogToolbar({
 					<button
 						type="button"
 						onClick={onOpenSort}
-						className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-light)]"
+						className="flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 !py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-light)]"
 					>
 						<ArrowUpDown size={14} aria-hidden />
 						Сортировка

@@ -2,42 +2,46 @@ import { cn } from "@/utils/cn";
 import type { InputStatus } from "./Input.types";
 
 export function inputStyles(
-  size: "sm" | "md" | "lg" = "md",
-  status: InputStatus = "default",
-  hasLeftIcon = false,
-  hasRightIcon = false,
-  className?: string,
+	size: "sm" | "md" | "lg" = "md",
+	status: InputStatus = "default",
+	hasLeftIcon = false,
+	hasRightIcon = false,
+	className?: string,
 ): string {
-  const baseClasses =
-    "w-full rounded-md border bg-(--input-bg) text-[var(--text-primary)] placeholder:text-[var(--text-muted)] " +
-    "focus:outline-none focus:ring-2 focus:ring-[var(--primary)] " +
-    "disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-200";
+	const baseClasses =
+		"w-full rounded-md border bg-(--input-bg) text-[var(--text-primary)] placeholder:text-[var(--text-muted)] " +
+		"focus:outline-none focus:ring-2 focus:ring-[var(--primary)] " +
+		"disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-200";
 
-  const sizeClasses = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2 text-base",
-    lg: "px-5 py-2.5 text-lg",
-  };
+	// md использует !px-4/!py-2: @once-ui-system/core грузится раньше Tailwind
+	// (см. layout.tsx) и его collision-классы .px-4/.py-2 перебивают padding
+	// без !important, сжимая инпут до нескольких пикселей — sm/lg не задеты,
+	// т.к. их числа (3, 1.5, 5, 2.5) не пересекаются с токенами Once UI.
+	const sizeClasses = {
+		sm: "px-3 py-1.5 text-sm",
+		md: "!px-4 !py-2 text-base",
+		lg: "px-5 py-2.5 text-lg",
+	};
 
-  const statusClasses = {
-    default: "border-[var(--border)] focus:border-[var(--primary)]",
-    error:
-      "border-[var(--error)] focus:border-[var(--error)] focus:ring-[var(--error)]",
-    success:
-      "border-[var(--success)] focus:border-[var(--success)] focus:ring-[var(--success)]",
-    warning:
-      "border-[var(--warning)] focus:border-[var(--warning)] focus:ring-[var(--warning)]",
-  };
+	const statusClasses = {
+		default: "border-[var(--border)] focus:border-[var(--primary)]",
+		error:
+			"border-[var(--error)] focus:border-[var(--error)] focus:ring-[var(--error)]",
+		success:
+			"border-[var(--success)] focus:border-[var(--success)] focus:ring-[var(--success)]",
+		warning:
+			"border-[var(--warning)] focus:border-[var(--warning)] focus:ring-[var(--warning)]",
+	};
 
-  const paddingLeft = hasLeftIcon ? "pl-9" : "";
-  const paddingRight = hasRightIcon ? "pr-9" : "";
+	const paddingLeft = hasLeftIcon ? "!pl-9" : "";
+	const paddingRight = hasRightIcon ? "!pr-9" : "";
 
-  return cn(
-    baseClasses,
-    sizeClasses[size],
-    statusClasses[status],
-    paddingLeft,
-    paddingRight,
-    className,
-  );
+	return cn(
+		baseClasses,
+		sizeClasses[size],
+		statusClasses[status],
+		paddingLeft,
+		paddingRight,
+		className,
+	);
 }
