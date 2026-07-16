@@ -11,8 +11,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Ответ 200 сам по себе означает полностью авторизованного пользователя:
+  // payload-token, по которому resolveSessionStatus его опознал, выдаётся
+  // только после подтверждения OTP (см. verifyOtp.ts).
   return NextResponse.json({
-    twoFAVerified: status.twoFAVerified,
+    authenticated: true,
     user: { email: status.email },
   });
 }

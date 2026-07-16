@@ -23,6 +23,7 @@ export default function UserMenu({ user }: Props) {
   return (
     <DropdownMenu
       trigger={user.name || 'Профиль'}
+      align="right"
       items={[
         { label: 'Профиль', href: '/profile' },
         { label: 'Мои заказы', href: '/orders' },

@@ -1,7 +1,6 @@
 "use client";
 
 import { ClipboardPaste } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import Button from "@/UI/Button/Button";
 import Card from "@/UI/Card/Card";
@@ -33,7 +32,6 @@ interface OtpFormProps {
  * мобильных (autoComplete="one-time-code").
  */
 export function OtpForm({ type, email, title, description }: OtpFormProps) {
-	const router = useRouter();
 	const formRef = useRef<HTMLFormElement>(null);
 
 	const [code, setCode] = useState(EMPTY_CODE);
@@ -52,13 +50,10 @@ export function OtpForm({ type, email, title, description }: OtpFormProps) {
 
 	const compactCode = code.replace(/\s/g, "");
 
-	// Редирект после успешной верификации
-	useEffect(() => {
-		if (verifyState?.success) {
-			router.push(verifyState.data.redirectTo);
-			router.refresh();
-		}
-	}, [verifyState, router]);
+	// Редиректа здесь нет: verifyOtpAction при успехе сам делает redirect() уже
+	// после того, как выставил cookies, и приносит свежее RSC-дерево (иначе
+	// Navbar остаётся отрисованным для гостя, см. комментарий в verifyOtp.ts).
+	// Поэтому verifyState здесь бывает только ошибкой.
 
 	// Неверный код — очищаем поля, трясём группу и возвращаем фокус на первую ячейку
 	useEffect(() => {

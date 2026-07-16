@@ -1,6 +1,5 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
@@ -9,8 +8,8 @@ import {
   logUnexpectedAuthError,
   safeCreateOtp,
 } from "../lib/errorHandling";
+import { createPendingAuth } from "../lib/pendingAuth";
 import { RATE_LIMITS } from "../lib/rateLimit";
-import { createSession } from "../lib/session";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
 import {
   AcceptedConsentInput,
@@ -132,7 +131,11 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
     );
   }
 
-  // 5. Логиним пользователя
+  // 5. Получаем токен, но НЕ выдаём его браузеру: пользователь считается
+  // авторизованным только после подтверждения email кодом (см. verifyOtp.ts).
+  // Токен ждёт своего часа на сервере, в pending-auth (см. pendingAuth.ts).
+  // Раньше payload-token выставлялся прямо здесь, и свежезарегистрированный
+  // пользователь был полноценно авторизован ещё до ввода кода.
   let loginToken: string | undefined;
   try {
     const loginResult = await payload.login({
@@ -140,42 +143,12 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       data: { email, password },
     });
     loginToken = loginResult.token;
-
-    if (loginToken) {
-      const cookieStore = await cookies();
-      cookieStore.set("payload-token", loginToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60,
-      });
-    }
   } catch (err) {
     logUnexpectedAuthError("register.loginAfterCreate", err);
   }
 
-  // 6. Создаём сессию — необязательный для дальнейшего флоу артефакт
-  // (verifyOtpAction работает и без cookie session-id), поэтому сбой здесь
-  // не должен ронять уже состоявшуюся регистрацию.
-  const cookieStore = await cookies();
-  try {
-    const session = await createSession(payload, {
-      userId: String(user.id),
-      ip,
-      userAgent,
-    });
-
-    cookieStore.set("session-id", String(session.id), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
-  } catch (err) {
-    logUnexpectedAuthError("register.createSession", err);
-  }
+  // 6. Session-запись здесь не создаётся — она появится в verifyOtpAction
+  // вместе с выдачей токена.
 
   // 7. Фиксируем принятые согласия
   await Promise.all(
@@ -199,7 +172,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
   // 8. OTP для верификации email. Без самой OTP-записи пользователю нечего
   // будет ввести на следующем экране, поэтому (в отличие от отправки письма
   // ниже) сбой здесь должен остановить флоу — но не откатывать уже
-  // созданный аккаунт/сессию/согласия, это необратимые побочные эффекты
+  // созданный аккаунт/согласия, это необратимые побочные эффекты
   // (см. также комментарий у notifyOtpCode ниже).
   const otp = await safeCreateOtp(
     payload,
@@ -209,6 +182,36 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
   if (!otp) {
     return actionError(
       "Аккаунт создан, но не удалось отправить код подтверждения. Войдите, чтобы запросить код повторно.",
+      undefined,
+      "server_error",
+    );
+  }
+
+  // 9. Челлендж, по которому экран ввода кода узнает пользователя. Без него
+  // (или без токена из шага 5) продолжать нечем — аккаунт уже создан, поэтому
+  // отправляем регистрироваться... точнее, входить обычным логином.
+  if (!loginToken) {
+    return actionError(
+      "Аккаунт создан, но автоматический вход не удался. Войдите, пожалуйста, вручную.",
+      undefined,
+      "server_error",
+    );
+  }
+
+  try {
+    await createPendingAuth({
+      userId: String(user.id),
+      email,
+      name,
+      type: "email_verify",
+      token: loginToken,
+      ip,
+      userAgent,
+    });
+  } catch (err) {
+    logUnexpectedAuthError("register.createPendingAuth", err);
+    return actionError(
+      "Аккаунт создан, но не удалось начать подтверждение. Войдите, пожалуйста, вручную.",
       undefined,
       "server_error",
     );

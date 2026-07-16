@@ -17,8 +17,8 @@ export default function LoginPage() {
   const [step, setStep] = useState<'login' | 'otp'>('login')
   const [email, setEmail] = useState('')
 
-  function handleRequiresOtp(enteredEmail?: string) {
-    if (enteredEmail) setEmail(enteredEmail)
+  function handleRequiresOtp(enteredEmail: string) {
+    setEmail(enteredEmail)
     setStep('otp')
   }
 

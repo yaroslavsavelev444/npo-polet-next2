@@ -8,7 +8,7 @@ import Input from '@/UI/Input/Input';
 import Button from '@/UI/Button/Button';
 
 interface LoginFormProps {
-  onRequiresOtp: () => void;
+  onRequiresOtp: (email: string) => void;
 }
 
 // Вспомогательная функция с поддержкой null
@@ -28,7 +28,7 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
 
   useEffect(() => {
     if (state?.success && state.data.requiresOtp) {
-      onRequiresOtp();
+      onRequiresOtp(state.data.email);
     }
   }, [state, onRequiresOtp]);
 

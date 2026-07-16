@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PENDING_AUTH_COOKIE } from "./src/modules/auth/lib/pendingAuth.ts";
 import { resolveSessionStatus } from "./src/modules/auth/lib/session.ts";
 import { getPayloadInstance } from "./src/payload/services/getPayload.ts";
 
-// ── Защищённые пути (требуют авторизацию и 2FA) ──────────────────────────────
+// ── Защищённые пути (требуют завершённой авторизации) ────────────────────────
 const PROTECTED_PATHS = ["/profile", "/orders", "/leave-review"];
 
-// Путь OTP — доступен только авторизованным, у которых 2FA ещё не пройдена
+// Путь OTP — доступен только тем, кто ввёл пароль, но ещё не подтвердил код
 const OTP_PATH = "/auth/verify-otp";
 
 export async function proxy(req: NextRequest) {
@@ -53,13 +54,21 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Три состояния пользователя различимы уже по cookies:
+  // 1. нет ничего                     — не авторизован
+  // 2. только pending-auth челлендж   — пароль введён, OTP ещё не подтверждён
+  // 3. payload-token                  — полностью авторизован (токен выдаётся
+  //                                     ТОЛЬКО после успешного OTP,
+  //                                     см. verifyOtp.ts)
   const payloadToken = req.cookies.get("payload-token")?.value;
   const sessionId = req.cookies.get("session-id")?.value;
+  const hasPendingAuth = req.cookies.has(PENDING_AUTH_COOKIE);
 
   console.log("[PROXY]", {
     pathname,
     hasPayloadToken: !!payloadToken,
     hasSessionId: !!sessionId,
+    hasPendingAuth,
   });
 
   // ── 2. Проверяем, является ли путь защищённым ──────────────────────────────
@@ -67,28 +76,19 @@ export async function proxy(req: NextRequest) {
 
   // ── 3. Если путь НЕ защищён — пропускаем без дополнительных проверок ──────
   if (!isProtected) {
-    // Единственное исключение: /auth/verify-otp требует токена, но не требует 2FA
+    // Единственное исключение: /auth/verify-otp — экран состояния №2
     if (pathname === OTP_PATH) {
-      // Если нет токена — редирект на логин
-      if (!payloadToken) {
+      // Уже полностью авторизован — на OTP делать нечего
+      if (payloadToken) {
+        return NextResponse.redirect(new URL("/profile", req.url));
+      }
+      // Нет незавершённого входа — вводить нечего, отправляем на логин
+      if (!hasPendingAuth) {
         const loginUrl = new URL("/auth/login", req.url);
         loginUrl.searchParams.set("from", pathname);
         return NextResponse.redirect(loginUrl);
       }
-      // Токен есть — проверяем сессию и статус 2FA
-      const status = await checkSessionStatus(req, sessionId);
-      if (!status) {
-        // Сессия невалидна — чистим куки и на логин
-        const response = NextResponse.redirect(new URL("/auth/login", req.url));
-        response.cookies.delete("payload-token");
-        response.cookies.delete("session-id");
-        return response;
-      }
-      // Если 2FA уже пройдена — редирект на профиль (незачем сидеть на OTP)
-      if (status.twoFAVerified) {
-        return NextResponse.redirect(new URL("/profile", req.url));
-      }
-      // Иначе (2FA не пройдена) — показываем страницу ввода OTP
+      // Пароль введён, код ждёт — показываем страницу ввода OTP
       return NextResponse.next();
     }
 
@@ -98,12 +98,22 @@ export async function proxy(req: NextRequest) {
 
   // ── 4. Защищённый путь: проверяем наличие токена ──────────────────────────
   if (!payloadToken) {
-    const loginUrl = new URL("/auth/login", req.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
+    // Состояние №2 (челлендж есть, кода ещё не было) — это НЕ авторизация:
+    // такому пользователю здесь так же нечего делать, как и гостю. Отправляем
+    // дальше вводить код.
+    const target = hasPendingAuth ? OTP_PATH : "/auth/login";
+    const url = new URL(target, req.url);
+    if (!hasPendingAuth) url.searchParams.set("from", pathname);
+    return NextResponse.redirect(url);
   }
 
   // ── 5. Проверяем статус сессии ───────────────────────────────────────────
+  // Отдельной проверки 2FA здесь больше нет и не должно быть: payload-token
+  // выдаётся только после успешного OTP (см. verifyOtp.ts), поэтому его
+  // наличие УЖЕ означает пройденный второй фактор. Раньше гейт опирался на
+  // поле users.twoFAVerified, которое остаётся true 24 часа после первого
+  // подтверждения — из-за чего при повторном входе в этом окне OTP
+  // пропускался полностью.
   const status = await checkSessionStatus(req, sessionId);
 
   if (!status) {
@@ -114,17 +124,7 @@ export async function proxy(req: NextRequest) {
     return response;
   }
 
-  // ── 6. Авторизован, но 2FA не пройден ──────────────────────────────────────
-  if (!status.twoFAVerified) {
-    // Если это не сам OTP-путь — редиректим на него
-    if (pathname !== OTP_PATH) {
-      return NextResponse.redirect(new URL(OTP_PATH, req.url));
-    }
-    // Если мы уже на OTP-пути — пропускаем (пользователь вводит код)
-    return NextResponse.next();
-  }
-
-  // ── 7. Всё хорошо: авторизован и 2FA пройдена ─────────────────────────────
+  // ── 6. Всё хорошо: вход завершён ──────────────────────────────────────────
   return NextResponse.next();
 }
 
@@ -147,10 +147,10 @@ export async function proxy(req: NextRequest) {
 async function checkSessionStatus(
   req: NextRequest,
   sessionId: string | undefined,
-): Promise<{ twoFAVerified: boolean } | null> {
+): Promise<{ userId: string } | null> {
   const payload = await getPayloadInstance();
   const status = await resolveSessionStatus(payload, req.headers, sessionId);
-  return status ? { twoFAVerified: status.twoFAVerified } : null;
+  return status ? { userId: status.userId } : null;
 }
 
 // ── Matcher ───────────────────────────────────────────────────────────────────

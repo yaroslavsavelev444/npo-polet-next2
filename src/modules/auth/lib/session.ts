@@ -76,13 +76,21 @@ export async function getActiveSession(payload: BasePayload, sessionId: string) 
 export interface SessionStatus {
   userId: string
   email: string
-  twoFAVerified: boolean
 }
 
 /**
- * Единая проверка "авторизован ли запрос и пройдена ли 2FA" — используется и
- * в /api/auth/session-status (для клиентских проверок вроде FeedbackButton),
- * и напрямую в proxy.ts. Раньше proxy.ts не мог вызвать Payload Local API
+ * Единая проверка "авторизован ли запрос" — используется и в
+ * /api/auth/session-status (для клиентских проверок вроде FeedbackButton),
+ * и напрямую в proxy.ts.
+ *
+ * Отдельного признака 2FA здесь нет намеренно: payload-token выдаётся только
+ * после успешного подтверждения OTP (см. verifyOtp.ts), поэтому валидный
+ * токен — это уже и есть "второй фактор пройден". Раньше здесь считался
+ * twoFAVerified по одноимённому полю пользователя с окном в 24 часа, и оно
+ * оставалось true между входами — то есть при повторном входе гейт пропускал
+ * пользователя ещё до ввода кода.
+ *
+ * Раньше proxy.ts не мог вызвать Payload Local API
  * (считалось, что Proxy работает в Edge Runtime) и поэтому делал HTTP-запрос
  * к самому себе через публичный домен — начиная с Next.js 15.5 Proxy по
  * умолчанию выполняется в Node.js runtime (см. node_modules/next/dist/docs/
@@ -113,14 +121,7 @@ export async function resolveSessionStatus(
 
   if (user.status === 'blocked' || user.status === 'suspended') return null
 
-  const TWO_FA_TTL_MS = 24 * 60 * 60 * 1000
-  const verifiedAt = user.twoFAVerifiedAt
-    ? new Date(user.twoFAVerifiedAt).getTime()
-    : 0
-  const twoFAVerified =
-    user.twoFAVerified === true && Date.now() - verifiedAt < TWO_FA_TTL_MS
-
-  return { userId: String(user.id), email: user.email, twoFAVerified }
+  return { userId: String(user.id), email: user.email }
 }
 
 export async function updateSessionActivity(payload: BasePayload, sessionId: string) {
