@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import { ownedByUserOrStaff } from '../access/ownership.ts'
 
 export const Notifications: CollectionConfig = {
   slug: 'notifications',
@@ -18,36 +19,17 @@ export const Notifications: CollectionConfig = {
   },
 
   access: {
-    read: ({ req }) => {
-      if (!req.user) return false
-
-      if (
-        req.user.role === 'admin' ||
-        req.user.role === 'superadmin'
-      ) {
-        return true
-      }
-
-      return {
-        user: {
-          equals: req.user.id,
-        },
-      }
-    },
-
+    // Владелец видит и помечает прочитанными только свои уведомления,
+    // персонал — все. См. ownership.ts.
+    //
+    // Кастомный роут app/api/notifications/route.ts перекрывает только сам
+    // путь /api/notifications — обращение по id (/api/notifications/42)
+    // уходит в REST Payload и упирается ровно в этот access. Раньше проверка
+    // шла по одному req.user.role, поэтому покупатель с role=superadmin читал
+    // и правил чужие уведомления по прямому id.
+    read: ownedByUserOrStaff,
     create: isAdminOrSuperAdmin,
-    // `isLoggedIn` раньше пускало ЛЮБОГО авторизованного пользователя
-    // патчить чужие уведомления (PATCH /api/notifications/:id без проверки
-    // владельца) — латентная дыра, безвредная пока коллекция не была
-    // подключена ни к какому клиенту. Теперь бэлл в шапке дергает её
-    // напрямую, так что сужаем update до владельца записи, по аналогии с read.
-    update: ({ req }) => {
-      if (!req.user) return false
-      if (req.user.role === 'admin' || req.user.role === 'superadmin') {
-        return true
-      }
-      return { user: { equals: req.user.id } }
-    },
+    update: ownedByUserOrStaff,
     delete: isAdminOrSuperAdmin,
   },
 

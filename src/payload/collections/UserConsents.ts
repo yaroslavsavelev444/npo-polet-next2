@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 
 export const UserConsents: CollectionConfig = {
@@ -13,13 +14,9 @@ export const UserConsents: CollectionConfig = {
 	},
 
 	access: {
-		// Пользователь может читать только свои согласия
-		read: ({ req }) => {
-			if (!req.user) return false;
-			if (req.user.role === "admin" || req.user.role === "superadmin")
-				return true;
-			return { user: { equals: req.user.id } };
-		},
+		// Пользователь может читать только свои согласия, персонал — все.
+		// См. ownership.ts.
+		read: ownedByUserOrStaff,
 		// Создаётся только через Local API при регистрации
 		create: () => false,
 		// Неизменяемые записи — юридический аудит

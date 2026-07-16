@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { sql } from "@payloadcms/db-postgres";
 import type { Payload } from "payload";
 import { env } from "@/env";
+import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import {
 	ACCOUNT_DELETION_COOLING_OFF_MS,
@@ -114,9 +115,12 @@ export class AccountDeletionService {
 	}): Promise<AccountDeletionView> {
 		// Re-authentication protects a destructive action even if the browser
 		// session has been hijacked. Do not leak whether a user exists.
+		// AUTH_FLOW_CONTEXT — см. requireServerAuthFlow.ts: это сверка пароля,
+		// а не выдача сессии (токен из результата не используется).
 		const login = await this.payload.login({
 			collection: "users",
 			data: { email: input.email, password: input.password },
+			context: AUTH_FLOW_CONTEXT,
 		});
 		if (!login.user || String(login.user.id) !== String(input.userId)) {
 			throw new AccountDeletionError("Неверный пароль", "INVALID_PASSWORD");

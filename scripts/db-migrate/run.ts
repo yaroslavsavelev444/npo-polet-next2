@@ -6,9 +6,11 @@
 // См. scripts/db-migrate/README.md за подробностями (сетевой доступ к
 // старой Mongo, безопасность повторного запуска, интерпретация отчёта).
 import "dotenv/config";
+import type { Db } from "mongodb";
 import { getPayload } from "payload";
 import config from "../../payload.config.ts";
 import { runMigrations } from "./core/index.ts";
+import { LEGACY_COLLECTIONS } from "./lib/legacyCollections.ts";
 import { closeLegacyMongo, getLegacyDb } from "./lib/legacyMongo.ts";
 import { allMigrations } from "./migrations/index.ts";
 
@@ -90,6 +92,40 @@ function printReport(report: Awaited<ReturnType<typeof runMigrations>>) {
 	}
 }
 
+/**
+ * Сверяет имена коллекций из LEGACY_COLLECTIONS с тем, что реально есть в
+ * старой Mongo, и падает с понятным сообщением, если чего-то нет.
+ *
+ * Без этой проверки опечатка в имени (или другая плюрализация mongoose в
+ * старом проекте) выглядит как полностью успешный прогон: Mongo молча отдаёт
+ * пустой курсор по несуществующей коллекции, миграция обрабатывает 0
+ * документов и печатает «✅ Без ошибок». Именно такое поведение легко принять
+ * за «всё уже перенесено».
+ *
+ * README обещал эту проверку с самого начала, но в коде её не было.
+ */
+async function assertLegacyCollectionsExist(legacyDb: Db): Promise<void> {
+	const existing = new Set(
+		(await legacyDb.listCollections({}, { nameOnly: true }).toArray()).map(
+			(c) => c.name,
+		),
+	);
+
+	const missing = Object.entries(LEGACY_COLLECTIONS)
+		.filter(([, name]) => !existing.has(name))
+		.map(([key, name]) => `${name} (для миграции ${key})`);
+
+	if (missing.length > 0) {
+		throw new Error(
+			`В старой БД "${legacyDb.databaseName}" нет ожидаемых коллекций:\n` +
+				missing.map((m) => `  - ${m}`).join("\n") +
+				"\n\nПроверьте LEGACY_MONGODB_URI (та ли база?) и имена в " +
+				"scripts/db-migrate/lib/legacyCollections.ts.\n" +
+				`Фактически в базе есть: ${[...existing].sort().join(", ") || "(пусто)"}`,
+		);
+	}
+}
+
 async function main() {
 	const options = parseArgs(process.argv.slice(2));
 	if (options.help) {
@@ -103,6 +139,7 @@ async function main() {
 	if (options.only) console.log(`Только: ${options.only.join(", ")}`);
 
 	const legacyDb = await getLegacyDb();
+	await assertLegacyCollectionsExist(legacyDb);
 	const payload = await getPayload({ config });
 
 	const report = await runMigrations(allMigrations, {

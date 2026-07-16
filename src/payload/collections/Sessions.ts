@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
+import { ownedByUserOrStaff } from '../access/ownership.ts'
 
 /**
  * Коллекция сессий пользователей.
@@ -26,12 +27,11 @@ export const Sessions: CollectionConfig = {
   },
 
   access: {
-    read: ({ req }) => {
-      if (!req.user) return false
-      if (req.user.role === 'admin' || req.user.role === 'superadmin') return true
-      // Пользователь видит только свои сессии
-      return { user: { equals: req.user.id } }
-    },
+    // Пользователь видит только свои сессии («Активные устройства» в профиле),
+    // персонал — все. См. ownership.ts: прежняя проверка по одному
+    // req.user.role отдавала покупателю с role=superadmin список сессий всех
+    // пользователей вместе с их IP и User-Agent.
+    read: ownedByUserOrStaff,
     create: () => false, // Только через Local API
     update: () => false, // Только через Local API
     delete: isAdminOrSuperAdmin,

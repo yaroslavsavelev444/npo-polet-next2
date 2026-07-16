@@ -1,5 +1,6 @@
 // scripts/db-migrate/migrations/orders.migration.ts
 import type { ObjectId } from "mongodb";
+import type { MigrationContext } from "../core/index.ts";
 import {
 	defineMigration,
 	emptyStats,
@@ -85,6 +86,8 @@ interface LegacyAppliedDiscount {
 interface LegacyOrder {
 	_id: ObjectId;
 	orderNumber: string;
+	/** Старая схема — mongoose с { timestamps: true }, поле есть у всех заказов. */
+	createdAt?: Date;
 	user?: ObjectId;
 	delivery: LegacyDelivery;
 	recipient: LegacyRecipient;
@@ -158,6 +161,8 @@ export default defineMigration({
 	async run(ctx) {
 		const { legacyDb, log } = ctx;
 		const stats = emptyStats();
+		let ownerlessOrders = 0;
+		let renumberedOrders = 0;
 
 		const cursor = legacyDb
 			.collection<LegacyOrder>(LEGACY_COLLECTIONS.orders)
@@ -170,9 +175,21 @@ export default defineMigration({
 			// аккаунта) — если ссылка не резолвится, заказ всё равно переносим
 			// с user: undefined, а не пропускаем: это финансовые/бухгалтерские
 			// данные, терять которые нельзя даже без владельца.
+			//
+			// Но такой заказ не виден никому в «Мои заказы», поэтому молчать об
+			// этом нельзя — раньше он создавался без единой строчки в логе.
+			// Причина почти всегда одна из двух: владелец — персонал старой
+			// системы (role admin/superadmin не мигрируется by design), либо
+			// его перенос не удался (см. users.migration.ts).
 			const userId = old.user
 				? await resolveRef(ctx, "users", old.user.toString())
 				: undefined;
+			if (old.user && userId === undefined) {
+				ownerlessOrders++;
+				log.warn(
+					`Заказ ${old.orderNumber} (${legacyId}): владелец ${old.user.toString()} не найден в новой БД — заказ переносится БЕЗ владельца и не будет виден в «Мои заказы»`,
+				);
+			}
 
 			const items: Array<{
 				product: string | number;
@@ -304,8 +321,60 @@ export default defineMigration({
 				ctx,
 				collection: "orders",
 				legacyId,
+				// orderNumber — в createOnlyData, а не в data, по двум причинам:
+				//
+				// 1. Номер заказа уникален, а обе системы нумеруют заказы
+				//    одинаково (ORD-{год}-{6 цифр}) независимыми счётчиками. Пока
+				//    старый сайт ещё принимает заказы, его новые номера
+				//    сталкиваются с номерами, уже занятыми заказами нового сайта:
+				//    create падал на unique-констрейнте, заказ уходил в failed и
+				//    просто не переносился (воспроизведено). Ниже подбирается
+				//    свободный номер.
+				// 2. Заказы уже переносились раньше — со своими исходными
+				//    номерами. Номер видит покупатель и называет его в поддержке,
+				//    поэтому повторный прогон не имеет права его менять. В
+				//    createOnlyData поле пишется только при создании и никогда не
+				//    сравнивается/не обновляется (см. core/upsert.ts).
+				createOnlyData: async () => {
+					const orderNumber = await resolveFreeOrderNumber(
+						ctx,
+						old.orderNumber,
+						legacyId,
+					);
+					if (orderNumber !== old.orderNumber) renumberedOrders++;
+					return { orderNumber };
+				},
 				data: {
-					orderNumber: old.orderNumber,
+					// Дата оформления заказа в СТАРОЙ системе.
+					//
+					// Payload проставляет createdAt = now только если поле не
+					// передали (см. @payloadcms/drizzle/dist/upsertRow: `if
+					// (operation === 'create' && !data.createdAt)`), поэтому
+					// историческую дату можно и нужно передать явно. Без этого все
+					// перенесённые заказы получали дату миграции: в «Мои заказы»
+					// (сортировка `-createdAt`) многолетняя история схлопывалась в
+					// один день, и покупатели видели свои старые заказы как
+					// «оформленные сегодня».
+					//
+					// Именно в data, а не в createOnlyData: поле должно
+					// синхронизироваться и для УЖЕ перенесённых заказов — иначе
+					// записи, созданные прошлыми прогонами, навсегда остались бы с
+					// датой миграции. Это безопасно: дата оформления в старой БД
+					// неизменна, а в новой системе её никто не редактирует.
+					//
+					// Условный spread обязателен: передать createdAt: undefined —
+					// значит попросить Payload перезаписать дату пустым значением.
+					// Если у легаси-заказа даты почему-то нет, поле просто не
+					// трогаем.
+					...(old.createdAt
+						? { createdAt: new Date(old.createdAt).toISOString() }
+						: {}),
+					// updatedAt намеренно НЕ переносим: Payload перезаписывает его
+					// на каждом update своим now (проверено), поэтому в data оно
+					// давало бы вечный «чурн» — каждый прогон переписывал бы все
+					// заказы ради поля, которое всё равно не сохранится. Для новой
+					// системы updatedAt честно означает «когда мы последний раз
+					// трогали эту строку».
 					user: userId,
 					status: old.status,
 					recipient: {
@@ -390,6 +459,59 @@ export default defineMigration({
 			stats[result.action]++;
 		}
 
+		if (ownerlessOrders > 0) {
+			log.warn(
+				`Заказов без владельца: ${ownerlessOrders}. Они перенесены (данные не потеряны), но не видны ни в одном личном кабинете. ` +
+					"Обычно это заказы персонала старой системы (в admins переносится вручную) либо пользователей, чей перенос не удался — см. ERROR выше.",
+			);
+		}
+		if (renumberedOrders > 0) {
+			log.warn(
+				`Заказов с изменённым номером: ${renumberedOrders}. Их исходные номера уже заняты заказами нового сайта, поэтому к номеру добавлен суффикс -L<legacyId> (исходный номер остаётся в начале строки и ищется поиском). Иначе эти заказы не перенеслись бы вовсе.`,
+			);
+		}
+
 		return stats;
 	},
 });
+
+/**
+ * Подбирает номер, под которым легаси-заказ можно вставить в новую БД.
+ *
+ * Обе системы нумеруют заказы по одному шаблону ORD-{год}-{6 цифр} и каждая
+ * от своего счётчика, поэтому пока старый сайт жив, номера неизбежно
+ * сталкиваются. Уникальность orderNumber — констрейнт БД, так что вариантов
+ * ровно два: не перенести заказ (тихая потеря оплаченных заказов — так было
+ * раньше) или перенести под свободным номером. Второе очевидно лучше:
+ * содержимое заказа ценнее, чем неизменность его номера.
+ *
+ * Суффикс детерминированный (берётся из legacyId, а не из счётчика/времени):
+ * при повторном прогоне для того же заказа получится то же самое значение.
+ * Исходный номер сохраняется в начале строки — заказ по-прежнему находится
+ * поиском по номеру, который назовёт покупатель.
+ *
+ * Возвращает исходный номер, если он свободен (обычный случай).
+ */
+async function resolveFreeOrderNumber(
+	ctx: MigrationContext,
+	legacyOrderNumber: string,
+	legacyId: string,
+): Promise<string> {
+	const { totalDocs } = await ctx.payload.find({
+		collection: "orders",
+		where: { orderNumber: { equals: legacyOrderNumber } },
+		limit: 0,
+		depth: 0,
+		overrideAccess: true,
+	});
+
+	if (totalDocs === 0) return legacyOrderNumber;
+
+	// legacyId (hex ObjectId) уникален, поэтому и суффикс уникален — повторной
+	// коллизии быть не может.
+	const fallback = `${legacyOrderNumber}-L${legacyId.slice(-6)}`;
+	ctx.log.warn(
+		`Номер ${legacyOrderNumber} уже занят заказом нового сайта — легаси-заказ ${legacyId} переносится как ${fallback}`,
+	);
+	return fallback;
+}

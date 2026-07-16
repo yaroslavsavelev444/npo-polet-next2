@@ -1,6 +1,8 @@
 import type { CollectionConfig } from "payload";
 
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { isLoggedIn } from "../access/isLoggedIn.ts";
+import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 
 export const Wishlists: CollectionConfig = {
@@ -13,24 +15,13 @@ export const Wishlists: CollectionConfig = {
 	},
 
 	access: {
-		read: ({ req }) => {
-			if (!req.user) return false;
-
-			if (req.user.role === "admin" || req.user.role === "superadmin") {
-				return true;
-			}
-
-			return {
-				user: {
-					equals: req.user.id,
-				},
-			};
-		},
-
-		create: ({ req }) => !!req.user,
-
-		update: ({ req }) => !!req.user,
-
+		// Владелец — только своё, персонал — всё. См. ownership.ts.
+		read: ownedByUserOrStaff,
+		create: isLoggedIn,
+		// Раньше здесь было `!!req.user` — ЛЮБОЙ авторизованный покупатель мог
+		// переписать чужое избранное по прямому id (PATCH /api/wishlists/1),
+		// даже не повышая себе роль. Проверка владельца обязательна.
+		update: ownedByUserOrStaff,
 		delete: isAdminOrSuperAdmin,
 	},
 

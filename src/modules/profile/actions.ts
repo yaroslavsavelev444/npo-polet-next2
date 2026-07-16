@@ -7,6 +7,7 @@ import {
   getUserActiveSessions,
   invalidateSession,
 } from "@/modules/auth/lib/session";
+import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordChanged";
@@ -55,10 +56,14 @@ export async function changePasswordAction(
   const { user } = await payload.auth({ headers: h });
   if (!user) redirect("/auth/login");
 
-  // Payload requires re-login to verify old password; use the login endpoint
+  // Payload requires re-login to verify old password; use the login endpoint.
+  // AUTH_FLOW_CONTEXT — см. requireServerAuthFlow.ts. Здесь это не выдача
+  // сессии, а сверка старого пароля: токен из результата не используется и
+  // браузеру не отдаётся, пользователь уже авторизован (payload.auth выше).
   const loginResult = await payload.login({
     collection: "users",
     data: { email: user.email as string, password: data.oldPassword },
+    context: AUTH_FLOW_CONTEXT,
   });
 
   if (!loginResult.user) {

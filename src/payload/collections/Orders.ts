@@ -7,6 +7,7 @@ import {
 } from "../../services/notifications/notifyOrderStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
+import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 
 /** Заказы после удаления аккаунта обезличиваются (user становится пустым) — для них in-app уведомление создавать некому. */
@@ -72,32 +73,59 @@ export type PaymentMethodType =
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 
-const generateOrderNumber = async ({
-	operation,
-	data,
-	req,
-	originalDoc,
-}: any) => {
+/**
+ * Номер следующего заказа = (максимальный уже существующий номер за год) + 1.
+ *
+ * Раньше считалось количество заказов за год (`totalDocs + 1`). Это неверно
+ * сразу по двум причинам, и обе становятся критичными после переноса
+ * исторических заказов из старой системы (scripts/db-migrate):
+ *
+ * 1. Количество ≠ последний номер. Перенесённые заказы занимают номера
+ *    ORD-{год}-000001…N, при этом их createdAt — момент миграции, то есть они
+ *    попадали в счётчик текущего года. Любой пропуск или удаление в
+ *    нумерации приводили к тому, что count+1 указывал на УЖЕ ЗАНЯТЫЙ номер —
+ *    а orderNumber уникален, значит падало бы оформление заказа у живого
+ *    покупателя.
+ * 2. Фильтр по createdAt вообще не связан с номером: заказ, созданный в этом
+ *    году, может нести номер прошлого года (перенесённый) — и наоборот.
+ *
+ * Берём максимум по самому полю orderNumber: нумерация с нулями до 6 знаков,
+ * поэтому лексикографическая сортировка совпадает с числовой. parseInt
+ * останавливается на первом не-цифре и потому корректно читает и номера с
+ * суффиксом -L<legacyId>, который миграция даёт заказам, чей исходный номер
+ * уже был занят (см. resolveFreeOrderNumber в orders.migration.ts).
+ */
+const generateOrderNumber = async ({ operation, data, req }: any) => {
 	// Только при создании
 	if (operation !== "create") return data;
 
-	// Если номер уже есть и он не пустой — ничего не делаем
+	// Если номер уже есть и он не пустой — ничего не делаем (миграция
+	// проставляет номер исторического заказа сама).
 	if (data?.orderNumber && data.orderNumber !== "") {
 		return data;
 	}
 
 	const year = new Date().getFullYear();
+	const prefix = `ORD-${year}-`;
 
-	const { totalDocs } = await req.payload.find({
+	const { docs } = await req.payload.find({
 		collection: "orders",
-		where: {
-			createdAt: { greater_than: `${year}-01-01` },
-		},
-		limit: 0,
+		where: { orderNumber: { like: prefix } },
+		sort: "-orderNumber",
+		limit: 1,
+		depth: 0,
+		overrideAccess: true,
 	});
 
-	const nextNumber = (totalDocs + 1).toString().padStart(6, "0");
-	data.orderNumber = `ORD-${year}-${nextNumber}`;
+	const lastNumber: string | undefined = docs[0]?.orderNumber;
+	const lastSequence = lastNumber?.startsWith(prefix)
+		? Number.parseInt(lastNumber.slice(prefix.length), 10)
+		: 0;
+
+	const nextNumber = ((Number.isNaN(lastSequence) ? 0 : lastSequence) + 1)
+		.toString()
+		.padStart(6, "0");
+	data.orderNumber = `${prefix}${nextNumber}`;
 
 	return data;
 };
@@ -120,12 +148,12 @@ export const Orders: CollectionConfig = {
 	},
 
 	access: {
-		read: ({ req }) => {
-			if (!req.user) return false;
-			if (req.user.role === "admin" || req.user.role === "superadmin")
-				return true;
-			return { user: { equals: req.user.id } };
-		},
+		// Покупатель видит только свои заказы, персонал — все.
+		// Проверка «свой/чужой» вынесена в ownedByUserOrStaff: раньше здесь
+		// сравнивалась только req.user.role, без коллекции, и покупатель с
+		// role=superadmin читал заказы всех пользователей (ФИО получателей,
+		// телефоны, состав, суммы) через GET /api/orders.
+		read: ownedByUserOrStaff,
 		create: isLoggedIn,
 		update: isAdminOrSuperAdmin,
 		delete: isAdminOrSuperAdmin,

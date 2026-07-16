@@ -1,5 +1,6 @@
 "use server";
 
+import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
@@ -138,9 +139,12 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
   // пользователь был полноценно авторизован ещё до ввода кода.
   let loginToken: string | undefined;
   try {
+    // AUTH_FLOW_CONTEXT — см. requireServerAuthFlow.ts: токен здесь тоже не
+    // выдаётся браузеру, а ждёт подтверждения email кодом в pending-auth.
     const loginResult = await payload.login({
       collection: "users",
       data: { email, password },
+      context: AUTH_FLOW_CONTEXT,
     });
     loginToken = loginResult.token;
   } catch (err) {

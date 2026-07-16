@@ -1,6 +1,7 @@
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
+import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -36,13 +37,9 @@ export const Feedbacks: CollectionConfig = {
 	},
 
 	access: {
-		// Пользователь видит только свои фидбеки, адмнин — все
-		read: ({ req }) => {
-			if (!req.user) return false;
-			if (req.user.role === "admin" || req.user.role === "superadmin")
-				return true;
-			return { user: { equals: req.user.id } };
-		},
+		// Пользователь видит только свои обращения, персонал — все.
+		// См. ownership.ts.
+		read: ownedByUserOrStaff,
 		create: isLoggedIn,
 		update: isAdminOrSuperAdmin,
 		delete: isAdminOrSuperAdmin,

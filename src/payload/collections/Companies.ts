@@ -3,6 +3,7 @@
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
+import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
@@ -16,22 +17,12 @@ export const Companies: CollectionConfig = {
 	},
 
 	access: {
-		read: ({ req }) => {
-			if (!req.user) return false;
-
-			if (req.user.role === "admin" || req.user.role === "superadmin") {
-				return true;
-			}
-
-			return {
-				user: {
-					equals: req.user.id,
-				},
-			};
-		},
-
+		// Владелец — только свои организации, персонал — все. См. ownership.ts.
+		read: ownedByUserOrStaff,
 		create: isLoggedIn,
-		update: isLoggedIn,
+		// Раньше здесь было `isLoggedIn` — любой авторизованный покупатель мог
+		// править чужие реквизиты (ИНН, юр. адрес) по прямому id.
+		update: ownedByUserOrStaff,
 		delete: isAdminOrSuperAdmin,
 	},
 

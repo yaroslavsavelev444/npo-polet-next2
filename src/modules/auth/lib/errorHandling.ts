@@ -102,6 +102,10 @@ export function classifyLoginError(err: unknown): AuthErrorClassification {
       message: (err as Error).message,
     };
   }
+  // AuthenticationError (неверный email/пароль) попадает сюда же, в default.
+  // Его бросает и requireServerAuthFlow, когда payload.login() вызван без
+  // AUTH_FLOW_CONTEXT — намеренно неотличимо для клиента (см. докстринг хука);
+  // настоящая причина в таком случае пишется в лог сервера.
   return { code: "invalid_credentials", message: "Неверный email или пароль" };
 }
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
@@ -75,8 +76,17 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 	let userId: string | number;
 	let userName: string;
 
+	// AUTH_FLOW_CONTEXT обязателен: без него beforeLogin-хук
+	// requireServerAuthFlow отклонит вход как «мимо нашего flow» (так закрыт
+	// прямой POST /api/users/login в обход OTP). Здесь передавать его
+	// правомерно — токен из этого вызова наружу не уходит, а прячется в
+	// pending-auth до подтверждения кода (см. ниже).
 	const attemptLogin = () =>
-		payload.login({ collection: "users", data: { email, password } });
+		payload.login({
+			collection: "users",
+			data: { email, password },
+			context: AUTH_FLOW_CONTEXT,
+		});
 
 	try {
 		let loginResult: Awaited<ReturnType<typeof attemptLogin>>;

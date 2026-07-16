@@ -1,8 +1,10 @@
-import type { CollectionAfterChangeHook, CollectionConfig, FieldAccess } from "payload";
+import type { CollectionAfterChangeHook, CollectionConfig } from "payload";
 import { notify } from "../../services/notifications/notificationCenter.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { isStaffUser, staffOnlyField } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { checkUserStatus } from "../hooks/users/beforeLogin.ts";
+import { requireServerAuthFlow } from "../hooks/users/requireServerAuthFlow.ts";
 
 /**
  * Реагирует на изменение status администратором (поле доступно на update
@@ -34,16 +36,6 @@ const notifyOnStatusChange: CollectionAfterChangeHook = async ({
 
 	return doc;
 };
-
-// `isAdminOrSuperAdmin` из ../access/isAdminOrSuperAdmin.ts типизирован как
-// `Access` (коллекционный контроль доступа) и не может напрямую переиспользоваться
-// в `field.access` — там ожидается `FieldAccess`, у которого другая форма
-// аргументов (в частности, `id: number | string`, тогда как `Access` в этом
-// проекте сужен до `id: number`). Логика идентична, но нужен отдельный,
-// корректно типизированный хелпер для полей.
-const staffOnlyFieldAccess: FieldAccess = ({ req }) =>
-	req.user?.collection === "admins" &&
-	["admin", "superadmin"].includes(req.user.role ?? "");
 
 export const Users: CollectionConfig = {
 	slug: "users",
@@ -83,28 +75,41 @@ export const Users: CollectionConfig = {
 		read: ({ req }) => {
 			if (!req.user) return false;
 			// Staff (коллекция admins) видит всех покупателей. Проверяем именно
-			// collection, а не только role — начиная с этой ревизии значение
-			// role у обычного покупателя вообще не может стать "admin"/"superadmin"
-			// (см. access.update на самом поле role ниже), но проверка на
-			// коллекцию — это независимая, не зависящая от состояния данных
-			// граница, и именно её используют все остальные коллекции проекта.
-			if (req.user.collection === "admins") return true;
+			// collection, а не role: role у покупателя — обычное поле данных, и
+			// доверять ему нельзя (см. ownership.ts). Проверка на коллекцию —
+			// независимая от содержимого данных граница, и именно её используют
+			// все остальные коллекции проекта.
+			if (isStaffUser(req.user)) return true;
 			// Покупатель может читать только свою запись
 			return {
 				id: { equals: req.user.id },
 			};
 		},
-		create: () => true, // Регистрация открыта
+		// Регистрация идёт ТОЛЬКО через registerAction (Server Action), который
+		// вызывает payload.create с overrideAccess: true и потому этот гейт не
+		// проходит вовсе. Здесь остаётся заведение покупателя руками персонала
+		// из админки.
+		//
+		// Раньше стояло `() => true` («регистрация открыта») — и это открывало
+		// анониму POST /api/users. В связке с тем, что поле role было закрыто
+		// только на update, любой желающий выписывал себе role=superadmin и
+		// получал чужие заказы. Публичный REST-регистратор не нужен ни одному
+		// клиенту этого проекта: он ещё и проходил мимо согласий и OTP.
+		create: isAdminOrSuperAdmin,
 		update: ({ req }) => {
 			if (!req.user) return false;
-			if (req.user.collection === "admins") return true;
+			if (isStaffUser(req.user)) return true;
 			return { id: { equals: req.user.id } };
 		},
 		delete: isAdminOrSuperAdmin,
 	},
 
 	hooks: {
-		beforeLogin: [checkUserStatus],
+		// requireServerAuthFlow — первым: он отсекает вход в обход нашего
+		// auth-flow (прямой POST /api/users/login мимо OTP) до любых других
+		// проверок и до того, как о существовании аккаунта что-либо станет
+		// известно вызывающему.
+		beforeLogin: [requireServerAuthFlow, checkUserStatus],
 		afterChange: [notifyOnStatusChange],
 	},
 
@@ -138,7 +143,7 @@ export const Users: CollectionConfig = {
 			// выдать себе права персонала. Поле правит роль — писать её могут
 			// только сами admins (сервисные вызовы делают это через
 			// overrideAccess: true и этим полностью обходят проверку).
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 		{
 			name: "status",
@@ -152,14 +157,14 @@ export const Users: CollectionConfig = {
 				{ label: "Приостановлен", value: "suspended" },
 			],
 			admin: { position: "sidebar" },
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 		{
 			name: "blockedUntil",
 			type: "date",
 			label: "Заблокирован до",
 			admin: { position: "sidebar" },
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 
 		// ── 2FA состояние ─────────────────────────────────────────────────────────
@@ -178,14 +183,14 @@ export const Users: CollectionConfig = {
 			admin: { position: "sidebar", readOnly: true },
 			// Пишется только сервисным кодом (verifyOtp.ts) через
 			// overrideAccess: true после реальной проверки OTP-кода.
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 		{
 			name: "twoFAVerifiedAt",
 			type: "date",
 			label: "Дата подтверждения 2FA",
 			admin: { position: "sidebar", readOnly: true },
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 
 		// ── Email верификация ─────────────────────────────────────────────────────
@@ -195,7 +200,7 @@ export const Users: CollectionConfig = {
 			defaultValue: false,
 			label: "Email подтверждён",
 			admin: { position: "sidebar", readOnly: true },
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 
 		// ── Аудит входа ──────────────────────────────────────────────────────────
@@ -204,7 +209,7 @@ export const Users: CollectionConfig = {
 			type: "date",
 			label: "Последний вход",
 			admin: { position: "sidebar", readOnly: true },
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 		{
 			name: "loginAttempts",
@@ -212,14 +217,14 @@ export const Users: CollectionConfig = {
 			defaultValue: 0,
 			label: "Неверных попыток входа",
 			admin: { readOnly: true },
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 		{
 			name: "lockUntil",
 			type: "date",
 			label: "Аккаунт заблокирован до",
 			admin: { readOnly: true },
-			access: { update: staffOnlyFieldAccess },
+			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 
 		// ── Миграция из старой системы ──────────────────────────────────────────

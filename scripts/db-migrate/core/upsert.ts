@@ -46,8 +46,22 @@ export async function upsertByLegacyId(params: {
 	 * повторных прогонах миграции нельзя каждый раз генерировать новый
 	 * случайный пароль и затирать им уже реальный (после первого логина
 	 * пользователя через legacyPasswordFallback).
+	 *
+	 * Сюда же относятся поля, которыми после создания владеет новая система
+	 * (профиль пользователя, номер заказа): старая БД — источник истины
+	 * только в момент создания записи.
+	 *
+	 * Можно передать функцию — тогда значения вычисляются лениво и только для
+	 * реально создаваемых записей. Это важно, когда вычисление стоит запроса к
+	 * БД (см. orders.migration.ts: подбор свободного orderNumber): на
+	 * повторных прогонах подавляющее большинство записей уже существует, и
+	 * платить за них лишним запросом не нужно. В dry-run функция всё равно
+	 * вызывается — чтобы прогон показал предупреждения (например о коллизии
+	 * номеров), но ничего не записал.
 	 */
-	createOnlyData?: Record<string, unknown>;
+	createOnlyData?:
+		| Record<string, unknown>
+		| (() => Promise<Record<string, unknown>> | Record<string, unknown>);
 }): Promise<UpsertResult> {
 	const {
 		ctx,
@@ -87,10 +101,18 @@ export async function upsertByLegacyId(params: {
 		const existing = docs[0];
 
 		if (!existing) {
+			// Вычисляем ДО проверки dryRun: createOnlyData-функция может по пути
+			// логировать то, ради чего dry-run и запускают (коллизия номера
+			// заказа и т.п.). Записи при этом всё равно не происходит.
+			const resolvedCreateOnlyData =
+				typeof createOnlyData === "function"
+					? await createOnlyData()
+					: createOnlyData;
+
 			if (dryRun) return { action: "created" };
 			const created = await payload.create({
 				collection,
-				data: { ...data, ...createOnlyData, legacyId },
+				data: { ...data, ...resolvedCreateOnlyData, legacyId },
 				overrideAccess: true,
 				depth: 0,
 				context,

@@ -1,6 +1,7 @@
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isLoggedIn } from "../access/isLoggedIn.ts";
+import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 
 // ─── Collection ───────────────────────────────────────────────────────────────
@@ -25,21 +26,12 @@ export const Carts: CollectionConfig = {
 	},
 
 	access: {
-		// Пользователь видит только свою корзину
-		read: ({ req }) => {
-			if (!req.user) return false;
-			if (req.user.role === "admin" || req.user.role === "superadmin")
-				return true;
-			return { user: { equals: req.user.id } };
-		},
+		// Пользователь видит и меняет только свою корзину, персонал — все.
+		// См. ownership.ts: прежняя проверка по одному req.user.role позволяла
+		// покупателю с role=superadmin читать и править чужие корзины.
+		read: ownedByUserOrStaff,
 		create: isLoggedIn,
-		// Обновление — владелец корзины или админ
-		update: ({ req }) => {
-			if (!req.user) return false;
-			if (req.user.role === "admin" || req.user.role === "superadmin")
-				return true;
-			return { user: { equals: req.user.id } };
-		},
+		update: ownedByUserOrStaff,
 		delete: isAdminOrSuperAdmin,
 	},
 

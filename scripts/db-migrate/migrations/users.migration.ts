@@ -37,7 +37,8 @@ export default defineMigration({
 			.countDocuments({ role: { $in: ["admin", "superadmin"] } });
 		if (staffCount > 0) {
 			log.warn(
-				`${staffCount} учётных записей персонала (admin/superadmin) в старой БД пропущены по решению — персонал заводится в admins вручную`,
+				`${staffCount} учётных записей персонала (admin/superadmin) в старой БД пропущены по решению — персонал заводится в admins вручную. ` +
+					"ВНИМАНИЕ: заказы, оформленные на эти аккаунты, останутся без владельца — см. предупреждения миграции orders.",
 			);
 		}
 
@@ -47,6 +48,16 @@ export default defineMigration({
 
 		for await (const old of cursor) {
 			const legacyId = old._id.toString();
+
+			// Человек мог зарегистрироваться на новом сайте сам, пока старый ещё
+			// работал. Тогда аккаунт с таким email уже есть, но без legacyId —
+			// см. adoptExistingByEmail (без этого его исторические заказы
+			// остались бы без владельца).
+			const adoption = await adoptExistingByEmail(ctx, legacyId, old.email);
+			if (adoption === "conflict") {
+				stats.skipped++;
+				continue;
+			}
 
 			// Пароль мигрированного пользователя нельзя перенести напрямую
 			// (bcrypt -> PBKDF2 несовместимы, см. src/modules/auth/lib/
@@ -59,7 +70,26 @@ export default defineMigration({
 				ctx,
 				collection: "users",
 				legacyId,
-				data: {
+				// ПУСТО — и это главное свойство этой миграции: старая БД является
+				// источником истины ТОЛЬКО в момент создания записи. Дальше
+				// аккаунтом владеет новая система, и повторный прогон не имеет
+				// права менять в нём хоть что-нибудь.
+				//
+				// Раньше здесь лежали name/status/blockedUntil/emailVerified/
+				// twoFAVerified, и повторный прогон откатывал их к значениям из
+				// старой БД: затирал имя, которое человек сменил в профиле, и
+				// снимал блокировку, поставленную администратором (проверено:
+				// status blocked -> active). Все эти поля переехали в
+				// createOnlyData — пишутся один раз при создании и никогда не
+				// участвуют ни в сравнении, ни в update (см. core/upsert.ts).
+				//
+				// Цена решения: правки, сделанные в СТАРОЙ системе после первого
+				// прогона (переименование, блокировка), в новую не доедут. Это
+				// осознанный размен — старая система выводится из эксплуатации,
+				// новая уже авторитетна, а тихий откат админских действий
+				// несравнимо опаснее.
+				data: {},
+				createOnlyData: {
 					name: old.name,
 					email: old.email,
 					role: "user",
@@ -72,22 +102,16 @@ export default defineMigration({
 					// новая регистрация, а перенос уже работающего аккаунта).
 					emailVerified: true,
 					twoFAVerified: false,
-				},
-				// password и legacyPasswordHash пишутся ТОЛЬКО при создании
-				// (createOnlyData, см. core/upsert.ts) и никогда не входят в
-				// сравнение hasChanges / update:
-				// - password обязателен для Payload на create() auth-коллекции,
-				//   но при повторных прогонах нельзя каждый раз генерировать
-				//   новый случайный пароль и затирать им уже реальный;
-				// - legacyPasswordHash по той же причине нельзя постоянно
-				//   переустанавливать из старых данных: после первого успешного
-				//   входа пользователя (см. legacyPasswordFallback.ts) это поле
-				//   намеренно очищается — повторный прогон не должен "воскрешать"
-				//   старый bcrypt-хеш для уже мигрировавшего пользователя.
-				createOnlyData: {
+					// password обязателен Payload'у на create() auth-коллекции.
 					password: placeholderPassword,
 					...(old.password ? { legacyPasswordHash: old.password } : {}),
 				},
+				// Без этого флага afterChange-хуки Users отрабатывают так, будто
+				// статус поменял администратор, и рассылают живым людям письма и
+				// in-app уведомления «аккаунт заблокирован» / «аккаунт снова
+				// активен» (воспроизведено на повторном прогоне). См.
+				// notifyOnStatusChange в src/payload/collections/User.ts.
+				context: { isMigration: true },
 			});
 
 			if (result.action === "failed") {
@@ -131,6 +155,81 @@ export default defineMigration({
 	},
 });
 
+type AdoptionResult =
+	/** Существующий аккаунт связан с legacyId (или был бы связан в dry-run). */
+	| "adopted"
+	/** Email занят другим legacy-аккаунтом — нужно ручное решение. */
+	| "conflict"
+	/** Подходящего аккаунта нет либо он уже связан — обычный путь upsert. */
+	| "none";
+
+/**
+ * Связывает уже существующий в новой БД аккаунт с его legacy-двойником по email.
+ *
+ * Зачем. Пока старый сайт ещё принимает регистрации, человек может завести
+ * аккаунт и на новом сайте. Тогда в новой БД есть запись с тем же email, но
+ * без legacyId: миграция ищет по legacyId, не находит и делает create, а он
+ * падает на unique email. Раньше это уходило в failed, и следствие было
+ * тяжелее самой ошибки — раз записи с таким legacyId нет, resolveRef в
+ * orders.migration возвращал undefined, и ВСЕ исторические заказы этого
+ * человека переносились без владельца: оплаченные заказы, которых больше
+ * никто не видит в «Мои заказы» (воспроизведено).
+ *
+ * email — идентификатор человека в обеих системах (unique и там, и там),
+ * поэтому совпадение email означает «это тот же человек», и правильное
+ * действие — связать записи, а не плодить и не ронять.
+ *
+ * Пароль при этом НЕ трогаем: у человека уже есть рабочий пароль в формате
+ * Payload, который он задал сам. Более того, помечаем аккаунт
+ * legacyPasswordMigrated — иначе backfillLegacyPasswordHash подложил бы ему
+ * bcrypt-хеш старого пароля, и старый (возможно, утёкший или намеренно
+ * заменённый) пароль снова начал бы подходить через legacyPasswordFallback.
+ */
+async function adoptExistingByEmail(
+	ctx: MigrationContext,
+	legacyId: string,
+	email: string,
+): Promise<AdoptionResult> {
+	const { docs } = await ctx.payload.find({
+		collection: "users",
+		where: { email: { equals: email } },
+		limit: 1,
+		overrideAccess: true,
+		depth: 0,
+	});
+
+	const existing = docs[0];
+	if (!existing) return "none";
+	if (existing.legacyId === legacyId) return "none"; // уже связан — обычный путь
+
+	if (existing.legacyId) {
+		ctx.log.error(
+			`Email ${email} занят аккаунтом с другим legacyId (${existing.legacyId}), а переносится ${legacyId} — пропуск, нужно ручное решение`,
+		);
+		return "conflict";
+	}
+
+	if (ctx.dryRun) {
+		ctx.log.warn(
+			`[dry-run] Аккаунт ${email} заведён на новом сайте самостоятельно — был бы связан с legacyId=${legacyId}`,
+		);
+		return "adopted";
+	}
+
+	await ctx.payload.update({
+		collection: "users",
+		id: existing.id,
+		data: { legacyId, legacyPasswordMigrated: true },
+		overrideAccess: true,
+		depth: 0,
+		context: { isMigration: true },
+	});
+	ctx.log.warn(
+		`Аккаунт ${email} заведён на новом сайте самостоятельно — связан с legacyId=${legacyId}, его исторические заказы получат владельца. Пароль и профиль не тронуты.`,
+	);
+	return "adopted";
+}
+
 /**
  * Донасаживает legacyPasswordHash для уже существующей (по legacyId) записи,
  * если он ещё не был перенесён и пользователь точно ещё не проходил
@@ -162,6 +261,7 @@ async function backfillLegacyPasswordHash(
 		data: { legacyPasswordHash: legacyBcryptHash },
 		overrideAccess: true,
 		depth: 0,
+		context: { isMigration: true },
 	});
 	ctx.log.warn(
 		`legacyPasswordHash донесён повторным прогоном для пользователя id=${userId} (не был перенесён при создании)`,
