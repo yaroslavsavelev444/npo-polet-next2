@@ -1,6 +1,28 @@
 import type { Order } from "@/payload-types";
+import type { OrderLineItem } from "./lib/order-line-item";
 
 export type OrderStatus = Order["status"];
+
+/** Вложение к заказу (медиа/документ, прикреплённый администратором). */
+export interface OrderAttachment {
+	id: string;
+	/** Назначение вложения, например «Счёт на оплату». */
+	label: string;
+	filename: string;
+	url: string;
+	/** Превью для изображений; `null` для документов. */
+	previewUrl: string | null;
+	mimeType: string | null;
+	kind: "image" | "pdf" | "document";
+	filesize: number | null;
+}
+
+/** Запись истории изменения статуса заказа. */
+export interface OrderStatusHistoryEntry {
+	status: OrderStatus;
+	changedAt: string | null;
+	comment: string | null;
+}
 
 export type OrderFilterGroup =
 	| "all"
@@ -8,15 +30,6 @@ export type OrderFilterGroup =
 	| "completed"
 	| "cancelled"
 	| "past";
-
-export interface OrderItemView {
-	productId: string;
-	name: string;
-	quantity: number;
-	unitPrice: number;
-	discount: number;
-	totalPrice: number;
-}
 
 export interface OrderListItemView {
 	id: string;
@@ -48,11 +61,13 @@ export interface OrderDetailView extends OrderListItemView {
 		} | null;
 		transportCompanyName?: string | null;
 		pickupPointName?: string | null;
+		transportCompanyPhone?: string | null;
+		pickupPointAddress?: string | null;
 		trackingNumber?: string | null;
 		estimatedDelivery?: string | null;
 		notes?: string | null;
 	};
-	items: OrderItemView[];
+	items: OrderLineItem[];
 	pricing: {
 		subtotal: number;
 		discount: number;
@@ -63,9 +78,17 @@ export interface OrderDetailView extends OrderListItemView {
 	payment: {
 		method: Order["payment"]["method"];
 		status: NonNullable<Order["payment"]["status"]>;
+		paidAt?: string | null;
 	};
+	statusHistory: OrderStatusHistoryEntry[];
+	attachments: OrderAttachment[];
 	notes?: string | null;
-	companyInfo?: { name?: string | null; taxNumber?: string | null } | null;
+	companyInfo?: {
+		name?: string | null;
+		taxNumber?: string | null;
+		contactPerson?: string | null;
+		legalAddress?: string | null;
+	} | null;
 }
 
 export interface OrdersListResult {

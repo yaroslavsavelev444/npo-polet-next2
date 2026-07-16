@@ -3,10 +3,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { formatPrice } from "@/modules/productCard";
 import { cn } from "@/utils/cn";
-import type { OrderSuccessItem } from "../lib/build-order-success-view";
+import type { OrderLineItem } from "../lib/order-line-item";
 
 interface OrderProductCardProps {
-	item: OrderSuccessItem;
+	item: OrderLineItem;
 }
 
 function discountPercent(original: number, final: number): number {

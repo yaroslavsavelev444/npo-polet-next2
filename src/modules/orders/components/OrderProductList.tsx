@@ -1,11 +1,11 @@
 import { ShoppingBag } from "lucide-react";
 import { formatPrice } from "@/modules/productCard";
-import type { OrderSuccessItem } from "../lib/build-order-success-view";
+import type { OrderLineItem } from "../lib/order-line-item";
 import { OrderProductCard } from "./OrderProductCard";
 import { ORDER_CARD_CLASS } from "./orderCard.styles";
 
 interface OrderProductListProps {
-	items: OrderSuccessItem[];
+	items: OrderLineItem[];
 }
 
 function pluralizeItems(count: number): string {

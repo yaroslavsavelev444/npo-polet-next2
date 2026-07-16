@@ -3,8 +3,8 @@ import { buildOrderSuccessView } from "../../lib/build-order-success-view";
 import { OrderInfoPanel } from "../OrderInfoPanel";
 import { OrderPriceSummary } from "../OrderPriceSummary";
 import { OrderProductList } from "../OrderProductList";
+import { OrderReveal } from "../OrderReveal";
 import { OrderActions } from "./OrderActions";
-import { OrderReveal } from "./OrderReveal";
 import { OrderSuccessHero } from "./OrderSuccessHero";
 
 interface OrderSuccessViewProps {

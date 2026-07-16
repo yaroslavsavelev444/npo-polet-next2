@@ -20,3 +20,12 @@ export const PAYMENT_STATUS_LABELS: Record<
 	failed: "Ошибка оплаты",
 	refunded: "Возврат",
 };
+
+export const DELIVERY_METHOD_LABELS: Record<
+	Order["delivery"]["method"],
+	string
+> = {
+	door_to_door: "Курьер до двери",
+	pickup_point: "Доставка в ПВЗ",
+	self_pickup: "Самовывоз",
+};
