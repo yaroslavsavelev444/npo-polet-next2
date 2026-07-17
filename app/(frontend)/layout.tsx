@@ -6,6 +6,7 @@ import "./theme.css";
 import "./globals.css";
 
 import { Column, Flex, Meta } from "@once-ui-system/core";
+import type { Viewport } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
 import { getCachedSettings } from "@/payload/services/settings.service";
@@ -32,6 +33,16 @@ const mono = IBM_Plex_Mono({
   subsets: ["latin", "cyrillic"],
   variable: "--font-mono",
 });
+
+// Красит адресную строку/UI браузера на мобильных под тему ОС — то же значение,
+// что theme_color/background_color в app/manifest.ts, чтобы вкладка, favicon и
+// PWA-запуск выглядели согласованно в светлой и тёмной теме.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FF4500" },
+    { media: "(prefers-color-scheme: dark)", color: "#1A1D24" },
+  ],
+};
 
 export async function generateMetadata() {
   return {
