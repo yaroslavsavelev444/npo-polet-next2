@@ -1,50 +1,50 @@
 # /etc/nginx/sites-available/npo-polet.ru.conf
 #
-# ПЕРЕКЛЮЧЕНИЕ ОСНОВНОГО ДОМЕНА (test.npo-polet.ru -> npo-polet.ru):
-# это ЧЕРНОВИК, отражающий целевое состояние — не копия того, что реально
-# сейчас лежит на VPS. Перед применением:
+# ПЕРЕКЛЮЧЕНИЕ ОСНОВНОГО ДОМЕНА (test.npo-polet.ru -> npo-polet.ru).
 #
-# 1. Сверьте с РЕАЛЬНЫМ содержимым файла на сервере (он мог отличаться от
-#    этой версии, т.к. правки nginx туда никогда не попадали через git/CI —
-#    см. deploy.sh, он nginx вообще не трогает).
-# 2. Проверьте сертификат: `sudo certbot certificates`. Домен npo-polet.ru,
-#    скорее всего, уже обслуживается старым сайтом по HTTPS — значит
-#    сертификат для него уже существует, и ниже нужно указать РЕАЛЬНЫЙ путь
-#    к нему, а не создавать новый через certbot. Если в SAN сертификата нет
-#    www.npo-polet.ru — расширить его: `certbot certonly --expand -d
-#    npo-polet.ru -d www.npo-polet.ru` (а не выпускать отдельный сертификат
-#    для www).
-# 3. Убедитесь, что имя shared-зоны `SSL_npo` не занято старым сайтом в этом
-#    же nginx (если и там объявлена зона с именем `SSL_npo` другого размера —
-#    будет конфликт при `nginx -t`).
-# 4. Старый сайт нужно перенастроить так, чтобы он больше НЕ отвечал на
-#    npo-polet.ru/www.npo-polet.ru (см. отдельный анализ его конфига — я его
-#    ещё не видела).
-# 5. Файл в sites-available можно оставить под этим (новым) именем и
-#    засимлинковать в sites-enabled; symlink на старое имя
-#    test.npo-polet.ru.conf убрать (test.npo-polet.ru полностью выводится
-#    из обслуживания — контейнеры при этом НЕ трогаем, они продолжают
-#    работать, просто на этот хост nginx больше ничего не проксирует).
-# 6. `sudo nginx -t` ДО `systemctl reload nginx`. Именно reload, не restart —
+# ВАЖНО: этот файл сосуществует с ещё активным test.npo-polet.ru.conf до
+# самого последнего шага переключения (отключение test. — намеренно
+# последнее действие, после проверки, что npo-polet.ru работает). nginx
+# хранит имена upstream/map-переменных/limit_req_zone/ssl_session_cache в
+# ОБЩЕМ на весь инстанс неймспейсе — двум одновременно загруженным файлам
+# нельзя использовать одинаковые имена, даже с идентичным содержимым (первая
+# попытка применить этот файл упала именно на этом: "duplicate upstream
+# polet_next"). Поэтому ниже везде уникальные, домен-специфичные имена
+# (суффикс _main), а не те же, что использует test.npo-polet.ru.conf.
+# Отдельный от общего proxy_params_npo.conf инклюд — proxy_params_npo_main.conf
+# (см. этот файл рядом) — по той же причине: тот общий файл ссылается на
+# map-переменную, объявленную ВНУТРИ test.npo-polet.ru.conf, и перестанет
+# существовать вместе с ним на шаге 6.
+#
+# Перед применением:
+# 1. Сверьте с реальным содержимым файла на сервере, если есть сомнения —
+#    правки nginx никогда не попадали туда через git/CI (deploy.sh nginx не
+#    трогает).
+# 2. Сертификат для npo-polet.ru получен заново (certbot certonly --webroot),
+#    путь ниже уже правильный: /etc/letsencrypt/live/npo-polet.ru/.
+# 3. Скопировать также proxy_params_npo_main.conf в /etc/nginx/.
+# 4. Файл в sites-available можно оставить под этим (новым) именем и
+#    засимлинковать в sites-enabled; symlink на test.npo-polet.ru.conf
+#    убрать ПОСЛЕДНИМ шагом (контейнеры при этом не трогаем — nginx просто
+#    перестаёт на этот хост что-либо проксировать).
+# 5. `sudo nginx -t` ДО `systemctl reload nginx`. Именно reload, не restart —
 #    не роняет уже открытые соединения и не требует ничего делать с Docker.
 
-upstream polet_next {
+upstream polet_next_main {
     server 127.0.0.1:3004;
     keepalive 32;
 }
 
-map $http_upgrade $connection_upgrade_npo {
+map $http_upgrade $connection_upgrade_npo_main {
     default upgrade;
     ''      close;
 }
 
 # limit_req_zone обязана быть на уровне http{}, а не внутри server{} (см.
-# ngx_http_limit_req_module) — в исходной версии этого файла она стояла
-# внутри 443-го server{} ниже, из-за чего `nginx -t` не прошёл бы в этом виде.
-# Файлы sites-enabled/* инклюдятся прямо в http{} главного nginx.conf,
-# поэтому достаточно вынести директиву на уровень файла, как здесь — сама
-# зона `limit_req zone=npo_auth ...` внутри location ниже валидна как была.
-limit_req_zone $binary_remote_addr zone=npo_auth:10m rate=10r/m;
+# ngx_http_limit_req_module) — файлы sites-enabled/* инклюдятся прямо в
+# http{} главного nginx.conf, поэтому достаточно вынести директиву на
+# уровень файла, как здесь.
+limit_req_zone $binary_remote_addr zone=npo_auth_main:10m rate=10r/m;
 
 # ── HTTP: acme-challenge + редирект на HTTPS-версию голого домена ──────────
 # Оба имени (голое и www) в одном блоке: любой HTTP-запрос, независимо от
@@ -73,7 +73,6 @@ server {
     listen [::]:443 ssl http2;
     server_name www.npo-polet.ru;
 
-    # ПРОВЕРИТЬ ПУТЬ перед применением — см. пункт 2 выше.
     ssl_certificate     /etc/letsencrypt/live/npo-polet.ru/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/npo-polet.ru/privkey.pem;
 
@@ -86,13 +85,12 @@ server {
     listen [::]:443 ssl http2;
     server_name npo-polet.ru;
 
-    # ПРОВЕРИТЬ ПУТЬ перед применением — см. пункт 2 выше.
     ssl_certificate     /etc/letsencrypt/live/npo-polet.ru/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/npo-polet.ru/privkey.pem;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_session_cache shared:SSL_npo:10m;
+    ssl_session_cache shared:SSL_npo_main:10m;
     ssl_session_timeout 1d;
     ssl_stapling on;
     ssl_stapling_verify on;
@@ -119,26 +117,26 @@ server {
 
     # Защита login endpoint от брутфорса
     location ~* ^/api/(admins|users)/login {
-        limit_req zone=npo_auth burst=5 nodelay;
-        proxy_pass http://polet_next;
-        include /etc/nginx/proxy_params_npo.conf;
+        limit_req zone=npo_auth_main burst=5 nodelay;
+        proxy_pass http://polet_next_main;
+        include /etc/nginx/proxy_params_npo_main.conf;
     }
 
     location ~* ^/(_next/static)/ {
-        proxy_pass http://polet_next;
+        proxy_pass http://polet_next_main;
         proxy_set_header Host $host;
         add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location /media/ {
-        proxy_pass http://polet_next;
+        proxy_pass http://polet_next_main;
         proxy_set_header Host $host;
         add_header Cache-Control "public, max-age=604800";
     }
 
     location / {
-        proxy_pass http://polet_next;
-        include /etc/nginx/proxy_params_npo.conf;
+        proxy_pass http://polet_next_main;
+        include /etc/nginx/proxy_params_npo_main.conf;
     }
 
     access_log /var/log/nginx/polet-next.access.log;
