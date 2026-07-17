@@ -1,6 +1,20 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// ВАЖНО: не добавлять сюда loading.tsx на уровне сегмента.
+//
+// Файл loading.tsx в app/(frontend)/category/ оборачивает в Suspense не только
+// эту страницу, но и ВСЕ вложенные маршруты (/category/[categorySlug] и
+// карточки товаров). Ответ при этом начинает стримиться, HTTP-статус
+// фиксируется как 200 ещё до того, как страница успевает вызвать notFound()
+// или permanentRedirect(). Последствия были видны на проде:
+//   • /category/<несуществующая> отдавала 200 вместо 404 (soft-404);
+//   • /category/<чужая>/products/<slug> отдавала 200 + <meta http-equiv
+//     ="refresh"> вместо честного 308 — то есть дубль оставался
+//     индексируемым (см. permanentRedirect.md, раздел про streaming).
+// Скелетон ниже живёт внутри самой страницы (Suspense вокруг CategoryToolbar) —
+// так он не влияет на статус ответа.
+
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";

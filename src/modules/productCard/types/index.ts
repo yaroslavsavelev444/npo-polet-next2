@@ -53,6 +53,9 @@ export interface ProductCardData {
   minOrderQuantity: number;
   maxOrderQuantity: number;
 
+  /** Производитель (brand.manufacturer). Уходит в Product JSON-LD как brand. */
+  brand?: string;
+
   /**
    * TODO(payload-schema): рейтинг и количество отзывов сейчас не хранятся
    * в коллекции `products`. Будет агрегироваться из коллекции `reviews`

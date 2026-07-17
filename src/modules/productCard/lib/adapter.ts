@@ -93,6 +93,7 @@ export function mapProductToCardData(product: Product): ProductCardData {
     status,
     minOrderQuantity,
     maxOrderQuantity,
+    brand: product.brand?.manufacturer ?? undefined,
     rating: 0,
     reviewsCount: 0,
   };

@@ -26,9 +26,21 @@ export interface GetProductsOptions {
 	depth?: number;
 }
 
+// У коллекции products включено versions.drafts, а payload.find без явного
+// фильтра возвращает документы независимо от статуса — то есть на витрину
+// (и в sitemap) попадали неопубликованные черновики, полностью открытые
+// анонимному посетителю. inventory.isVisible это не закрывал: он про «убрать
+// из продажи», а не про «ещё не готово к публикации».
+//
+// Условие обязано быть во ВСЕХ выборках витрины. Поиск
+// (search.service.ts) и ссылки в заказах (modules/orders/lib/order-line-item.ts,
+// isProductArchived) статус уважали и раньше — каталог с карточкой были
+// единственными, кто выбивался.
+const PUBLISHED_ONLY = { _status: { equals: "published" } } as const;
+
 export function buildProductWhere(options: GetProductsOptions): Where {
 	const where: Where = {};
-	const conditions: any[] = [];
+	const conditions: Where[] = [PUBLISHED_ONLY];
 
 	if (options.category) {
 		conditions.push({ category: { equals: options.category } });
@@ -124,7 +136,7 @@ async function fetchProductById(id: string): Promise<Product | null> {
 	const payload = await getPayloadInstance();
 	const result = await payload.find({
 		collection: "products",
-		where: { id: { equals: id } },
+		where: { and: [PUBLISHED_ONLY, { id: { equals: id } }] },
 		limit: 1,
 		depth: 1,
 	});
@@ -137,6 +149,28 @@ export const getCachedProductById = (id: string) => {
 		return fetchFn();
 	}
 	return unstable_cache(fetchFn, [`product-${id}`], {
+		tags: ["products"],
+		revalidate: false,
+	})();
+};
+
+async function fetchProductBySlug(slug: string): Promise<Product | null> {
+	const payload = await getPayloadInstance();
+	const result = await payload.find({
+		collection: "products",
+		where: { and: [PUBLISHED_ONLY, { slug: { equals: slug } }] },
+		limit: 1,
+		depth: 1,
+	});
+	return (result.docs[0] || null) as unknown as Product | null;
+}
+
+export const getCachedProductBySlug = (slug: string) => {
+	const fetchFn = () => fetchProductBySlug(slug);
+	if (env.NODE_ENV === "development") {
+		return fetchFn();
+	}
+	return unstable_cache(fetchFn, [`product-slug-${slug}`], {
 		tags: ["products"],
 		revalidate: false,
 	})();

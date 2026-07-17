@@ -16,6 +16,7 @@ import {
   buildWebsiteSchema,
 } from "@/shared/lib/seo/schema";
 import { cn } from "@/utils/cn";
+import { YandexMetrika } from "@/widgets/Analytics/YandexMetrika";
 import Footer from "@/widgets/Footer/Footer";
 import { HeaderSpacer } from "@/widgets/Header/HeaderSpacer";
 import { StickyHeader } from "@/widgets/Header/StickyHeader";
@@ -33,13 +34,20 @@ const mono = IBM_Plex_Mono({
 });
 
 export async function generateMetadata() {
-  return Meta.generate({
-    title: home.title,
-    description: home.description,
-    baseURL: baseURL,
-    path: home.path,
-    image: home.image,
-  });
+  return {
+    ...Meta.generate({
+      title: home.title,
+      description: home.description,
+      baseURL: baseURL,
+      path: home.path,
+      image: home.image,
+    }),
+    // Без metadataBase Next резолвит относительные OG/Twitter-пути от
+    // http://localhost:3000 (он так и предупреждает на сборке) — в шаринге это
+    // давало бы битые картинки. Значение общее для всех страниц, поэтому
+    // задаётся здесь, в корневом layout, а не в каждой странице отдельно.
+    metadataBase: new URL(baseURL),
+  };
 }
 
 export default async function RootLayout({
@@ -79,6 +87,8 @@ export default async function RootLayout({
               __html: JSON.stringify(buildWebsiteSchema()),
             }}
           />
+
+          <YandexMetrika />
 
           <StickyHeader />
           <HeaderSpacer />

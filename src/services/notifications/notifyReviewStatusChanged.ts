@@ -1,7 +1,7 @@
 // src/services/notifications/notifyReviewStatusChanged.ts
 
 import type { Product, ProductReview, User } from "../../../payload-types.ts";
-import { getProductHref } from "../../modules/productCard/lib/routing.ts";
+import { getProductHrefFromDoc } from "../../modules/productCard/lib/routing.ts";
 import { getEmailConfig } from "../email/config.ts";
 import {
   emailService,
@@ -27,7 +27,7 @@ export async function notifyReviewStatusChanged(
         productTitle: product.title,
         status: review.status,
         rejectionReason: review.rejectionReason,
-        productUrl: `${appUrl}${getProductHref({ id: String(product.id), category: null })}`,
+        productUrl: `${appUrl}${getProductHrefFromDoc(product)}`,
       },
       { to: { email: user.email } },
     );

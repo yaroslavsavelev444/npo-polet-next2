@@ -58,11 +58,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const productEntries: MetadataRoute.Sitemap = productsResult.docs.flatMap(
     (product) => {
-      const slug = resolveCategorySlug(product.category);
-      if (!slug) return [];
+      const categorySlug = resolveCategorySlug(product.category);
+      if (!categorySlug) return [];
+
+      // В sitemap попадают только канонические ЧПУ. Товар без slug доступен
+      // лишь по legacy-id, а тот сам отдаёт 301 на ЧПУ — редиректы в sitemap
+      // и Яндекс, и Google считают ошибкой. Товар вернётся сюда сам, как
+      // только пройдёт бэкофилл (scripts/backfill-product-slugs.ts).
+      if (!product.slug) return [];
+
       return [
         {
-          url: `${baseURL}/category/${slug}/products/${product.id}`,
+          url: `${baseURL}/category/${categorySlug}/products/${product.slug}`,
           lastModified: new Date(product.updatedAt),
           changeFrequency: "weekly" as const,
           priority: 0.7,

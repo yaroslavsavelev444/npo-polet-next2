@@ -28,6 +28,10 @@ export interface ProductJsonLd {
   image: string[];
   sku: string;
   category?: string;
+  brand?: {
+    "@type": "Brand";
+    name: string;
+  };
   aggregateRating?: {
     "@type": "AggregateRating";
     ratingValue: number;
@@ -39,6 +43,11 @@ export interface ProductJsonLd {
     priceCurrency: "RUB";
     price: number;
     availability: string;
+    itemCondition: string;
+    seller: {
+      "@type": "Organization";
+      name: string;
+    };
   };
 }
 
@@ -63,12 +72,23 @@ export function buildProductJsonLd(
     image: product.images.map((img) => img.url).filter(Boolean),
     sku: product.slug,
     category: product.category?.title,
+    // brand заполнен не у всех товаров, а пустой Brand в разметке — прямая
+    // ошибка в валидаторах Яндекса и Google, поэтому ключ добавляем только
+    // при наличии значения.
+    ...(product.brand
+      ? { brand: { "@type": "Brand" as const, name: product.brand } }
+      : {}),
     offers: {
       "@type": "Offer",
       url: canonicalUrl,
       priceCurrency: "RUB",
       price: finalPrice,
       availability: AVAILABILITY_SCHEMA_MAP[product.status],
+      itemCondition: "https://schema.org/NewCondition",
+      seller: {
+        "@type": "Organization",
+        name: SITE_NAME,
+      },
     },
   };
 

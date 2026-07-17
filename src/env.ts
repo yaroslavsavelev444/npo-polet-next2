@@ -53,6 +53,12 @@ const clientSchema = z.object({
   // В dev по умолчанию localhost:3000, в проде ОБЯЗАН быть переопределён
   // на реальный домен (https://npo-polet.ru) через .env.production.
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+
+  // Номер счётчика Яндекс.Метрики, например "87654321". Не задан — счётчик
+  // просто не рендерится (см. widgets/Analytics/YandexMetrika.tsx): слать хиты
+  // с dev и превью-стендов в боевой счётчик нельзя, иначе статистика
+  // перестаёт быть достоверной.
+  NEXT_PUBLIC_YM_ID: z.string().regex(/^\d+$/).optional(),
 });
 
 /**
@@ -73,6 +79,7 @@ function buildEnv() {
 
   const clientEnv = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_YM_ID: process.env.NEXT_PUBLIC_YM_ID,
   };
 
   // Парсим серверные переменные (только если запущено на сервере)

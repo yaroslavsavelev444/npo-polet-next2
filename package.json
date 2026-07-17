@@ -14,6 +14,7 @@
     "payload:sync": "pnpm payload:types && pnpm payload:importmap",
     "worker:account-deletion": "tsx src/modules/account-deletion/worker.ts",
     "migrate:legacy": "node --experimental-strip-types scripts/db-migrate/run.ts",
+    "slugs:backfill": "node --experimental-strip-types scripts/backfill-product-slugs.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

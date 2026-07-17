@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "payload";
-import { getProductHref } from "../../modules/productCard/lib/routing.ts";
+import { getProductHrefFromDoc } from "../../modules/productCard/lib/routing.ts";
 import { notify } from "../../services/notifications/notificationCenter.ts";
 import { notifyReviewStatusChanged } from "../../services/notifications/notifyReviewStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
@@ -73,7 +73,7 @@ export const ProductReviews: CollectionConfig = {
             const user = populated.user;
             const product = populated.product;
             if (typeof user === "object" && typeof product === "object") {
-              const productUrl = getProductHref({ id: String(product.id), category: null });
+              const productUrl = getProductHrefFromDoc(product);
               void notify(
                 req.payload,
                 user.id,

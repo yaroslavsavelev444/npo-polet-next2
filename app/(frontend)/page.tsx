@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import CategoryGrid from "@/modules/category/components/CategoryGrid";
 import { ContentBlockGroup } from "@/modules/contentBlocks/components/ContentBlockGroup";
 import {
@@ -11,8 +12,17 @@ import { getCachedCategories } from "@/payload/services/categories.service";
 import { getCatalogData } from "@/payload/services/products.service";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import type { Category } from "@/payload-types";
+import { baseURL } from "@/resources/content";
 import { getHeroBackground } from "@/utils/settings-helpers";
 import { HeroMediaBackground } from "@/widgets/Hero/HeroMediaBackground";
+
+// Canonical задаётся здесь, а не в layout: layout общий для всех страниц, и
+// указанный там canonical достался бы по наследству /contacts, /consents и
+// прочим страницам без собственного canonical — все они схлопнулись бы в
+// главную. Title/description при этом по-прежнему наследуются от layout.
+export const metadata: Metadata = {
+  alternates: { canonical: baseURL },
+};
 
 export default async function Home() {
   // Параллельная загрузка

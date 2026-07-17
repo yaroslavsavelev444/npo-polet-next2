@@ -73,6 +73,7 @@ function buildHref(product: Product | null): string | null {
 	const category = product.category;
 	return getProductHref({
 		id: String(product.id),
+		slug: product.slug ?? "",
 		category: isPopulatedCategory(category)
 			? {
 					id: String(category.id),

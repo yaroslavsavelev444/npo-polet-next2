@@ -5,6 +5,7 @@ import type { SearchResultProduct } from '../types'
 export function getSearchResultHref(result: SearchResultProduct): string {
   return getProductHref({
     id: result.id,
+    slug: result.slug,
     category: result.category
       ? { id: result.category.id, slug: result.category.slug, title: result.category.name }
       : null,
