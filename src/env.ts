@@ -41,9 +41,6 @@ const serverSchema = z.object({
   // proxy.ts для маршрутизации и ниже — чтобы на старте процесса проверить,
   // что соответствующий https-origin присутствует в ALLOWED_ORIGINS.
   ADMIN_HOSTNAME: z.string().optional(),
-
-  // Внешние сервисы
-  RESEND_API_KEY: z.string().optional(),
 });
 
 /**
@@ -69,7 +66,6 @@ function buildEnv() {
     REDIS_URL: process.env.REDIS_URL,
     REDIS_HOST: process.env.REDIS_HOST,
     REDIS_PORT: process.env.REDIS_PORT,
-    RESEND_API_KEY: process.env.RESEND_API_KEY,
     NODE_ENV: process.env.NODE_ENV,
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
     ADMIN_HOSTNAME: process.env.ADMIN_HOSTNAME,

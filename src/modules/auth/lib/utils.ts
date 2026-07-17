@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { AuthErrorCode, OtpType } from '../types'
+import { AuthErrorCode } from '../types'
 
 
 /** Извлекает IP и User-Agent из входящего запроса. */
@@ -29,24 +29,4 @@ export function actionError(
 
 export function actionSuccess<T>(data: T) {
   return { success: true as const, data }
-}
-
-
-export function logOtpDev({
-  email,
-  otp,
-  type,
-}: {
-  email: string
-  otp: string
-  type: OtpType
-}) {
-  if (process.env.NODE_ENV !== 'development') return
-
-  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('📧 OTP CODE')
-  console.log('Email:', email)
-  console.log('Type:', type)
-  console.log('Code:', otp)
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 }
