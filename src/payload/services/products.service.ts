@@ -17,7 +17,6 @@ export interface GetProductsOptions {
 	status?: "available" | "preorder" | "out_of_stock" | "discontinued";
 	isVisible?: boolean;
 	showOnMainPage?: boolean;
-	sku?: string;
 	minPrice?: number;
 	maxPrice?: number;
 	sort?: string;
@@ -66,9 +65,6 @@ export function buildProductWhere(options: GetProductsOptions): Where {
 			},
 		});
 	}
-	if (options.sku) {
-		conditions.push({ sku: { equals: options.sku } });
-	}
 	if (options.minPrice !== undefined) {
 		conditions.push({
 			"pricing.priceForIndividual": { greater_than_equal: options.minPrice },
@@ -92,7 +88,6 @@ function getProductsCacheKey(options?: GetProductsOptions): string {
 		status,
 		isVisible,
 		showOnMainPage,
-		sku,
 		minPrice,
 		maxPrice,
 
@@ -101,7 +96,7 @@ function getProductsCacheKey(options?: GetProductsOptions): string {
 		page,
 		depth,
 	} = options || {};
-	return `products-cat-${category || "any"}-st-${status || "any"}-vis-${isVisible ?? "any"}-main-${showOnMainPage ?? "any"}-sku-${sku || "any"}-pmin-${minPrice ?? "any"}-pmax-${maxPrice ?? "any"}-sort-${sort || "title"}-l-${limit || 100}-p-${page || 1}-d-${depth ?? 1}`;
+	return `products-cat-${category || "any"}-st-${status || "any"}-vis-${isVisible ?? "any"}-main-${showOnMainPage ?? "any"}-pmin-${minPrice ?? "any"}-pmax-${maxPrice ?? "any"}-sort-${sort || "title"}-l-${limit || 100}-p-${page || 1}-d-${depth ?? 1}`;
 }
 
 async function fetchProducts(options: GetProductsOptions = {}) {
@@ -171,28 +166,6 @@ export const getCachedProductBySlug = (slug: string) => {
 		return fetchFn();
 	}
 	return unstable_cache(fetchFn, [`product-slug-${slug}`], {
-		tags: ["products"],
-		revalidate: false,
-	})();
-};
-
-async function fetchProductBySku(sku: string): Promise<Product | null> {
-	const payload = await getPayloadInstance();
-	const result = await payload.find({
-		collection: "products",
-		where: { sku: { equals: sku } },
-		limit: 1,
-		depth: 1,
-	});
-	return (result.docs[0] || null) as unknown as Product | null;
-}
-
-export const getCachedProductBySku = (sku: string) => {
-	const fetchFn = () => fetchProductBySku(sku);
-	if (env.NODE_ENV === "development") {
-		return fetchFn();
-	}
-	return unstable_cache(fetchFn, [`product-sku-${sku}`], {
 		tags: ["products"],
 		revalidate: false,
 	})();
