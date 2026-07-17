@@ -34,6 +34,8 @@ interface LegacySpecification {
 interface LegacyProduct {
 	_id: ObjectId;
 	sku: string;
+	/** Старая схема — mongoose с { timestamps: true }. */
+	createdAt?: Date;
 	title: string;
 	description: string;
 	priceForIndividual: number;
@@ -115,6 +117,23 @@ export default defineMigration({
 				collection: "products",
 				legacyId,
 				data: {
+					// Дата появления товара в СТАРОЙ системе.
+					//
+					// Каталог по умолчанию сортируется «Сначала новые» — это
+					// `-createdAt` (см. SORT_OPTIONS в modules/productCatalog/lib/
+					// catalogOptions.ts и buildCatalogSort в payload/services/
+					// products.service.ts). Без переноса даты у всех перенесённых
+					// товаров createdAt одинаковый (момент миграции), и порядок
+					// каталога по умолчанию становится произвольным.
+					//
+					// В data, а не в createOnlyData: дату нужно починить и у уже
+					// перенесённых товаров. Условный spread обязателен — передать
+					// createdAt: undefined значит попросить Payload затереть дату.
+					// updatedAt не переносим: Payload всё равно перезапишет его
+					// своим now на каждом update (см. orders.migration.ts).
+					...(old.createdAt
+						? { createdAt: new Date(old.createdAt).toISOString() }
+						: {}),
 					title: old.title,
 					description: old.description,
 					category: categoryId,

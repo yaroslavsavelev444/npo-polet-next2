@@ -164,10 +164,18 @@ export const Products: CollectionConfig = {
 					type: "number",
 					min: 1,
 					max: 10000,
+					// `!= null` (а не `!== undefined`) — принципиально: поле
+					// необязательное, и «не задано» приходит сюда как undefined
+					// только при create. При update Payload подставляет значение из
+					// БД, где пустое поле хранится как NULL, а `null < 1` — это
+					// true. Из-за этого товар без maxOrderQuantity вообще нельзя
+					// было сохранить: и админка, и повторный прогон миграции
+					// падали на «Максимальное количество должно быть больше или
+					// равно минимальному», хотя максимум просто не указан.
 					validate: (value: any, { siblingData }: { siblingData: any }) => {
 						if (
-							value !== undefined &&
-							siblingData?.minOrderQuantity !== undefined &&
+							value != null &&
+							siblingData?.minOrderQuantity != null &&
 							value < siblingData.minOrderQuantity
 						) {
 							return "Максимальное количество должно быть больше или равно минимальному";
