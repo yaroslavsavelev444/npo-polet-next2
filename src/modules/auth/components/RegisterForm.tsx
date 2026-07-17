@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { registerAction } from '../actions/register';
 import { AuthAlert } from './AuthAlert';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
+import { validateEmail } from '../lib/email';
 import type { AcceptedConsentInput } from '../schemas/register.schema';
 import Typography, { Heading } from '@/UI/Typography/Typography';
 import { Input } from '@/UI/Input/Input';
@@ -33,10 +34,19 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
   const [state, action, isPending] = useActionState(registerAction, null);
   const [checkedSlugs, setCheckedSlugs] = useState<Record<string, boolean>>({});
   const [emailValue, setEmailValue] = useState('');
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const [passwordValue, setPasswordValue] = useState('');
 
   const requiredConsents = consents.filter((c) => c.isRequired);
   const allRequiredChecked = requiredConsents.every((c) => checkedSlugs[c.slug]);
+
+  // Мгновенная клиентская подсказка теми же функциями, что и на сервере
+  // (lib/email). Настоящая проверка всё равно повторяется в registerAction —
+  // это только UX. Пустое поле не подсвечиваем: об этом скажет required.
+  const handleEmailChange = (value: string) => {
+    setEmailValue(value);
+    setEmailError(value.trim() ? (validateEmail(value) ?? undefined) : undefined);
+  };
 
   useEffect(() => {
     if (state?.success && state.data.requiresOtp) {
@@ -82,8 +92,8 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
           disabled={isPending}
           placeholder="name@example.com"
           value={emailValue}
-          onChange={(e) => setEmailValue(e.target.value)}
-          errorMessage={getFieldError(state, 'email')}
+          onChange={(e) => handleEmailChange(e.target.value)}
+          errorMessage={emailError ?? getFieldError(state, 'email')}
           fullWidth
         />
 
@@ -145,7 +155,7 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
           size="md"
           fullWidth
           loading={isPending}
-          disabled={isPending || !allRequiredChecked}
+          disabled={isPending || !allRequiredChecked || Boolean(emailError)}
         >
           Зарегистрироваться
         </Button>

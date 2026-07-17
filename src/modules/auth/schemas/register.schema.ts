@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateEmail } from "../lib/email";
 import {
   PASSWORD_DIGIT_REGEX,
   PASSWORD_LOWERCASE_REGEX,
@@ -10,11 +11,22 @@ import {
 
 export const registerSchema = z
   .object({
+    // Единый источник правды по email: формат + allowlist поддерживаемых
+    // доменов + blocklist (заглушки/одноразовые/подозрительный local-part).
+    // Эта же схема выполняется в registerAction, поэтому проверка работает и
+    // при прямом запросе к серверному экшену в обход формы. На клиенте те же
+    // функции из lib/email дают мгновенную подсказку (см. RegisterForm.tsx).
     email: z
       .string()
       .min(1, "Email обязателен")
-      .email("Некорректный email")
-      .toLowerCase(),
+      .trim()
+      .toLowerCase()
+      .superRefine((value, ctx) => {
+        const error = validateEmail(value);
+        if (error) {
+          ctx.addIssue({ code: "custom", message: error });
+        }
+      }),
 
     // Регексы и границы длины — из lib/passwordPolicy.ts, того же источника,
     // что использует PasswordStrengthMeter на клиенте, чтобы индикатор

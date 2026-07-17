@@ -16,8 +16,9 @@ import {
   buildOrganizationSchema,
   buildWebsiteSchema,
 } from "@/shared/lib/seo/schema";
+import { AnalyticsGate } from "@/modules/cookie-consent/components/AnalyticsGate";
+import { CookieConsentBanner } from "@/modules/cookie-consent/components/CookieConsentBanner";
 import { cn } from "@/utils/cn";
-import { YandexMetrika } from "@/widgets/Analytics/YandexMetrika";
 import Footer from "@/widgets/Footer/Footer";
 import { HeaderSpacer } from "@/widgets/Header/HeaderSpacer";
 import { StickyHeader } from "@/widgets/Header/StickyHeader";
@@ -99,7 +100,9 @@ export default async function RootLayout({
             }}
           />
 
-          <YandexMetrika />
+          {/* Яндекс.Метрика подгружается только после согласия на
+              аналитические cookie (см. AnalyticsGate). */}
+          <AnalyticsGate />
 
           <StickyHeader />
           <HeaderSpacer />
@@ -111,6 +114,8 @@ export default async function RootLayout({
           </Flex>
 
           <Footer />
+
+          <CookieConsentBanner />
         </Column>
       </Flex>
     </Providers>
