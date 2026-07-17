@@ -22,7 +22,10 @@ const serverSchema = z.object({
     .default("development"),
 
   // ── CORS / CSRF ──────────────────────────────────────────────────────────
-  // Список через запятую, например: "https://test.npo-polet.ru,https://admin.npo-polet.ru".
+  // Список через запятую, например: "https://npo-polet.ru,https://admin.npo-polet.ru".
+  // www.npo-polet.ru сюда добавлять не нужно: nginx редиректит www на голый
+  // домен ещё до приложения (см. nginx.txt), поэтому Origin с www в
+  // запросах, реально доходящих до Payload, никогда не возникает.
   // Payload использует это ОДНО значение и для `cors`, и для `csrf` (см.
   // payload.config.ts). Если Origin входящего запроса не входит в этот
   // список, Payload молча отбрасывает JWT из cookie (см.
@@ -51,7 +54,7 @@ const clientSchema = z.object({
   // Используется: payload.config.ts (serverURL для абсолютных URL медиа),
   // письма (ссылки восстановления пароля и т.д.), email/config.ts.
   // В dev по умолчанию localhost:3000, в проде ОБЯЗАН быть переопределён
-  // на реальный домен (https://test.npo-polet.ru) через .env.production.
+  // на реальный домен (https://npo-polet.ru) через .env.production.
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
 

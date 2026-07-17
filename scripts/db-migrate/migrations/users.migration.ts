@@ -2,12 +2,13 @@
 
 import crypto from "node:crypto";
 import type { ObjectId } from "mongodb";
+import type { MigrationContext } from "../core/index.ts";
 import {
 	defineMigration,
 	emptyStats,
+	extractUniqueConstraintFieldPaths,
 	upsertByLegacyId,
 } from "../core/index.ts";
-import type { MigrationContext } from "../core/index.ts";
 import { LEGACY_COLLECTIONS } from "../lib/legacyCollections.ts";
 
 interface LegacyUser {
@@ -66,72 +67,104 @@ export default defineMigration({
 			// bcrypt-хеш кладём в legacyPasswordHash для fallback при первом входе.
 			const placeholderPassword = crypto.randomBytes(32).toString("hex");
 
-			const result = await upsertByLegacyId({
-				ctx,
-				collection: "users",
-				legacyId,
-				// Здесь только неизменяемые исторические факты — и это главное
-				// свойство этой миграции: во всём остальном старая БД является
-				// источником истины ТОЛЬКО в момент создания записи. Дальше
-				// аккаунтом владеет новая система, и повторный прогон не имеет
-				// права менять в нём состояние.
-				//
-				// Раньше здесь лежали name/status/blockedUntil/emailVerified/
-				// twoFAVerified, и повторный прогон откатывал их к значениям из
-				// старой БД: затирал имя, которое человек сменил в профиле, и
-				// снимал блокировку, поставленную администратором (проверено:
-				// status blocked -> active). Все эти поля переехали в
-				// createOnlyData — пишутся один раз при создании и никогда не
-				// участвуют ни в сравнении, ни в update (см. core/upsert.ts).
-				//
-				// Цена решения: правки, сделанные в СТАРОЙ системе после первого
-				// прогона (переименование, блокировка), в новую не доедут. Это
-				// осознанный размен — старая система выводится из эксплуатации,
-				// новая уже авторитетна, а тихий откат админских действий
-				// несравнимо опаснее.
-				data: {
-					// Дата регистрации в старой системе — не «состояние аккаунта»,
-					// а факт, который не меняется ни там, ни здесь, поэтому его
-					// синхронизация безопасна и нужна: иначе в админке все
-					// перенесённые клиенты выглядят зарегистрированными в день
-					// миграции. В data (а не в createOnlyData) — чтобы дата
-					// починилась и у тех, кого перенесли прошлые прогоны.
+			const attemptUpsert = () =>
+				upsertByLegacyId({
+					ctx,
+					collection: "users",
+					legacyId,
+					// Здесь только неизменяемые исторические факты — и это главное
+					// свойство этой миграции: во всём остальном старая БД является
+					// источником истины ТОЛЬКО в момент создания записи. Дальше
+					// аккаунтом владеет новая система, и повторный прогон не имеет
+					// права менять в нём состояние.
 					//
-					// Для аккаунта, связанного по email (adoptExistingByEmail),
-					// это тоже верно: человек стал клиентом тогда, когда
-					// зарегистрировался на старом сайте, а не когда завёл учётку
-					// на новом.
+					// Раньше здесь лежали name/status/blockedUntil/emailVerified/
+					// twoFAVerified, и повторный прогон откатывал их к значениям из
+					// старой БД: затирал имя, которое человек сменил в профиле, и
+					// снимал блокировку, поставленную администратором (проверено:
+					// status blocked -> active). Все эти поля переехали в
+					// createOnlyData — пишутся один раз при создании и никогда не
+					// участвуют ни в сравнении, ни в update (см. core/upsert.ts).
 					//
-					// Условный spread обязателен: createdAt: undefined попросил бы
-					// Payload затереть дату.
-					...(old.createdAt
-						? { createdAt: new Date(old.createdAt).toISOString() }
-						: {}),
-				},
-				createOnlyData: {
-					name: old.name,
-					email: old.email,
-					role: "user",
-					status: old.status ?? "active",
-					blockedUntil: old.blockedUntil
-						? new Date(old.blockedUntil).toISOString()
-						: null,
-					// Явных данных о верификации email в старой системе нет — считаем
-					// существующих активных пользователей верифицированными (это не
-					// новая регистрация, а перенос уже работающего аккаунта).
-					emailVerified: true,
-					twoFAVerified: false,
-					// password обязателен Payload'у на create() auth-коллекции.
-					password: placeholderPassword,
-					...(old.password ? { legacyPasswordHash: old.password } : {}),
-				},
-				// Без этого флага afterChange-хуки Users отрабатывают так, будто
-				// статус поменял администратор, и рассылают живым людям письма и
-				// in-app уведомления «аккаунт заблокирован» / «аккаунт снова
-				// активен» (воспроизведено на повторном прогоне). См.
-				// notifyOnStatusChange в src/payload/collections/User.ts.
-				context: { isMigration: true },
-			});
+					// Цена решения: правки, сделанные в СТАРОЙ системе после первого
+					// прогона (переименование, блокировка), в новую не доедут. Это
+					// осознанный размен — старая система выводится из эксплуатации,
+					// новая уже авторитетна, а тихий откат админских действий
+					// несравнимо опаснее.
+					data: {
+						// Дата регистрации в старой системе — не «состояние аккаунта»,
+						// а факт, который не меняется ни там, ни здесь, поэтому его
+						// синхронизация безопасна и нужна: иначе в админке все
+						// перенесённые клиенты выглядят зарегистрированными в день
+						// миграции. В data (а не в createOnlyData) — чтобы дата
+						// починилась и у тех, кого перенесли прошлые прогоны.
+						//
+						// Для аккаунта, связанного по email (adoptExistingByEmail),
+						// это тоже верно: человек стал клиентом тогда, когда
+						// зарегистрировался на старом сайте, а не когда завёл учётку
+						// на новом.
+						//
+						// Условный spread обязателен: createdAt: undefined попросил бы
+						// Payload затереть дату.
+						...(old.createdAt
+							? { createdAt: new Date(old.createdAt).toISOString() }
+							: {}),
+					},
+					createOnlyData: {
+						name: old.name,
+						email: old.email,
+						role: "user",
+						status: old.status ?? "active",
+						blockedUntil: old.blockedUntil
+							? new Date(old.blockedUntil).toISOString()
+							: null,
+						// Явных данных о верификации email в старой системе нет — считаем
+						// существующих активных пользователей верифицированными (это не
+						// новая регистрация, а перенос уже работающего аккаунта).
+						emailVerified: true,
+						twoFAVerified: false,
+						// password обязателен Payload'у на create() auth-коллекции.
+						password: placeholderPassword,
+						...(old.password ? { legacyPasswordHash: old.password } : {}),
+					},
+					// Без этого флага afterChange-хуки Users отрабатывают так, будто
+					// статус поменял администратор, и рассылают живым людям письма и
+					// in-app уведомления «аккаунт заблокирован» / «аккаунт снова
+					// активен» (воспроизведено на повторном прогоне). См.
+					// notifyOnStatusChange в src/payload/collections/User.ts.
+					context: { isMigration: true },
+				});
+
+			let result = await attemptUpsert();
+
+			// Гонка с живым сайтом: пока шла эта миграция, кто-то зарегистрировался
+			// на сайте с тем же email. adoptExistingByEmail проверил чуть раньше и
+			// ещё не увидел эту запись — она закоммитилась уже ПОСЛЕ проверки, —
+			// поэтому create() падает на unique-constraint по email (см. подробный
+			// разбор в scripts/db-migrate/README.md). Повторяем обе проверки один
+			// раз: на этот раз adoptExistingByEmail увидит уже существующую
+			// запись и свяжет legacyId с ней вместо повторной попытки create.
+			//
+			// Повторный adoptExistingByEmail здесь МОЖЕТ вернуть "conflict" —
+			// например если конкурентная запись успела получить чужой legacyId
+			// (крайне маловероятно, но не невозможно) — тогда это уже не гонка,
+			// а настоящий конфликт данных, и мы обрабатываем его так же, как в
+			// первой попытке: пропускаем запись, не повторяя upsert ещё раз.
+			if (
+				result.action === "failed" &&
+				extractUniqueConstraintFieldPaths(result.error).includes("email")
+			) {
+				const retryAdoption = await adoptExistingByEmail(
+					ctx,
+					legacyId,
+					old.email,
+				);
+				if (retryAdoption === "conflict") {
+					stats.skipped++;
+					continue;
+				}
+				result = await attemptUpsert();
+			}
 
 			if (result.action === "failed") {
 				stats.failed++;

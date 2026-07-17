@@ -4,6 +4,7 @@ import type { MigrationContext } from "../core/index.ts";
 import {
 	defineMigration,
 	emptyStats,
+	extractUniqueConstraintFieldPaths,
 	resolveRef,
 	upsertByLegacyId,
 } from "../core/index.ts";
@@ -317,130 +318,146 @@ export default defineMigration({
 				? [old.internalNotes, cashNote].filter(Boolean).join("\n")
 				: old.internalNotes;
 
-			const result = await upsertByLegacyId({
-				ctx,
-				collection: "orders",
-				legacyId,
-				// orderNumber — в createOnlyData, а не в data, по двум причинам:
-				//
-				// 1. Номер заказа уникален, а обе системы нумеруют заказы
-				//    одинаково (ORD-{год}-{6 цифр}) независимыми счётчиками. Пока
-				//    старый сайт ещё принимает заказы, его новые номера
-				//    сталкиваются с номерами, уже занятыми заказами нового сайта:
-				//    create падал на unique-констрейнте, заказ уходил в failed и
-				//    просто не переносился (воспроизведено). Ниже подбирается
-				//    свободный номер.
-				// 2. Заказы уже переносились раньше — со своими исходными
-				//    номерами. Номер видит покупатель и называет его в поддержке,
-				//    поэтому повторный прогон не имеет права его менять. В
-				//    createOnlyData поле пишется только при создании и никогда не
-				//    сравнивается/не обновляется (см. core/upsert.ts).
-				createOnlyData: async () => {
-					const orderNumber = await resolveFreeOrderNumber(
-						ctx,
-						old.orderNumber,
-						legacyId,
-					);
-					if (orderNumber !== old.orderNumber) renumberedOrders++;
-					return { orderNumber };
-				},
-				data: {
-					// Дата оформления заказа в СТАРОЙ системе.
+			const attemptUpsert = () =>
+				upsertByLegacyId({
+					ctx,
+					collection: "orders",
+					legacyId,
+					// orderNumber — в createOnlyData, а не в data, по двум причинам:
 					//
-					// Payload проставляет createdAt = now только если поле не
-					// передали (см. @payloadcms/drizzle/dist/upsertRow: `if
-					// (operation === 'create' && !data.createdAt)`), поэтому
-					// историческую дату можно и нужно передать явно. Без этого все
-					// перенесённые заказы получали дату миграции: в «Мои заказы»
-					// (сортировка `-createdAt`) многолетняя история схлопывалась в
-					// один день, и покупатели видели свои старые заказы как
-					// «оформленные сегодня».
-					//
-					// Именно в data, а не в createOnlyData: поле должно
-					// синхронизироваться и для УЖЕ перенесённых заказов — иначе
-					// записи, созданные прошлыми прогонами, навсегда остались бы с
-					// датой миграции. Это безопасно: дата оформления в старой БД
-					// неизменна, а в новой системе её никто не редактирует.
-					//
-					// Условный spread обязателен: передать createdAt: undefined —
-					// значит попросить Payload перезаписать дату пустым значением.
-					// Если у легаси-заказа даты почему-то нет, поле просто не
-					// трогаем.
-					...(old.createdAt
-						? { createdAt: new Date(old.createdAt).toISOString() }
-						: {}),
-					// updatedAt намеренно НЕ переносим: Payload перезаписывает его
-					// на каждом update своим now (проверено), поэтому в data оно
-					// давало бы вечный «чурн» — каждый прогон переписывал бы все
-					// заказы ради поля, которое всё равно не сохранится. Для новой
-					// системы updatedAt честно означает «когда мы последний раз
-					// трогали эту строку».
-					user: userId,
-					status: old.status,
-					recipient: {
-						fullName: old.recipient?.fullName,
-						phone: old.recipient?.phone,
-						email: old.recipient?.email,
-						contactPerson: old.recipient?.contactPerson,
+					// 1. Номер заказа уникален, а обе системы нумеруют заказы
+					//    одинаково (ORD-{год}-{6 цифр}) независимыми счётчиками. Пока
+					//    старый сайт ещё принимает заказы, его новые номера
+					//    сталкиваются с номерами, уже занятыми заказами нового сайта:
+					//    create падал на unique-констрейнте, заказ уходил в failed и
+					//    просто не переносился (воспроизведено). Ниже подбирается
+					//    свободный номер.
+					// 2. Заказы уже переносились раньше — со своими исходными
+					//    номерами. Номер видит покупатель и называет его в поддержке,
+					//    поэтому повторный прогон не имеет права его менять. В
+					//    createOnlyData поле пишется только при создании и никогда не
+					//    сравнивается/не обновляется (см. core/upsert.ts).
+					createOnlyData: async () => {
+						const orderNumber = await resolveFreeOrderNumber(
+							ctx,
+							old.orderNumber,
+							legacyId,
+						);
+						if (orderNumber !== old.orderNumber) renumberedOrders++;
+						return { orderNumber };
 					},
-					delivery: {
-						method: deliveryMethod,
-						address: old.delivery?.address
-							? {
-									street: old.delivery.address.street,
-									city: old.delivery.address.city,
-									postalCode: old.delivery.address.postalCode,
-									country: old.delivery.address.country ?? "Россия",
-								}
-							: undefined,
-						transportCompany: transportCompanyId,
-						pickupPoint: pickupPointId,
-						trackingNumber: old.delivery?.trackingNumber,
-						estimatedDelivery: old.delivery?.estimatedDelivery
-							? new Date(old.delivery.estimatedDelivery).toISOString()
-							: undefined,
-						notes: old.delivery?.notes,
+					data: {
+						// Дата оформления заказа в СТАРОЙ системе.
+						//
+						// Payload проставляет createdAt = now только если поле не
+						// передали (см. @payloadcms/drizzle/dist/upsertRow: `if
+						// (operation === 'create' && !data.createdAt)`), поэтому
+						// историческую дату можно и нужно передать явно. Без этого все
+						// перенесённые заказы получали дату миграции: в «Мои заказы»
+						// (сортировка `-createdAt`) многолетняя история схлопывалась в
+						// один день, и покупатели видели свои старые заказы как
+						// «оформленные сегодня».
+						//
+						// Именно в data, а не в createOnlyData: поле должно
+						// синхронизироваться и для УЖЕ перенесённых заказов — иначе
+						// записи, созданные прошлыми прогонами, навсегда остались бы с
+						// датой миграции. Это безопасно: дата оформления в старой БД
+						// неизменна, а в новой системе её никто не редактирует.
+						//
+						// Условный spread обязателен: передать createdAt: undefined —
+						// значит попросить Payload перезаписать дату пустым значением.
+						// Если у легаси-заказа даты почему-то нет, поле просто не
+						// трогаем.
+						...(old.createdAt
+							? { createdAt: new Date(old.createdAt).toISOString() }
+							: {}),
+						// updatedAt намеренно НЕ переносим: Payload перезаписывает его
+						// на каждом update своим now (проверено), поэтому в data оно
+						// давало бы вечный «чурн» — каждый прогон переписывал бы все
+						// заказы ради поля, которое всё равно не сохранится. Для новой
+						// системы updatedAt честно означает «когда мы последний раз
+						// трогали эту строку».
+						user: userId,
+						status: old.status,
+						recipient: {
+							fullName: old.recipient?.fullName,
+							phone: old.recipient?.phone,
+							email: old.recipient?.email,
+							contactPerson: old.recipient?.contactPerson,
+						},
+						delivery: {
+							method: deliveryMethod,
+							address: old.delivery?.address
+								? {
+										street: old.delivery.address.street,
+										city: old.delivery.address.city,
+										postalCode: old.delivery.address.postalCode,
+										country: old.delivery.address.country ?? "Россия",
+									}
+								: undefined,
+							transportCompany: transportCompanyId,
+							pickupPoint: pickupPointId,
+							trackingNumber: old.delivery?.trackingNumber,
+							estimatedDelivery: old.delivery?.estimatedDelivery
+								? new Date(old.delivery.estimatedDelivery).toISOString()
+								: undefined,
+							notes: old.delivery?.notes,
+						},
+						items,
+						pricing: {
+							subtotal: old.pricing?.subtotal ?? 0,
+							productDiscounts: old.pricing?.productDiscounts ?? 0,
+							centralDiscountAmount: old.pricing?.centralDiscountAmount ?? 0,
+							centralDiscountPercent: old.pricing?.centralDiscountPercent ?? 0,
+							discount: old.pricing?.discount ?? 0,
+							shippingCost: old.pricing?.shippingCost ?? 0,
+							total: old.pricing?.total ?? 0,
+							currency: old.pricing?.currency ?? "RUB",
+						},
+						payment: {
+							method: paymentMethod,
+							status: old.payment?.status ?? "pending",
+							transactionId: old.payment?.transactionId,
+							paidAt: old.payment?.paidAt
+								? new Date(old.payment.paidAt).toISOString()
+								: undefined,
+						},
+						appliedDiscounts,
+						companyInfo:
+							companyId || old.companyInfo?.name
+								? {
+										companyId,
+										name: old.companyInfo?.name,
+										legalAddress: old.companyInfo?.legalAddress,
+										companyAddress: old.companyInfo?.address,
+										taxNumber: old.companyInfo?.taxNumber,
+										contactPerson: old.companyInfo?.contactPerson,
+									}
+								: undefined,
+						notes: old.notes,
+						internalNotes,
+						statusHistory,
+						source: SOURCE_MAP[old.source ?? "web"] ?? "web",
+						ipAddress: old.ipAddress,
+						userAgent: old.userAgent,
 					},
-					items,
-					pricing: {
-						subtotal: old.pricing?.subtotal ?? 0,
-						productDiscounts: old.pricing?.productDiscounts ?? 0,
-						centralDiscountAmount: old.pricing?.centralDiscountAmount ?? 0,
-						centralDiscountPercent: old.pricing?.centralDiscountPercent ?? 0,
-						discount: old.pricing?.discount ?? 0,
-						shippingCost: old.pricing?.shippingCost ?? 0,
-						total: old.pricing?.total ?? 0,
-						currency: old.pricing?.currency ?? "RUB",
-					},
-					payment: {
-						method: paymentMethod,
-						status: old.payment?.status ?? "pending",
-						transactionId: old.payment?.transactionId,
-						paidAt: old.payment?.paidAt
-							? new Date(old.payment.paidAt).toISOString()
-							: undefined,
-					},
-					appliedDiscounts,
-					companyInfo:
-						companyId || old.companyInfo?.name
-							? {
-									companyId,
-									name: old.companyInfo?.name,
-									legalAddress: old.companyInfo?.legalAddress,
-									companyAddress: old.companyInfo?.address,
-									taxNumber: old.companyInfo?.taxNumber,
-									contactPerson: old.companyInfo?.contactPerson,
-								}
-							: undefined,
-					notes: old.notes,
-					internalNotes,
-					statusHistory,
-					source: SOURCE_MAP[old.source ?? "web"] ?? "web",
-					ipAddress: old.ipAddress,
-					userAgent: old.userAgent,
-				},
-				context: { isMigration: true },
-			});
+					context: { isMigration: true },
+				});
+
+			let result = await attemptUpsert();
+
+			// Гонка с живым сайтом: resolveFreeOrderNumber проверил номер
+			// свободным, но пока шла эта же миграция, реальный заказ с сайта
+			// успел занять его — create() падает на unique-constraint по
+			// orderNumber. Повторяем один раз: createOnlyData — функция, она
+			// заново проверит свежее состояние БД и на этот раз корректно
+			// увидит занятость номера (подберёт "-L" суффикс).
+			if (
+				result.action === "failed" &&
+				extractUniqueConstraintFieldPaths(result.error).includes("orderNumber")
+			) {
+				result = await attemptUpsert();
+			}
 
 			if (result.action === "failed") {
 				stats.failed++;

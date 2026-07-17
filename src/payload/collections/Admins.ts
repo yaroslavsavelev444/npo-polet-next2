@@ -24,12 +24,12 @@ export const Admins: CollectionConfig = {
     // имеет (см. IncomingAuthType в node_modules/payload/dist/auth/types.d.ts).
     // То есть развести admins и users по разным именам cookie на уровне
     // коллекции в этой версии Payload архитектурно невозможно — и это не
-    // баг: раз admin.npo-polet.ru и test.npo-polet.ru/npo-polet.ru — разные
-    // хосты, а cookie здесь ставится без Domain (host-only), браузер и так
-    // хранит её отдельно для каждого хоста и коллизии со стороны customer-
-    // сессии не будет. Настоящая причина 403 на Settings/Media и 400 на
-    // logout — не эта cookie, а ALLOWED_ORIGINS/CSRF в payload.config.ts,
-    // см. подробный комментарий там.
+    // баг: раз admin.npo-polet.ru и npo-polet.ru — разные хосты, а cookie
+    // здесь ставится без Domain (host-only), браузер и так хранит её отдельно
+    // для каждого хоста и коллизии со стороны customer-сессии не будет.
+    // Настоящая причина 403 на Settings/Media и 400 на logout — не эта
+    // cookie, а ALLOWED_ORIGINS/CSRF в payload.config.ts, см. подробный
+    // комментарий там.
     cookies: {
       secure: process.env.NODE_ENV === "production",
 

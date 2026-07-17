@@ -1,4 +1,32 @@
-# /etc/nginx/sites-available/test.npo-polet.ru.conf
+# /etc/nginx/sites-available/npo-polet.ru.conf
+#
+# ПЕРЕКЛЮЧЕНИЕ ОСНОВНОГО ДОМЕНА (test.npo-polet.ru -> npo-polet.ru):
+# это ЧЕРНОВИК, отражающий целевое состояние — не копия того, что реально
+# сейчас лежит на VPS. Перед применением:
+#
+# 1. Сверьте с РЕАЛЬНЫМ содержимым файла на сервере (он мог отличаться от
+#    этой версии, т.к. правки nginx туда никогда не попадали через git/CI —
+#    см. deploy.sh, он nginx вообще не трогает).
+# 2. Проверьте сертификат: `sudo certbot certificates`. Домен npo-polet.ru,
+#    скорее всего, уже обслуживается старым сайтом по HTTPS — значит
+#    сертификат для него уже существует, и ниже нужно указать РЕАЛЬНЫЙ путь
+#    к нему, а не создавать новый через certbot. Если в SAN сертификата нет
+#    www.npo-polet.ru — расширить его: `certbot certonly --expand -d
+#    npo-polet.ru -d www.npo-polet.ru` (а не выпускать отдельный сертификат
+#    для www).
+# 3. Убедитесь, что имя shared-зоны `SSL_npo` не занято старым сайтом в этом
+#    же nginx (если и там объявлена зона с именем `SSL_npo` другого размера —
+#    будет конфликт при `nginx -t`).
+# 4. Старый сайт нужно перенастроить так, чтобы он больше НЕ отвечал на
+#    npo-polet.ru/www.npo-polet.ru (см. отдельный анализ его конфига — я его
+#    ещё не видела).
+# 5. Файл в sites-available можно оставить под этим (новым) именем и
+#    засимлинковать в sites-enabled; symlink на старое имя
+#    test.npo-polet.ru.conf убрать (test.npo-polet.ru полностью выводится
+#    из обслуживания — контейнеры при этом НЕ трогаем, они продолжают
+#    работать, просто на этот хост nginx больше ничего не проксирует).
+# 6. `sudo nginx -t` ДО `systemctl reload nginx`. Именно reload, не restart —
+#    не роняет уже открытые соединения и не требует ничего делать с Docker.
 
 upstream polet_next {
     server 127.0.0.1:3004;
@@ -10,27 +38,57 @@ map $http_upgrade $connection_upgrade_npo {
     ''      close;
 }
 
+# limit_req_zone обязана быть на уровне http{}, а не внутри server{} (см.
+# ngx_http_limit_req_module) — в исходной версии этого файла она стояла
+# внутри 443-го server{} ниже, из-за чего `nginx -t` не прошёл бы в этом виде.
+# Файлы sites-enabled/* инклюдятся прямо в http{} главного nginx.conf,
+# поэтому достаточно вынести директиву на уровень файла, как здесь — сама
+# зона `limit_req zone=npo_auth ...` внутри location ниже валидна как была.
+limit_req_zone $binary_remote_addr zone=npo_auth:10m rate=10r/m;
+
+# ── HTTP: acme-challenge + редирект на HTTPS-версию голого домена ──────────
+# Оба имени (голое и www) в одном блоке: любой HTTP-запрос, независимо от
+# того, каким хостом пришёл, одним 301 уходит сразу на https://npo-polet.ru —
+# без промежуточного прыжка через https://www.
 server {
     listen 80;
     listen [::]:80;
-    server_name test.npo-polet.ru;
+    server_name npo-polet.ru www.npo-polet.ru;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
     location / {
-        return 301 https://$host$request_uri;
+        return 301 https://npo-polet.ru$request_uri;
     }
 }
 
+# ── HTTPS: www -> редирект на голый домен ──────────────────────────────────
+# Отдельный блок, а не `if` внутри общего server{} (в nginx `if` в контексте
+# server/location — известный источник трудноуловимых багов, отдельный
+# server{} на server_name — стандартный безопасный способ).
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name test.npo-polet.ru;
+    server_name www.npo-polet.ru;
 
-    ssl_certificate     /etc/letsencrypt/live/test.npo-polet.ru/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/test.npo-polet.ru/privkey.pem;
+    # ПРОВЕРИТЬ ПУТЬ перед применением — см. пункт 2 выше.
+    ssl_certificate     /etc/letsencrypt/live/npo-polet.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/npo-polet.ru/privkey.pem;
+
+    return 301 https://npo-polet.ru$request_uri;
+}
+
+# ── HTTPS: основной сервер приложения ──────────────────────────────────────
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name npo-polet.ru;
+
+    # ПРОВЕРИТЬ ПУТЬ перед применением — см. пункт 2 выше.
+    ssl_certificate     /etc/letsencrypt/live/npo-polet.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/npo-polet.ru/privkey.pem;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
@@ -60,8 +118,6 @@ server {
         image/svg+xml;
 
     # Защита login endpoint от брутфорса
-    limit_req_zone $binary_remote_addr zone=npo_auth:10m rate=10r/m;
-
     location ~* ^/api/(admins|users)/login {
         limit_req zone=npo_auth burst=5 nodelay;
         proxy_pass http://polet_next;

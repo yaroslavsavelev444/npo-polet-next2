@@ -1,0 +1,41 @@
+# ВРЕМЕННЫЙ файл. Удалить с VPS после того, как сертификат для npo-polet.ru
+# получен и на его место встал полный конфиг из nginx.txt (тот, с HTTPS).
+#
+# Зачем он нужен: сертификата Let's Encrypt для голого npo-polet.ru на этом
+# VPS никогда не было (домен всё это время обслуживался с Beget, а не
+# отсюда, см. `sudo certbot certificates`) — certbot не может доказать
+# владение доменом на этом сервере, пока nginx здесь вообще не отвечает на
+# запросы к нему. Этот файл — временный HTTP-only vhost, который решает
+# только эту курицу-и-яйцо задачу: отвечает на /.well-known/acme-challenge/,
+# ничего больше не проксирует. Тот же приём уже применялся в проекте для
+# test.npo-polet.ru — см. nginx2.txt.
+#
+# ПОРЯДОК (см. подробный чек-лист в чате):
+# 1. В панели Beget: A-запись npo-polet.ru (и www.npo-polet.ru) -> IP этого
+#    VPS (узнать: curl -s https://api.ipify.org).
+# 2. Дождаться распространения DNS: `dig +short npo-polet.ru` с любой
+#    машины ВНЕ этого VPS должен вернуть IP VPS, а не Beget.
+# 3. Этот файл -> /etc/nginx/sites-available/npo-polet.ru.conf,
+#    symlink в sites-enabled, `sudo nginx -t && sudo systemctl reload nginx`.
+# 4. sudo certbot certonly --webroot -w /var/www/certbot \
+#      -d npo-polet.ru -d www.npo-polet.ru
+# 5. Заменить содержимое /etc/nginx/sites-available/npo-polet.ru.conf на
+#    содержимое nginx.txt (там уже правильные пути к свежевыпущенному
+#    сертификату — /etc/letsencrypt/live/npo-polet.ru/...).
+# 6. sudo nginx -t && sudo systemctl reload nginx
+# 7. Удалить этот файл (bootstrap больше не нужен).
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name npo-polet.ru www.npo-polet.ru;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 200 "bootstrap: ожидание выпуска сертификата\n";
+        add_header Content-Type text/plain;
+    }
+}

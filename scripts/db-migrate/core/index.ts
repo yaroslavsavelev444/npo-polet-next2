@@ -1,4 +1,5 @@
 // scripts/db-migrate/core/index.ts
+export { extractUniqueConstraintFieldPaths } from "./errors.ts";
 export { hasChanges, stableStringify } from "./hash.ts";
 export type { Logger } from "./logger.ts";
 export { createLogger } from "./logger.ts";

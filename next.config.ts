@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     // блокирует image-optimizer от обращения к private/loopback IP как
     // защиту от SSRF (images.dangerouslyAllowLocalIP=false по умолчанию).
     // В проде serverURL указывает на реальный публичный домен
-    // (test.npo-polet.ru), поэтому там private IP никогда не возникнет —
+    // (npo-polet.ru), поэтому там private IP никогда не возникнет —
     // включаем флаг СТРОГО только для dev, чтобы не ослаблять защиту в бою.
     dangerouslyAllowLocalIP: process.env.NODE_ENV !== "production",
     remotePatterns: [
@@ -33,17 +33,17 @@ const nextConfig: NextConfig = {
         port: "3000",
         pathname: "/api/media/**",
       },
-      // Прод: без этих паттернов картинки в проде всегда будут падать
+      // Прод: без этого паттерна картинки в проде всегда будут падать
       // с "hostname not configured", независимо от того, что исправлено
       // в serverURL.
+      //
+      // www.npo-polet.ru сюда намеренно не добавлен: nginx редиректит www на
+      // голый домен ещё до того, как запрос доходит до приложения (см.
+      // nginx.txt), а NEXT_PUBLIC_APP_URL/baseURL везде настроены на голый
+      // домен — сам код никогда не строит абсолютный URL картинки с www.
       {
         protocol: "https",
-        hostname: "test.npo-polet.ru",
-        pathname: "/api/media/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.test.npo-polet.ru",
+        hostname: "npo-polet.ru",
         pathname: "/api/media/**",
       },
     ],
