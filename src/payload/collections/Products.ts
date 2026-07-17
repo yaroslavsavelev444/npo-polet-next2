@@ -2,6 +2,7 @@ import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
+import { trackPreviousSlug } from "../hooks/trackPreviousSlug.ts";
 import { generateSlug } from "../utils/generateSlug.ts";
 
 export const Products: CollectionConfig = {
@@ -20,6 +21,7 @@ export const Products: CollectionConfig = {
 		delete: isAdminOrSuperAdmin,
 	},
 	hooks: {
+		beforeChange: [trackPreviousSlug],
 		// getCachedProducts кэширует список/карточки с revalidate:false — без
 		// этого хука изменения товаров не появлялись бы на сайте до редеплоя.
 		afterChange: [createRevalidateCacheHook("products")],
@@ -49,6 +51,20 @@ export const Products: CollectionConfig = {
 						position: "sidebar",
 						description: "Автоматически генерируется из названия при создании",
 					},
+				},
+				{
+					name: "previousSlugs",
+					type: "array",
+					label: "Прежние адреса товара",
+					admin: {
+						readOnly: true,
+						position: "sidebar",
+						description:
+							"Заполняется автоматически при смене slug. Старый URL уводит " +
+							"301-редиректом на текущий — снимать это поле нельзя, иначе " +
+							"проиндексированная страница отдаст 404.",
+					},
+					fields: [{ name: "slug", type: "text", required: true }],
 				},
 			],
 		},

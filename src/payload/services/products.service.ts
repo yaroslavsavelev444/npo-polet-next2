@@ -171,6 +171,37 @@ export const getCachedProductBySlug = (slug: string) => {
 	})();
 };
 
+// Ищет товар по прежнему slug (см. hooks/trackPreviousSlug.ts). Используется
+// резолвером страницы товара ТОЛЬКО как fallback, когда прямой поиск по
+// текущему slug ничего не нашёл — иначе уже проиндексированный старый URL
+// (например, после исправления опечатки в названии) отдавал бы 404 вместо
+// 301 на актуальный адрес.
+async function fetchProductByPreviousSlug(
+	slug: string,
+): Promise<Product | null> {
+	const payload = await getPayloadInstance();
+	const result = await payload.find({
+		collection: "products",
+		where: {
+			and: [PUBLISHED_ONLY, { "previousSlugs.slug": { equals: slug } }],
+		},
+		limit: 1,
+		depth: 1,
+	});
+	return (result.docs[0] || null) as unknown as Product | null;
+}
+
+export const getCachedProductByPreviousSlug = (slug: string) => {
+	const fetchFn = () => fetchProductByPreviousSlug(slug);
+	if (env.NODE_ENV === "development") {
+		return fetchFn();
+	}
+	return unstable_cache(fetchFn, [`product-prev-slug-${slug}`], {
+		tags: ["products"],
+		revalidate: false,
+	})();
+};
+
 // Payload сортирует по реальному пути поля с префиксом "-" для убывания
 // (см. src/payload/services/search.service.ts: "-analytics.viewsCount"), а не
 // по синтаксису "field:order" — часть полей каталога вложена в группы,

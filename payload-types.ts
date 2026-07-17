@@ -341,6 +341,15 @@ export interface Product {
    * Автоматически генерируется из названия при создании
    */
   slug?: string | null;
+  /**
+   * Заполняется автоматически при смене slug. Старый URL уводит 301-редиректом на текущий — снимать это поле нельзя, иначе проиндексированная страница отдаст 404.
+   */
+  previousSlugs?:
+    | {
+        slug: string;
+        id?: string | null;
+      }[]
+    | null;
   description: string;
   category: number | Category;
   images?: (number | Media)[] | null;
@@ -1499,6 +1508,12 @@ export interface CategoriesSelect<T extends boolean = true> {
 export interface ProductsSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
+  previousSlugs?:
+    | T
+    | {
+        slug?: T;
+        id?: T;
+      };
   description?: T;
   category?: T;
   images?: T;

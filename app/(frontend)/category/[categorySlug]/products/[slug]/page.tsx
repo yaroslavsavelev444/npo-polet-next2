@@ -21,6 +21,7 @@ import {
 } from "@/modules/productDetails";
 import {
 	getCachedProductById,
+	getCachedProductByPreviousSlug,
 	getCachedProductBySlug,
 } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
@@ -42,6 +43,12 @@ interface Props {
  * Теперь единственный источник правды — категория, к которой товар привязан
  * в Payload (см. getProductHref). Любой другой categorySlug — не
  * альтернативный адрес, а ошибка, и с него уходит редирект на канонический.
+ *
+ * Товар мог сменить slug и после того, как ЧПУ уже проиндексировано
+ * (например, исправление опечатки в названии — см. hooks/trackPreviousSlug.ts).
+ * Если прямой поиск по текущему slug ничего не нашёл, а сегмент не похож на
+ * legacy-id, пробуем найти товар по истории его прежних slug — так старый
+ * адрес продолжает 308-редиректить на актуальный, а не отдаёт 404.
  */
 async function resolveProduct(categorySlug: string, slug: string) {
 	// Числовой сегмент — legacy-URL старой схемы /products/[id], уже
@@ -49,9 +56,13 @@ async function resolveProduct(categorySlug: string, slug: string) {
 	// по id и уводим на ЧПУ, чтобы передать накопленный вес.
 	const isLegacyId = /^\d+$/.test(slug);
 
-	const product = isLegacyId
+	let product = isLegacyId
 		? await getCachedProductById(slug)
 		: await getCachedProductBySlug(slug);
+
+	if (!product && !isLegacyId) {
+		product = await getCachedProductByPreviousSlug(slug);
+	}
 
 	if (!product) notFound();
 
