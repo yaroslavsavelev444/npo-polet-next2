@@ -261,6 +261,17 @@ export const Products: CollectionConfig = {
 
 		// ─── Характеристики ────────────────────────────────────────────────────
 		{
+			name: "copySpecifications",
+			type: "ui",
+			label: "Копирование характеристик",
+			admin: {
+				components: {
+					Field:
+						"@/payload/fields/CopySpecifications/CopySpecificationsField#CopySpecificationsField",
+				},
+			},
+		},
+		{
 			name: "specifications",
 			type: "array",
 			label: "Характеристики",
