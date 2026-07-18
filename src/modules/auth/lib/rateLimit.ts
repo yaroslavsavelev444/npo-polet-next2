@@ -53,4 +53,8 @@ export const RATE_LIMITS = {
 		checkRateLimit(`otp_resend:${email}`, 3, 10 * 60 * 1000),
 	// Обратная связь: не больше 5 обращений с одного IP за 15 минут.
 	feedback: (ip: string) => checkRateLimit(`feedback:${ip}`, 5, 15 * 60 * 1000),
+	// Отзывы: не больше 10 попыток отправки с одного IP за 15 минут
+	// (один отзыв на товар уже гарантирован дедупликацией — это защита от
+	// перебора/спама попытками).
+	review: (ip: string) => checkRateLimit(`review:${ip}`, 10, 15 * 60 * 1000),
 } as const;

@@ -4,6 +4,7 @@ export const revalidate = 0;
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
+import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import {
 	buildProductJsonLd,
 	buildProductMetadata,
@@ -13,17 +14,19 @@ import {
 import {
 	getRelatedProducts,
 	mapProductToDetailData,
-	ProductCharacteristicsPreview,
 	ProductDetailTabs,
 	ProductGallery,
 	ProductHeader,
 	ProductRelated,
+	ProductStickyBar,
 } from "@/modules/productDetails";
+import { getReviewsSectionData } from "@/modules/reviews/server";
 import {
 	getCachedProductById,
 	getCachedProductByPreviousSlug,
 	getCachedProductBySlug,
 } from "@/payload/services/products.service";
+import { getProductRatingBreakdown } from "@/payload/services/reviews.service";
 import { baseURL } from "@/resources/content";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
 
@@ -98,9 +101,20 @@ export default async function ProductDetailPage({ params }: Props) {
 	const detailData = mapProductToDetailData(product);
 	const upsellIds = detailData.upsellProducts.map((p) => p.id);
 
-	const relatedProducts = detailData.category
-		? await getRelatedProducts(detailData.category.id, detailData.id, upsellIds)
-		: [];
+	const user = await getCurrentUser();
+
+	const [ratingBreakdown, reviewsData, relatedProducts] = await Promise.all([
+		getProductRatingBreakdown(detailData.id),
+		getReviewsSectionData(detailData.id, detailData.title, user?.id ?? null),
+		detailData.category
+			? getRelatedProducts(detailData.category.id, detailData.id, upsellIds)
+			: Promise.resolve([]),
+	]);
+
+	// Рейтинг из отзывов уходит и в карточку для JSON-LD (aggregateRating), и в
+	// шапку — единый источник агрегата на всю страницу.
+	cardData.rating = ratingBreakdown.average;
+	cardData.reviewsCount = ratingBreakdown.count;
 
 	const canonicalUrl = `${baseURL}${getProductHref(cardData)}`;
 	const jsonLd = buildProductJsonLd(cardData, canonicalUrl);
@@ -120,7 +134,7 @@ export default async function ProductDetailPage({ params }: Props) {
 	];
 
 	return (
-		<main className="min-h-screen pb-16">
+		<main className="min-h-screen pb-24 lg:pb-16">
 			<script
 				type="application/ld+json"
 				dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -132,28 +146,47 @@ export default async function ProductDetailPage({ params }: Props) {
 				}}
 			/>
 
-			<div className="container mx-auto px-4 py-8">
+			<div className="container mx-auto px-4 py-6 sm:py-8">
 				<Breadcrumbs items={breadcrumbItems} variant="white" />
 
-				<div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
+				{/* Верх: галерея + блок покупки. На десктопе блок покупки липкий. */}
+				<div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:gap-12">
 					<ProductGallery images={detailData.images} title={detailData.title} />
 
-					<div className="flex flex-col gap-8">
-						<ProductHeader product={detailData} cardData={cardData} />
-						<ProductCharacteristicsPreview
-							specifications={detailData.specifications}
+					<div className="lg:sticky lg:top-24 lg:self-start">
+						<ProductHeader
+							product={detailData}
+							cardData={cardData}
+							rating={{
+								average: ratingBreakdown.average,
+								count: ratingBreakdown.count,
+							}}
 						/>
 					</div>
 				</div>
 
-				<div className="mt-10">
-					<ProductDetailTabs product={detailData} />
+				{/* Описание — отдельной секцией, чтобы не оттеснять кнопку покупки вниз */}
+				{detailData.description && (
+					<section className="mt-12 max-w-3xl">
+						<h2 className="mb-3 text-lg font-semibold text-[var(--text-primary)]">
+							Описание
+						</h2>
+						<p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">
+							{detailData.description}
+						</p>
+					</section>
+				)}
+
+				<div className="mt-12">
+					<ProductDetailTabs product={detailData} reviewsData={reviewsData} />
 				</div>
 
-				<div className="mt-14">
+				<div className="mt-16">
 					<ProductRelated products={relatedProducts} />
 				</div>
 			</div>
+
+			<ProductStickyBar product={detailData} cardData={cardData} />
 		</main>
 	);
 }

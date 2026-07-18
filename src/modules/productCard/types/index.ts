@@ -57,9 +57,9 @@ export interface ProductCardData {
   brand?: string;
 
   /**
-   * TODO(payload-schema): рейтинг и количество отзывов сейчас не хранятся
-   * в коллекции `products`. Будет агрегироваться из коллекции `reviews`
-   * (см. README модуля). До тех пор — 0 по умолчанию.
+   * Средняя оценка и количество ОДОБРЕННЫХ отзывов. Агрегируются из коллекции
+   * `product-reviews` (см. reviews.service `getRatingAggregatesForProducts`) и
+   * прокидываются в adapter вторым аргументом. Если агрегат не передан — 0.
    */
   rating: number;
   reviewsCount: number;

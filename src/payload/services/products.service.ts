@@ -9,6 +9,21 @@ import {
 import { ProductQuery } from "../../modules/productCard/types/query";
 import { ProductCatalogResult } from "../../modules/productCatalog/types/filters";
 import { getPayloadInstance } from "./getPayload";
+import { getRatingAggregatesForProducts } from "./reviews.service";
+
+/**
+ * Превращает список Payload-товаров в карточки, подмешивая агрегаты рейтинга
+ * одним группированным запросом (без N+1). Рейтинг берётся из отзывов на лету,
+ * а не из кэша товаров, — чтобы одобренный отзыв отражался в каталоге сразу.
+ */
+async function mapProductsToCardsWithRating(
+	docs: Product[],
+): Promise<ProductCardData[]> {
+	const ratingMap = await getRatingAggregatesForProducts(docs.map((p) => p.id));
+	return docs.map((doc) =>
+		mapProductToCardData(doc, ratingMap.get(String(doc.id))),
+	);
+}
 
 export interface GetProductsOptions {
 	ids?: string[]; // добавить
@@ -239,7 +254,7 @@ export async function getCatalogData(
 	const totalPages = Math.ceil(totalDocs / (options.limit || 24));
 
 	return {
-		products: docs.map(mapProductToCardData),
+		products: await mapProductsToCardsWithRating(docs),
 		totalDocs,
 		pagination: {
 			page: options.page || 1,
