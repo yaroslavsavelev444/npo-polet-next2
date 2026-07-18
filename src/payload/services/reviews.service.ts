@@ -124,13 +124,22 @@ export async function getRatingAggregatesForProducts(
 	if (ids.length === 0) return map;
 
 	const payload = await getPayloadInstance();
+	// drizzle разворачивает JS-массив в кортеж параметров ($2, $3, …), поэтому
+	// `= ANY(${ids}::int[])` собирается в невалидный `ANY(($2,$3,...)::int[])`
+	// и падает в рантайме. Строим явный список через sql.join → `IN ($2,$3,…)`:
+	// каждый id остаётся отдельным биндом (без конкатенации в строку — SQL-
+	// инъекции невозможны), а сам список — валидный.
+	const idList = sql.join(
+		ids.map((id) => sql`${id}`),
+		sql`, `,
+	);
 	const result = (await payload.db.drizzle.execute(sql`
 		SELECT
 			product_id,
 			AVG(rating)::float AS average,
 			COUNT(*)::int AS count
 		FROM product_reviews
-		WHERE status = ${APPROVED} AND product_id = ANY(${ids}::int[])
+		WHERE status = ${APPROVED} AND product_id IN (${idList})
 		GROUP BY product_id
 	`)) as DrizzleRows;
 
