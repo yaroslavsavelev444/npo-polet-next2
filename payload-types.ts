@@ -745,58 +745,22 @@ export interface Consent {
   createdAt: string;
 }
 /**
- * Обратная связь, баги и предложения от пользователей
+ * Обращения пользователей: баги, предложения, вопросы
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "feedbacks".
  */
 export interface Feedback {
   id: number;
+  type: 'bug' | 'improvement' | 'question' | 'order_issue' | 'account_issue' | 'other';
   title: string;
   description: string;
-  type: 'bug' | 'improvement' | 'feature' | 'other';
-  status?: ('new' | 'in_progress' | 'resolved' | 'closed' | 'duplicate' | 'wont_fix') | null;
-  priority?: ('low' | 'medium' | 'high' | 'critical') | null;
-  user?: (number | null) | User;
-  userEmail?: string | null;
-  userName?: string | null;
-  userRole?: ('user' | 'lawyer' | 'admin' | 'moderator') | null;
-  assignedTo?: (number | null) | User;
-  tags?:
-    | {
-        tag: string;
-        id?: string | null;
-      }[]
-    | null;
-  attachments?: (number | Media)[] | null;
+  userEmail: string;
+  status?: ('new' | 'in_progress' | 'resolved') | null;
   /**
-   * Видны только сотрудникам
+   * С какого устройства/браузера отправлено обращение. Проставляется автоматически из заголовков запроса.
    */
-  internalNotes?:
-    | {
-        note: string;
-        createdBy?: (number | null) | User;
-        createdAt?: string | null;
-        isPrivate?: boolean | null;
-        id?: string | null;
-      }[]
-    | null;
-  viewCount?: number | null;
-  upvotes?: number | null;
-  upvotedBy?: (number | User)[] | null;
-  relatedTo?: (number | Feedback)[] | null;
-  duplicateOf?: (number | null) | Feedback;
-  resolvedAt?: string | null;
-  closedAt?: string | null;
-  dueDate?: string | null;
-  deviceInfo?: {
-    userAgent?: string | null;
-    platform?: string | null;
-    os?: string | null;
-    browser?: string | null;
-    screenResolution?: string | null;
-  };
-  ipAddress?: string | null;
+  userAgent?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1759,50 +1723,12 @@ export interface ConsentsSelect<T extends boolean = true> {
  * via the `definition` "feedbacks_select".
  */
 export interface FeedbacksSelect<T extends boolean = true> {
+  type?: T;
   title?: T;
   description?: T;
-  type?: T;
-  status?: T;
-  priority?: T;
-  user?: T;
   userEmail?: T;
-  userName?: T;
-  userRole?: T;
-  assignedTo?: T;
-  tags?:
-    | T
-    | {
-        tag?: T;
-        id?: T;
-      };
-  attachments?: T;
-  internalNotes?:
-    | T
-    | {
-        note?: T;
-        createdBy?: T;
-        createdAt?: T;
-        isPrivate?: T;
-        id?: T;
-      };
-  viewCount?: T;
-  upvotes?: T;
-  upvotedBy?: T;
-  relatedTo?: T;
-  duplicateOf?: T;
-  resolvedAt?: T;
-  closedAt?: T;
-  dueDate?: T;
-  deviceInfo?:
-    | T
-    | {
-        userAgent?: T;
-        platform?: T;
-        os?: T;
-        browser?: T;
-        screenResolution?: T;
-      };
-  ipAddress?: T;
+  status?: T;
+  userAgent?: T;
   updatedAt?: T;
   createdAt?: T;
 }

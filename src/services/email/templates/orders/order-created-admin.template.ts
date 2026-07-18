@@ -5,17 +5,17 @@ import { formatRub } from "../shared/formatters.ts";
 import { renderEmailLayout } from "../shared/layout.ts";
 
 export interface OrderCreatedAdminEmailData {
-  orderNumber: string;
-  recipientName: string;
-  recipientPhone: string;
-  itemsCount: number;
-  total: number;
-  paymentMethodLabel: string;
-  adminUrl: string;
+	orderNumber: string;
+	recipientName: string;
+	recipientPhone: string;
+	itemsCount: number;
+	total: number;
+	paymentMethodLabel: string;
+	adminUrl: string;
 }
 
 function render(data: OrderCreatedAdminEmailData): RenderedEmail {
-  const bodyHtml = `
+	const bodyHtml = `
     <h1 style="margin:0 0 16px;font-size:18px;color:#18181B;">Новый заказ на сайте</h1>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
       ${renderRow("Номер заказа", `<strong>${data.orderNumber}</strong>`)}
@@ -28,18 +28,18 @@ function render(data: OrderCreatedAdminEmailData): RenderedEmail {
     ${renderButton("Открыть заказ в админке", data.adminUrl)}
   `;
 
-  return {
-    subject: `Новый заказ №${data.orderNumber} — ${formatRub(data.total)}`,
-    html: renderEmailLayout({
-      previewText: `Новый заказ №${data.orderNumber}`,
-      bodyHtml,
-    }),
-    text: `Новый заказ №${data.orderNumber} от ${data.recipientName}, ${data.recipientPhone}, сумма ${formatRub(data.total)}. ${data.adminUrl}`,
-  };
+	return {
+		subject: `Новый заказ №${data.orderNumber} — ${formatRub(data.total)}`,
+		html: renderEmailLayout({
+			previewText: `Новый заказ №${data.orderNumber}`,
+			bodyHtml,
+		}),
+		text: `Новый заказ №${data.orderNumber} от ${data.recipientName}, ${data.recipientPhone}, сумма ${formatRub(data.total)}. ${data.adminUrl}`,
+	};
 }
 
 export const orderCreatedAdminEmailTemplate: EmailTemplate<OrderCreatedAdminEmailData> =
-  {
-    id: "order-created-admin",
-    render,
-  };
+	{
+		id: "order-created-admin",
+		render,
+	};

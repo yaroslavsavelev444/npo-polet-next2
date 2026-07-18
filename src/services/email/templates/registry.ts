@@ -3,6 +3,7 @@ import { newSessionLoginEmailTemplate } from "./auth/new-session-login.template.
 import { otpEmailTemplate } from "./auth/otp-code.template.ts";
 import { passwordChangedEmailTemplate } from "./auth/password-changed.template.ts";
 import { passwordResetEmailTemplate } from "./auth/password-reset.template.ts";
+import { feedbackCreatedAdminEmailTemplate } from "./feedback/feedback-created-admin.template.ts";
 import { orderCancelledEmailTemplate } from "./orders/order-cancelled.template.ts";
 import { orderCreatedAdminEmailTemplate } from "./orders/order-created-admin.template.ts";
 import { orderCreatedUserEmailTemplate } from "./orders/order-created-user.template.ts";
@@ -10,14 +11,15 @@ import { orderStatusChangedEmailTemplate } from "./orders/order-status-changed.t
 import { reviewStatusChangedEmailTemplate } from "./reviews/review-status-changed.template.ts";
 
 export const emailTemplates = {
-  otp: otpEmailTemplate,
-  passwordChanged: passwordChangedEmailTemplate,
-  passwordReset: passwordResetEmailTemplate,
-  newSessionLogin: newSessionLoginEmailTemplate,
-  accountLocked: accountLockedEmailTemplate,
-  orderCreatedUser: orderCreatedUserEmailTemplate,
-  orderCreatedAdmin: orderCreatedAdminEmailTemplate,
-  orderStatusChanged: orderStatusChangedEmailTemplate,
-  orderCancelled: orderCancelledEmailTemplate,
-  reviewStatusChanged: reviewStatusChangedEmailTemplate,
+	otp: otpEmailTemplate,
+	passwordChanged: passwordChangedEmailTemplate,
+	passwordReset: passwordResetEmailTemplate,
+	newSessionLogin: newSessionLoginEmailTemplate,
+	accountLocked: accountLockedEmailTemplate,
+	orderCreatedUser: orderCreatedUserEmailTemplate,
+	orderCreatedAdmin: orderCreatedAdminEmailTemplate,
+	orderStatusChanged: orderStatusChangedEmailTemplate,
+	orderCancelled: orderCancelledEmailTemplate,
+	reviewStatusChanged: reviewStatusChangedEmailTemplate,
+	feedbackCreatedAdmin: feedbackCreatedAdminEmailTemplate,
 } as const;

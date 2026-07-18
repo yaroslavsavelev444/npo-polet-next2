@@ -1,6 +1,6 @@
 interface EmailLayoutOptions {
-  previewText?: string;
-  bodyHtml: string;
+	previewText?: string;
+	bodyHtml: string;
 }
 
 const BRAND_COLOR = "#FF4500"; // совпадает с --primary из theme.css
@@ -13,10 +13,10 @@ const COMPANY_NAME = "НПО Полёт";
  * консистентным без дублирования разметки.
  */
 export function renderEmailLayout({
-  previewText,
-  bodyHtml,
+	previewText,
+	bodyHtml,
 }: EmailLayoutOptions): string {
-  return `<!DOCTYPE html>
+	return `<!DOCTYPE html>
 <html lang="ru">
   <head>
     <meta charset="utf-8" />

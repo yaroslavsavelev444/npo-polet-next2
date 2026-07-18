@@ -4,13 +4,13 @@ import { formatDate } from "../shared/formatters.ts";
 import { renderEmailLayout } from "../shared/layout.ts";
 
 export interface PasswordChangedEmailData {
-  userName: string;
-  changedAt: Date;
-  supportUrl: string;
+	userName: string;
+	changedAt: Date;
+	supportUrl: string;
 }
 
 function render(data: PasswordChangedEmailData): RenderedEmail {
-  const bodyHtml = `
+	const bodyHtml = `
     <h1 style="margin:0 0 16px;font-size:18px;color:#18181B;">Пароль изменён</h1>
     <p style="margin:0 0 12px;color:#52525B;">Здравствуйте, ${data.userName}!</p>
     <p style="margin:0 0 20px;color:#52525B;">
@@ -23,18 +23,18 @@ function render(data: PasswordChangedEmailData): RenderedEmail {
     ${renderButton("Связаться с поддержкой", data.supportUrl)}
   `;
 
-  return {
-    subject: "Пароль вашего аккаунта был изменён",
-    html: renderEmailLayout({
-      previewText: "Пароль вашего аккаунта был изменён",
-      bodyHtml,
-    }),
-    text: `Пароль вашего аккаунта был изменён ${formatDate(data.changedAt)}. Если это были не вы — свяжитесь с поддержкой: ${data.supportUrl}`,
-  };
+	return {
+		subject: "Пароль вашего аккаунта был изменён",
+		html: renderEmailLayout({
+			previewText: "Пароль вашего аккаунта был изменён",
+			bodyHtml,
+		}),
+		text: `Пароль вашего аккаунта был изменён ${formatDate(data.changedAt)}. Если это были не вы — свяжитесь с поддержкой: ${data.supportUrl}`,
+	};
 }
 
 export const passwordChangedEmailTemplate: EmailTemplate<PasswordChangedEmailData> =
-  {
-    id: "password-changed",
-    render,
-  };
+	{
+		id: "password-changed",
+		render,
+	};
