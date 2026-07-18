@@ -37,7 +37,7 @@ export async function fetchProductsPage({
 	if (filters.priceTo !== undefined)
 		params.set("priceTo", String(filters.priceTo));
 
-	const res = await fetch(`/api/products?${params.toString()}`);
+	const res = await fetch(`/api/catalog/products?${params.toString()}`);
 	return parseJsonOrThrow<ProductsPageResponse>(
 		res,
 		"Не удалось загрузить товары",

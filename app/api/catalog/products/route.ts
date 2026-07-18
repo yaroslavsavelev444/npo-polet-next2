@@ -11,7 +11,7 @@ const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 48;
 
 /**
- * GET /api/products?categoryId=...&cursor=<page>&limit=<n>&status=...&sort=...&order=...&priceFrom=...&priceTo=...
+ * GET /api/catalog/products?categoryId=...&cursor=<page>&limit=<n>&status=...&sort=...&order=...&priceFrom=...&priceTo=...
  *
  * Подгрузка страниц каталога категории для infinite scroll на клиенте.
  * Первая страница приходит с сервера вместе с самим page.tsx категории —
