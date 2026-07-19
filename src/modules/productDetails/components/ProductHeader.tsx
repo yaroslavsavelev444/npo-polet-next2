@@ -7,6 +7,7 @@ import { ProductStatusBadge } from "@/modules/productCard/components/ProductStat
 import { WishlistButton } from "@/modules/wishlist/components/WishlistButton";
 import type { ProductDetailData } from "../types";
 import { ProductRatingLink } from "./ProductRatingLink";
+import { InstructionCard } from "./tabs/InstructionCard";
 
 interface ProductHeaderProps {
 	product: ProductDetailData;
@@ -97,6 +98,11 @@ export function ProductHeader({
 					/>
 				) : null}
 			</ul>
+
+			{/* Инструкция к товару — компактным блоком у зоны покупки */}
+			{product.instruction && (
+				<InstructionCard instruction={product.instruction} />
+			)}
 		</div>
 	);
 }

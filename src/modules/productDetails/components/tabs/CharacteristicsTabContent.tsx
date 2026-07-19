@@ -1,6 +1,5 @@
 import { Empty } from "@/UI";
 import type { ProductDetailData } from "../../types";
-import { InstructionCard } from "./InstructionCard";
 import { SpecificationsTabContent, SpecRow } from "./SpecificationsTabContent";
 
 interface Props {
@@ -8,12 +7,12 @@ interface Props {
 }
 
 /**
- * Полный блок характеристик товара. Собирает воедино то, что раньше было
- * размазано по трём вкладкам (характеристики + «все параметры»): сами
- * характеристики, габариты/вес и инструкцию. Одно место — без дублей.
+ * Блок характеристик товара: сами характеристики и габариты/вес в одном месте.
+ * Инструкция вынесена в компактный блок у зоны покупки (см. ProductHeader),
+ * поэтому здесь не дублируется.
  */
 export function CharacteristicsTabContent({ product }: Props) {
-	const { specifications, dimensions, instruction } = product;
+	const { specifications, dimensions } = product;
 
 	const dimensionRows = [
 		{ name: "Длина", value: dimensions.length, unit: "см" },
@@ -25,7 +24,7 @@ export function CharacteristicsTabContent({ product }: Props) {
 	const hasSpecs = specifications.length > 0;
 	const hasDimensions = dimensionRows.length > 0;
 
-	if (!hasSpecs && !hasDimensions && !instruction) {
+	if (!hasSpecs && !hasDimensions) {
 		return <Empty message="Характеристики не указаны" />;
 	}
 
@@ -51,8 +50,6 @@ export function CharacteristicsTabContent({ product }: Props) {
 					</dl>
 				</div>
 			)}
-
-			{instruction && <InstructionCard instruction={instruction} />}
 		</div>
 	);
 }

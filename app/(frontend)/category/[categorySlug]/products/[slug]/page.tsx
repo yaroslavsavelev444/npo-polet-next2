@@ -149,8 +149,11 @@ export default async function ProductDetailPage({ params }: Props) {
 			<div className="container mx-auto px-4 py-6 sm:py-8">
 				<Breadcrumbs items={breadcrumbItems} variant="white" />
 
-				{/* Верх: галерея + блок покупки. На десктопе блок покупки липкий. */}
-				<div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:gap-12">
+				{/* Верх: галерея + блок покупки. На десктопе блок покупки липкий.
+				    Ширину верхнего блока ограничиваем (~840px), а колонку покупки
+				    фиксируем в 380px — так квадратный кадр галереи держится в пределах
+				    ~420px и не раздувается на весь первый экран на широких мониторах. */}
+				<div className="mt-6 grid grid-cols-1 gap-8 lg:max-w-[840px] lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-10">
 					<ProductGallery images={detailData.images} title={detailData.title} />
 
 					<div className="lg:sticky lg:top-24 lg:self-start">
