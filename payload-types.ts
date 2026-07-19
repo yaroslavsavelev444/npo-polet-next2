@@ -2230,6 +2230,13 @@ export interface Setting {
      */
     videoPoster?: (number | null) | Media;
   };
+  /**
+   * Показываются справа на страницах входа и регистрации (split-screen). Если не задано — используется стандартная заглушка. Рекомендуется вертикальное изображение высокого качества, не менее 1200×1600px.
+   */
+  authImages?: {
+    loginImage?: (number | null) | Media;
+    registerImage?: (number | null) | Media;
+  };
   workingHours?: string | null;
   map?: string | null;
   seo?: {
@@ -2304,6 +2311,12 @@ export interface SettingsSelect<T extends boolean = true> {
         image?: T;
         video?: T;
         videoPoster?: T;
+      };
+  authImages?:
+    | T
+    | {
+        loginImage?: T;
+        registerImage?: T;
       };
   workingHours?: T;
   map?: T;

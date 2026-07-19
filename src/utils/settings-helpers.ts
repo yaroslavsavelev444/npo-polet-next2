@@ -90,6 +90,24 @@ export function getHeroBackground(Setting: Setting | null): HeroBackground {
   }
 }
 
+export interface AuthImages {
+  loginUrl: string | null
+  registerUrl: string | null
+}
+
+/**
+ * Разбирает Setting.authImages в плоский набор URL для split-screen страниц
+ * входа/регистрации. Возвращает null для незаданных изображений — вызывающий
+ * код показывает градиентную заглушку.
+ */
+export function getAuthImages(Setting: Setting | null): AuthImages {
+  const authImages = Setting?.authImages
+  return {
+    loginUrl: mediaUrl(authImages?.loginImage),
+    registerUrl: mediaUrl(authImages?.registerImage),
+  }
+}
+
 /**
  * Получить юридический адрес
  */

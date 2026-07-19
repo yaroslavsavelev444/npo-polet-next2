@@ -4,6 +4,7 @@ import { useActionState, useEffect } from 'react';
 import Link from 'next/link';
 import { loginAction } from '../actions/login';
 import { AuthAlert } from './AuthAlert';
+import { Typewriter } from './Typewriter';
 import Input from '@/UI/Input/Input';
 import Button from '@/UI/Button/Button';
 
@@ -33,10 +34,14 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
   }, [state, onRequiresOtp]);
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Вход</h1>
-        <p className="mt-1 text-sm text-gray-500">Введите данные для входа</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+          <Typewriter text="Добро пожаловать" />
+        </h1>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          Введите данные, чтобы войти в аккаунт
+        </p>
       </div>
 
       <form action={action} className="space-y-4">
@@ -74,7 +79,7 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
         <div className="flex items-center justify-end">
           <Link
             href="/auth/forgot-password"
-            className="text-sm text-blue-600 hover:text-blue-500"
+            className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
           >
             Забыли пароль?
           </Link>
@@ -91,9 +96,12 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
           Войти
         </Button>
 
-        <p className="text-center text-sm text-gray-500">
+        <p className="text-center text-sm text-[var(--text-secondary)]">
           Нет аккаунта?{' '}
-          <Link href="/auth/register" className="text-blue-600 hover:text-blue-500 font-medium">
+          <Link
+            href="/auth/register"
+            className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+          >
             Зарегистрироваться
           </Link>
         </p>

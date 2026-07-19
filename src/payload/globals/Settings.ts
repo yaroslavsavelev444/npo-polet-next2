@@ -312,6 +312,31 @@ export const Settings: GlobalConfig = {
 			],
 		},
 
+		// ── Изображения страниц входа и регистрации (split-screen) ──
+		{
+			name: "authImages",
+			type: "group",
+			label: "Изображения страниц входа/регистрации",
+			admin: {
+				description:
+					"Показываются справа на страницах входа и регистрации (split-screen). Если не задано — используется стандартная заглушка. Рекомендуется вертикальное изображение высокого качества, не менее 1200×1600px.",
+			},
+			fields: [
+				{
+					name: "loginImage",
+					type: "upload",
+					relationTo: "media",
+					label: "Изображение для страницы входа",
+				},
+				{
+					name: "registerImage",
+					type: "upload",
+					relationTo: "media",
+					label: "Изображение для страницы регистрации",
+				},
+			],
+		},
+
 		// ── Рабочие часы и карта ──
 		{
 			name: "workingHours",

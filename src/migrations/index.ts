@@ -8,6 +8,7 @@ import * as migration_20260713_093858_legacy_data_migration_support from "./2026
 import * as migration_20260714_115946_legacy_password_migrated_flag from "./20260714_115946_legacy_password_migrated_flag.ts";
 import * as migration_20260717_121326_add_products_previous_slugs from "./20260717_121326_add_products_previous_slugs.ts";
 import * as migration_20260717_170000_feedback_simplify from "./20260717_170000_feedback_simplify.ts";
+import * as migration_20260719_120000_auth_images from "./20260719_120000_auth_images.ts";
 
 export const migrations = [
 	{
@@ -59,5 +60,10 @@ export const migrations = [
 		up: migration_20260717_170000_feedback_simplify.up,
 		down: migration_20260717_170000_feedback_simplify.down,
 		name: "20260717_170000_feedback_simplify",
+	},
+	{
+		up: migration_20260719_120000_auth_images.up,
+		down: migration_20260719_120000_auth_images.down,
+		name: "20260719_120000_auth_images",
 	},
 ];

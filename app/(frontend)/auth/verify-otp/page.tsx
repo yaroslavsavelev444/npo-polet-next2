@@ -3,8 +3,11 @@ export const revalidate = 0;
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { AuthShell } from "@/modules/auth/components/AuthShell";
 import { OtpForm } from "@/modules/auth/components/OtpForm";
 import { readPendingAuth } from "@/modules/auth/lib/pendingAuth";
+import { getCachedSettings } from "@/payload/services/settings.service";
+import { getAuthImages } from "@/utils/settings-helpers";
 
 const COPY = {
   login_2fa: {
@@ -36,12 +39,23 @@ export default async function VerifyOtpPage() {
 
   const copy = COPY[pending.type];
 
+  const settings = await getCachedSettings();
+  const { loginUrl, registerUrl } = getAuthImages(settings);
+  // email_verify относится к регистрации, login_2fa — ко входу.
+  const isRegister = pending.type === "email_verify";
+
   return (
-    <OtpForm
-      type={pending.type}
-      email={pending.email}
-      title={copy.title}
-      description={copy.description}
-    />
+    <AuthShell
+      imageUrl={isRegister ? registerUrl : loginUrl}
+      imageAlt={isRegister ? "Подтверждение регистрации" : "Подтверждение входа"}
+      variant={isRegister ? "register" : "login"}
+    >
+      <OtpForm
+        type={pending.type}
+        email={pending.email}
+        title={copy.title}
+        description={copy.description}
+      />
+    </AuthShell>
   );
 }

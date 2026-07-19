@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { registerAction } from '../actions/register';
 import { AuthAlert } from './AuthAlert';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
+import { Typewriter } from './Typewriter';
 import { validateEmail } from '../lib/email';
 import type { AcceptedConsentInput } from '../schemas/register.schema';
-import Typography, { Heading } from '@/UI/Typography/Typography';
+import Typography from '@/UI/Typography/Typography';
 import { Input } from '@/UI/Input/Input';
 import { Button } from '@/UI/Button/Button';
 import { ConsentList } from '@/components/Consent/ConsentList';
@@ -68,12 +69,14 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full">
       <div className="mb-8">
-        <Heading level={1}>Регистрация</Heading>
-        <Typography variant="body-sm" color="secondary" className="mt-1">
-          Создайте аккаунт
-        </Typography>
+        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+          <Typewriter text="Рады знакомству!" />
+        </h1>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          Создайте аккаунт, чтобы начать
+        </p>
       </div>
 
       <form action={handleSubmit} className="space-y-4">
@@ -162,7 +165,10 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
 
         <Typography variant="body-sm" color="secondary" className="text-center">
           Уже есть аккаунт?{' '}
-          <Link href="/auth/login" className="text-blue-600 hover:text-blue-500 font-medium">
+          <Link
+            href="/auth/login"
+            className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+          >
             Войти
           </Link>
         </Typography>

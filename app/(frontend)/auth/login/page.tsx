@@ -1,37 +1,22 @@
-'use client'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
-import { useState } from 'react'
-import { LoginForm } from '@/modules/auth/components/LoginForm'
-import { OtpForm } from '@/modules/auth/components/OtpForm'
+import { AuthShell } from '@/modules/auth/components/AuthShell'
+import { getCachedSettings } from '@/payload/services/settings.service'
+import { getAuthImages } from '@/utils/settings-helpers'
+import { LoginFlow } from './LoginFlow'
 
 /**
- * Страница входа.
- *
- * Состояние (два шага) живёт на клиенте — это минимальный UI state,
- * не требующий глобального хранилища.
- *
- * Шаг 1: LoginForm → вводит email + пароль
- * Шаг 2: OtpForm  → вводит 6-значный код
+ * Страница входа. Server Component: подтягивает изображение для правой колонки
+ * из настроек админки и оборачивает клиентский поток входа в split-screen.
  */
-export default function LoginPage() {
-  const [step, setStep] = useState<'login' | 'otp'>('login')
-  const [email, setEmail] = useState('')
+export default async function LoginPage() {
+  const settings = await getCachedSettings()
+  const { loginUrl } = getAuthImages(settings)
 
-  function handleRequiresOtp(enteredEmail: string) {
-    setEmail(enteredEmail)
-    setStep('otp')
-  }
-
-  if (step === 'otp') {
-    return (
-      <OtpForm
-        type="login_2fa"
-        email={email}
-        title="Подтверждение входа"
-        description="Введите код, отправленный на"
-      />
-    )
-  }
-
-  return <LoginForm onRequiresOtp={handleRequiresOtp} />
+  return (
+    <AuthShell imageUrl={loginUrl} imageAlt="Вход в личный кабинет" variant="login">
+      <LoginFlow />
+    </AuthShell>
+  )
 }

@@ -65,6 +65,18 @@ body {
 	}
 }
 
+/* Мигающий курсор для печатного эффекта приветствия (src/modules/auth Typewriter) */
+@keyframes caret-blink {
+	0%,
+	100% {
+		opacity: 1;
+	}
+
+	50% {
+		opacity: 0;
+	}
+}
+
 /* Тряска группы полей OTP при неверном коде (src/modules/auth) */
 @keyframes shake {
 	10%,
