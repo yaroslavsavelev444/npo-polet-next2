@@ -101,11 +101,28 @@ export const checkoutSchema = z
         });
     }
     if (data.delivery.method === "pickup_point") {
-      if (!data.delivery.address?.city?.trim())
+      // Для ПВЗ нужен адрес пункта: город, улица, дом. Квартиры и индекса нет.
+      const city = data.delivery.address?.city?.trim() ?? "";
+      const street = data.delivery.address?.street?.trim() ?? "";
+      const house = data.delivery.address?.house?.trim() ?? "";
+
+      if (city.length < 2)
         ctx.addIssue({
           code: "custom",
           path: ["delivery", "address", "city"],
           message: "Укажите город назначения",
+        });
+      if (street.length < 2)
+        ctx.addIssue({
+          code: "custom",
+          path: ["delivery", "address", "street"],
+          message: "Укажите улицу",
+        });
+      if (house.length < 1)
+        ctx.addIssue({
+          code: "custom",
+          path: ["delivery", "address", "house"],
+          message: "Укажите номер дома",
         });
       if (!data.delivery.transportCompanyId)
         ctx.addIssue({

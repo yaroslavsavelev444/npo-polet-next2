@@ -224,19 +224,47 @@ export function DeliveryMethodSelector({
 						</div>
 					)}
 
-					{/* Destination city (pickup_point) */}
+					{/* Address (pickup_point: город/улица/дом — без квартиры и индекса) */}
 					{value.method === "pickup_point" && (
-						<Input
-							label="Город назначения"
-							placeholder="Город назначения"
-							value={address.city}
-							onChange={(e) =>
-								onChange({
-									...value,
-									address: { ...address, city: e.target.value },
-								})
-							}
-						/>
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							<Input
+								label="Город назначения"
+								placeholder="Например, Москва"
+								value={address.city}
+								onChange={(e) =>
+									onChange({
+										...value,
+										address: { ...address, city: e.target.value },
+									})
+								}
+								required
+								wrapperClassName="sm:col-span-2"
+							/>
+							<Input
+								label="Улица"
+								placeholder="Например, Ленина"
+								value={address.street}
+								onChange={(e) =>
+									onChange({
+										...value,
+										address: { ...address, street: e.target.value },
+									})
+								}
+								required
+							/>
+							<Input
+								label="Дом"
+								placeholder="Например, 12к1"
+								value={address.house}
+								onChange={(e) =>
+									onChange({
+										...value,
+										address: { ...address, house: e.target.value },
+									})
+								}
+								required
+							/>
+						</div>
 					)}
 
 					{/* Pickup point (self_pickup) */}

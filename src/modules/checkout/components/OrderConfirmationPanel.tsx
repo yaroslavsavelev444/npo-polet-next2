@@ -64,10 +64,19 @@ export function OrderConfirmationPanel({
       <div className="flex flex-col gap-1 text-sm">
         <Row label="Доставка" value={DELIVERY_LABELS[delivery.method]} />
         {delivery.method === "door_to_door" && delivery.address?.street && (
-          <Row label="Адрес" value={formatDoorAddress(delivery.address)} />
+          <Row
+            label="Адрес"
+            value={formatDeliveryAddress(delivery.address, {
+              withApartment: true,
+              withPostalCode: true,
+            })}
+          />
         )}
-        {delivery.method === "pickup_point" && delivery.address?.city && (
-          <Row label="Город" value={delivery.address.city} />
+        {delivery.method === "pickup_point" && delivery.address?.street && (
+          <Row
+            label="Адрес ПВЗ"
+            value={formatDeliveryAddress(delivery.address)}
+          />
         )}
         {transportCompany && (
           <Row label="Компания" value={transportCompany.name} />
@@ -123,18 +132,21 @@ export function OrderConfirmationPanel({
   );
 }
 
-function formatDoorAddress(
+function formatDeliveryAddress(
   address: NonNullable<CheckoutDeliveryInput["address"]>,
+  opts: { withApartment?: boolean; withPostalCode?: boolean } = {},
 ): string {
   const line = [
     address.city,
     address.street,
     address.house ? `д. ${address.house}` : null,
-    address.apartment ? `кв. ${address.apartment}` : null,
+    opts.withApartment && address.apartment ? `кв. ${address.apartment}` : null,
   ]
     .filter(Boolean)
     .join(", ");
-  return address.postalCode ? `${address.postalCode}, ${line}` : line;
+  return opts.withPostalCode && address.postalCode
+    ? `${address.postalCode}, ${line}`
+    : line;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
