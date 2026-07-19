@@ -15,21 +15,28 @@ interface AuthShellProps {
   variant: "login" | "register";
 }
 
+// Отступ, на который контент опускается ниже фиксированной шапки. Тот же токен,
+// что используют HeaderSpacer и Hero на главной (app/(frontend)/page.tsx).
+const HEADER_OFFSET =
+  "calc(var(--sticky-header-height) + var(--responsive-space-l))";
+
 /**
  * Split-screen оболочка страниц входа/регистрации.
  *
  * Слева — форма (передаётся как children), справа — изображение из админки.
  * На мобильных изображение полностью скрыто, остаётся только форма.
  *
- * Геометрия:
- *  - Компонент рендерится внутри общего layout (frontend), у которого есть
- *    фиксированная шапка (--sticky-header-height) и внешний отступ p-l
- *    (--responsive-space-l). Мы «выходим» из этого отступа отрицательными
- *    полями тем же токеном, чтобы split-screen занял ровно оставшийся первый
- *    экран: header + shell = 100svh, из-за чего футер оказывается ниже сгиба
- *    и не виден без прокрутки.
- *  - Используем svh (small viewport height), чтобы на мобильных панель
- *    браузера не «съедала» высоту и футер гарантированно не подглядывал.
+ * Геометрия (тот же приём, что у Hero на главной):
+ *  - Компонент рендерится внутри общего layout (frontend): фиксированная
+ *    полупрозрачная шапка + внешний отступ p-l (--responsive-space-l) + спейсер
+ *    высотой --sticky-header-height. Спейсер немного выше реальной шапки, из-за
+ *    чего между шапкой и контентом появлялась полоса фона.
+ *  - Поэтому оболочку поднимаем к самому верху (marginTop = -(спейсер + p-l))
+ *    и растягиваем на весь экран (min-height: 100svh). Фон/изображение уходят
+ *    под полупрозрачную шапку без зазора, а сам контент опускаем ниже шапки
+ *    через paddingTop, чтобы он её не перекрывал. Футер оказывается за сгибом.
+ *  - svh (small viewport height) — чтобы на мобильных панель браузера не
+ *    «съедала» высоту и футер не подглядывал.
  */
 export function AuthShell({
   imageUrl,
@@ -43,41 +50,65 @@ export function AuthShell({
         width: "100vw",
         marginLeft: "-50vw",
         marginRight: "-50vw",
-        marginTop: "calc(-1 * var(--responsive-space-l))",
-        marginBottom: "calc(-1 * var(--responsive-space-l))",
-        minHeight: "calc(100svh - var(--sticky-header-height))",
+        marginTop: `calc(-1 * ${HEADER_OFFSET})`,
+        minHeight: "100svh",
       }}
       className="flex"
     >
-      {/* Левая колонка — форма. m-auto (а не justify-center) центрирует форму по
-          вертикали, но при нехватке высоты позволяет прокрутить её целиком, не
-          обрезая верх (известная особенность flexbox + overflow). */}
-      <div className="flex w-full flex-col overflow-y-auto px-6 py-10 sm:px-10 lg:w-1/2 lg:px-16 xl:px-24">
+      {/* Левая колонка — форма. paddingTop опускает форму ниже шапки; m-auto (а не
+          justify-center) центрирует её по вертикали, но при нехватке высоты
+          позволяет прокрутить целиком, не обрезая верх (особенность flexbox). */}
+      <div
+        className="flex w-full flex-col overflow-y-auto px-6 pb-10 sm:px-10 lg:w-1/2 lg:px-16 xl:px-24"
+        style={{ paddingTop: HEADER_OFFSET }}
+      >
         <div className="m-auto w-full max-w-md">{children}</div>
       </div>
 
-      {/* Правая колонка — изображение (скрыта на мобильных) */}
-      <div className="relative hidden lg:block lg:w-1/2">
+      {/* Правая колонка — изображение (скрыта на мобильных). Изображение
+          показывается целиком (object-contain) — без обрезки и искажения; пустоты
+          по краям заполняет размытая копия того же изображения (backdrop), чтобы
+          колонка выглядела цельной при любом соотношении сторон. */}
+      <div className="relative hidden overflow-hidden lg:block lg:w-1/2">
         {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={imageAlt}
-            fill
-            sizes="50vw"
-            quality={85}
-            priority
-            className="object-cover"
-          />
+          <>
+            {/* Размытый фон-заполнитель */}
+            <Image
+              src={imageUrl}
+              alt=""
+              aria-hidden
+              fill
+              sizes="50vw"
+              quality={30}
+              className="scale-110 object-cover blur-2xl"
+              style={{ opacity: 0.45 }}
+            />
+            <div
+              aria-hidden
+              className="absolute inset-0"
+              style={{ background: "var(--background)", opacity: 0.35 }}
+            />
+            {/* Само изображение — целиком, без обрезки */}
+            <Image
+              src={imageUrl}
+              alt={imageAlt}
+              fill
+              sizes="50vw"
+              quality={90}
+              priority
+              className="object-contain"
+            />
+          </>
         ) : (
           <AuthImagePlaceholder variant={variant} />
         )}
-        {/* Мягкое затемнение по левому краю — стык с формой без резкой границы */}
+        {/* Мягкий стык с формой по левому краю */}
         <div
           aria-hidden
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(90deg, var(--background) 0%, rgba(26,29,36,0) 12%)",
+              "linear-gradient(90deg, var(--background) 0%, rgba(26,29,36,0) 10%)",
           }}
         />
       </div>
