@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/UI";
 import { formatRuPhoneInput, isValidRuPhone } from "../lib/phone";
+import { validateFullName } from "../lib/validate-full-name";
 import type { CheckoutRecipientInput } from "../types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,7 +15,12 @@ interface Props {
 
 export function RecipientForm({ value, onChange }: Props) {
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const [fullNameTouched, setFullNameTouched] = useState(false);
 
+  const fullNameError =
+    fullNameTouched && value.fullName
+      ? (validateFullName(value.fullName) ?? undefined)
+      : undefined;
   const phoneError =
     phoneTouched && value.phone && !isValidRuPhone(value.phone)
       ? "Укажите номер телефона полностью, например +7 (999) 123-45-67"
@@ -35,7 +41,10 @@ export function RecipientForm({ value, onChange }: Props) {
           label="ФИО получателя"
           value={value.fullName}
           onChange={(e) => onChange({ ...value, fullName: e.target.value })}
+          onBlur={() => setFullNameTouched(true)}
           placeholder="Иванов Иван Иванович"
+          errorMessage={fullNameError}
+          helperText="Фамилия, имя и отчество получателя полностью"
           required
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

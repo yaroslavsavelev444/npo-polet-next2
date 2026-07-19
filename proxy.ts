@@ -9,6 +9,43 @@ const PROTECTED_PATHS = ["/profile", "/orders", "/leave-review"];
 // Путь OTP — доступен только тем, кто ввёл пароль, но ещё не подтвердил код
 const OTP_PATH = "/auth/verify-otp";
 
+// Гостевые страницы авторизации — доступны ТОЛЬКО неавторизованным. Полностью
+// авторизованному пользователю тут делать нечего (verify-otp обрабатывается
+// отдельно — это состояние №2, а не гостевая страница).
+const GUEST_AUTH_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/forgot-password",
+  "/auth/password-reset",
+];
+
+function isGuestAuthPath(pathname: string): boolean {
+  return GUEST_AUTH_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
+
+/**
+ * Куда вернуть уже авторизованного пользователя, попавшего на гостевую
+ * страницу входа. По возможности — на исходный внутренний путь из ?from=
+ * (напр. его прислал сюда гейт защищённого пути), иначе в личный кабинет.
+ * Внешние адреса и повторно-гостевые/OTP-пути отбрасываем — иначе open-redirect
+ * и петля переадресаций.
+ */
+function safeRedirectTarget(req: NextRequest): string {
+  const from = req.nextUrl.searchParams.get("from");
+  if (
+    from &&
+    from.startsWith("/") &&
+    !from.startsWith("//") &&
+    !isGuestAuthPath(from) &&
+    from !== OTP_PATH
+  ) {
+    return from;
+  }
+  return "/profile";
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const host = req.headers.get("host")?.split(":")[0] ?? "";
@@ -76,6 +113,15 @@ export async function proxy(req: NextRequest) {
 
   // ── 3. Если путь НЕ защищён — пропускаем без дополнительных проверок ──────
   if (!isProtected) {
+    // Зеркало защиты ниже (гость → на логин): полностью авторизованному
+    // пользователю нечего делать на гостевых страницах входа/регистрации —
+    // уводим в кабинет (или на исходный путь из ?from=). Опираемся на наличие
+    // payload-token так же, как OTP-гейт: устаревший токен само-починится на
+    // защищённом пути (шаг 5 удалит куки и вернёт на логин).
+    if (payloadToken && isGuestAuthPath(pathname)) {
+      return NextResponse.redirect(new URL(safeRedirectTarget(req), req.url));
+    }
+
     // Единственное исключение: /auth/verify-otp — экран состояния №2
     if (pathname === OTP_PATH) {
       // Уже полностью авторизован — на OTP делать нечего

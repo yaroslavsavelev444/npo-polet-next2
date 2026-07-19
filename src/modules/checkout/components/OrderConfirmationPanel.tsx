@@ -64,10 +64,7 @@ export function OrderConfirmationPanel({
       <div className="flex flex-col gap-1 text-sm">
         <Row label="Доставка" value={DELIVERY_LABELS[delivery.method]} />
         {delivery.method === "door_to_door" && delivery.address?.street && (
-          <Row
-            label="Адрес"
-            value={`${delivery.address.street}, ${delivery.address.city}`}
-          />
+          <Row label="Адрес" value={formatDoorAddress(delivery.address)} />
         )}
         {delivery.method === "pickup_point" && delivery.address?.city && (
           <Row label="Город" value={delivery.address.city} />
@@ -124,6 +121,20 @@ export function OrderConfirmationPanel({
       </div>
     </div>
   );
+}
+
+function formatDoorAddress(
+  address: NonNullable<CheckoutDeliveryInput["address"]>,
+): string {
+  const line = [
+    address.city,
+    address.street,
+    address.house ? `д. ${address.house}` : null,
+    address.apartment ? `кв. ${address.apartment}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return address.postalCode ? `${address.postalCode}, ${line}` : line;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

@@ -208,8 +208,10 @@ export async function createOrderFromCheckout({
           form.delivery.method === "self_pickup"
             ? undefined
             : {
-                street: form.delivery.address?.street,
                 city: form.delivery.address?.city,
+                street: form.delivery.address?.street,
+                house: form.delivery.address?.house,
+                apartment: form.delivery.address?.apartment,
                 postalCode: form.delivery.address?.postalCode,
                 country: form.delivery.address?.country ?? "Россия",
               },

@@ -482,8 +482,10 @@ export interface Order {
   delivery: {
     method: 'door_to_door' | 'pickup_point' | 'self_pickup';
     address?: {
-      street?: string | null;
       city?: string | null;
+      street?: string | null;
+      house?: string | null;
+      apartment?: string | null;
       postalCode?: string | null;
       country?: string | null;
     };
@@ -1142,8 +1144,10 @@ export interface CheckoutPreference {
   delivery?: {
     method?: ('door_to_door' | 'pickup_point' | 'self_pickup') | null;
     address?: {
-      street?: string | null;
       city?: string | null;
+      street?: string | null;
+      house?: string | null;
+      apartment?: string | null;
       postalCode?: string | null;
       country?: string | null;
     };
@@ -1605,8 +1609,10 @@ export interface OrdersSelect<T extends boolean = true> {
         address?:
           | T
           | {
-              street?: T;
               city?: T;
+              street?: T;
+              house?: T;
+              apartment?: T;
               postalCode?: T;
               country?: T;
             };
@@ -2111,8 +2117,10 @@ export interface CheckoutPreferencesSelect<T extends boolean = true> {
         address?:
           | T
           | {
-              street?: T;
               city?: T;
+              street?: T;
+              house?: T;
+              apartment?: T;
               postalCode?: T;
               country?: T;
             };

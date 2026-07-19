@@ -53,8 +53,10 @@ export function DeliveryMethodSelector({
 	transportCompanies,
 }: Props) {
 	const address = value.address ?? {
-		street: "",
 		city: "",
+		street: "",
+		house: "",
+		apartment: "",
 		postalCode: "",
 		country: "Россия",
 	};
@@ -156,20 +158,8 @@ export function DeliveryMethodSelector({
 					{value.method === "door_to_door" && (
 						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 							<Input
-								label="Адрес"
-								placeholder="Улица, дом, квартира"
-								value={address.street}
-								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, street: e.target.value },
-									})
-								}
-								wrapperClassName="sm:col-span-2"
-							/>
-							<Input
 								label="Город"
-								placeholder="Город"
+								placeholder="Например, Москва"
 								value={address.city}
 								onChange={(e) =>
 									onChange({
@@ -177,10 +167,49 @@ export function DeliveryMethodSelector({
 										address: { ...address, city: e.target.value },
 									})
 								}
+								required
+								wrapperClassName="sm:col-span-2"
+							/>
+							<Input
+								label="Улица"
+								placeholder="Например, Ленина"
+								value={address.street}
+								onChange={(e) =>
+									onChange({
+										...value,
+										address: { ...address, street: e.target.value },
+									})
+								}
+								required
+								wrapperClassName="sm:col-span-2"
+							/>
+							<Input
+								label="Дом"
+								placeholder="Например, 12к1"
+								value={address.house}
+								onChange={(e) =>
+									onChange({
+										...value,
+										address: { ...address, house: e.target.value },
+									})
+								}
+								required
+							/>
+							<Input
+								label="Квартира / офис"
+								placeholder="Необязательно"
+								value={address.apartment}
+								onChange={(e) =>
+									onChange({
+										...value,
+										address: { ...address, apartment: e.target.value },
+									})
+								}
 							/>
 							<Input
 								label="Индекс"
-								placeholder="Индекс"
+								placeholder="6 цифр"
+								inputMode="numeric"
 								value={address.postalCode}
 								onChange={(e) => {
 									const val = e.target.value.replace(/\D/g, "").slice(0, 6);
@@ -189,6 +218,8 @@ export function DeliveryMethodSelector({
 										address: { ...address, postalCode: val },
 									});
 								}}
+								required
+								wrapperClassName="sm:col-span-2"
 							/>
 						</div>
 					)}

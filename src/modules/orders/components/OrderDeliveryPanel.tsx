@@ -30,10 +30,21 @@ const METHOD_ICON: Record<
 };
 
 function formatAddress(address: NonNullable<Delivery["address"]>): string {
+	// Обратная совместимость: у старых заказов весь адрес лежит в street, полей
+	// house/apartment нет — тогда просто выводим street как есть. У новых заказов
+	// house/apartment заполнены и добавляются к улице отдельными сегментами.
+	const streetLine = [
+		address.street,
+		address.house ? `д. ${address.house}` : null,
+		address.apartment ? `кв. ${address.apartment}` : null,
+	]
+		.filter(Boolean)
+		.join(", ");
+
 	return [
 		address.postalCode,
 		address.city,
-		address.street,
+		streetLine || null,
 		address.country && address.country !== "Россия" ? address.country : null,
 	]
 		.filter(Boolean)

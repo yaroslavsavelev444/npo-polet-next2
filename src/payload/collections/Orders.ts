@@ -304,8 +304,14 @@ export const Orders: CollectionConfig = {
 							siblingData?.method === DeliveryMethod.PICKUP_POINT,
 					},
 					fields: [
-						{ name: "street", type: "text" },
 						{ name: "city", type: "text" },
+						{ name: "street", type: "text" },
+						// house/apartment добавлены позже — исторические заказы хранят
+						// весь адрес в одном поле street, поэтому они опциональны, а код
+						// отображения (OrderDeliveryPanel.formatAddress) поддерживает
+						// оба формата.
+						{ name: "house", type: "text", label: "Дом" },
+						{ name: "apartment", type: "text", label: "Квартира" },
 						{ name: "postalCode", type: "text" },
 						{ name: "country", type: "text", defaultValue: "Россия" },
 					],

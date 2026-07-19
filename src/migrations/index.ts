@@ -9,6 +9,7 @@ import * as migration_20260714_115946_legacy_password_migrated_flag from "./2026
 import * as migration_20260717_121326_add_products_previous_slugs from "./20260717_121326_add_products_previous_slugs.ts";
 import * as migration_20260717_170000_feedback_simplify from "./20260717_170000_feedback_simplify.ts";
 import * as migration_20260719_120000_auth_images from "./20260719_120000_auth_images.ts";
+import * as migration_20260719_140000_order_address_house_apartment from "./20260719_140000_order_address_house_apartment.ts";
 
 export const migrations = [
 	{
@@ -65,5 +66,10 @@ export const migrations = [
 		up: migration_20260719_120000_auth_images.up,
 		down: migration_20260719_120000_auth_images.down,
 		name: "20260719_120000_auth_images",
+	},
+	{
+		up: migration_20260719_140000_order_address_house_apartment.up,
+		down: migration_20260719_140000_order_address_house_apartment.down,
+		name: "20260719_140000_order_address_house_apartment",
 	},
 ];

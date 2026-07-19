@@ -54,8 +54,10 @@ export interface OrderDetailView extends OrderListItemView {
 	delivery: {
 		method: Order["delivery"]["method"];
 		address?: {
-			street?: string | null;
 			city?: string | null;
+			street?: string | null;
+			house?: string | null;
+			apartment?: string | null;
 			postalCode?: string | null;
 			country?: string | null;
 		} | null;

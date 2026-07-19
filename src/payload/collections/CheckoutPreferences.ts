@@ -64,8 +64,10 @@ export const CheckoutPreferences: CollectionConfig = {
           name: "address",
           type: "group",
           fields: [
-            { name: "street", type: "text" },
             { name: "city", type: "text" },
+            { name: "street", type: "text" },
+            { name: "house", type: "text", label: "Дом" },
+            { name: "apartment", type: "text", label: "Квартира" },
             { name: "postalCode", type: "text" },
             { name: "country", type: "text" },
           ],

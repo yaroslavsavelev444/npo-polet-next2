@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateFullName } from "./validate-full-name";
 import { validateInn } from "./validate-inn";
 import { RU_PHONE_E164_RE } from "./phone";
 
@@ -6,8 +7,10 @@ import { RU_PHONE_E164_RE } from "./phone";
 // зависит от выбранного способа доставки и проверяется в superRefine ниже,
 // иначе валидация адреса срабатывала бы даже для самовывоза.
 const addressSchema = z.object({
-  street: z.string().optional().default(""),
   city: z.string().optional().default(""),
+  street: z.string().optional().default(""),
+  house: z.string().optional().default(""),
+  apartment: z.string().optional().default(""),
   postalCode: z.string().optional().default(""),
   country: z.string().optional().default("Россия"),
 });
@@ -15,7 +18,9 @@ const addressSchema = z.object({
 export const checkoutSchema = z
   .object({
     recipient: z.object({
-      fullName: z.string().trim().min(4, "Укажите ФИО получателя"),
+      // Строгая проверка ФИО (не логин/имя аккаунта) — в superRefine ниже,
+      // чтобы вернуть точное сообщение об ошибке.
+      fullName: z.string().trim(),
       phone: z
         .string()
         .regex(RU_PHONE_E164_RE, "Укажите корректный номер телефона"),
@@ -46,24 +51,41 @@ export const checkoutSchema = z
     notes: z.string().max(1000).optional(),
   })
   .superRefine((data, ctx) => {
+    // Строгая валидация ФИО получателя (фамилия + имя [+ отчество]).
+    const fullNameError = validateFullName(data.recipient.fullName);
+    if (fullNameError) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["recipient", "fullName"],
+        message: fullNameError,
+      });
+    }
+
     // Delivery-method-specific requirements — только для выбранного способа,
     // остальные способы не проверяются вовсе (self_pickup не требует адреса).
     if (data.delivery.method === "door_to_door") {
       const street = data.delivery.address?.street?.trim() ?? "";
       const city = data.delivery.address?.city?.trim() ?? "";
+      const house = data.delivery.address?.house?.trim() ?? "";
       const postalCode = data.delivery.address?.postalCode ?? "";
 
-      if (street.length < 3)
-        ctx.addIssue({
-          code: "custom",
-          path: ["delivery", "address", "street"],
-          message: "Укажите улицу и дом",
-        });
       if (city.length < 2)
         ctx.addIssue({
           code: "custom",
           path: ["delivery", "address", "city"],
           message: "Укажите город",
+        });
+      if (street.length < 2)
+        ctx.addIssue({
+          code: "custom",
+          path: ["delivery", "address", "street"],
+          message: "Укажите улицу",
+        });
+      if (house.length < 1)
+        ctx.addIssue({
+          code: "custom",
+          path: ["delivery", "address", "house"],
+          message: "Укажите номер дома",
         });
       if (!/^\d{6}$/.test(postalCode))
         ctx.addIssue({

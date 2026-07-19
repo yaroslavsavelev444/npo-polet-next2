@@ -44,8 +44,10 @@ export async function buildCheckoutView(userId: string): Promise<CheckoutView> {
         method: preferences.delivery.method as SavedDelivery["method"],
         address: preferences.delivery.address
           ? {
-              street: preferences.delivery.address.street ?? undefined,
               city: preferences.delivery.address.city ?? undefined,
+              street: preferences.delivery.address.street ?? undefined,
+              house: preferences.delivery.address.house ?? undefined,
+              apartment: preferences.delivery.address.apartment ?? undefined,
               postalCode: preferences.delivery.address.postalCode ?? undefined,
               country: preferences.delivery.address.country ?? undefined,
             }

@@ -20,8 +20,10 @@ interface SaveCheckoutPreferencesInput {
   delivery?: {
     method: string;
     address?: {
-      street?: string;
       city?: string;
+      street?: string;
+      house?: string;
+      apartment?: string;
       postalCode?: string;
       country?: string;
     };

@@ -33,8 +33,10 @@ export interface SavedRecipient {
 export interface SavedDelivery {
   method: CheckoutDeliveryMethod;
   address?: {
-    street?: string;
     city?: string;
+    street?: string;
+    house?: string;
+    apartment?: string;
     postalCode?: string;
     country?: string;
   };
@@ -63,8 +65,10 @@ export interface CheckoutRecipientInput {
 export interface CheckoutDeliveryInput {
   method: CheckoutDeliveryMethod;
   address?: {
-    street: string;
     city: string;
+    street: string;
+    house: string;
+    apartment: string;
     postalCode: string;
     country: string;
   };

@@ -6,6 +6,7 @@ import { appToast } from "@/shared/lib/toast";
 import { Button } from "@/UI";
 import { submitOrderAction } from "../actions/checkout.actions";
 import { formatRuPhoneInput, isValidRuPhone, normalizeRuPhone } from "../lib/phone";
+import { isValidFullName } from "../lib/validate-full-name";
 import {
   getAvailablePaymentMethods,
   getDefaultPaymentMethod,
@@ -38,7 +39,9 @@ export function CheckoutPageClient({
   const [isSubmitting, startSubmitting] = useTransition();
 
   const [recipient, setRecipient] = useState<CheckoutRecipientInput>({
-    fullName: initialView.savedRecipient?.fullName ?? user.name ?? "",
+    // ФИО НЕ подставляется из аккаунта — пользователь вводит получателя вручную,
+    // либо оно приходит из ранее сохранённых (и уже провалидированных) данных.
+    fullName: initialView.savedRecipient?.fullName ?? "",
     phone: formatRuPhoneInput(initialView.savedRecipient?.phone ?? ""),
     email: initialView.savedRecipient?.email ?? user.email ?? "",
     saveRecipient: Boolean(initialView.savedRecipient),
@@ -47,8 +50,10 @@ export function CheckoutPageClient({
   const [delivery, setDelivery] = useState<CheckoutDeliveryInput>({
     method: initialView.savedDelivery?.method ?? "self_pickup",
     address: {
-      street: initialView.savedDelivery?.address?.street ?? "",
       city: initialView.savedDelivery?.address?.city ?? "",
+      street: initialView.savedDelivery?.address?.street ?? "",
+      house: initialView.savedDelivery?.address?.house ?? "",
+      apartment: initialView.savedDelivery?.address?.apartment ?? "",
       postalCode: initialView.savedDelivery?.address?.postalCode ?? "",
       country: initialView.savedDelivery?.address?.country ?? "Россия",
     },
@@ -105,7 +110,7 @@ export function CheckoutPageClient({
 
   const isValid =
     initialView.cart.validation.isValid &&
-    recipient.fullName &&
+    isValidFullName(recipient.fullName) &&
     isValidRuPhone(recipient.phone) &&
     recipient.email;
 
