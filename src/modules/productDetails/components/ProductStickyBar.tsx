@@ -19,7 +19,7 @@ interface Props {
  */
 export function ProductStickyBar({ product, cardData }: Props) {
 	return (
-		<div className="fixed inset-x-0 bottom-0 z-[51] border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 backdrop-blur-md lg:hidden">
+		<div className="fixed inset-x-0 bottom-0 z-[51] border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur-md lg:hidden">
 			<div className="flex items-center gap-3">
 				<div className="flex shrink-0 flex-col leading-tight">
 					<span className="text-base font-bold text-[var(--text-primary)]">

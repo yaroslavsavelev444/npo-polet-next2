@@ -3,7 +3,16 @@
 
 :root {
 	--foreground: #ecedee;
-	--sticky-header-height: 124px;
+	/* Мобильная шапка = только navbar (topbar скрыт, см. TopHeader.tsx). */
+	--sticky-header-height: 72px;
+}
+
+/* sm+ : показывается topbar, поэтому шапка выше. Значение синхронизировано с
+   реальной суммой высот TopHeader + Navbar. */
+@media (min-width: 640px) {
+	:root {
+		--sticky-header-height: 124px;
+	}
 }
 
 @theme inline {
