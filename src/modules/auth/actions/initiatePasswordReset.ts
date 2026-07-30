@@ -1,5 +1,6 @@
 "use server";
 
+import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordChanged";
@@ -110,6 +111,7 @@ export async function resetPasswordAction(
       collection: "users",
       data: { token, password },
       overrideAccess: true,
+      context: AUTH_FLOW_CONTEXT, // ← вот это добавить
     });
 
     // Payload возвращает { token, user } — используем user.id
