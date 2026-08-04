@@ -15,30 +15,32 @@ import { closeLegacyMongo, getLegacyDb } from "./lib/legacyMongo.ts";
 import { allMigrations } from "./migrations/index.ts";
 
 interface CliOptions {
-	dryRun: boolean;
-	verbose: boolean;
-	help: boolean;
-	only?: string[];
+  dryRun: boolean;
+  verbose: boolean;
+  help: boolean;
+  noDeps: boolean;
+  only?: string[];
 }
 
 function parseArgs(argv: string[]): CliOptions {
-	const only = argv.find((a) => a.startsWith("--only="));
-	return {
-		dryRun: argv.includes("--dry-run"),
-		verbose: argv.includes("--verbose"),
-		help: argv.includes("--help") || argv.includes("-h"),
-		only: only
-			? only
-					.slice("--only=".length)
-					.split(",")
-					.map((s) => s.trim())
-					.filter(Boolean)
-			: undefined,
-	};
+  const only = argv.find((a) => a.startsWith("--only="));
+  return {
+    dryRun: argv.includes("--dry-run"),
+    verbose: argv.includes("--verbose"),
+    help: argv.includes("--help") || argv.includes("-h"),
+    noDeps: argv.includes("--no-deps"),
+    only: only
+      ? only
+          .slice("--only=".length)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined,
+  };
 }
 
 function printHelp() {
-	console.log(`
+  console.log(`
 Миграция данных из старой MongoDB в новую Payload/Postgres схему.
 
 Использование:
@@ -51,6 +53,13 @@ function printHelp() {
                       зависимости (см. dependsOn в каждом *.migration.ts).
                       Доступные slug'и: ${allMigrations.map((m) => m.slug).join(", ")}
   --verbose           Подробный DEBUG-лог.
+  --no-deps           Вместе с --only=... выполнить СТРОГО перечисленные
+                      миграции, без автоматического подтягивания dependsOn.
+                      Резолв связей (resolveRef) при этом всё равно работает
+                      корректно — он читает уже существующие в новой БД
+                      записи по legacyId, а не требует повторного прогона
+                      зависимостей. Безопасно, только если зависимые
+                      сущности УЖЕ переносились раньше.
   --help, -h          Эта справка.
 
 Переменные окружения:
@@ -69,27 +78,27 @@ function printHelp() {
 }
 
 function printReport(report: Awaited<ReturnType<typeof runMigrations>>) {
-	console.log("\n=== Итог миграции ===");
-	console.table(
-		report.perMigration.map((m) => ({
-			migration: m.slug,
-			created: m.stats.created,
-			updated: m.stats.updated,
-			unchanged: m.stats.unchanged,
-			skipped: m.stats.skipped,
-			failed: m.stats.failed,
-			ms: m.durationMs,
-			crashed: m.error ? "ДА" : "",
-		})),
-	);
-	console.log(`Всего: ${report.totalDurationMs}мс`);
-	if (report.hadFailures) {
-		console.error(
-			"\n❌ Были ошибки на уровне отдельных записей или миграция прервана — см. ERROR/WARN выше по логу.",
-		);
-	} else {
-		console.log("\n✅ Без ошибок.");
-	}
+  console.log("\n=== Итог миграции ===");
+  console.table(
+    report.perMigration.map((m) => ({
+      migration: m.slug,
+      created: m.stats.created,
+      updated: m.stats.updated,
+      unchanged: m.stats.unchanged,
+      skipped: m.stats.skipped,
+      failed: m.stats.failed,
+      ms: m.durationMs,
+      crashed: m.error ? "ДА" : "",
+    })),
+  );
+  console.log(`Всего: ${report.totalDurationMs}мс`);
+  if (report.hadFailures) {
+    console.error(
+      "\n❌ Были ошибки на уровне отдельных записей или миграция прервана — см. ERROR/WARN выше по логу.",
+    );
+  } else {
+    console.log("\n✅ Без ошибок.");
+  }
 }
 
 /**
@@ -105,57 +114,67 @@ function printReport(report: Awaited<ReturnType<typeof runMigrations>>) {
  * README обещал эту проверку с самого начала, но в коде её не было.
  */
 async function assertLegacyCollectionsExist(legacyDb: Db): Promise<void> {
-	const existing = new Set(
-		(await legacyDb.listCollections({}, { nameOnly: true }).toArray()).map(
-			(c) => c.name,
-		),
-	);
+  const existing = new Set(
+    (await legacyDb.listCollections({}, { nameOnly: true }).toArray()).map(
+      (c) => c.name,
+    ),
+  );
 
-	const missing = Object.entries(LEGACY_COLLECTIONS)
-		.filter(([, name]) => !existing.has(name))
-		.map(([key, name]) => `${name} (для миграции ${key})`);
+  const missing = Object.entries(LEGACY_COLLECTIONS)
+    .filter(([, name]) => !existing.has(name))
+    .map(([key, name]) => `${name} (для миграции ${key})`);
 
-	if (missing.length > 0) {
-		throw new Error(
-			`В старой БД "${legacyDb.databaseName}" нет ожидаемых коллекций:\n` +
-				missing.map((m) => `  - ${m}`).join("\n") +
-				"\n\nПроверьте LEGACY_MONGODB_URI (та ли база?) и имена в " +
-				"scripts/db-migrate/lib/legacyCollections.ts.\n" +
-				`Фактически в базе есть: ${[...existing].sort().join(", ") || "(пусто)"}`,
-		);
-	}
+  if (missing.length > 0) {
+    throw new Error(
+      `В старой БД "${legacyDb.databaseName}" нет ожидаемых коллекций:\n` +
+        missing.map((m) => `  - ${m}`).join("\n") +
+        "\n\nПроверьте LEGACY_MONGODB_URI (та ли база?) и имена в " +
+        "scripts/db-migrate/lib/legacyCollections.ts.\n" +
+        `Фактически в базе есть: ${[...existing].sort().join(", ") || "(пусто)"}`,
+    );
+  }
 }
 
 async function main() {
-	const options = parseArgs(process.argv.slice(2));
-	if (options.help) {
-		printHelp();
-		return;
-	}
+  const options = parseArgs(process.argv.slice(2));
+  if (options.help) {
+    printHelp();
+    return;
+  }
 
-	console.log("=== Миграция из старой MongoDB ===");
-	if (options.dryRun)
-		console.log("Режим: DRY-RUN (изменения в новую БД не пишутся)");
-	if (options.only) console.log(`Только: ${options.only.join(", ")}`);
+  console.log("=== Миграция из старой MongoDB ===");
+  if (options.dryRun)
+    console.log("Режим: DRY-RUN (изменения в новую БД не пишутся)");
+  if (options.only) console.log(`Только: ${options.only.join(", ")}`);
 
-	const legacyDb = await getLegacyDb();
-	await assertLegacyCollectionsExist(legacyDb);
-	const payload = await getPayload({ config });
+  const legacyDb = await getLegacyDb();
+  await assertLegacyCollectionsExist(legacyDb);
+  const payload = await getPayload({ config });
 
-	const report = await runMigrations(allMigrations, {
-		payload,
-		legacyDb,
-		dryRun: options.dryRun,
-		verbose: options.verbose,
-		only: options.only,
-	});
+  if (options.noDeps && !options.only) {
+    throw new Error("--no-deps имеет смысл только вместе с --only=...");
+  }
+  if (options.noDeps) {
+    console.log(
+      "⚠️  --no-deps: зависимости НЕ будут перепрогнаны. Резолв связей идёт по уже существующим в БД legacyId — если какая-то зависимая сущность ни разу не переносилась, её записи в заказах останутся нерезолвленными (см. WARN в логе).",
+    );
+  }
 
-	printReport(report);
-	await closeLegacyMongo();
-	process.exit(report.hadFailures ? 1 : 0);
+  const report = await runMigrations(allMigrations, {
+    payload,
+    legacyDb,
+    dryRun: options.dryRun,
+    verbose: options.verbose,
+    only: options.only,
+    noDeps: options.noDeps,
+  });
+
+  printReport(report);
+  await closeLegacyMongo();
+  process.exit(report.hadFailures ? 1 : 0);
 }
 
 main().catch((err) => {
-	console.error("💥 Миграция аварийно прервана:", err);
-	process.exit(1);
+  console.error("💥 Миграция аварийно прервана:", err);
+  process.exit(1);
 });
