@@ -1,0 +1,26 @@
+# systemd unit для ежедневного бэкапа PostgreSQL NPO Polet.
+# Установка описана в scripts/backup/README.md.
+#
+# Отредактируйте User= и путь ExecStart= под своего пользователя на сервере.
+
+[Unit]
+Description=NPO Polet — бэкап PostgreSQL
+Documentation=file:///home/y4s/polet-next/scripts/backup/README.md
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=y4s
+Group=y4s
+
+# Скрипт сам логирует в logs/backup.log; stdout/stderr дублируются в journald.
+ExecStart=/home/y4s/polet-next/scripts/backup/pg-backup.sh
+
+# Бэкап не должен мешать боевой нагрузке.
+Nice=10
+IOSchedulingClass=idle
+
+# Разумный потолок по времени на случай зависания.
+TimeoutStartSec=1800

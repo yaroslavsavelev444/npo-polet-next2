@@ -1,0 +1,21 @@
+# Таймер: запускает polet-backup.service каждый день.
+# Установка описана в scripts/backup/README.md.
+
+[Unit]
+Description=NPO Polet — ежедневный бэкап PostgreSQL (таймер)
+Documentation=file:///home/y4s/polet-next/scripts/backup/README.md
+
+[Timer]
+# Каждый день в 03:30 по времени сервера.
+OnCalendar=*-*-* 03:30:00
+
+# Случайная задержка до 15 минут — размывает пиковую нагрузку.
+RandomizedDelaySec=15m
+
+# Если в назначенное время сервер был выключен — запустить бэкап при старте.
+Persistent=true
+
+Unit=polet-backup.service
+
+[Install]
+WantedBy=timers.target
