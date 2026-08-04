@@ -76,7 +76,7 @@ fi
 
 # Проверяем, что архив читается (валидный custom-format).
 log "Проверка целостности архива..."
-docker exec -i "$CONTAINER" pg_restore --list - < "$BACKUP_FILE" >/dev/null \
+docker exec -i "$CONTAINER" pg_restore --list < "$BACKUP_FILE" >/dev/null \
   || fail "Архив повреждён или не является дампом pg_dump -Fc"
 log "✅ Архив валиден"
 

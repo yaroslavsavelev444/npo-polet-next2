@@ -124,7 +124,7 @@ fi
 
 # 2) Целостность: pg_restore --list читает оглавление архива и падает,
 #    если файл повреждён или это не валидный custom-format дамп.
-if ! docker exec -i "$CONTAINER" pg_restore --list - < "$TMP_FILE" >/dev/null 2>>"$LOG_FILE"; then
+if ! docker exec -i "$CONTAINER" pg_restore --list < "$TMP_FILE" >/dev/null 2>>"$LOG_FILE"; then
   fail "Архив не прошёл проверку целостности (pg_restore --list) — не публикуем"
 fi
 
