@@ -60,7 +60,10 @@ fail() { log "❌ ОШИБКА: $*"; exit 1; }
 # Временный файл дампа; чистим при любом выходе.
 TMP_FILE=""
 cleanup() {
-  [[ -n "$TMP_FILE" && -f "$TMP_FILE" ]] && rm -f -- "$TMP_FILE"
+  if [[ -n "$TMP_FILE" && -f "$TMP_FILE" ]]; then
+    rm -f -- "$TMP_FILE"
+  fi
+  return 0
 }
 trap cleanup EXIT
 trap 'fail "Прервано на непредвиденной ошибке (строка $LINENO)"' ERR
