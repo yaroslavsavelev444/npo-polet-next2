@@ -19,9 +19,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Версия pnpm НЕ задаётся здесь: action читает её из поля
+      # packageManager в package.json. Раньше тут было жёстко прописано
+      # `version: 9`, а lock-файл и pnpm-workspace.yaml писались локальной
+      # pnpm 11 — из-за чего `--frozen-lockfile` падал с
+      # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH: pnpm 9 вообще не читает секцию
+      # overrides из pnpm-workspace.yaml (она переехала туда в pnpm 10+),
+      # видела пустой конфиг и не совпадала с lock-файлом. Единственный
+      # источник правды о версии — packageManager.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -46,6 +52,10 @@ jobs:
         env:
           PAYLOAD_SECRET: ${{ github.event_name == 'pull_request' && 'ci-placeholder-secret' || secrets.PAYLOAD_SECRET }}
           DATABASE_URI: ${{ github.event_name == 'pull_request' && 'postgres://ci:ci@localhost:5432/ci' || secrets.DATABASE_URI }}
+
+      # Регрессионные security-тесты (access control, open redirect, OTP).
+      # Не требуют ни БД, ни сети — если падают, деплоить нельзя.
+      - run: pnpm test:security
 
   deploy:
     needs: build-and-test

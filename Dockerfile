@@ -1,10 +1,22 @@
 # syntax=docker/dockerfile:1
 FROM node:22-alpine AS base
+# Версия pnpm нигде не дублируется: её единственный источник — поле
+# packageManager в package.json, которое читает corepack (`corepack install`
+# ниже). Раньше версия не была закреплена вообще, и три окружения брали три
+# разные: локально pnpm 11, в CI жёстко прописанная 9, в образе — дефолт
+# corepack. Из-за этого CI падал с ERR_PNPM_LOCKFILE_CONFIG_MISMATCH (pnpm 9
+# не читает overrides из pnpm-workspace.yaml), а флаг
+# --dangerously-allow-all-builds ниже вообще существует только с pnpm 10+.
 RUN corepack enable
+# Скачивание менеджера пакетов не должно ждать подтверждения в TTY-less сборке.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
+# corepack install — отдельным шагом до install: так несоответствие версии
+# видно сразу и отдельной ошибкой, а не посреди установки зависимостей.
+RUN corepack install
 RUN pnpm install --frozen-lockfile --dangerously-allow-all-builds
 
 # ── base-builder: полный исходный код + зависимости, БЕЗ next build ────────
@@ -14,6 +26,11 @@ FROM base AS base-builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Кладём pnpm в СЛОЙ ОБРАЗА: на этом стейдже основаны migrate и worker, чей
+# CMD — `pnpm ...`. Без этого шага corepack пытался бы скачать pnpm при каждом
+# старте контейнера, и сетевой сбой означал бы, что не поднимается воркер
+# отложенного удаления аккаунтов.
+RUN corepack install
 
 # ── builder: полноценная сборка Next.js ─────────────────────────────────────
 # ВАЖНО: next build здесь обращается к Payload -> Postgres на этапе
@@ -46,7 +63,13 @@ FROM base-builder AS worker
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs \
     && chown -R nextjs:nodejs /app
 USER nextjs
-CMD ["pnpm", "worker:account-deletion"]
+# Запускаем tsx напрямую, а не через `pnpm worker:account-deletion`: corepack
+# кэширует менеджер пакетов в домашнем каталоге ТОГО пользователя, который его
+# ставил (root на стейдже выше), поэтому под непривилегированным nextjs pnpm
+# пришлось бы качать заново при каждом старте контейнера — сетевой сбой
+# означал бы неподнявшийся воркер. Команда та же, что в скрипте
+# worker:account-deletion в package.json.
+CMD ["node_modules/.bin/tsx", "src/modules/account-deletion/worker.ts"]
 
 # ── runner: минимальный production-образ ────────────────────────────────────
 FROM base AS runner
