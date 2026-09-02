@@ -1,8 +1,9 @@
-import type { CollectionConfig } from "payload";
+import type { AccessResult, CollectionConfig, Where } from "payload";
 import { getProductHrefFromDoc } from "../../modules/productCard/lib/routing.ts";
 import { notify } from "../../services/notifications/notificationCenter.ts";
 import { notifyReviewStatusChanged } from "../../services/notifications/notifyReviewStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { isStaffUser } from "../access/ownership.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
 // Средний рейтинг и количество отзывов показываются на карточках каталога,
@@ -21,9 +22,41 @@ export const ProductReviews: CollectionConfig = {
 	},
 
 	access: {
-		read: () => true,
+		// Публично видны только прошедшие модерацию отзывы. Раньше стояло
+		// `() => true`, и анонимный GET /api/product-reviews отдавал вообще всё,
+		// включая ещё не проверенные и отклонённые отзывы вместе с причиной
+		// отклонения (rejectionReason) и связью с автором. Витрина этим гейтом
+		// не пользуется — все её выборки идут через reviews.service.ts с
+		// overrideAccess: true и собственным фильтром по статусу.
+		read: ({ req }): AccessResult => {
+			if (isStaffUser(req.user)) return true;
+			// Автор дополнительно видит свой отзыв в любом статусе — иначе он
+			// не может убедиться, что отзыв принят на модерацию.
+			if (req.user?.collection === "users") {
+				const where: Where = {
+					or: [
+						{ status: { equals: "approved" } },
+						{ user: { equals: req.user.id } },
+					],
+				};
+				return where;
+			}
+			const approvedOnly: Where = { status: { equals: "approved" } };
+			return approvedOnly;
+		},
 
-		create: ({ req }) => !!req.user,
+		// Создание закрыто для любого клиента REST/GraphQL. Единственный
+		// легитимный путь — submitReviewAction (см. modules/reviews), который
+		// вызывает payload.create с overrideAccess: true и потому этот гейт не
+		// проходит вовсе; там же проверяются авторство, факт покупки
+		// (delivered-заказ), отсутствие дубля и rate limit.
+		//
+		// Раньше здесь было `!!req.user` без единого field-level access на
+		// user/status/isVerifiedPurchase — то есть любой вошедший покупатель
+		// мог отправить POST /api/product-reviews с чужим `user`, статусом
+		// `approved` и `isVerifiedPurchase: true`, опубликовав от чужого имени
+		// произвольный текст мимо модерации и мимо требования покупки.
+		create: () => false,
 
 		update: isAdminOrSuperAdmin,
 

@@ -23,6 +23,7 @@ import { CategoryToolbar } from "@/modules/category/components/CategoryToolbar";
 import { applyCategoryFilters } from "@/modules/category/lib/applyCategoryFilters";
 import { parseCategorySearchParams } from "@/modules/category/lib/parseFilters";
 import { getCachedCategories } from "@/payload/services/categories.service";
+import { JsonLd } from "@/shared/components/JsonLd";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
 import { Empty } from "@/UI";
 
@@ -59,12 +60,7 @@ export default async function CategoriesPage({
 		<main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
 			<div className="flex flex-col gap-6">
 				<Breadcrumbs items={breadcrumbItems} variant="white" />
-				<script
-					type="application/ld+json"
-					dangerouslySetInnerHTML={{
-						__html: JSON.stringify(buildBreadcrumbSchema(breadcrumbItems)),
-					}}
-				/>
+				<JsonLd data={buildBreadcrumbSchema(breadcrumbItems)} />
 
 				<header className="flex flex-col gap-2">
 					<h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">

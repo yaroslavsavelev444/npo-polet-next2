@@ -6,7 +6,6 @@ import {
 	notifyOrderStatusChanged,
 } from "../../services/notifications/notifyOrderStatusChanged.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
-import { isLoggedIn } from "../access/isLoggedIn.ts";
 import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 
@@ -154,7 +153,19 @@ export const Orders: CollectionConfig = {
 		// role=superadmin читал заказы всех пользователей (ФИО получателей,
 		// телефоны, состав, суммы) через GET /api/orders.
 		read: ownedByUserOrStaff,
-		create: isLoggedIn,
+		// Создание закрыто ПОЛНОСТЬЮ для любого клиента REST/GraphQL API.
+		// Единственный легитимный путь — createOrderFromCheckout() (см.
+		// orders.service.ts), который вызывает payload.create с
+		// overrideAccess: true и потому этот гейт не проходит вовсе. Там же
+		// цены и состав пересчитываются на сервере из корзины.
+		//
+		// Раньше здесь было `isLoggedIn` без единого field-level access на
+		// pricing/user/payment/status/items — и любой вошедший покупатель мог
+		// POST /api/orders с произвольной суммой (total: 1 ₽), payment.status:
+		// "paid", чужим user и любым статусом, полностью минуя серверный
+		// пересчёт цен в submitOrderAction. admin.readOnly на полях — лишь
+		// подсказка UI и REST/GraphQL API не защищает.
+		create: () => false,
 		update: isAdminOrSuperAdmin,
 		delete: isAdminOrSuperAdmin,
 	},

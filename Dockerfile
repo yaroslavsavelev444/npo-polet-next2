@@ -22,11 +22,31 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # и уже промигрированному Postgres — см. build.network в docker-compose.prod.yml
 # и порядок операций в deploy.sh.
 FROM base-builder AS builder
-ARG DATABASE_URI
-ARG PAYLOAD_SECRET
-ENV DATABASE_URI=${DATABASE_URI} PAYLOAD_SECRET=${PAYLOAD_SECRET}
-RUN pnpm payload:types
-RUN pnpm build
+ENV NEXT_TELEMETRY_DISABLED=1
+# DATABASE_URI и PAYLOAD_SECRET нужны build-команде (payload:types/next build),
+# но НЕ должны попадать в слои образа. Раньше они передавались через ARG/ENV и
+# оседали в метаданных промежуточного образа (docker history). Теперь .env.
+# production монтируется как BuildKit-секрет ТОЛЬКО на время этого RUN
+# (/run/secrets/prod_env не сохраняется ни в одном слое), а нужные значения
+# извлекаются в переменные окружения самого процесса сборки.
+RUN --mount=type=secret,id=prod_env \
+    export DATABASE_URI="$(grep -E '^DATABASE_URI=' /run/secrets/prod_env | cut -d= -f2-)" && \
+    export PAYLOAD_SECRET="$(grep -E '^PAYLOAD_SECRET=' /run/secrets/prod_env | cut -d= -f2-)" && \
+    pnpm payload:types && \
+    pnpm build
+
+# ── worker: long-running фоновые обработчики ────────────────────────────────
+# Тот же контент, что и base-builder (worker'у нужен payload.config.ts и весь
+# src/), но НЕ под root. base-builder — это build-стейдж: в нём нет USER,
+# поэтому account-deletion-worker, работавший прямо на нём, крутился в
+# production сутками от root'а с доступом к Postgres и Redis и полным набором
+# сборочного инструментария. Долгоживущий процесс обязан быть непривилегированным
+# ровно так же, как runner.
+FROM base-builder AS worker
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs \
+    && chown -R nextjs:nodejs /app
+USER nextjs
+CMD ["pnpm", "worker:account-deletion"]
 
 # ── runner: минимальный production-образ ────────────────────────────────────
 FROM base AS runner

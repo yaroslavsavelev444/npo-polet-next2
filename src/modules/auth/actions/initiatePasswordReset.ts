@@ -117,14 +117,12 @@ export async function resetPasswordAction(
     // Payload возвращает { token, user } — используем user.id
     const userId = String(result.user.id);
 
-    // Отзываем все сессии (пароль сменился — старые сессии не должны работать)
-    await revokeAllUserSessions(payload, userId, "password_changed");
-    await notifyPasswordChanged({
-      email: result.user.email as string,
-      userName: result.user.name as string,
-    });
-    void notify(payload, userId, "password_changed", {});
-    // Сбрасываем 2FA флаг — при следующем входе потребуется заново
+    // Сбрасываем 2FA флаг — при следующем входе потребуется заново.
+    // Делается ДО отзыва сессий намеренно: payload.update перезаписывает
+    // документ пользователя целиком тем, что прочитал перед записью, включая
+    // массив сессий Payload (users.sessions). Выполненный после отзыва, он бы
+    // вернул только что удалённые сессии обратно — и сброс пароля перестал бы
+    // инвалидировать старые токены.
     await payload.update({
       collection: "users",
       id: userId,
@@ -134,6 +132,18 @@ export async function resetPasswordAction(
       },
       overrideAccess: true,
     });
+
+    // Отзываем все сессии (пароль сменился — старые сессии не должны
+    // работать). Сюда же попадает и сессия, которую payload.resetPassword
+    // завёл для возвращённого им токена: наружу мы его не отдаём, войти нужно
+    // заново.
+    await revokeAllUserSessions(payload, userId, "password_changed");
+
+    await notifyPasswordChanged({
+      email: result.user.email as string,
+      userName: result.user.name as string,
+    });
+    void notify(payload, userId, "password_changed", {});
 
     return actionSuccess({
       message: "Пароль успешно изменён. Войдите с новым паролем.",

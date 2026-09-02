@@ -63,6 +63,26 @@ export function logUnexpectedAuthError(scope: string, err: unknown): void {
   console.error(`[auth:${scope}]`, err);
 }
 
+/**
+ * Ошибка означает «этот аккаунт сейчас вообще не имеет права входить»
+ * (временная блокировка Payload по числу попыток или статус, выставленный
+ * администратором), а не «пара email/пароль не подошла».
+ *
+ * Нужна для legacy-фоллбека (см. legacyPasswordFallback.ts): он сверяет
+ * bcrypt-хеш САМ, в обход payload.login(), — то есть в обход и счётчика
+ * попыток, и lockUntil, и checkUserStatus. Запускать его на таких ошибках
+ * нельзя: заблокированному аккаунту это возвращало неограниченную проверку
+ * паролей, а заблокированному администратором — ещё и молчаливую миграцию
+ * пароля в новый формат.
+ */
+export function isAccountAccessDeniedError(err: unknown): boolean {
+  return (
+    errorNameIs(err, "LockedAuth") ||
+    errorNameIs(err, "AccountBlockedError") ||
+    errorNameIs(err, "AccountSuspendedError")
+  );
+}
+
 export interface AuthErrorClassification {
   code: AuthErrorCode;
   message: string;

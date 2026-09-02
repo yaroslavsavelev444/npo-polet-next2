@@ -4,7 +4,12 @@ import { getPayloadInstance } from "@/payload/services/getPayload";
 
 export async function GET(req: NextRequest) {
   const payload = await getPayloadInstance();
-  const sessionId = req.nextUrl.searchParams.get("sessionId");
+  // Идентификатор сессии берём ИЗ COOKIE, а не из query-параметра: параметром
+  // клиент управляет сам, и его значение ничего не подтверждает (раньше
+  // достаточно было не передавать его вовсе, чтобы проверка сессии не
+  // выполнялась). Cookie session-id выставляется сервером в verifyOtpAction
+  // вместе с самим токеном.
+  const sessionId = req.cookies.get("session-id")?.value ?? null;
 
   const status = await resolveSessionStatus(payload, req.headers, sessionId);
   if (!status) {

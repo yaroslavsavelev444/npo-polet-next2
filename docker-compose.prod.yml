@@ -53,9 +53,11 @@ services:
       dockerfile: Dockerfile
       target: runner
       # network: polet-next-internal
-      args:
-        DATABASE_URI: ${DATABASE_URI}
-        PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      # Секреты сборки (DATABASE_URI/PAYLOAD_SECRET) передаются через
+      # BuildKit-секрет prod_env вместо build args — так они не оседают в
+      # слоях/метаданных образа. Извлекаются в Dockerfile (builder-стейдж).
+      secrets:
+        - prod_env
     image: polet-next:${IMAGE_TAG:-latest}
     container_name: polet-next-app-prod
     restart: unless-stopped
@@ -78,8 +80,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: base-builder
-    image: polet-next-migrate:${IMAGE_TAG:-latest}
+      # Отдельный стейдж вместо base-builder: тот не задаёт USER, и этот
+      # долгоживущий процесс работал в проде от root. Стейдж worker — то же
+      # содержимое, но под непривилегированным nextjs (см. Dockerfile).
+      # ВНИМАНИЕ: образ переименован, поэтому после выката его нужно один раз
+      # пересобрать явно:
+      #   docker compose -f docker-compose.prod.yml build account-deletion-worker
+      #   docker compose -f docker-compose.prod.yml up -d account-deletion-worker
+      # (deploy.sh этот сервис не трогает вовсе — см. отчёт по аудиту).
+      target: worker
+    image: polet-next-worker:${IMAGE_TAG:-latest}
     container_name: polet-next-account-deletion-worker-prod
     restart: unless-stopped
     env_file: .env.production
@@ -95,6 +105,13 @@ volumes:
   postgres_data:
   redis_data:
   media_data:
+
+# Секрет сборки: весь .env.production монтируется в builder-стейдж только на
+# время RUN (см. Dockerfile) и не попадает в слои образа. На хосте файл уже
+# обязателен для деплоя (deploy.sh проверяет его наличие).
+secrets:
+  prod_env:
+    file: .env.production
 
 networks:
   internal:

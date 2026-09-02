@@ -1,4 +1,9 @@
 import type { BasePayload } from 'payload'
+import {
+  getSidForSessionRow,
+  revokeAllPayloadSessions,
+  revokePayloadSession,
+} from './payloadSessions'
 import { isUser } from './typeGuards'
 
 // ─── Константы ────────────────────────────────────────────────────────────────
@@ -31,7 +36,17 @@ export async function createSession(
     userId,
     ip,
     userAgent,
-  }: { userId: string; ip: string; userAgent: string },
+    payloadSessionId,
+  }: {
+    userId: string
+    ip: string
+    userAgent: string
+    /**
+     * claim `sid` выданного пользователю JWT. Без него отзыв этой записи не
+     * сможет инвалидировать сам токен (см. payloadSessions.ts).
+     */
+    payloadSessionId?: string | null
+  },
 ) {
   const now = new Date()
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS)
@@ -42,6 +57,7 @@ export async function createSession(
       user: Number(userId),
       ip,
       userAgent,
+      payloadSessionId: payloadSessionId ?? null,
       deviceLabel: parseDeviceLabel(userAgent),
       createdAt: now.toISOString(),
       lastActiveAt: now.toISOString(),
@@ -60,6 +76,10 @@ export async function getActiveSession(payload: BasePayload, sessionId: string) 
     const session = await payload.findByID({
       collection: 'sessions',
       id: sessionId,
+      // depth: 0 — иначе relationship `user` приходит populated-объектом, и
+      // сравнение владельца у вызывающего кода всегда ложно (та же ловушка,
+      // что описана в invalidateSession ниже).
+      depth: 0,
       overrideAccess: true,
     })
 
@@ -114,10 +134,15 @@ export async function resolveSessionStatus(
 
   if (!user || !isUser(user)) return null
 
-  if (sessionId) {
-    const session = await getActiveSession(payload, sessionId)
-    if (!session) return null
-  }
+  // Отсутствие session-id раньше означало «проверять нечего» — то есть гейт
+  // проходился простым удалением этой cookie, а отозванная сессия продолжала
+  // работать. Теперь отсутствие или невалидность записи — это отказ:
+  // session-id выставляется в verifyOtpAction вместе с самим токеном, поэтому
+  // у завершённого входа она есть всегда, а «токен без сессии» легитимным
+  // состоянием не является.
+  const session = sessionId ? await getActiveSession(payload, sessionId) : null
+  if (!session) return null
+  if (String(session.user) !== String(user.id)) return null
 
   if (user.status === 'blocked' || user.status === 'suspended') return null
 
@@ -138,6 +163,22 @@ export async function revokeSession(
   sessionId: string,
   reason: 'logout' | 'logout_all' | 'password_changed' | 'admin' = 'logout',
 ) {
+  // Сначала снимаем сам токен с валидности (users_sessions), и только потом
+  // помечаем запись отозванной: если второе упадёт, доступ уже закрыт.
+  // Обратный порядок оставлял бы работающий JWT при «отозванной» на витрине
+  // сессии — то есть ровно ту дыру, ради которой это и делается.
+  const session = await payload.findByID({
+    collection: 'sessions',
+    id: sessionId,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const sid = await getSidForSessionRow(payload, sessionId)
+  if (sid && session?.user) {
+    await revokePayloadSession(payload, Number(session.user), sid)
+  }
+
   await payload.update({
     collection: 'sessions',
     id: sessionId,
@@ -150,7 +191,20 @@ export async function revokeAllUserSessions(
   payload: BasePayload,
   userId: string,
   reason: 'logout_all' | 'password_changed' = 'logout_all',
+  // Позволяет оставить активной одну сессию (напр. текущую при смене пароля
+  // из профиля) — все остальные устройства выкидываются.
+  exceptSessionId?: string,
 ) {
+  // Токены снимаем СРАЗУ и ЦЕЛИКОМ по пользователю, а не по списку наших
+  // записей: у токена может не быть парной записи в `sessions` (создание
+  // записи в verifyOtpAction не критично и её сбой не отменяет вход), а
+  // «выйти со всех устройств» / смена пароля обязаны закрыть доступ полностью,
+  // а не только там, где витрина знает об устройстве.
+  const exceptSid = exceptSessionId
+    ? await getSidForSessionRow(payload, exceptSessionId)
+    : null
+  await revokeAllPayloadSessions(payload, userId, exceptSid)
+
   const { docs } = await payload.find({
     collection: 'sessions',
     where: {
@@ -165,14 +219,16 @@ export async function revokeAllUserSessions(
   })
 
   await Promise.all(
-    docs.map((s) =>
-      payload.update({
-        collection: 'sessions',
-        id: s.id,
-        data: { revoked: true, revokedReason: reason },
-        overrideAccess: true,
-      }),
-    ),
+    docs
+      .filter((s) => !exceptSessionId || String(s.id) !== String(exceptSessionId))
+      .map((s) =>
+        payload.update({
+          collection: 'sessions',
+          id: s.id,
+          data: { revoked: true, revokedReason: reason },
+          overrideAccess: true,
+        }),
+      ),
   )
 }
 
@@ -228,16 +284,9 @@ export async function invalidateSession(
       }
     }
 
-    // Отзываем сессию
-    await payload.update({
-      collection: 'sessions',
-      id: sessionId,
-      data: {
-        revoked: true,
-        revokedReason: reason,
-      },
-      overrideAccess: true,
-    });
+    // Отзываем сессию (revokeSession снимает и сам payload-token —
+    // см. payloadSessions.ts)
+    await revokeSession(payload, sessionId, reason);
 
     return true;
   } catch {

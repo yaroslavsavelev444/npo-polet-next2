@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 import { HeadingBlock } from "./blocks/HeadingBlock.ts";
 import { ImageBlock } from "./blocks/ImageBlock.ts";
@@ -16,6 +17,18 @@ export const KnowledgeTopics: CollectionConfig = {
 
 	access: {
 		read: () => true,
+		// Явно перечисляем ВСЕ операции. Payload подставляет неуказанным свой
+		// дефолт — `({ req }) => Boolean(req.user)` (см.
+		// node_modules/payload/dist/auth/defaultAccess.js и
+		// addDefaultsToCollectionConfig), а `req.user` — это в том числе
+		// обычный покупатель из коллекции `users`. То есть коллекция, где был
+		// объявлен только `read`, оставалась открытой на запись любому
+		// зарегистрированному пользователю через POST/PATCH/DELETE
+		// /api/<slug>: контент публичных страниц и справочники доставки можно
+		// было править и удалять из обычного аккаунта.
+		create: isAdminOrSuperAdmin,
+		update: isAdminOrSuperAdmin,
+		delete: isAdminOrSuperAdmin,
 	},
 
 	hooks: {

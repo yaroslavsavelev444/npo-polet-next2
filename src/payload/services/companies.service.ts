@@ -136,3 +136,31 @@ export const getCachedCompaniesByUser = (
     revalidate: false,
   })();
 };
+
+/**
+ * Принадлежит ли организация этому пользователю.
+ *
+ * Намеренно НЕ через кэш: это проверка права доступа перед созданием заказа,
+ * а не отображение списка — она обязана видеть актуальное состояние и не
+ * зависеть от того, когда последний раз сбрасывался тег `companies`.
+ * Фильтр по владельцу — часть запроса, поэтому чужой id не найдётся вовсе
+ * (а не найдётся и будет отброшен позже).
+ */
+export async function isCompanyOwnedByUser(
+  companyId: string | number,
+  userId: string | number,
+): Promise<boolean> {
+  const numericId = Number(companyId);
+  if (!Number.isFinite(numericId)) return false;
+
+  const payload = await getPayloadInstance();
+  const { totalDocs } = await payload.count({
+    collection: "companies",
+    where: {
+      and: [{ id: { equals: numericId } }, { user: { equals: userId } }],
+    },
+    overrideAccess: true,
+  });
+
+  return totalDocs > 0;
+}

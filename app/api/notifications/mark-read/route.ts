@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  getUnreadNotificationCount,
-  markAllNotificationsReadForUser,
-  markNotificationsReadForUser,
-} from "@/payload/services/notifications.service";
-import { getPayloadInstance } from "@/payload/services/getPayload";
+import { getAuthenticatedUserFromHeaders } from "@/modules/auth/lib/getCurrentUser";
 import type { MarkReadResponse } from "@/modules/notifications/types";
+import {
+	getUnreadNotificationCount,
+	markAllNotificationsReadForUser,
+	markNotificationsReadForUser,
+} from "@/payload/services/notifications.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.union([
-  z.object({ all: z.literal(true) }),
-  z.object({ ids: z.array(z.union([z.number(), z.string()])).min(1) }),
+	z.object({ all: z.literal(true) }),
+	z.object({ ids: z.array(z.union([z.number(), z.string()])).min(1) }),
 ]);
 
 /**
@@ -26,34 +26,38 @@ const bodySchema = z.union([
  * должно закрыть и то, что ещё не подгружалось в дропдаун.
  */
 export async function POST(
-  req: NextRequest,
+	req: NextRequest,
 ): Promise<NextResponse<MarkReadResponse | { error: string }>> {
-  const payload = await getPayloadInstance();
+	// Единая проверка личности (валидный токен + активный статус аккаунта):
+	// payload.auth() сам по себе пропускает заблокированного администратором
+	// пользователя, пока его JWT не истёк.
+	const user = await getAuthenticatedUserFromHeaders(req.headers);
+	if (!user) {
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
 
-  const { user } = await payload.auth({ headers: req.headers });
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+	const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+	if (!parsed.success) {
+		return NextResponse.json(
+			{ error: "Некорректное тело запроса" },
+			{ status: 400 },
+		);
+	}
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Некорректное тело запроса" }, { status: 400 });
-  }
+	try {
+		const updated =
+			"all" in parsed.data
+				? await markAllNotificationsReadForUser(user.id)
+				: await markNotificationsReadForUser(user.id, parsed.data.ids);
 
-  try {
-    const updated =
-      "all" in parsed.data
-        ? await markAllNotificationsReadForUser(user.id)
-        : await markNotificationsReadForUser(user.id, parsed.data.ids);
+		const unreadCount = await getUnreadNotificationCount(user.id);
 
-    const unreadCount = await getUnreadNotificationCount(user.id);
-
-    return NextResponse.json({ updated, unreadCount });
-  } catch (error) {
-    console.error("[api/notifications/mark-read] Unexpected error:", error);
-    return NextResponse.json(
-      { error: "Не удалось отметить уведомления прочитанными" },
-      { status: 500 },
-    );
-  }
+		return NextResponse.json({ updated, unreadCount });
+	} catch (error) {
+		console.error("[api/notifications/mark-read] Unexpected error:", error);
+		return NextResponse.json(
+			{ error: "Не удалось отметить уведомления прочитанными" },
+			{ status: 500 },
+		);
+	}
 }

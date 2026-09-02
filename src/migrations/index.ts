@@ -10,6 +10,7 @@ import * as migration_20260717_121326_add_products_previous_slugs from "./202607
 import * as migration_20260717_170000_feedback_simplify from "./20260717_170000_feedback_simplify.ts";
 import * as migration_20260719_120000_auth_images from "./20260719_120000_auth_images.ts";
 import * as migration_20260719_140000_order_address_house_apartment from "./20260719_140000_order_address_house_apartment.ts";
+import * as migration_20260902_120000_sessions_payload_session_id from "./20260902_120000_sessions_payload_session_id.ts";
 
 export const migrations = [
 	{
@@ -71,5 +72,10 @@ export const migrations = [
 		up: migration_20260719_140000_order_address_house_apartment.up,
 		down: migration_20260719_140000_order_address_house_apartment.down,
 		name: "20260719_140000_order_address_house_apartment",
+	},
+	{
+		up: migration_20260902_120000_sessions_payload_session_id.up,
+		down: migration_20260902_120000_sessions_payload_session_id.down,
+		name: "20260902_120000_sessions_payload_session_id",
 	},
 ];

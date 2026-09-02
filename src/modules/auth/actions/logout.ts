@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPayloadInstance } from "@/payload/services/getPayload";
+import { revokePayloadSession } from "../lib/payloadSessions";
 import { revokeAllUserSessions, revokeSession } from "../lib/session";
 
 /**
@@ -12,15 +13,26 @@ import { revokeAllUserSessions, revokeSession } from "../lib/session";
 export async function logoutAction() {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get("session-id")?.value;
-  const payloadToken = cookieStore.get("payload-token");
 
-  if (sessionId) {
-    try {
-      const payload = await getPayloadInstance();
-      await revokeSession(payload, sessionId, "logout");
-    } catch {
-      // Продолжаем logout даже если БД недоступна
+  try {
+    const payload = await getPayloadInstance();
+
+    // Снять сам токен с валидности обязательно и в том случае, когда
+    // session-id нет (или он не совпадает с токеном): иначе «выход» удалял бы
+    // только cookies, а сохранённый payload-token работал бы ещё 7 суток.
+    // user._sid Payload проставляет после проверки подписи JWT — это
+    // единственный достоверный идентификатор сессии текущего запроса.
+    const { user } = await payload.auth({ headers: await headers() });
+    const sid = (user as { _sid?: string } | null)?._sid;
+    if (user && sid) {
+      await revokePayloadSession(payload, user.id, sid);
     }
+
+    if (sessionId) {
+      await revokeSession(payload, sessionId, "logout");
+    }
+  } catch {
+    // Продолжаем logout даже если БД недоступна
   }
 
   // Удаляем обе cookies

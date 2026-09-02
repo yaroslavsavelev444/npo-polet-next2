@@ -7,6 +7,12 @@ on:
   pull_request:
     branches: [master]
 
+# Минимальные права GITHUB_TOKEN на весь workflow: ни одному из шагов не нужен
+# доступ на запись в репозиторий, пакеты или деплойменты, а токен по умолчанию
+# доступен любому шагу, в том числе коду из pull request.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -25,19 +31,27 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # На pull_request прод-секреты в сборку НЕ передаются: код в PR
+      # выполняется в этом же job'е и может вывести любое доступное ему
+      # значение в лог/наружу. Ни type-check, ни next build реального
+      # подключения не требуют — payload.config.ts валидируется схемой env.ts,
+      # а Local API на этапе сборки подменяется заглушкой (см.
+      # src/payload/services/getPayload.ts), поэтому placeholder'ов достаточно.
       - run: pnpm type-check
         env:
-          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-          DATABASE_URI: ${{ secrets.DATABASE_URI }}
+          PAYLOAD_SECRET: ${{ github.event_name == 'pull_request' && 'ci-placeholder-secret' || secrets.PAYLOAD_SECRET }}
+          DATABASE_URI: ${{ github.event_name == 'pull_request' && 'postgres://ci:ci@localhost:5432/ci' || secrets.DATABASE_URI }}
 
       - run: pnpm build
         env:
-          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
-          DATABASE_URI: ${{ secrets.DATABASE_URI }}
+          PAYLOAD_SECRET: ${{ github.event_name == 'pull_request' && 'ci-placeholder-secret' || secrets.PAYLOAD_SECRET }}
+          DATABASE_URI: ${{ github.event_name == 'pull_request' && 'postgres://ci:ci@localhost:5432/ci' || secrets.DATABASE_URI }}
 
   deploy:
     needs: build-and-test
-    if: github.ref == 'refs/heads/master'
+    # Явно и push, и ветка: одного `github.ref` мало как гарантии — условие
+    # должно читаться как «деплоим только то, что уже влито в master».
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy over SSH

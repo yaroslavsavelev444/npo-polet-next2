@@ -47,6 +47,18 @@ export const Sessions: CollectionConfig = {
       label: 'Пользователь',
     },
     {
+      // claim `sid` того payload-token, который был выдан вместе с этой
+      // записью. Именно по нему Payload сверяет валидность JWT на каждом
+      // запросе (users_sessions), поэтому отзыв сессии обязан дойти сюда —
+      // см. src/modules/auth/lib/payloadSessions.ts. Без этой привязки
+      // «выйти» меняло только флаг revoked, а сам токен продолжал работать.
+      name: 'payloadSessionId',
+      type: 'text',
+      index: true,
+      label: 'ID сессии Payload',
+      admin: { readOnly: true, hidden: true },
+    },
+    {
       name: 'userAgent',
       type: 'text',
       label: 'User Agent',

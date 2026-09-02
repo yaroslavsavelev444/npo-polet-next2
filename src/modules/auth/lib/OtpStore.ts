@@ -1,13 +1,13 @@
+import { sql } from '@payloadcms/db-postgres'
 import type { BasePayload } from 'payload'
+import type { OtpType } from '../types'
 import {
   generateOtp,
+  hashesEqual,
   hashOtp,
-  isOtpExpired,
-  otpExpiresAt,
-  verifyOtp,
   OTP_MAX_ATTEMPTS,
+  otpExpiresAt,
 } from './otp'
-import type { OtpType } from '../types'
 
 /**
  * Создаёт новый OTP для пользователя.
@@ -77,9 +77,25 @@ export type VerifyOtpResult =
   | { ok: true; otpId: string }
   | { ok: false; reason: 'not_found' | 'expired' | 'used' | 'max_attempts' | 'invalid' }
 
+type ClaimRow = {
+  id: number
+  code_hash: string
+  attempts: string | number
+  max_attempts: string | number
+}
+
 /**
  * Проверяет OTP-код.
- * Автоматически инкрементирует счётчик попыток и помечает использованным при успехе.
+ *
+ * Попытка «занимается» ОДНИМ атомарным UPDATE ... RETURNING до сверки хеша, а
+ * не читается-проверяется-записывается по отдельности. Раньше счётчик
+ * инкрементировался вторым запросом уже после сравнения: несколько
+ * одновременных запросов читали одно и то же `attempts`, каждый видел его
+ * меньше лимита, и число реальных попыток ограничивалось только тем, сколько
+ * их успевало пройти параллельно, — 6-значный код при этом перебирается
+ * пачками (CWE-362). Условия `used = false`, `attempts < max_attempts` и
+ * `expires_at > NOW()` теперь тоже часть этого же UPDATE, поэтому «свободной»
+ * попытки не остаётся ни при какой конкуренции.
  */
 export async function verifyOtpCode(
   payload: BasePayload,
@@ -89,70 +105,82 @@ export async function verifyOtpCode(
     code,
   }: { userId: string | number; type: OtpType; code: string },
 ): Promise<VerifyOtpResult> {
-  // Приводим userId к числу
   const userIdNum = typeof userId === 'string' ? Number(userId) : userId
   if (isNaN(userIdNum)) {
     return { ok: false, reason: 'not_found' }
   }
 
-  // Берём последний активный код данного типа
-  const { docs } = await payload.find({
-    collection: 'otp-codes',
-    where: {
-      and: [
-        { user: { equals: userIdNum } },
-        { type: { equals: type } },
-        { used: { equals: false } },
-      ],
-    },
-    sort: '-createdAt',
-    limit: 1,
-    overrideAccess: true,
-  })
+  const claimed = (await payload.db.drizzle.execute(sql`
+    UPDATE otp_codes
+    SET attempts = attempts + 1, updated_at = NOW()
+    WHERE id = (
+      SELECT id FROM otp_codes
+      WHERE user_id = ${userIdNum} AND type = ${type} AND used = false
+      ORDER BY created_at DESC
+      LIMIT 1
+    )
+      AND used = false
+      AND attempts < max_attempts
+      AND expires_at > NOW()
+    RETURNING id, code_hash, attempts, max_attempts
+  `)) as { rows?: ClaimRow[] }
 
-  if (docs.length === 0) {
-    return { ok: false, reason: 'not_found' }
+  const row = claimed.rows?.[0]
+
+  if (!row) {
+    // Попытку занять не удалось — выясняем, почему именно, чтобы UI показал
+    // осмысленное сообщение (истёк / исчерпаны попытки / кода нет вовсе).
+    return { ok: false, reason: await describeUnclaimable(payload, userIdNum, type) }
   }
 
-  const otpRecord = docs[0]
+  const attempts = Number(row.attempts)
+  const maxAttempts = Number(row.max_attempts)
 
-  if (isOtpExpired(otpRecord.expiresAt)) {
-    return { ok: false, reason: 'expired' }
-  }
-
-  // Безопасное получение значений (защита от null/undefined)
-  const attempts = otpRecord.attempts ?? 0
-  const maxAttempts = otpRecord.maxAttempts ?? OTP_MAX_ATTEMPTS
-
-  if (attempts >= maxAttempts) {
-    return { ok: false, reason: 'max_attempts' }
-  }
-
-  const isValid = verifyOtp(code, String(userIdNum), otpRecord.codeHash)
-
-  if (!isValid) {
-    const newAttempts = attempts + 1
-    await payload.update({
-      collection: 'otp-codes',
-      id: otpRecord.id,
-      data: {
-        attempts: newAttempts,
-        // Если исчерпаны — помечаем использованным, чтобы нельзя было угадать
-        ...(newAttempts >= maxAttempts ? { used: true } : {}),
-      },
-      overrideAccess: true,
-    })
+  if (!hashesEqual(hashOtp(code, String(userIdNum)), row.code_hash)) {
+    // Исчерпаны попытки — гасим код целиком, чтобы остаток диапазона нельзя
+    // было добрать следующим запросом кода на тот же хеш.
+    if (attempts >= maxAttempts) {
+      await payload.db.drizzle.execute(sql`
+        UPDATE otp_codes SET used = true, updated_at = NOW() WHERE id = ${row.id}
+      `)
+    }
     return { ok: false, reason: 'invalid' }
   }
 
-  // Помечаем использованным
-  await payload.update({
-    collection: 'otp-codes',
-    id: otpRecord.id,
-    data: { used: true },
-    overrideAccess: true,
-  })
+  // Успех фиксируем условно: если параллельный запрос уже погасил код,
+  // второй раз он не сработает (одноразовость кода).
+  const consumed = (await payload.db.drizzle.execute(sql`
+    UPDATE otp_codes SET used = true, updated_at = NOW()
+    WHERE id = ${row.id} AND used = false
+    RETURNING id
+  `)) as { rows?: { id: number }[] }
 
-  // Возвращаем ID как строку (соответствует типу VerifyOtpResult)
-  return { ok: true, otpId: String(otpRecord.id) }
+  if (!consumed.rows?.length) {
+    return { ok: false, reason: 'used' }
+  }
+
+  return { ok: true, otpId: String(row.id) }
+}
+
+/** Почему активный код не удалось «занять»: для сообщения пользователю. */
+async function describeUnclaimable(
+  payload: BasePayload,
+  userIdNum: number,
+  type: OtpType,
+): Promise<'not_found' | 'expired' | 'max_attempts'> {
+  const result = (await payload.db.drizzle.execute(sql`
+    SELECT expires_at, attempts, max_attempts
+    FROM otp_codes
+    WHERE user_id = ${userIdNum} AND type = ${type} AND used = false
+    ORDER BY created_at DESC
+    LIMIT 1
+  `)) as {
+    rows?: { expires_at: string | Date; attempts: string | number; max_attempts: string | number }[]
+  }
+
+  const row = result.rows?.[0]
+  if (!row) return 'not_found'
+  if (new Date(row.expires_at) <= new Date()) return 'expired'
+  if (Number(row.attempts) >= Number(row.max_attempts)) return 'max_attempts'
+  return 'not_found'
 }

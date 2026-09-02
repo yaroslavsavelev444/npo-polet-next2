@@ -2,7 +2,6 @@
 
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
-import { isLoggedIn } from "../access/isLoggedIn.ts";
 import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
@@ -19,7 +18,13 @@ export const Companies: CollectionConfig = {
 	access: {
 		// Владелец — только свои организации, персонал — все. См. ownership.ts.
 		read: ownedByUserOrStaff,
-		create: isLoggedIn,
+// Создание закрыто для покупателей: поле-владелец `user` не имеет
+		// field-level access, поэтому `isLoggedIn` позволял любому вошедшему
+		// создать документ, записав в `user` ЧУЖОЙ id (mass assignment), а заодно
+		// плодить документы без ограничений. Легитимный путь — сервисы
+		// (payload.create с overrideAccess: true), которые подставляют владельца
+		// из проверенной сессии; персоналу создание из админки оставлено.
+		create: isAdminOrSuperAdmin,
 		// Раньше здесь было `isLoggedIn` — любой авторизованный покупатель мог
 		// править чужие реквизиты (ИНН, юр. адрес) по прямому id.
 		update: ownedByUserOrStaff,

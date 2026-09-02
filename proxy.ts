@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PENDING_AUTH_COOKIE } from "./src/modules/auth/lib/pendingAuth.ts";
+import { resolveSafeRedirect } from "./src/modules/auth/lib/safeRedirect.ts";
 import { resolveSessionStatus } from "./src/modules/auth/lib/session.ts";
 import { getPayloadInstance } from "./src/payload/services/getPayload.ts";
 
@@ -33,17 +34,52 @@ function isGuestAuthPath(pathname: string): boolean {
  * и петля переадресаций.
  */
 function safeRedirectTarget(req: NextRequest): string {
-  const from = req.nextUrl.searchParams.get("from");
-  if (
-    from &&
-    from.startsWith("/") &&
-    !from.startsWith("//") &&
-    !isGuestAuthPath(from) &&
-    from !== OTP_PATH
-  ) {
-    return from;
-  }
-  return "/profile";
+  return resolveSafeRedirect(req.nextUrl.searchParams.get("from"), {
+    origin: req.nextUrl.origin,
+    fallback: "/profile",
+    isDisallowedTarget: (pathname) =>
+      isGuestAuthPath(pathname) || pathname === OTP_PATH,
+  });
+}
+
+/**
+ * Строит значение заголовка Content-Security-Policy для одного запроса.
+ *
+ * script-src — строгий: разрешены только скрипты с этим одноразовым nonce и
+ * те, что они сами подгружают ('strict-dynamic'). Это отсекает inline-инъекции
+ * (XSS) даже при попадании непроверенного ввода в разметку. Next сам
+ * проставляет nonce своим бандлам и компонентам <Script>: он читает CSP из
+ * заголовка запроса (см. node_modules/next/dist/docs/.../content-security-
+ * policy.md, раздел "How nonces work in Next.js"). Наши inline JSON-LD
+ * получают nonce через <JsonLd> (src/shared/components/JsonLd.tsx).
+ *
+ * style-src — 'unsafe-inline' намеренно: antd/@once-ui и React (inline
+ * style=...) вставляют стили в рантайме без nonce, строгий style-src их бы
+ * сломал. Риск инъекции стилей несопоставимо ниже скриптовой.
+ *
+ * mc.yandex.ru — домены Яндекс.Метрики (скрипт грузится только после согласия
+ * на аналитические cookie, см. AnalyticsGate).
+ *
+ * В dev добавляются 'unsafe-eval' (React использует eval для отладки) и ws:
+ * (HMR); upgrade-insecure-requests в dev выключен — локалка работает по http.
+ */
+function buildCsp(nonce: string, isDev: boolean): string {
+  const directives = [
+    `default-src 'self'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    `style-src 'self' 'unsafe-inline'`,
+    `img-src 'self' data: blob: https:`,
+    `font-src 'self' data:`,
+    `connect-src 'self' https://mc.yandex.ru https://mc.yandex.com${isDev ? " ws: wss:" : ""}`,
+    `frame-src 'self' https://mc.yandex.ru`,
+    `worker-src 'self' blob:`,
+    `object-src 'none'`,
+    `base-uri 'self'`,
+    `form-action 'self'`,
+    `frame-ancestors 'self'`,
+    ...(isDev ? [] : [`upgrade-insecure-requests`]),
+  ];
+  return directives.join("; ");
 }
 
 export async function proxy(req: NextRequest) {
@@ -71,16 +107,11 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  const redirectedFrom = req.nextUrl.searchParams.get("_r");
-  if (redirectedFrom === pathname) {
-    // Что-то пошло не так — не редиректим повторно на тот же путь,
-    // пропускаем дальше, чтобы не зациклиться
-    return NextResponse.next();
-  }
-
-  console.log("[PROXY]", pathname);
-
-  // ── 1. Служебные пути ── пропускаем без проверок ──────────────────────────
+  // ── 1. Служебные пути ── пропускаем без проверок и без CSP ────────────────
+  // CSP с nonce сюда не вешаем намеренно: /admin — это панель Payload со своим
+  // бандлом (строгий script-src мог бы её сломать), а /api и статика — не
+  // документы с inline-скриптами. Строгий CSP получают только storefront-
+  // страницы ниже.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/payload") ||
@@ -89,6 +120,35 @@ export async function proxy(req: NextRequest) {
     pathname.includes(".")
   ) {
     return NextResponse.next();
+  }
+
+  // ── CSP: одноразовый nonce на запрос ──────────────────────────────────────
+  // Генерируем nonce и кладём его И в заголовок запроса x-nonce (его читает
+  // <JsonLd> и сам Next для своих скриптов), И в CSP заголовок ответа. Все
+  // storefront-ответы ниже проходят через render()/redirectTo(), чтобы CSP
+  // гарантированно попадал на каждый из них.
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = buildCsp(nonce, process.env.NODE_ENV !== "production");
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
+
+  const applyCsp = (res: NextResponse): NextResponse => {
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
+  };
+  // Рендер storefront-страницы: пробрасываем изменённые заголовки запроса
+  // (чтобы Next проставил nonce своим скриптам) и вешаем CSP на ответ.
+  const render = (): NextResponse =>
+    applyCsp(NextResponse.next({ request: { headers: requestHeaders } }));
+  const redirectTo = (url: URL): NextResponse =>
+    applyCsp(NextResponse.redirect(url));
+
+  const redirectedFrom = req.nextUrl.searchParams.get("_r");
+  if (redirectedFrom === pathname) {
+    // Что-то пошло не так — не редиректим повторно на тот же путь,
+    // пропускаем дальше, чтобы не зациклиться
+    return render();
   }
 
   // Три состояния пользователя различимы уже по cookies:
@@ -101,13 +161,6 @@ export async function proxy(req: NextRequest) {
   const sessionId = req.cookies.get("session-id")?.value;
   const hasPendingAuth = req.cookies.has(PENDING_AUTH_COOKIE);
 
-  console.log("[PROXY]", {
-    pathname,
-    hasPayloadToken: !!payloadToken,
-    hasSessionId: !!sessionId,
-    hasPendingAuth,
-  });
-
   // ── 2. Проверяем, является ли путь защищённым ──────────────────────────────
   const isProtected = PROTECTED_PATHS.some((path) => pathname.startsWith(path));
 
@@ -119,27 +172,27 @@ export async function proxy(req: NextRequest) {
     // payload-token так же, как OTP-гейт: устаревший токен само-починится на
     // защищённом пути (шаг 5 удалит куки и вернёт на логин).
     if (payloadToken && isGuestAuthPath(pathname)) {
-      return NextResponse.redirect(new URL(safeRedirectTarget(req), req.url));
+      return redirectTo(new URL(safeRedirectTarget(req), req.url));
     }
 
     // Единственное исключение: /auth/verify-otp — экран состояния №2
     if (pathname === OTP_PATH) {
       // Уже полностью авторизован — на OTP делать нечего
       if (payloadToken) {
-        return NextResponse.redirect(new URL("/profile", req.url));
+        return redirectTo(new URL("/profile", req.url));
       }
       // Нет незавершённого входа — вводить нечего, отправляем на логин
       if (!hasPendingAuth) {
         const loginUrl = new URL("/auth/login", req.url);
         loginUrl.searchParams.set("from", pathname);
-        return NextResponse.redirect(loginUrl);
+        return redirectTo(loginUrl);
       }
       // Пароль введён, код ждёт — показываем страницу ввода OTP
-      return NextResponse.next();
+      return render();
     }
 
     // Все остальные публичные пути — пропускаем
-    return NextResponse.next();
+    return render();
   }
 
   // ── 4. Защищённый путь: проверяем наличие токена ──────────────────────────
@@ -150,7 +203,7 @@ export async function proxy(req: NextRequest) {
     const target = hasPendingAuth ? OTP_PATH : "/auth/login";
     const url = new URL(target, req.url);
     if (!hasPendingAuth) url.searchParams.set("from", pathname);
-    return NextResponse.redirect(url);
+    return redirectTo(url);
   }
 
   // ── 5. Проверяем статус сессии ───────────────────────────────────────────
@@ -164,14 +217,16 @@ export async function proxy(req: NextRequest) {
 
   if (!status) {
     // JWT есть, но сессия отозвана или истекла → чистим куки и на логин
-    const response = NextResponse.redirect(new URL("/auth/login", req.url));
+    const response = applyCsp(
+      NextResponse.redirect(new URL("/auth/login", req.url)),
+    );
     response.cookies.delete("payload-token");
     response.cookies.delete("session-id");
     return response;
   }
 
   // ── 6. Всё хорошо: вход завершён ──────────────────────────────────────────
-  return NextResponse.next();
+  return render();
 }
 
 // ── checkSessionStatus ─────────────────────────────────────────────────────────

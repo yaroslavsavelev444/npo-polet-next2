@@ -6,17 +6,33 @@ interface RateLimitResult {
 	resetAt: Date;
 }
 
+interface RateLimitOptions {
+	/**
+	 * Как вести себя при недоступности Redis:
+	 *  - false (по умолчанию) — fail-open: пропускаем запрос, чтобы сбой
+	 *    инфраструктуры не ронял публичные формы (feedback/review), которые
+	 *    без Redis работать могут.
+	 *  - true — fail-closed: блокируем запрос. Для чувствительных auth-флоу
+	 *    (login/register/forgot-password/otp-resend), которые без Redis всё
+	 *    равно не могут завершиться (createPendingAuth/OTP пишут в Redis), —
+	 *    иначе падение Redis снимало бы разом всю защиту от брутфорса/спама.
+	 */
+	failClosed?: boolean;
+}
+
 /**
  * Sliding window rate limiter на базе Redis.
  *
- * @param key     - уникальный ключ (например `login:127.0.0.1`)
- * @param limit   - максимум запросов
+ * @param key      - уникальный ключ (например `login:127.0.0.1`)
+ * @param limit    - максимум запросов
  * @param windowMs - окно в миллисекундах
+ * @param options  - поведение при сбое Redis (см. RateLimitOptions)
  */
 export async function checkRateLimit(
 	key: string,
 	limit: number,
 	windowMs: number,
+	options: RateLimitOptions = {},
 ): Promise<RateLimitResult> {
 	const redisKey = `rl:${key}`;
 
@@ -36,7 +52,14 @@ export async function checkRateLimit(
 			resetAt,
 		};
 	} catch (err) {
-		// При недоступности Redis — пропускаем, чтобы не блокировать пользователей
+		if (options.failClosed) {
+			// Fail-closed: блокируем. Эти флоу без Redis всё равно не завершатся,
+			// поэтому «пропустить» здесь означало бы только открыть окно для
+			// брутфорса, ничего не дав легитимному пользователю.
+			console.error("[RateLimit] Redis error, blocking request:", err);
+			return { allowed: false, remaining: 0, resetAt: new Date() };
+		}
+		// Fail-open: пропускаем, чтобы не блокировать пользователей.
 		console.error("[RateLimit] Redis error, allowing request:", err);
 		return { allowed: true, remaining: limit, resetAt: new Date() };
 	}
@@ -44,13 +67,28 @@ export async function checkRateLimit(
 
 // ─── Предустановленные лимиты ──────────────────────────────────────────────
 
+// Чувствительные auth-флоу считаем fail-closed: они и так не могут
+// завершиться без Redis (pending-auth/OTP), поэтому при сбое Redis блокируем,
+// а не открываем окно для брутфорса. Публичные формы (feedback/review) —
+// fail-open, чтобы сбой Redis не ронял их работу.
+const FAIL_CLOSED: RateLimitOptions = { failClosed: true };
+
 export const RATE_LIMITS = {
-	login: (ip: string) => checkRateLimit(`login:${ip}`, 10, 60 * 60 * 1000),
-	register: (ip: string) => checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000),
+	login: (ip: string) =>
+		checkRateLimit(`login:${ip}`, 10, 60 * 60 * 1000, FAIL_CLOSED),
+	register: (ip: string) =>
+		checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000, FAIL_CLOSED),
 	forgotPassword: (ip: string) =>
-		checkRateLimit(`forgot:${ip}`, 3, 60 * 60 * 1000),
+		checkRateLimit(`forgot:${ip}`, 3, 60 * 60 * 1000, FAIL_CLOSED),
 	otpResend: (email: string) =>
-		checkRateLimit(`otp_resend:${email}`, 3, 10 * 60 * 1000),
+		checkRateLimit(`otp_resend:${email}`, 3, 10 * 60 * 1000, FAIL_CLOSED),
+	// Ввод OTP: счётчик попыток самого кода (OTP_MAX_ATTEMPTS) ограничивает
+	// перебор ОДНОГО кода, но не бесконечную цепочку «запросил новый код →
+	// потратил 5 попыток → снова». Ограничение по IP закрывает перебор в целом,
+	// оставляя запас для честных опечаток. fail-closed по тем же причинам, что
+	// и остальные auth-флоу: без Redis челленджа всё равно не существует.
+	otpVerify: (ip: string) =>
+		checkRateLimit(`otp_verify:${ip}`, 20, 15 * 60 * 1000, FAIL_CLOSED),
 	// Обратная связь: не больше 5 обращений с одного IP за 15 минут.
 	feedback: (ip: string) => checkRateLimit(`feedback:${ip}`, 5, 15 * 60 * 1000),
 	// Отзывы: не больше 10 попыток отправки с одного IP за 15 минут

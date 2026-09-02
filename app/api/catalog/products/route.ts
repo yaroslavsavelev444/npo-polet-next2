@@ -10,6 +10,25 @@ export const dynamic = "force-dynamic";
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 48;
 
+// Значения синхронизированы с полем inventory.status коллекции products и с
+// SORT_FIELD_PATHS в products.service.ts (там же — трансляция в реальный путь
+// поля). Всё, чего нет в этих списках, отбрасывается.
+const ALLOWED_STATUSES = [
+	"available",
+	"preorder",
+	"out_of_stock",
+	"discontinued",
+] as const;
+type AllowedStatus = (typeof ALLOWED_STATUSES)[number];
+
+const ALLOWED_SORTS = [
+	"createdAt",
+	"price",
+	"title",
+	"viewsCount",
+	"purchasesCount",
+];
+
 /**
  * GET /api/catalog/products?categoryId=...&cursor=<page>&limit=<n>&status=...&sort=...&order=...&priceFrom=...&priceTo=...
  *
@@ -45,21 +64,34 @@ export async function GET(
 			: DEFAULT_LIMIT,
 	);
 
-	const status = params.get("status");
-	const sort = params.get("sort") ?? undefined;
-	const order = params.get("order") as "asc" | "desc" | null;
+	// status/sort/order приходят из query-строки и раньше уходили в сервис
+	// как есть (status — прямым `as`). Сам Payload от этого не страдал, но
+	// произвольные значения попадали в ключ кэша каталога (unstable_cache с
+	// revalidate: false), то есть любой желающий мог бесконечно плодить записи
+	// Data Cache простым перебором параметра. Принимаем только известные
+	// значения, неизвестное — считаем «не задано».
+	const statusParam = params.get("status");
+	const status =
+		statusParam && ALLOWED_STATUSES.includes(statusParam as AllowedStatus)
+			? (statusParam as ProductQuery["status"])
+			: undefined;
+
+	const sortParam = params.get("sort");
+	const sort =
+		sortParam && ALLOWED_SORTS.includes(sortParam) ? sortParam : undefined;
+
+	const orderParam = params.get("order");
+	const order = orderParam === "asc" || orderParam === "desc" ? orderParam : undefined;
+
 	const priceFrom = params.get("priceFrom");
 	const priceTo = params.get("priceTo");
 
 	const query: ProductQuery = {
 		categoryId,
 		isVisible: true,
-		status:
-			status && status !== "all"
-				? (status as ProductQuery["status"])
-				: undefined,
+		status,
 		sort,
-		order: order ?? undefined,
+		order,
 		priceFrom: priceFrom ? Number(priceFrom) : undefined,
 		priceTo: priceTo ? Number(priceTo) : undefined,
 		page,

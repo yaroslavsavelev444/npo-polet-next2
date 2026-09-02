@@ -43,6 +43,15 @@ export interface PendingAuth {
 	/** IP и User-Agent момента ввода пароля — из них создаётся Session после OTP. */
 	ip: string;
 	userAgent: string;
+	/**
+	 * Челлендж-обманка для защиты регистрации от enumeration: ставится, когда
+	 * на регистрацию пришёл уже существующий email. Ответ и последующий экран
+	 * ввода кода тогда неотличимы от настоящей регистрации, но код ввести
+	 * нельзя (OTP не создавался), а токена здесь нет (пустая строка). См.
+	 * registerAction и verifyOtpAction/resendOtpAction, которые распознают
+	 * этот флаг.
+	 */
+	decoy?: boolean;
 }
 
 const redisKey = (id: string) => `pending-auth:${id}`;

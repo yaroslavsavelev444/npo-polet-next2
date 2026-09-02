@@ -10,6 +10,7 @@ import {
   getCartByUserId,
 } from "@/payload/services/carts.service";
 import { saveCheckoutPreferences } from "@/payload/services/checkout-preferences.service";
+import { isCompanyOwnedByUser } from "@/payload/services/companies.service";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { createOrderFromCheckout } from "@/payload/services/orders.service";
 import { checkoutSchema } from "../lib/checkout-schema";
@@ -63,6 +64,30 @@ export async function submitOrderAction(
 
   // ── Company: create if new + save requested ────────────────────────────
   let companyForm = form.company;
+
+  // existingCompanyId приходит из формы, то есть полностью управляется
+  // клиентом. Без проверки владельца заказ можно было привязать к организации
+  // ЧУЖОГО пользователя (её реквизиты — ИНН, юр. адрес — подтягиваются по
+  // связи при чтении заказа), просто подставив другой id. Схема при этом не
+  // требует остальных полей компании, когда указан existingCompanyId, —
+  // проверка принадлежности здесь единственная.
+  if (companyForm?.isCompany && companyForm.existingCompanyId) {
+    const owned = await isCompanyOwnedByUser(
+      companyForm.existingCompanyId,
+      String(user.id),
+    );
+    if (!owned) {
+      return {
+        success: false,
+        error: "VALIDATION_ERROR",
+        message: "Организация не найдена",
+        fieldErrors: {
+          "company.existingCompanyId": "Организация не найдена",
+        },
+      };
+    }
+  }
+
   if (
     companyForm?.isCompany &&
     !companyForm.existingCompanyId &&

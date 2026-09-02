@@ -7,6 +7,7 @@ import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocke
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
 import {
 	classifyLoginError,
+	isAccountAccessDeniedError,
 	logUnexpectedAuthError,
 	safeCreateOtp,
 } from "../lib/errorHandling";
@@ -94,6 +95,12 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 		try {
 			loginResult = await attemptLogin();
 		} catch (err) {
+			// Блокировка (по числу попыток или администратором) — не повод
+			// пробовать legacy-хеш: этот путь сверяет пароль сам, в обход
+			// lockUntil/статуса, то есть превращал бы заблокированный аккаунт в
+			// неограниченный оракул проверки паролей.
+			if (isAccountAccessDeniedError(err)) throw err;
+
 			// payload.login() отклоняет пароль, если он захеширован ещё старой
 			// системой (bcrypt) — Payload использует PBKDF2 и не умеет сверять
 			// bcrypt-хеши напрямую. Пробуем legacy-fallback: если пароль совпал

@@ -14,6 +14,7 @@ import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import { Providers } from "@/providers/Providers";
 import { baseURL, home } from "@/resources/content";
+import { JsonLd } from "@/shared/components/JsonLd";
 import {
 	buildOrganizationSchema,
 	buildWebsiteSchema,
@@ -91,18 +92,8 @@ export default async function RootLayout({
 					padding="0"
 					horizontal="center"
 				>
-					<script
-						type="application/ld+json"
-						dangerouslySetInnerHTML={{
-							__html: JSON.stringify(buildOrganizationSchema(settings)),
-						}}
-					/>
-					<script
-						type="application/ld+json"
-						dangerouslySetInnerHTML={{
-							__html: JSON.stringify(buildWebsiteSchema()),
-						}}
-					/>
+					<JsonLd data={buildOrganizationSchema(settings)} />
+					<JsonLd data={buildWebsiteSchema()} />
 
 					{/* Яндекс.Метрика подгружается только после согласия на
               аналитические cookie (см. AnalyticsGate). */}

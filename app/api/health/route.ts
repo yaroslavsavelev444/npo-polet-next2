@@ -17,12 +17,10 @@ export async function GET() {
     });
     return NextResponse.json({ status: "ok", ts: new Date().toISOString() });
   } catch (error) {
-    return NextResponse.json(
-      {
-        status: "error",
-        message: error instanceof Error ? error.message : "unknown",
-      },
-      { status: 503 },
-    );
+    // Детали (строка подключения к БД, хост, стектрейс) — только в логи
+    // сервера. Наружу — минимум, иначе публичный /api/health превращается в
+    // источник разведданных об инфраструктуре при сбое БД.
+    console.error("[api/health] check failed:", error);
+    return NextResponse.json({ status: "error" }, { status: 503 });
   }
 }

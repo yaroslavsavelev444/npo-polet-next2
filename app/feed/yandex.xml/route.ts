@@ -29,11 +29,13 @@ export async function GET(): Promise<Response> {
 			},
 		});
 	} catch (error) {
-		const message = error instanceof Error ? error.message : "unknown";
-		// Фид — фоновый сервис для робота, а не страница пользователя: при сбое
-		// отдаём 500 с коротким текстом, не роняя ничего лишнего.
+		// Текст ошибки — только в лог сервера. Наружу он уходить не должен:
+		// сюда долетают в том числе ошибки Postgres/Payload с именами таблиц,
+		// параметрами подключения и фрагментами запросов, а фид публичен и
+		// индексируется. Клиенту достаточно кода 500.
+		console.error("[feed/yandex.xml] generation failed:", error);
 		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>\n<!-- feed generation error: ${message.replace(/-->/g, "")} -->`,
+			`<?xml version="1.0" encoding="UTF-8"?>\n<!-- feed generation error -->`,
 			{
 				status: 500,
 				headers: { "Content-Type": "application/xml; charset=utf-8" },

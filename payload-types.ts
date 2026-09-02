@@ -1064,6 +1064,7 @@ export interface ProductReview {
 export interface Session {
   id: number;
   user: number | User;
+  payloadSessionId?: string | null;
   userAgent?: string | null;
   ip?: string | null;
   deviceLabel?: string | null;
@@ -2052,6 +2053,7 @@ export interface ProductReviewsSelect<T extends boolean = true> {
  */
 export interface SessionsSelect<T extends boolean = true> {
   user?: T;
+  payloadSessionId?: T;
   userAgent?: T;
   ip?: T;
   deviceLabel?: T;

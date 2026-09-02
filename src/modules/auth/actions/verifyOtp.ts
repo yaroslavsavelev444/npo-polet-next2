@@ -9,9 +9,11 @@ import { notify } from "@/services/notifications/notificationCenter";
 import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
 import { logUnexpectedAuthError } from "../lib/errorHandling";
 import { verifyOtpCode } from "../lib/OtpStore";
+import { extractPayloadSessionId } from "../lib/payloadSessions";
 import { clearPendingAuth, readPendingAuth } from "../lib/pendingAuth";
+import { RATE_LIMITS } from "../lib/rateLimit";
 import { createSession, parseDeviceLabel } from "../lib/session";
-import { actionError } from "../lib/utils";
+import { actionError, getRequestMeta } from "../lib/utils";
 import type { AuthErrorCode } from "../types";
 
 /** Куда попадает пользователь сразу после завершения входа. */
@@ -53,6 +55,19 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 
 	const { code, type } = parsed.data;
 
+	// Перебор кода ограничен не только счётчиком попыток самого OTP: без
+	// лимита по IP атакующий проходил бы цепочку «новый код → 5 попыток →
+	// новый код» столько раз, сколько нужно.
+	const { ip } = await getRequestMeta();
+	const rl = await RATE_LIMITS.otpVerify(ip);
+	if (!rl.allowed) {
+		return actionError(
+			"Слишком много попыток. Попробуйте позже.",
+			undefined,
+			"rate_limited",
+		);
+	}
+
 	// ── Незавершённый вход ────────────────────────────────────────────────────
 	const pending = await readPendingAuth();
 	if (!pending) {
@@ -62,6 +77,13 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 	// иначе кодом одного назначения можно было бы закрыть другое.
 	if (pending.type !== type) {
 		return actionError("Сессия подтверждения истекла. Войдите снова.");
+	}
+
+	// Челлендж-обманка (регистрация на уже существующий email — см.
+	// registerAction): OTP для него не создавался. Отвечаем ровно как на
+	// ненайденный код, чтобы регистрация оставалась неотличимой от повтора.
+	if (pending.decoy) {
+		return actionError("Код не найден. Запросите новый.");
 	}
 
 	const payload = await getPayloadInstance();
@@ -136,6 +158,10 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 			userId: pending.userId,
 			ip: pending.ip,
 			userAgent: pending.userAgent,
+			// Привязка записи к самой сессии Payload: без неё «завершить
+			// сессию»/«выйти» отзывали бы только витринную запись, а выданный
+			// выше JWT продолжал бы работать (см. payloadSessions.ts).
+			payloadSessionId: extractPayloadSessionId(pending.token),
 		});
 
 		cookieStore.set("session-id", String(session.id), {

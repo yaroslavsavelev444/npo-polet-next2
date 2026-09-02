@@ -16,7 +16,8 @@
     "migrate:legacy": "node --experimental-strip-types scripts/db-migrate/run.ts",
     "slugs:backfill": "node --experimental-strip-types scripts/backfill-product-slugs.ts",
     "slug:regenerate": "node --experimental-strip-types scripts/regenerate-product-slug.ts",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:security": "node --experimental-strip-types --test tests/security/*.test.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.2.5",
@@ -38,7 +39,7 @@
     "lodash": "^4.18.1",
     "lucide-react": "^1.21.0",
     "mongodb": "^7.5.0",
-    "next": "16.2.9",
+    "next": "16.2.11",
     "nodemailer": "^9.0.3",
     "payload": "^3.85.1",
     "qrcode": "^1.5.4",
@@ -64,7 +65,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
     "tsx": "4.22.4",
     "typescript": "^5"

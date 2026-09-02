@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUserFromHeaders } from "@/modules/auth/lib/getCurrentUser";
 import { getUnreadNotificationCount } from "@/payload/services/notifications.service";
-import { getPayloadInstance } from "@/payload/services/getPayload";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,23 +15,24 @@ export const dynamic = "force-dynamic";
  * нужен для фонового обновления бейджа, пока дропдаун ни разу не открыт.
  */
 export async function GET(
-  req: NextRequest,
+	req: NextRequest,
 ): Promise<NextResponse<{ count: number } | { error: string }>> {
-  const payload = await getPayloadInstance();
+	// Единая проверка личности (валидный токен + активный статус аккаунта):
+	// payload.auth() сам по себе пропускает заблокированного администратором
+	// пользователя, пока его JWT не истёк.
+	const user = await getAuthenticatedUserFromHeaders(req.headers);
+	if (!user) {
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
 
-  const { user } = await payload.auth({ headers: req.headers });
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const count = await getUnreadNotificationCount(user.id);
-    return NextResponse.json({ count });
-  } catch (error) {
-    console.error("[api/notifications/unread-count] Unexpected error:", error);
-    return NextResponse.json(
-      { error: "Не удалось получить счётчик уведомлений" },
-      { status: 500 },
-    );
-  }
+	try {
+		const count = await getUnreadNotificationCount(user.id);
+		return NextResponse.json({ count });
+	} catch (error) {
+		console.error("[api/notifications/unread-count] Unexpected error:", error);
+		return NextResponse.json(
+			{ error: "Не удалось получить счётчик уведомлений" },
+			{ status: 500 },
+		);
+	}
 }

@@ -1,14 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getPayloadInstance } from "@/payload/services/getPayload";
+import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { AccountDeletionError, getAccountDeletionService } from "./lib/service";
 
+/**
+ * getCurrentUser, а не payload.auth: удаление аккаунта — операция покупателя,
+ * и подставлять сюда id аккаунта персонала (коллекция `admins` с независимой
+ * нумерацией) нельзя; заблокированный аккаунт тоже не должен инициировать
+ * необратимые действия.
+ */
 async function getAuthedUser() {
-	const payload = await getPayloadInstance();
-	const { user } = await payload.auth({ headers: await headers() });
+	const user = await getCurrentUser();
 	if (!user) redirect("/auth/login");
 	return user;
 }

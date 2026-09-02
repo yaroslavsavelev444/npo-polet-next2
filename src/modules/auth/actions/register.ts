@@ -113,11 +113,28 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
     void notify(payload, user.id, "welcome", {});
   } catch (err: unknown) {
     if (isFieldTakenError(err, "email")) {
-      return actionError(
-        "Пользователь с таким email уже зарегистрирован.",
-        undefined,
-        "email_taken",
-      );
+      // Защита от enumeration: НЕ раскрываем, что email уже занят. Ставим
+      // челлендж-обманку и возвращаем ровно тот же ответ, что и при успешной
+      // регистрации (requiresOtp: true) — клиент уходит на экран ввода кода,
+      // как обычно. Реального OTP не создаём и письмо не шлём (иначе — вектор
+      // рассылки на чужой ящик); ввести код будет нельзя, и пользователь в
+      // итоге уйдёт на вход. Настоящий новый email при этом проходит обычным
+      // путём ниже и получает код. Снаружи два случая неотличимы.
+      try {
+        await createPendingAuth({
+          userId: "0",
+          email,
+          name,
+          type: "email_verify",
+          token: "",
+          ip,
+          userAgent,
+          decoy: true,
+        });
+      } catch (e) {
+        logUnexpectedAuthError("register.createDecoyPendingAuth", e);
+      }
+      return actionSuccess<RegisterResult>({ requiresOtp: true });
     }
     // Любая другая ошибка создания (неожиданная валидация Payload, сбой БД
     // и т.п.) раньше пробрасывалась дальше (`throw err`) и роняла рендер

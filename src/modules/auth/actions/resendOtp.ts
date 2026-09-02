@@ -32,10 +32,8 @@ export async function resendOtpAction(_prevState: unknown, formData: FormData) {
 		return actionError("Сессия подтверждения истекла. Войдите снова.");
 	}
 
-	const payload = await getPayloadInstance();
-	const { ip } = await getRequestMeta();
-
-	// Rate limit по email
+	// Rate limit по email — до ветки decoy, чтобы поведение (в т.ч. троттлинг)
+	// не отличалось от обычного повторного запроса кода.
 	const rl = await RATE_LIMITS.otpResend(pending.email);
 	if (!rl.allowed) {
 		return actionError(
@@ -44,6 +42,17 @@ export async function resendOtpAction(_prevState: unknown, formData: FormData) {
 			"rate_limited",
 		);
 	}
+
+	// Челлендж-обманка (см. registerAction): реального пользователя/OTP нет.
+	// Возвращаем такой же success, как при настоящей отправке, но ничего не
+	// создаём и не шлём — регистрация на существующий email остаётся
+	// неотличимой от повтора.
+	if (pending.decoy) {
+		return actionSuccess({ message: "Код отправлен повторно" });
+	}
+
+	const payload = await getPayloadInstance();
+	const { ip } = await getRequestMeta();
 
 	const otp = await safeCreateOtp(
 		payload,

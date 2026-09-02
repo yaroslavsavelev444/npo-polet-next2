@@ -1,6 +1,5 @@
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
-import { isLoggedIn } from "../access/isLoggedIn.ts";
 import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { DeliveryMethod } from "./Orders.ts";
 
@@ -17,7 +16,13 @@ export const CheckoutPreferences: CollectionConfig = {
   access: {
     // Владелец — только своё, персонал — всё. См. ownership.ts.
     read: ownedByUserOrStaff,
-    create: isLoggedIn,
+// Создание закрыто для покупателей: поле-владелец `user` не имеет
+    // field-level access, поэтому `isLoggedIn` позволял любому вошедшему
+    // создать документ, записав в `user` ЧУЖОЙ id (mass assignment), а заодно
+    // плодить документы без ограничений. Легитимный путь — сервисы
+    // (payload.create с overrideAccess: true), которые подставляют владельца
+    // из проверенной сессии; персоналу создание из админки оставлено.
+    create: isAdminOrSuperAdmin,
     // Раньше здесь было `!!req.user` — любой авторизованный покупатель мог
     // переписать чужие сохранённые данные получателя (ФИО, телефон, email,
     // адрес доставки) по прямому id, без всякого повышения привилегий.

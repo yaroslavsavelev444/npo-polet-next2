@@ -28,6 +28,7 @@ import {
 } from "@/payload/services/products.service";
 import { getProductRatingBreakdown } from "@/payload/services/reviews.service";
 import { baseURL } from "@/resources/content";
+import { JsonLd } from "@/shared/components/JsonLd";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
 
 interface Props {
@@ -135,16 +136,8 @@ export default async function ProductDetailPage({ params }: Props) {
 
 	return (
 		<main className="min-h-screen pb-24 lg:pb-16">
-			<script
-				type="application/ld+json"
-				dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-			/>
-			<script
-				type="application/ld+json"
-				dangerouslySetInnerHTML={{
-					__html: JSON.stringify(buildBreadcrumbSchema(breadcrumbItems)),
-				}}
-			/>
+			<JsonLd data={jsonLd} />
+			<JsonLd data={buildBreadcrumbSchema(breadcrumbItems)} />
 
 			<div className="container mx-auto px-4 py-6 sm:py-8">
 				<Breadcrumbs items={breadcrumbItems} variant="white" />
