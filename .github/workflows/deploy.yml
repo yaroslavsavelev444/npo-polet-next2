@@ -256,6 +256,21 @@ jobs:
     timeout-minutes: 5
     needs: deploy
     steps:
+      # ⚠ С повторами, и это не «на всякий случай».
+      #
+      # Проверка идёт сразу после пересоздания контейнера, а перед приложением
+      # стоит nginx, у которого апстрим объявлен с `keepalive 32`
+      # (/etc/nginx/sites-enabled/npo-polet.ru.conf). Пул уже установленных
+      # соединений указывает на слушающий сокет ПРЕЖНЕГО контейнера, и первые
+      # запросы после подмены могут получить 502, пока nginx не обнаружит, что
+      # соединения мертвы, и не откроет новые. Приложение при этом полностью
+      # исправно — это видно по тому, что прямой запрос на 127.0.0.1:3004
+      # отвечает 200.
+      #
+      # Один запрос в этот момент проверяет удачу, а не работоспособность
+      # выкладки. Пять попыток с паузой отличают короткий переходный 502 от
+      # действительно сломанного сайта — а если он сломан, шаг всё равно
+      # покраснеет, только на 20 секунд позже.
       - name: Публичные страницы отвечают
         env:
           BASE: ${{ vars.NEXT_PUBLIC_APP_URL }}
@@ -264,10 +279,22 @@ jobs:
           # /sitemap.xml намеренно не проверяется: он обходит все товары и
           # категории, и на медленном ответе дымовая проверка красила бы
           # успешную выкладку в красный, ничего не сообщая о её качестве.
+          check() {
+            local path="$1" code attempt
+            for attempt in 1 2 3 4 5; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 "$BASE$path" || echo 000)
+              if [ "$code" = "200" ]; then
+                echo "$path → $code (попытка $attempt)"
+                return 0
+              fi
+              echo "$path → $code, повтор через 5с (попытка $attempt/5)"
+              sleep 5
+            done
+            echo "❌ $path так и не ответил 200 (последний код: $code)"
+            return 1
+          }
           for path in / /category /robots.txt; do
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 "$BASE$path")
-            echo "$path → $code"
-            [ "$code" = "200" ] || { echo "❌ $path вернул $code"; exit 1; }
+            check "$path"
           done
 
       - name: Здоровье приложения
@@ -278,6 +305,13 @@ jobs:
           BASE: ${{ vars.NEXT_PUBLIC_APP_URL }}
         run: |
           set -euo pipefail
-          body=$(curl -sS --max-time 25 -w '\n%{http_code}' "$BASE/api/health")
-          echo "$body"
-          [ "$(echo "$body" | tail -n1)" = "200" ] || { echo "❌ health вернул не 200"; exit 1; }
+          for attempt in 1 2 3 4 5; do
+            body=$(curl -sS --max-time 25 -w '\n%{http_code}' "$BASE/api/health" || echo -e "\n000")
+            code=$(echo "$body" | tail -n1)
+            echo "попытка $attempt → $code"
+            echo "$body"
+            [ "$code" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "❌ health так и не вернул 200"
+          exit 1
