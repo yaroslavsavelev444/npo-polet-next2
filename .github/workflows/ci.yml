@@ -86,17 +86,15 @@ jobs:
       - name: Граф импортов payload.config.ts
         run: node scripts/verify-payload-graph.mjs
 
-      # ⚠ `test:security`, а не `test`. Скрипт `pnpm test` перечисляет ещё и
-      # tests/checkout/*.test.ts, а этот каталог на момент перехода в git не
-      # добавлен (`git status` показывает его как untracked). В свежем
-      # checkout'е шаблон не раскроется, и node упадёт на несуществующем
-      # файле — то есть CI был бы красным из-за состояния рабочей копии, а не
-      # из-за кода.
+      # Регрессионные тесты: access control, open redirect, OTP, оформление
+      # заказа — 101 проверка. Ни базы, ни сети не требуют. Падают — деплоить
+      # нельзя.
       #
-      # Когда tests/checkout попадёт в репозиторий, здесь и в deploy.yml
-      # достаточно заменить на `pnpm test`.
-      - name: Тесты (безопасность: access control, open redirect, OTP)
-        run: pnpm test:security
+      # ⚠ Браузерных сценариев (tests/e2e) здесь нет намеренно: им нужен
+      # отдельный раннер (`pnpm e2e:install`) и поднятый стенд. По той же
+      # причине tests/e2e исключён из tsconfig.json — см. комментарий там.
+      - name: Тесты
+        run: pnpm test
         env:
           PAYLOAD_SECRET: ci-placeholder-secret
           DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci

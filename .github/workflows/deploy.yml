@@ -71,8 +71,7 @@ jobs:
           PAYLOAD_SECRET: ci-placeholder-secret
           DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
       - run: node scripts/verify-payload-graph.mjs
-      # См. комментарий в ci.yml: tests/checkout пока не в git.
-      - run: pnpm test:security
+      - run: pnpm test
         env:
           PAYLOAD_SECRET: ci-placeholder-secret
           DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
