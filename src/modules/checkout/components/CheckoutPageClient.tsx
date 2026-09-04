@@ -3,6 +3,8 @@
 import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import type { PromoApplyPreview } from "@/modules/promo";
+import { PromoCodeField } from "@/modules/promo";
 import { appToast } from "@/shared/lib/toast";
 import { Button } from "@/UI";
 import { submitOrderAction } from "../actions/checkout.actions";
@@ -22,19 +24,19 @@ import {
 import { formatRuPhoneInput, normalizeRuPhone } from "../lib/phone";
 import type {
 	CheckoutCompanyInput,
+	CheckoutContactsFormValue,
 	CheckoutDeliveryInput,
 	CheckoutPaymentMethod,
-	CheckoutRecipientInput,
 	CheckoutSubmitInput,
 	CheckoutView,
 } from "../types";
 import { CheckoutErrorSummary } from "./CheckoutErrorSummary";
 import { CompanySection } from "./CompanySection";
+import { ContactsSection } from "./ContactsSection";
 import { DeliveryMethodSelector } from "./DeliveryMethodSelector";
 import { OrderConfirmationPanel } from "./OrderConfirmationPanel";
 import { OrderItemsSummary } from "./OrderItemsSummary";
 import { PaymentMethodSelector } from "./PaymentMethodSelector";
-import { RecipientForm } from "./RecipientForm";
 
 interface CheckoutPageClientProps {
 	initialView: CheckoutView;
@@ -48,13 +50,33 @@ export function CheckoutPageClient({
 	const router = useRouter();
 	const [isSubmitting, startSubmitting] = useTransition();
 
-	const [recipient, setRecipient] = useState<CheckoutRecipientInput>({
-		// ФИО НЕ подставляется из аккаунта — пользователь вводит получателя вручную,
-		// либо оно приходит из ранее сохранённых (и уже провалидированных) данных.
-		fullName: initialView.savedRecipient?.fullName ?? "",
-		phone: formatRuPhoneInput(initialView.savedRecipient?.phone ?? ""),
-		email: initialView.savedRecipient?.email ?? user.email ?? "",
-		saveRecipient: Boolean(initialView.savedRecipient),
+	const [contacts, setContacts] = useState<CheckoutContactsFormValue>(() => {
+		const saved = initialView.savedRecipient;
+		// Телефоны подставляются ТОЛЬКО из предпочтений, сохранённых уже после
+		// разделения номеров (признак — заполненный customerPhone). У более
+		// старых предпочтений известен один номер неизвестной принадлежности:
+		// подставить его как «ваш телефон» значило бы с высокой вероятностью
+		// снова направить менеджера на получателя — то есть вернуть ту самую
+		// ошибку, ради которой номера и разделили.
+		const restorePhones = Boolean(saved?.customerPhone);
+		const recipientPhone = restorePhones ? (saved?.recipientPhone ?? "") : "";
+
+		return {
+			// ФИО НЕ подставляется из аккаунта — пользователь вводит получателя
+			// вручную, либо оно приходит из ранее сохранённых (и уже
+			// провалидированных) данных.
+			fullName: saved?.fullName ?? "",
+			email: saved?.email ?? user.email ?? "",
+			customerPhone: restorePhones
+				? formatRuPhoneInput(saved?.customerPhone ?? "")
+				: "",
+			recipientPhone: formatRuPhoneInput(recipientPhone),
+			hasSeparateRecipient: recipientPhone !== "",
+			// Безопасное значение по умолчанию: пока покупатель не выбрал иного,
+			// звонить нужно тому, кто оформляет заказ и точно о нём знает.
+			callPreference: "customer",
+			saveRecipient: Boolean(saved),
+		};
 	});
 
 	const [delivery, setDelivery] = useState<CheckoutDeliveryInput>(() => ({
@@ -78,6 +100,14 @@ export function CheckoutPageClient({
 			),
 	);
 	const [notes, setNotes] = useState("");
+	/**
+	 * Применённый промокод.
+	 *
+	 * Хранится ровно здесь и нигде больше — ни в корзине, ни в сессии. Наружу
+	 * уходит один только код: сумму скидки сервер пересчитывает сам, поэтому
+	 * состояние формы физически не может повлиять на цену заказа.
+	 */
+	const [promo, setPromo] = useState<PromoApplyPreview | null>(null);
 	// Ошибка, не привязанная ни к какому полю: сеть, пустая корзина, отказ
 	// бизнес-логики. Живёт отдельно от ошибок полей, потому что исправляется
 	// не правкой формы, а повторной попыткой.
@@ -96,13 +126,26 @@ export function CheckoutPageClient({
 	 */
 	const submitValue = useMemo<CheckoutSubmitInput>(
 		() => ({
-			recipient: { ...recipient, phone: normalizeRuPhone(recipient.phone) },
+			customer: { phone: normalizeRuPhone(contacts.customerPhone) },
+			recipient: {
+				fullName: contacts.fullName,
+				// Отдельный номер получателя существует только при включённом
+				// переключателе: иначе получателем считается сам заказчик, и
+				// второго номера у заказа нет.
+				phone: contacts.hasSeparateRecipient
+					? normalizeRuPhone(contacts.recipientPhone)
+					: "",
+				email: contacts.email,
+				saveRecipient: contacts.saveRecipient,
+			},
+			contactPreference: contacts.callPreference,
 			delivery,
 			company: company.isCompany ? company : undefined,
 			paymentMethod,
 			notes,
+			promoCode: promo?.code,
 		}),
-		[recipient, delivery, company, paymentMethod, notes],
+		[contacts, delivery, company, paymentMethod, notes, promo],
 	);
 
 	const validation = useCheckoutValidation(submitValue);
@@ -199,6 +242,19 @@ export function CheckoutPageClient({
 					return;
 				}
 
+				if (result.error === "PROMO_INVALID") {
+					// Промокод перестал действовать между «Применить» и
+					// подтверждением. Он снимается — иначе следующая попытка
+					// оформить заказ упиралась бы в тот же отказ, — но заказ при
+					// этом НЕ отправляется автоматически: итог только что вырос,
+					// и подтвердить новую сумму должен покупатель, а не мы за
+					// него.
+					setPromo(null);
+					setFormError(result.message);
+					appToast.warning(result.message);
+					return;
+				}
+
 				if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
 					validation.setServerErrors(result.fieldErrors, submitted);
 					validation.revealAll();
@@ -250,10 +306,10 @@ export function CheckoutPageClient({
 						onAddressManualModeChange={setAddressManualMode}
 					/>
 
-					<RecipientForm
-						value={recipient}
+					<ContactsSection
+						value={contacts}
 						onChange={(next) => {
-							setRecipient(next);
+							setContacts(next);
 							setFormError(null);
 						}}
 						errors={visibleErrors}
@@ -296,15 +352,31 @@ export function CheckoutPageClient({
 
 				<div className="lg:col-span-1">
 					<div className="sticky top-24 flex flex-col gap-4">
+						{/* Поле стоит рядом с итогом, а не среди полей доставки:
+						    промокод меняет именно сумму, и результат его применения
+						    должен быть виден в том же взгляде, что и само поле. */}
+						<PromoCodeField
+							applied={promo}
+							onAppliedChange={(next) => {
+								setPromo(next);
+								setFormError(null);
+							}}
+							disabled={
+								initialView.cart.items.length === 0 ||
+								!initialView.cart.validation.isValid
+							}
+						/>
+
 						<OrderConfirmationPanel
 							cart={initialView.cart}
-							recipient={recipient}
+							contacts={contacts}
 							delivery={delivery}
 							company={company}
 							paymentMethod={paymentMethod}
 							notes={notes}
 							pickupPoints={initialView.pickupPoints}
 							transportCompanies={initialView.transportCompanies}
+							promo={promo}
 						/>
 
 						{cartIssue && (

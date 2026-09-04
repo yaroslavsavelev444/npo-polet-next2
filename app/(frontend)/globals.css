@@ -31,7 +31,6 @@
    и после смены приоритета эти места поедут. Менять каскад стоит отдельной
    задачей, вместе с переводом таких пропсов на явные значения.          */
 
-
 :root {
 	--foreground: #ecedee;
 	/* Мобильная шапка = только navbar (topbar скрыт, см. TopHeader.tsx). */
@@ -47,16 +46,57 @@
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	/* Раньше здесь стояли --font-geist-sans/--font-geist-mono — переменные из
+	   шаблона create-next-app, которых в проекте нет. Утилиты font-sans/
+	   font-mono резолвились в пустоту, а body ниже был жёстко прибит к Arial:
+	   Manrope загружался с Google Fonts и не применялся НИ К ЧЕМУ. Весь
+	   магазин рисовался системным Arial. */
+	--font-sans: var(--font-manrope);
+	--font-mono: var(--font-ibm-plex-mono);
 }
 
 body {
 	background: var(--background);
 	color: var(--foreground);
-	font-family: Arial, Helvetica, sans-serif;
+	font-family:
+		var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+	/* Кириллица Manrope заметно выигрывает от сглаживания: без него на тёмном
+	   фоне тонкие штрихи выглядят грязными. */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+/* ===========================================================================
+   Типографика заголовков
+   ===========================================================================
+   Трекинг зависит от кегля и потому не может быть одним значением на все
+   размеры: крупный текст с нейтральным трекингом читается разреженным, мелкий
+   с отрицательным — слипается. До этого трекинг задавался поштучно в
+   компонентах, и заголовки одного уровня отличались: -1.2px в каталоге,
+   -0.75px на главной, normal в оформлении заказа.
+
+   Правила живут здесь, а не в утилитах Tailwind, потому что глобальные стили
+   @once-ui-system не завёрнуты в слои и перебивают любой слоистый CSS
+   (см. комментарий в начале файла). Значения в em — масштабируются вместе с
+   кеглем, в том числе при пользовательской настройке размера текста.        */
+
+h1 {
+	letter-spacing: var(--tracking-display);
+	line-height: 1.12;
+}
+
+h2 {
+	letter-spacing: var(--tracking-heading);
+	line-height: 1.2;
+}
+
+h3,
+h4 {
+	letter-spacing: var(--tracking-tight);
+	line-height: 1.3;
 }
 
 /* ===========================================================================
@@ -90,7 +130,13 @@ textarea,
 
 /* Клавиатурный фокус виден всегда и одинаково. Мышиный клик кольцо не
    рисует — за это отвечает :focus-visible, а не :focus. */
-:where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+:where(
+	a,
+	button,
+	summary,
+	[role="button"],
+	[tabindex]:not([tabindex="-1"])
+):focus-visible {
 	outline: 2px solid var(--accent-400);
 	outline-offset: 2px;
 }
@@ -378,7 +424,9 @@ textarea,
 	text-decoration-thickness: 1px;
 	text-underline-offset: 0.2em;
 	text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
-	transition: color 0.15s ease-out, text-decoration-color 0.15s ease-out;
+	transition:
+		color 0.15s ease-out,
+		text-decoration-color 0.15s ease-out;
 }
 
 .knowledge-prose a:hover {

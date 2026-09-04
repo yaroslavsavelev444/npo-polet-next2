@@ -11,6 +11,12 @@ interface OrderPriceSummaryProps {
 	total: number;
 	/** Стоимость доставки — строка показывается только если > 0. */
 	shippingCost?: number;
+	/**
+	 * Промокод заказа. Его сумма уже входит в `discount`, поэтому строка
+	 * «Скидка» показывает остаток — иначе одна и та же уступка была бы
+	 * посчитана в итоге дважды.
+	 */
+	promo?: { code: string; amount: number } | null;
 	/** Статус оплаты — бейдж рядом с итогом (только в просмотре заказа). */
 	paymentStatus?: PaymentStatus;
 }
@@ -23,8 +29,14 @@ const PAYMENT_STATUS_STYLES: Record<PaymentStatus, string> = {
 };
 
 /**
- * Итоговая стоимость заказа. Строка скидки показывается только при её наличии
- * (промокодов в заказе нет — только скидки на товары, уже учтённые в позициях).
+ * Итоговая стоимость заказа.
+ *
+ * Скидка по промокоду выделена отдельной строкой с самим кодом: покупатель,
+ * применивший код, должен видеть в заказе подтверждение, что он сработал, а
+ * не безымянную «Скидку», по которой это не проверить. Прочие скидки
+ * (товарные и корзинная) остаются одной строкой — они не результат действия
+ * покупателя и разбивать их не на что.
+ *
  * Строки доставки и статуса оплаты опциональны — используются в просмотре заказа.
  */
 export function OrderPriceSummary({
@@ -33,8 +45,14 @@ export function OrderPriceSummary({
 	total,
 	shippingCost = 0,
 	paymentStatus,
+	promo,
 }: OrderPriceSummaryProps) {
-	const hasDiscount = discount > 0;
+	const promoAmount = promo && promo.amount > 0 ? promo.amount : 0;
+	// Остаток скидки после вычета промокода. Math.max — страховка от
+	// исторического заказа, где снимок цен по какой-то причине не сходится:
+	// отрицательная «Скидка» была бы заведомой ерундой на глазах покупателя.
+	const otherDiscount = Math.max(0, discount - promoAmount);
+	const hasDiscount = otherDiscount > 0;
 	const hasShipping = shippingCost > 0;
 
 	return (
@@ -56,6 +74,18 @@ export function OrderPriceSummary({
 						<dt className="text-[var(--success)]">Скидка</dt>
 						<dd className="tabular-nums text-[var(--success)]">
 							−{formatPrice(discount)}
+						</dd>
+					</div>
+				)}
+
+				{promoAmount > 0 && promo && (
+					<div className="flex items-baseline justify-between gap-3">
+						<dt className="text-[var(--success)]">
+							Промокод{" "}
+							<span className="font-mono tracking-wide">{promo.code}</span>
+						</dt>
+						<dd className="tabular-nums text-[var(--success)]">
+							−{formatPrice(promoAmount)}
 						</dd>
 					</div>
 				)}

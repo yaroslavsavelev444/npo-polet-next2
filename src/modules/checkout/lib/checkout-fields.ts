@@ -1,3 +1,5 @@
+import { PROMO_CODE_INPUT_ID } from "../../promo/lib/promo-code.ts";
+
 /**
  * Реестр полей формы оформления заказа.
  *
@@ -11,9 +13,13 @@
 
 export const CHECKOUT_SECTIONS = {
 	delivery: "Способ получения",
-	recipient: "Данные получателя",
+	// Один раздел на все контакты: телефон заказчика, данные получателя и
+	// выбор номера для связи — это одно решение пользователя, и разносить их
+	// по разным разделам в сводке ошибок значило бы разрывать его пополам.
+	contacts: "Контактные данные",
 	company: "Организация",
 	payment: "Способ оплаты",
+	promo: "Промокод",
 	cart: "Корзина",
 } as const;
 
@@ -35,9 +41,11 @@ export interface CheckoutFieldMeta {
 const ID = "checkout";
 
 export const CHECKOUT_FIELD_IDS = {
+	customerPhone: `${ID}-customer-phone`,
 	recipientFullName: `${ID}-recipient-full-name`,
 	recipientPhone: `${ID}-recipient-phone`,
 	recipientEmail: `${ID}-recipient-email`,
+	contactPreference: `${ID}-contact-preference`,
 	transportCompany: `${ID}-transport-company`,
 	pickupPoint: `${ID}-pickup-point`,
 	addressQuery: `${ID}-address-query`,
@@ -50,6 +58,9 @@ export const CHECKOUT_FIELD_IDS = {
 	companyLegalAddress: `${ID}-company-legal-address`,
 	companyTaxNumber: `${ID}-company-tax-number`,
 	payment: `${ID}-payment`,
+	// Единственный id, приходящий извне: поле промокода принадлежит своему
+	// модулю, а не форме оформления (см. PROMO_CODE_INPUT_ID).
+	promoCode: PROMO_CODE_INPUT_ID,
 } as const;
 
 /**
@@ -63,31 +74,46 @@ export const CHECKOUT_FIELD_ORDER = [
 	"delivery.address.house",
 	"delivery.address.postalCode",
 	"delivery.pickupPointId",
+	"customer.phone",
+	"recipient.email",
 	"recipient.fullName",
 	"recipient.phone",
-	"recipient.email",
+	"contactPreference",
 	"company.existingCompanyId",
 	"company.companyName",
 	"company.legalAddress",
 	"company.taxNumber",
 	"paymentMethod",
+	// Последним: поле промокода стоит в колонке итога, ниже всех разделов
+	// формы, и ссылка на него не должна уводить пользователя вверх.
+	"promoCode",
 ] as const;
 
 export const CHECKOUT_FIELDS: Record<string, CheckoutFieldMeta> = {
+	"customer.phone": {
+		label: "Ваш телефон",
+		section: "contacts",
+		elementId: CHECKOUT_FIELD_IDS.customerPhone,
+	},
 	"recipient.fullName": {
 		label: "ФИО получателя",
-		section: "recipient",
+		section: "contacts",
 		elementId: CHECKOUT_FIELD_IDS.recipientFullName,
 	},
 	"recipient.phone": {
-		label: "Телефон",
-		section: "recipient",
+		label: "Телефон получателя",
+		section: "contacts",
 		elementId: CHECKOUT_FIELD_IDS.recipientPhone,
 	},
 	"recipient.email": {
 		label: "Email",
-		section: "recipient",
+		section: "contacts",
 		elementId: CHECKOUT_FIELD_IDS.recipientEmail,
+	},
+	contactPreference: {
+		label: "Номер для связи",
+		section: "contacts",
+		elementId: CHECKOUT_FIELD_IDS.contactPreference,
 	},
 	"delivery.transportCompanyId": {
 		label: "Транспортная компания",
@@ -143,6 +169,11 @@ export const CHECKOUT_FIELDS: Record<string, CheckoutFieldMeta> = {
 		label: "Способ оплаты",
 		section: "payment",
 		elementId: CHECKOUT_FIELD_IDS.payment,
+	},
+	promoCode: {
+		label: "Промокод",
+		section: "promo",
+		elementId: CHECKOUT_FIELD_IDS.promoCode,
 	},
 };
 

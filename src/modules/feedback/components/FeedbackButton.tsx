@@ -1,6 +1,6 @@
 "use client";
 
-import { BugOutlined } from "@ant-design/icons";
+import { Bug } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Tooltip } from "@/UI";
 import { FeedbackDialog } from "./FeedbackDialog";
@@ -26,7 +26,7 @@ export function FeedbackButton() {
 				<button
 					onClick={() => setOpen(true)}
 					className="
-            fixed left-4 bottom-4 z-50
+            group fixed left-4 bottom-4 z-50
             flex items-center justify-center
             w-10 h-10
             border-0 bg-transparent cursor-pointer
@@ -35,7 +35,10 @@ export function FeedbackButton() {
           "
 					aria-label="Сообщить о проблеме"
 				>
-					<BugOutlined className="text-2xl text-red-500 hover:text-red-600 transition-colors" />
+					<Bug
+						className="h-6 w-6 text-(--error) transition-colors group-hover:text-(--error-hover)"
+						aria-hidden
+					/>
 				</button>
 			</Tooltip>
 

@@ -8,7 +8,10 @@ import { SuccessCheckmark } from "./SuccessCheckmark";
 interface OrderSuccessHeroProps {
 	orderNumber: string;
 	status: OrderStatus;
+	/** Номер, который покупатель выбрал для связи по заказу. */
 	phone: string;
+	/** Выбран номер получателя, а не самого покупателя. */
+	callsRecipient?: boolean;
 	createdAt: string;
 }
 
@@ -31,6 +34,7 @@ export function OrderSuccessHero({
 	orderNumber,
 	status,
 	phone,
+	callsRecipient = false,
 	createdAt,
 }: OrderSuccessHeroProps) {
 	return (
@@ -72,8 +76,14 @@ export function OrderSuccessHero({
 					<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[var(--accent-light)]">
 						<Headset size={17} aria-hidden />
 					</span>
+					{/* Номер здесь — тот самый, который покупатель выбрал в форме.
+					    Формулировка меняется вместе с выбором: обещать «свяжется с
+					    вами», когда звонок уйдёт получателю, значит снова спутать
+					    два разных человека. */}
 					<p className="text-sm leading-relaxed text-[var(--text-primary)]">
-						В ближайшее время менеджер свяжется с вами по номеру{" "}
+						{callsRecipient
+							? "В ближайшее время менеджер позвонит получателю по номеру "
+							: "В ближайшее время менеджер свяжется с вами по номеру "}
 						<a
 							href={`tel:${phone.replace(/[^\d+]/g, "")}`}
 							className="font-semibold text-[var(--accent-light)] underline-offset-2 hover:underline"

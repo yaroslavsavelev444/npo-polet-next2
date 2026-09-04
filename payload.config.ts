@@ -26,6 +26,8 @@ import { Orders } from "./src/payload/collections/Orders.ts";
 import { OtpCodes } from "./src/payload/collections/OtpCodes.ts"; // добавили
 import PickupPoints from "./src/payload/collections/PickupPoint.ts";
 import { Products } from "./src/payload/collections/Products.ts";
+import { PromoCodeRedemptions } from "./src/payload/collections/PromoCodeRedemptions.ts";
+import { PromoCodes } from "./src/payload/collections/PromoCodes.ts";
 import { ProductReviews } from "./src/payload/collections/Reviews.ts"; // добавили (если экспортируется как ProductReviews)
 import { Sessions } from "./src/payload/collections/Sessions.ts"; // добавили
 import TransportCompanies from "./src/payload/collections/TransportCompanies.ts";
@@ -85,6 +87,10 @@ export default buildConfig({
 		PickupPoints,
 		TransportCompanies,
 		Discounts,
+		// Промокоды намеренно живут отдельно от Discounts: другая сущность,
+		// свой учёт активаций, свои правила (см. src/modules/promo).
+		PromoCodes,
+		PromoCodeRedemptions,
 		Companies,
 		KnowledgeCategories,
 		KnowledgeSections,

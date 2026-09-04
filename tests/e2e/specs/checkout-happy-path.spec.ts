@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 import {
+	chooseCallTarget,
 	deliveryMethodButton,
 	errorSummary,
 	FIELD,
 	fillRecipient,
+	fillSeparateRecipientPhone,
 	openCheckout,
 	readOrder,
 	resetCart,
@@ -50,7 +52,88 @@ test("самовывоз: заказ оформляется и открывае�
 	expect(order.delivery.address?.fullAddress ?? null).toBeFalsy();
 	expect(order.payment.method).toBe("self_pickup_cash");
 	expect(order.recipient.fullName).toBe("Иванов Иван Иванович");
-	expect(order.recipient.phone).toBe("+79991234567");
+	// Получателем выступает сам заказчик — отдельного номера у заказа нет,
+	// а звонить менеджер должен по номеру заказчика.
+	expect(order.recipient.phone ?? null).toBeFalsy();
+	expect(order.contact.customerPhone).toBe("+79991234567");
+	expect(order.contact.preferred).toBe("customer");
+	expect(order.contact.phone).toBe("+79991234567");
+});
+
+test("отдельный получатель: заказ хранит оба номера и выбор заказчика", async ({
+	page,
+}) => {
+	// Сценарий, ради которого номера и разделили: заказ оформляет один
+	// человек, получает другой, а уточнять детали нужно у оформившего.
+	await openCheckout(page);
+	await fillRecipient(page);
+	await fillSeparateRecipientPhone(page);
+	await page.getByRole("radio", { name: /E2E Пункт самовывоза/ }).click();
+
+	// По умолчанию выбран номер заказчика — тот, кто точно знает о заказе.
+	await expect(
+		page.locator(FIELD.contactPreference).getByRole("radio", { name: "Мне" }),
+	).toHaveAttribute("aria-checked", "true");
+
+	await submitButton(page).click();
+	await expect(page).toHaveURL(/\/orders\/ORD-/, { timeout: 30_000 });
+
+	const order = readOrder(page.url().split("/").pop() as string);
+	expect(order.recipient.phone).toBe("+79997654321");
+	expect(order.contact.customerPhone).toBe("+79991234567");
+	expect(order.contact.preferred).toBe("customer");
+	// Номер для связи — именно заказчика, а не получателя.
+	expect(order.contact.phone).toBe("+79991234567");
+});
+
+test("выбор «звонить получателю» сохраняется в заказе", async ({ page }) => {
+	await openCheckout(page);
+	await fillRecipient(page);
+	await fillSeparateRecipientPhone(page);
+	await chooseCallTarget(page, "Получателю");
+	await page.getByRole("radio", { name: /E2E Пункт самовывоза/ }).click();
+
+	await submitButton(page).click();
+	await expect(page).toHaveURL(/\/orders\/ORD-/, { timeout: 30_000 });
+
+	const order = readOrder(page.url().split("/").pop() as string);
+	expect(order.contact.preferred).toBe("recipient");
+	expect(order.contact.phone).toBe("+79997654321");
+	// Номер заказчика при этом не теряется — он остаётся в заказе.
+	expect(order.contact.customerPhone).toBe("+79991234567");
+
+	// Страница подтверждения обещает звонок ровно тому, кого выбрали.
+	await expect(page.getByText(/менеджер позвонит получателю/i)).toBeVisible();
+});
+
+test("снятый переключатель убирает номер получателя и возвращает выбор", async ({
+	page,
+}) => {
+	// Противоречивое состояние «звонить получателю, которого нет» не должно
+	// быть достижимо даже через отмену собственного выбора.
+	await openCheckout(page);
+	await fillRecipient(page);
+	await fillSeparateRecipientPhone(page);
+	await chooseCallTarget(page, "Получателю");
+
+	await page
+		.getByRole("checkbox", { name: "Заказ получит другой человек" })
+		.uncheck();
+
+	// Выбора больше нет — вместо переключателя форма прямо говорит, кому
+	// позвонят.
+	await expect(
+		page.locator(FIELD.contactPreference).getByRole("radiogroup"),
+	).toHaveCount(0);
+
+	await page.getByRole("radio", { name: /E2E Пункт самовывоза/ }).click();
+	await submitButton(page).click();
+	await expect(page).toHaveURL(/\/orders\/ORD-/, { timeout: 30_000 });
+
+	const order = readOrder(page.url().split("/").pop() as string);
+	expect(order.recipient.phone ?? null).toBeFalsy();
+	expect(order.contact.preferred).toBe("customer");
+	expect(order.contact.phone).toBe("+79991234567");
 });
 
 test("курьер до двери: адрес из подсказок и данные для курьера попадают в заказ", async ({
@@ -189,7 +272,10 @@ test("сохранённые данные подставляются в след
 	await suggestionOption(page, "д 10").click();
 	await page.getByLabel("Квартира / офис").fill("42");
 
-	await page.getByLabel("Сохранить данные получателя").check();
+	await fillSeparateRecipientPhone(page);
+	await page
+		.getByLabel("Сохранить контактные данные для следующих заказов")
+		.check();
 	await page
 		.getByLabel("Сохранить данные доставки для следующих заказов")
 		.check();
@@ -204,6 +290,19 @@ test("сохранённые данные подставляются в след
 
 	await expect(page.locator(FIELD.recipientFullName)).toHaveValue(
 		"Иванов Иван Иванович",
+	);
+	// Свой номер возвращается: в профиле его нет, и без этого пользователь
+	// набирал бы его при каждом заказе.
+	await expect(page.locator(FIELD.customerPhone)).toHaveValue(
+		"+7 (999) 123-45-67",
+	);
+	// Отдельный получатель тоже восстанавливается вместе с переключателем —
+	// иначе номер молча исчез бы, а форма выглядела бы заполненной.
+	await expect(
+		page.getByRole("checkbox", { name: "Заказ получит другой человек" }),
+	).toBeChecked();
+	await expect(page.locator(FIELD.recipientPhone)).toHaveValue(
+		"+7 (999) 765-43-21",
 	);
 	await expect(page.locator(FIELD.addressQuery)).toHaveValue(
 		"г Москва, ул Ленина, д 10",

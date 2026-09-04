@@ -186,8 +186,8 @@ test("сельский адрес без города принимается п�
 	await page
 		.locator(FIELD.transportCompany)
 		.selectOption({ label: "E2E Перевозчик" });
+	await page.locator(FIELD.customerPhone).fill("+79991234567");
 	await page.locator(FIELD.recipientFullName).fill("Иванов Иван Иванович");
-	await page.locator(FIELD.recipientPhone).fill("+79991234567");
 	await page.locator(FIELD.recipientEmail).fill("ivanov@example.com");
 
 	// Города нет, но есть населённый пункт и индекс — заказ обязан оформиться.
@@ -279,8 +279,8 @@ test("ручной ввод даёт валидный адрес без подс
 	await page
 		.locator(FIELD.transportCompany)
 		.selectOption({ label: "E2E Перевозчик" });
+	await page.locator(FIELD.customerPhone).fill("+79991234567");
 	await page.locator(FIELD.recipientFullName).fill("Иванов Иван Иванович");
-	await page.locator(FIELD.recipientPhone).fill("+79991234567");
 	await page.locator(FIELD.recipientEmail).fill("ivanov@example.com");
 
 	await expect(errorSummary(page)).toBeHidden();

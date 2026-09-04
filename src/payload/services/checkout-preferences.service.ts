@@ -17,7 +17,14 @@ export async function getCheckoutPreferences(
 }
 
 interface SaveCheckoutPreferencesInput {
-	recipient?: { fullName: string; phone: string; email: string };
+	recipient?: {
+		fullName: string;
+		/** Телефон оформившего заказ. Подставляется в форму при следующем заказе. */
+		customerPhone: string;
+		/** Телефон получателя. Пусто, когда отдельного получателя не было. */
+		phone?: string;
+		email: string;
+	};
 	delivery?: {
 		method: string;
 		/**
@@ -53,7 +60,15 @@ export async function saveCheckoutPreferences(
 	const existing = await getCheckoutPreferences(userId);
 
 	const data: Record<string, unknown> = {};
-	if (input.recipient) data.recipient = input.recipient;
+	if (input.recipient) {
+		// Пустой телефон получателя пишем как NULL, а не "": сохранённые
+		// предпочтения читаются тем же кодом, что и заказ, и различие
+		// «"" против NULL» между ними меняло бы поведение автозаполнения.
+		data.recipient = {
+			...input.recipient,
+			phone: input.recipient.phone?.trim() || undefined,
+		};
+	}
 	if (input.delivery) {
 		data.delivery = {
 			method: input.delivery.method,

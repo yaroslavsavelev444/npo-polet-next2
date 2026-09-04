@@ -30,14 +30,18 @@ export async function buildCheckoutView(userId: string): Promise<CheckoutView> {
 
 	const cart = await buildCartView(cartDoc);
 
+	// Телефон больше не входит в условие: сохранённые данные полезны и без
+	// него (ФИО + email), а телефоны подставляются отдельно — см. ниже.
 	const savedRecipient =
-		preferences?.recipient?.fullName &&
-		preferences.recipient.phone &&
-		preferences.recipient.email
+		preferences?.recipient?.fullName && preferences.recipient.email
 			? {
 					fullName: preferences.recipient.fullName,
-					phone: preferences.recipient.phone,
 					email: preferences.recipient.email,
+					// Пусто у предпочтений, сохранённых до разделения номеров:
+					// принадлежность единственного тогдашнего номера неизвестна, и
+					// форма намеренно им не пользуется (CheckoutPageClient).
+					customerPhone: preferences.recipient.customerPhone ?? "",
+					recipientPhone: preferences.recipient.phone ?? "",
 				}
 			: null;
 

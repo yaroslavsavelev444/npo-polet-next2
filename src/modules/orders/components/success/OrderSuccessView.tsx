@@ -25,7 +25,8 @@ export function OrderSuccessView({ order }: OrderSuccessViewProps) {
 				<OrderSuccessHero
 					orderNumber={view.orderNumber}
 					status={view.status}
-					phone={view.recipient.phone}
+					phone={view.contact.phone}
+					callsRecipient={view.contact.owner === "recipient"}
 					createdAt={view.createdAt}
 				/>
 			</OrderReveal>
@@ -37,6 +38,7 @@ export function OrderSuccessView({ order }: OrderSuccessViewProps) {
 				<div className="flex flex-col gap-4 sm:gap-5">
 					<OrderReveal delay={120}>
 						<OrderInfoPanel
+							contact={view.contact}
 							recipient={view.recipient}
 							payment={view.payment}
 							company={view.company}
@@ -56,6 +58,7 @@ export function OrderSuccessView({ order }: OrderSuccessViewProps) {
 						subtotal={view.pricing.subtotal}
 						discount={view.pricing.discount}
 						total={view.pricing.total}
+						promo={view.promo}
 					/>
 				</OrderReveal>
 			</div>

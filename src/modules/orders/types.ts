@@ -1,4 +1,5 @@
 import type { Order } from "@/payload-types";
+import type { OrderContactPreference } from "./lib/order-contact";
 import type { OrderLineItem } from "./lib/order-line-item";
 
 export type OrderStatus = Order["status"];
@@ -45,8 +46,21 @@ export interface OrderListItemView {
 }
 
 export interface OrderDetailView extends OrderListItemView {
+	/**
+	 * Контакты заказа в разобранном виде. `phone` — номер, по которому идёт
+	 * связь по заказу; он заполнен всегда, включая заказы, оформленные до
+	 * разделения номеров (см. lib/order-contact).
+	 */
+	contact: {
+		phone: string;
+		owner: OrderContactPreference | null;
+		customerPhone: string;
+		/** Номер получателя, если он отличается от номера заказчика. */
+		recipientPhone: string;
+	};
 	recipient: {
 		fullName: string;
+		/** Пусто, когда отдельного получателя у заказа нет. */
 		phone: string;
 		email: string;
 		contactPerson?: string | null;
@@ -76,6 +90,15 @@ export interface OrderDetailView extends OrderListItemView {
 		total: number;
 		currency: string;
 	};
+	/**
+	 * Промокод заказа — снимок на момент оформления.
+	 *
+	 * Отдельно от `pricing.discount` (куда его сумма тоже входит): заказ
+	 * обязан объяснять, откуда взялась скидка. Иначе покупатель, применивший
+	 * код, видит в заказе безымянную «Скидку» и не может убедиться, что код
+	 * вообще сработал.
+	 */
+	promo?: { code: string; amount: number } | null;
 	payment: {
 		method: Order["payment"]["method"];
 		status: NonNullable<Order["payment"]["status"]>;

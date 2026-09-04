@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+	isValidPromoCodeFormat,
+	normalizePromoCode,
+	PROMO_CODE_MAX_LENGTH,
+} from "../../promo/lib/promo-code.ts";
 import { RU_PHONE_E164_RE } from "./phone.ts";
 import { validateFullName } from "./validate-full-name.ts";
 import { validateInn } from "./validate-inn.ts";
@@ -59,16 +64,27 @@ export const ADDRESS_ERROR_FIELDS = [
 
 export const checkoutSchema = z
 	.object({
+		// Телефон того, кто оформляет заказ. Обязателен всегда: в профиле
+		// пользователя номера нет, а менеджеру нужен хоть один достоверный
+		// контакт, за которым стоит человек, знающий о заказе.
+		customer: z.object({
+			phone: z.string().regex(RU_PHONE_E164_RE, "Укажите свой номер телефона"),
+		}),
 		recipient: z.object({
 			// Строгая проверка ФИО (не логин/имя аккаунта) — в superRefine ниже,
 			// чтобы вернуть точное сообщение об ошибке.
 			fullName: z.string().trim(),
-			phone: z
-				.string()
-				.regex(RU_PHONE_E164_RE, "Укажите корректный номер телефона"),
+			// Опционален: получателем часто оказывается сам заказчик, а если это
+			// другой человек — его номер известен покупателю не всегда. Формат
+			// проверяется в superRefine, но только для непустого значения.
+			phone: z.string().optional().default(""),
 			email: z.string().email("Некорректный email"),
 			saveRecipient: z.boolean(),
 		}),
+		// Номер, по которому менеджер уточняет заказ. Хранится как выбор, а не
+		// как копия номера: заказ обязан помнить, ЧЕЙ номер выбран, иначе
+		// различие «получатель / контакт» снова схлопнется в один телефон.
+		contactPreference: z.enum(["customer", "recipient"]),
 		delivery: z.object({
 			method: z.enum(["door_to_door", "pickup_point", "self_pickup"]),
 			address: addressSchema.optional(),
@@ -91,8 +107,28 @@ export const checkoutSchema = z
 			.optional(),
 		paymentMethod: z.enum(["invoice", "self_pickup_card", "self_pickup_cash"]),
 		notes: z.string().max(1000).optional(),
+		/**
+		 * Промокод, применённый покупателем. Схема проверяет только ФОРМУ —
+		 * существование, срок, лимиты и сумму скидки перепроверяет сервер в
+		 * момент создания заказа (submitOrderAction). Иначе схема повторяла бы
+		 * правила промокодов на клиенте, а любое расхождение с сервером
+		 * означало бы показанную покупателю скидку, которой он не получит.
+		 */
+		promoCode: z.string().max(PROMO_CODE_MAX_LENGTH).optional(),
 	})
 	.superRefine((data, ctx) => {
+		// Пустой промокод — законное состояние (его просто не вводили).
+		// Непустой обязан хотя бы выглядеть как код: заведомо невозможное
+		// значение отклоняется здесь, не доходя до базы.
+		const promoCode = normalizePromoCode(data.promoCode ?? "");
+		if (promoCode !== "" && !isValidPromoCodeFormat(promoCode)) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["promoCode"],
+				message: "Промокод не найден или больше не действует",
+			});
+		}
+
 		// Строгая валидация ФИО получателя (фамилия + имя [+ отчество]).
 		const fullNameError = validateFullName(data.recipient.fullName);
 		if (fullNameError) {
@@ -100,6 +136,32 @@ export const checkoutSchema = z
 				code: "custom",
 				path: ["recipient", "fullName"],
 				message: fullNameError,
+			});
+		}
+
+		// ── Телефоны ────────────────────────────────────────────────────────
+		const recipientPhone = data.recipient.phone?.trim() ?? "";
+
+		// Пустой номер получателя — законное состояние (получает сам заказчик).
+		// Непустой обязан быть корректным: полунабранный номер хуже
+		// отсутствующего, потому что выглядит как рабочий контакт.
+		if (recipientPhone !== "" && !RU_PHONE_E164_RE.test(recipientPhone)) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["recipient", "phone"],
+				message: "Укажите корректный номер телефона получателя",
+			});
+		}
+
+		// Главный инвариант новой модели: выбранным не может оказаться номер,
+		// которого нет. Интерфейс такой выбор просто не предлагает, но схема
+		// выполняется и на сервере — а туда попадают устаревшая вкладка и
+		// обход формы.
+		if (data.contactPreference === "recipient" && recipientPhone === "") {
+			ctx.addIssue({
+				code: "custom",
+				path: ["contactPreference"],
+				message: "Укажите телефон получателя или выберите для связи свой номер",
 			});
 		}
 

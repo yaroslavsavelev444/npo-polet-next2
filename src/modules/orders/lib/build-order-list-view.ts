@@ -10,6 +10,7 @@ import type {
 	OrderListItemView,
 	OrderStatusHistoryEntry,
 } from "../types";
+import { getOrderContact } from "./order-contact";
 import { mapOrderLineItems } from "./order-line-item";
 import { isOrderCancellable } from "./status.groups";
 
@@ -108,11 +109,19 @@ export function mapOrderToDetailView(order: Order): OrderDetailView {
 		? order.delivery.pickupPoint
 		: null;
 
+	const contact = getOrderContact(order);
+
 	return {
 		...mapOrderToListItem(order),
+		contact: {
+			phone: contact.phone,
+			owner: contact.owner,
+			customerPhone: contact.customerPhone,
+			recipientPhone: contact.recipientPhone,
+		},
 		recipient: {
 			fullName: order.recipient.fullName,
-			phone: order.recipient.phone,
+			phone: order.recipient.phone ?? "",
 			email: order.recipient.email,
 			contactPerson: order.recipient.contactPerson ?? null,
 		},
@@ -128,6 +137,12 @@ export function mapOrderToDetailView(order: Order): OrderDetailView {
 			notes: order.delivery.notes ?? null,
 		},
 		items: mapOrderLineItems(order),
+		promo: order.promoCode?.code
+			? {
+					code: order.promoCode.code,
+					amount: order.pricing.promoDiscountAmount ?? 0,
+				}
+			: null,
 		pricing: {
 			subtotal: order.pricing.subtotal,
 			discount: order.pricing.discount ?? 0,

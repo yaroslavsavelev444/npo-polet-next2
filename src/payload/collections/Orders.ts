@@ -1,4 +1,13 @@
-import type { CollectionConfig } from "payload";
+import type {
+	CollectionBeforeChangeHook,
+	CollectionConfig,
+	FieldHook,
+} from "payload";
+import type { Order } from "../../../payload-types.ts";
+import {
+	type OrderContactPreference,
+	resolveOrderContact,
+} from "../../modules/orders/lib/order-contact.ts";
 import { notify } from "../../services/notifications/notificationCenter.ts";
 import { notifyNewOrder } from "../../services/notifications/notifyNewOrder.ts";
 import {
@@ -8,6 +17,7 @@ import {
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
+import { revokeRedemptionsForOrder } from "../services/promo-redemptions.db.ts";
 
 /** Заказы после удаления аккаунта обезличиваются (user становится пустым) — для них in-app уведомление создавать некому. */
 function getOrderUserId(doc: { user?: unknown }): number | null {
@@ -129,6 +139,124 @@ const generateOrderNumber = async ({ operation, data, req }: any) => {
 	return data;
 };
 
+/**
+ * Держит «номер для связи» в согласии с остальными полями заказа.
+ *
+ * `contact.phone` — денормализация, и она существует ровно затем, чтобы
+ * менеджер видел готовый ответ, а не выводил его из трёх полей. Значит,
+ * рассинхронизация недопустима: номер пересчитывается на КАЖДОЕ изменение
+ * заказа, а не только при оформлении. Иначе правка телефона заказчика в
+ * админке оставила бы в поле связи прежний номер — то есть ровно ту ошибку,
+ * ради которой поле и вводилось.
+ *
+ * Побочный полезный эффект — исторические заказы. У них группа `contact`
+ * пуста; при первом же изменении (смена статуса, прикрепление счёта) хук
+ * заполняет её единственным известным номером получателя. Отдельная миграция
+ * данных для этого не нужна: до тех пор чтение делает ту же подстановку
+ * (см. getOrderContact).
+ */
+/**
+ * Значение поля с учётом частичного обновления.
+ *
+ * Различать «поля нет в запросе» и «поле пришло пустым» здесь обязательно, и
+ * различает их наличие ключа, а не `??`. Со слиянием через `??` очистка
+ * телефона в админке (поле пришло как null) молча возвращала бы прежний
+ * номер — то есть заказ продолжал бы указывать на телефон, который менеджер
+ * только что удалил.
+ */
+function fieldOrPrevious(
+	incoming: Record<string, unknown> | null | undefined,
+	previous: Record<string, unknown> | null | undefined,
+	key: string,
+): unknown {
+	if (incoming && key in incoming) return incoming[key];
+	return previous?.[key];
+}
+
+/**
+ * Дозаполняет контакт при ЧТЕНИИ заказа, ничего не записывая.
+ *
+ * Нужно ровно для заказов, оформленных до разделения номеров: в базе у них
+ * группа `contact` пуста, и админка показывала бы менеджеру пустое «Номер для
+ * связи» рядом с заполненным телефоном получателя — то есть заставляла бы
+ * его додумывать, куда звонить. Витрина покупателя и письма уже подставляют
+ * этот номер через getOrderContact; хук распространяет ту же трактовку на
+ * админку и REST API, оставляя данные в базе нетронутыми.
+ *
+ * Записывать сюда нечего: сохранение заказа в админке и без того приводит
+ * контакт в согласованный вид (см. syncOrderContact).
+ */
+function resolveContactFieldOnRead(
+	key: "phone" | "owner",
+): FieldHook<Order, string | null | undefined> {
+	return ({ value, data }) => {
+		if (typeof value === "string" && value.trim() !== "") return value;
+
+		const resolved = resolveOrderContact({
+			customerPhone: data?.contact?.customerPhone,
+			recipientPhone: data?.recipient?.phone,
+			preferred: data?.contact?.preferred,
+		});
+
+		// Обезличенный заказ: номеров не осталось, резолвер возвращает пустое
+		// значение — поле обязано остаться пустым, а не показывать выдуманное.
+		return resolved[key] || value;
+	};
+}
+
+const syncOrderContact: CollectionBeforeChangeHook = ({
+	data,
+	originalDoc,
+	req,
+}) => {
+	if (!data) return data;
+
+	// Перенос исторических заказов (scripts/db-migrate) не должен получать
+	// придуманный выбор покупателя: у таких заказов он неизвестен, и записать
+	// его значило бы сделать догадку неотличимой от настоящих данных. Читаются
+	// они корректно и без этого — getOrderContact подставляет единственный
+	// известный номер на лету.
+	if (req?.context?.isMigration) return data;
+
+	// На update Payload передаёт только изменённые поля — недостающие берём из
+	// текущего документа, иначе частичное обновление (например, смена статуса)
+	// обнулило бы контакт.
+	const customerPhone = fieldOrPrevious(
+		data.contact,
+		originalDoc?.contact,
+		"customerPhone",
+	);
+	const recipientPhone = fieldOrPrevious(
+		data.recipient,
+		originalDoc?.recipient,
+		"phone",
+	);
+	const preferred = fieldOrPrevious(
+		data.contact,
+		originalDoc?.contact,
+		"preferred",
+	);
+
+	const resolved = resolveOrderContact({
+		customerPhone: typeof customerPhone === "string" ? customerPhone : null,
+		recipientPhone: typeof recipientPhone === "string" ? recipientPhone : null,
+		preferred: typeof preferred === "string" ? preferred : null,
+	});
+
+	data.contact = {
+		...(data.contact ?? {}),
+		customerPhone: resolved.customerPhone || undefined,
+		// Ни одного номера не осталось (обезличенный заказ) — поле связи должно
+		// быть пустым, а не указывать на несуществующий номер.
+		preferred: (resolved.owner ?? undefined) as
+			| OrderContactPreference
+			| undefined,
+		phone: resolved.phone || undefined,
+	};
+
+	return data;
+};
+
 // ─── Collection ─────────────────────────────────────────────────────────────
 
 export const Orders: CollectionConfig = {
@@ -136,6 +264,12 @@ export const Orders: CollectionConfig = {
 
 	admin: {
 		useAsTitle: "orderNumber",
+		// Колонками списка Payload делает только поля верхнего уровня — группы
+		// ("recipient", "pricing") он молча пропускает. Поэтому номер для связи
+		// сюда не добавлен: заводить ради колонки отдельное дублирующее поле
+		// значило бы завести второй источник правды о том, куда звонить.
+		// Менеджер видит номер там, где действительно работает с заказом: первым
+		// блоком в карточке заказа и в письме о новом заказе.
 		defaultColumns: [
 			"orderNumber",
 			"status",
@@ -171,8 +305,49 @@ export const Orders: CollectionConfig = {
 	},
 
 	hooks: {
-		beforeChange: [generateOrderNumber],
+		beforeChange: [generateOrderNumber, syncOrderContact],
 		afterChange: [
+			/**
+			 * Возврат активации промокода при отмене заказа.
+			 *
+			 * Живёт хуком коллекции, а не в Server Action отмены, сознательно:
+			 * заказ отменяют из трёх разных мест — личный кабинет покупателя,
+			 * админка и сервисные скрипты. Положи эту логику в один из путей —
+			 * отмена из двух других тихо «съедала» бы активацию, и лимит акции
+			 * таял бы без единого оформленного заказа.
+			 *
+			 * Возврат идемпотентен (см. revokeRedemptionsForOrder):
+			 * повторные сохранения уже отменённого заказа ничего не меняют.
+			 * Статус `refunded` обрабатывается наравне с `cancelled`: деньги
+			 * покупателю вернули, значит и активация обязана вернуться в лимит.
+			 */
+			async ({ doc, previousDoc, operation, req }) => {
+				if (req.context?.isMigration) return doc;
+				if (operation !== "update") return doc;
+				if (previousDoc?.status === doc.status) return doc;
+				if (doc.status !== "cancelled" && doc.status !== "refunded") {
+					return doc;
+				}
+
+				try {
+					await revokeRedemptionsForOrder(
+						req.payload,
+						String(doc.id),
+						doc.status === "refunded" ? "Возврат по заказу" : "Заказ отменён",
+					);
+				} catch (err) {
+					// Отмена заказа важнее учёта активаций: уронив хук, мы
+					// оставили бы покупателя с заказом, который «не отменяется».
+					// Расхождение счётчика восстановимо по журналу активаций,
+					// потерянная отмена — нет.
+					req.payload.logger.error(
+						{ err, orderId: doc.id },
+						"[promo] не удалось вернуть активацию промокода",
+					);
+				}
+
+				return doc;
+			},
 			async ({ doc, previousDoc, operation, req }) => {
 				// scripts/db-migrate/migrations/orders.migration.ts переносит
 				// исторические заказы пачками через create/update — без этого флага
@@ -272,6 +447,56 @@ export const Orders: CollectionConfig = {
 			admin: { position: "sidebar" },
 		},
 
+		// ── Связь по заказу ────────────────────────────────────────────────────
+		// Первая группа формы заказа в админке: с неё начинается работа
+		// менеджера, и она отвечает на единственный вопрос — куда звонить.
+		{
+			name: "contact",
+			type: "group",
+			label: "Связь по заказу",
+			admin: {
+				description:
+					"Звонить нужно по номеру из поля «Номер для связи» — его выбрал сам покупатель при оформлении. Определять номер по остальным полям заказа не требуется",
+			},
+			fields: [
+				{
+					name: "phone",
+					type: "text",
+					label: "Номер для связи",
+					index: true,
+					hooks: { afterRead: [resolveContactFieldOnRead("phone")] },
+					admin: {
+						readOnly: true,
+						description:
+							"Заполняется автоматически из выбора покупателя. Чтобы изменить — исправьте телефон заказчика или получателя ниже",
+					},
+				},
+				{
+					name: "preferred",
+					type: "select",
+					label: "Чей это номер",
+					options: [
+						{ label: "Заказчик (оформил заказ)", value: "customer" },
+						{ label: "Получатель", value: "recipient" },
+					],
+					hooks: { afterRead: [resolveContactFieldOnRead("owner")] },
+					admin: {
+						description:
+							"У заказов, оформленных до разделения номеров, подставляется единственный известный номер — он принадлежит получателю",
+					},
+				},
+				{
+					name: "customerPhone",
+					type: "text",
+					label: "Телефон заказчика",
+					admin: {
+						description:
+							"Номер человека, оформившего заказ. Пусто у заказов, оформленных до разделения номеров",
+					},
+				},
+			],
+		},
+
 		// ── Получатель ─────────────────────────────────────────────────────────
 		{
 			name: "recipient",
@@ -279,7 +504,20 @@ export const Orders: CollectionConfig = {
 			label: "Получатель",
 			fields: [
 				{ name: "fullName", type: "text", required: true },
-				{ name: "phone", type: "text", required: true },
+				// НЕ обязателен: получателем может быть сам заказчик (тогда
+				// отдельного номера нет) либо другой человек, чей номер покупатель
+				// знать не обязан. Обязательным поле было, пока оно же служило
+				// номером для связи; теперь за связь отвечает contact.phone.
+				// У всех исторических заказов номер заполнен — чтение не меняется.
+				{
+					name: "phone",
+					type: "text",
+					label: "Телефон получателя",
+					admin: {
+						description:
+							"Указывается, только если заказ получает другой человек",
+					},
+				},
 				{ name: "email", type: "email", required: true },
 				{ name: "contactPerson", type: "text" },
 			],
@@ -483,6 +721,13 @@ export const Orders: CollectionConfig = {
 					max: 100,
 				},
 				{
+					name: "promoDiscountAmount",
+					type: "number",
+					defaultValue: 0,
+					min: 0,
+					label: "Скидка по промокоду",
+				},
+				{
 					name: "discount",
 					type: "number",
 					defaultValue: 0,
@@ -555,6 +800,50 @@ export const Orders: CollectionConfig = {
 				{ name: "discountPercent", type: "number" },
 				{ name: "discountAmount", type: "number" },
 				{ name: "message", type: "text" },
+			],
+		},
+
+		// ── Промокод (снимок на момент оформления) ───────────────────────────
+		/**
+		 * Заказ хранит КОПИЮ промокода, а не только связь с ним.
+		 *
+		 * Промокод — живая сущность: его переименуют под новую акцию, отключат
+		 * или удалят. Связи одной было бы недостаточно, чтобы через полгода
+		 * ответить, откуда в заказе взялась скидка, — а именно этот вопрос
+		 * задают при разборе возвратов и сверке с бухгалтерией. Связь при этом
+		 * тоже сохраняется: по ней собирается статистика по акции.
+		 */
+		{
+			name: "promoCode",
+			type: "group",
+			label: "Промокод",
+			admin: {
+				condition: (data) => Boolean(data?.promoCode?.code),
+			},
+			fields: [
+				{
+					name: "promoCodeId",
+					type: "relationship",
+					relationTo: "promo-codes",
+					label: "Промокод",
+				},
+				{ name: "code", type: "text", label: "Код (снимок)" },
+				{
+					name: "discountType",
+					type: "select",
+					label: "Тип скидки",
+					options: [
+						{ label: "Процент от суммы", value: "percentage" },
+						{ label: "Фиксированная сумма", value: "fixed" },
+					],
+				},
+				{ name: "discountPercent", type: "number", label: "Процент" },
+				{
+					name: "discountAmount",
+					type: "number",
+					min: 0,
+					label: "Сумма скидки, ₽",
+				},
 			],
 		},
 

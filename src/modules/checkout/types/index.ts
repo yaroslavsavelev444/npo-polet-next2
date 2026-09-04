@@ -27,8 +27,16 @@ export interface PickupPointOption {
 
 export interface SavedRecipient {
 	fullName: string;
-	phone: string;
 	email: string;
+	/**
+	 * Телефон заказчика. Пусто у предпочтений, сохранённых до разделения
+	 * номеров: тогда сохранялся один номер, и чей он — заказчика или
+	 * получателя — неизвестно. Подставлять его наугад значило бы вернуть
+	 * ровно ту ошибку, ради которой номера и разделили.
+	 */
+	customerPhone: string;
+	/** Телефон получателя, если в прошлый раз он был указан отдельно. */
+	recipientPhone: string;
 }
 
 export interface SavedDelivery {
@@ -84,10 +92,39 @@ export interface AddressSuggestResponse {
 
 // ── Client form state / submission payload ──────────────────────────────────
 
+/** Чей номер выбран для связи менеджера по заказу. */
+export type CheckoutContactPreference = "customer" | "recipient";
+
+/** Данные того, кто оформляет заказ. */
+export interface CheckoutCustomerInput {
+	/** Номер в каноническом виде (+7XXXXXXXXXX). */
+	phone: string;
+}
+
 export interface CheckoutRecipientInput {
 	fullName: string;
+	/**
+	 * Телефон получателя — только когда заказ получает другой человек.
+	 * Пустая строка означает «отдельного номера нет», а не ошибку ввода.
+	 */
 	phone: string;
 	email: string;
+	saveRecipient: boolean;
+}
+
+/**
+ * Состояние блока контактов в форме. Отличается от отправляемых данных двумя
+ * вещами, которые существуют только в интерфейсе: телефоны хранятся с маской
+ * (+7 (999) 123-45-67), а `hasSeparateRecipient` — это положение
+ * переключателя «заказ получит другой человек», а не факт о заказе.
+ */
+export interface CheckoutContactsFormValue {
+	customerPhone: string;
+	fullName: string;
+	email: string;
+	recipientPhone: string;
+	hasSeparateRecipient: boolean;
+	callPreference: CheckoutContactPreference;
 	saveRecipient: boolean;
 }
 
@@ -112,11 +149,22 @@ export interface CheckoutCompanyInput {
 }
 
 export interface CheckoutSubmitInput {
+	customer: CheckoutCustomerInput;
 	recipient: CheckoutRecipientInput;
+	/** Явный выбор покупателя: по какому номеру звонить по заказу. */
+	contactPreference: CheckoutContactPreference;
 	delivery: CheckoutDeliveryInput;
 	company?: CheckoutCompanyInput;
 	paymentMethod: CheckoutPaymentMethod;
 	notes?: string;
+	/**
+	 * Применённый промокод — только сам код, без суммы скидки.
+	 *
+	 * Сумму клиент не присылает и прислать не может: она пересчитывается на
+	 * сервере из корзины и правил кода. Приняв её от клиента, магазин отдавал
+	 * бы скидку любого размера всякому, кто умеет менять тело запроса.
+	 */
+	promoCode?: string;
 }
 
 export type CheckoutActionErrorCode =
@@ -124,6 +172,14 @@ export type CheckoutActionErrorCode =
 	| "CART_EMPTY"
 	| "CART_INVALID"
 	| "VALIDATION_ERROR"
+	/**
+	 * Промокод перестал быть применимым между нажатием «Применить» и
+	 * подтверждением заказа: истёк срок, кончился лимит, изменилась корзина.
+	 * Отдельный код, а не VALIDATION_ERROR, потому что исправляется он не
+	 * правкой формы, а снятием промокода — и сообщение должно вести именно
+	 * туда.
+	 */
+	| "PROMO_INVALID"
 	| "UNKNOWN";
 
 export type CheckoutActionResult =

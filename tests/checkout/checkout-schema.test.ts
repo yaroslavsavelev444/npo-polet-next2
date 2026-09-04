@@ -14,16 +14,27 @@ import type { CheckoutSubmitInput } from "../../src/modules/checkout/types/index
  * Запуск: pnpm test:checkout
  */
 
+const CUSTOMER_PHONE = "+79991234567";
+const RECIPIENT_PHONE = "+79997654321";
+
+const VALID_CUSTOMER = { phone: CUSTOMER_PHONE };
+
+/**
+ * Получатель без собственного номера — самый частый случай: заказ получает
+ * сам заказчик. Отдельный телефон получателя добавляется в тестах явно.
+ */
 const VALID_RECIPIENT = {
 	fullName: "Иванов Иван Иванович",
-	phone: "+79991234567",
+	phone: "",
 	email: "ivanov@example.com",
 	saveRecipient: false,
 };
 
 function selfPickup(overrides: Partial<CheckoutSubmitInput> = {}) {
 	return {
+		customer: VALID_CUSTOMER,
 		recipient: VALID_RECIPIENT,
+		contactPreference: "customer" as const,
 		delivery: {
 			method: "self_pickup" as const,
 			pickupPointId: "1",
@@ -36,7 +47,9 @@ function selfPickup(overrides: Partial<CheckoutSubmitInput> = {}) {
 
 function courier(addressOverrides: Record<string, string> = {}) {
 	return {
+		customer: VALID_CUSTOMER,
 		recipient: VALID_RECIPIENT,
+		contactPreference: "customer" as const,
 		delivery: {
 			method: "door_to_door" as const,
 			transportCompanyId: "3",
@@ -58,7 +71,9 @@ function courier(addressOverrides: Record<string, string> = {}) {
 
 function pickupPoint(addressOverrides: Record<string, string> = {}) {
 	return {
+		customer: VALID_CUSTOMER,
 		recipient: VALID_RECIPIENT,
+		contactPreference: "customer" as const,
 		delivery: {
 			method: "pickup_point" as const,
 			transportCompanyId: "3",
@@ -212,17 +227,60 @@ test("ФИО: логин вместо ФИО не проходит", () => {
 	}
 });
 
-test("телефон проверяется в каноническом формате E.164", () => {
+// ── Телефоны и выбор номера для связи ───────────────────────────────────────
+
+test("телефон заказчика обязателен и проверяется в формате E.164", () => {
 	// Форма присылает уже нормализованный номер; маска остаётся на клиенте.
+	for (const phone of ["", "+7 (999) 123-45-67", "8999", "+7999123456"]) {
+		const input = selfPickup();
+		input.customer = { phone };
+		assert.equal(
+			validateCheckout(input)["customer.phone"],
+			"Укажите свой номер телефона",
+			`номер "${phone}" должен быть отклонён`,
+		);
+	}
+});
+
+test("телефон получателя необязателен: заказ получает сам заказчик", () => {
+	// Это самый частый сценарий, и он обязан проходить без единого поля
+	// сверх прежнего минимума.
 	const input = selfPickup();
-	input.recipient = { ...VALID_RECIPIENT, phone: "+7 (999) 123-45-67" };
+	input.recipient = { ...VALID_RECIPIENT, phone: "" };
+	assert.deepEqual(validateCheckout(input), {});
+});
+
+test("указанный телефон получателя обязан быть корректным", () => {
+	// Недобранный номер хуже отсутствующего: он выглядит как рабочий контакт.
+	const input = selfPickup();
+	input.recipient = { ...VALID_RECIPIENT, phone: "+7999" };
 	assert.equal(
 		validateCheckout(input)["recipient.phone"],
-		"Укажите корректный номер телефона",
+		"Укажите корректный номер телефона получателя",
 	);
+});
 
-	input.recipient = { ...VALID_RECIPIENT, phone: "" };
-	assert.ok(validateCheckout(input)["recipient.phone"]);
+test("связь с получателем требует его номера", () => {
+	// Главный инвариант новой модели: выбранным не может оказаться номер,
+	// которого в заказе нет. Интерфейс такой выбор не предлагает — сюда
+	// попадают устаревшая вкладка и обход формы.
+	const input = selfPickup({ contactPreference: "recipient" });
+	assert.equal(
+		validateCheckout(input).contactPreference,
+		"Укажите телефон получателя или выберите для связи свой номер",
+	);
+});
+
+test("связь с получателем валидна, когда его номер указан", () => {
+	const input = selfPickup({ contactPreference: "recipient" });
+	input.recipient = { ...VALID_RECIPIENT, phone: RECIPIENT_PHONE };
+	assert.deepEqual(validateCheckout(input), {});
+});
+
+test("выбор номера для связи ограничен двумя значениями", () => {
+	const input = selfPickup();
+	(input as { contactPreference: string }).contactPreference = "manager";
+	assert.ok(validateCheckout(input).contactPreference);
 });
 
 test("некорректный email отклоняется", () => {
@@ -304,7 +362,9 @@ test("возвращаются ВСЕ ошибки формы, а не перв�
 	// Показ одной ошибки за раз — главная причина, по которой пользователь не
 	// понимает, сколько ещё осталось исправить.
 	const input = {
+		customer: { phone: "" },
 		recipient: { fullName: "", phone: "", email: "", saveRecipient: false },
+		contactPreference: "customer" as const,
 		delivery: {
 			method: "door_to_door" as const,
 			saveAddress: false,
@@ -317,7 +377,7 @@ test("возвращаются ВСЕ ошибки формы, а не перв�
 
 	assert.ok(Object.keys(errors).length >= 8, JSON.stringify(errors, null, 2));
 	assert.ok(errors["recipient.fullName"]);
-	assert.ok(errors["recipient.phone"]);
+	assert.ok(errors["customer.phone"]);
 	assert.ok(errors["recipient.email"]);
 	assert.ok(errors["delivery.address.city"]);
 	assert.ok(errors["delivery.address.street"]);
@@ -329,7 +389,9 @@ test("возвращаются ВСЕ ошибки формы, а не перв�
 
 test("на одно поле приходится ровно одно сообщение", () => {
 	const errors = validateCheckout({
+		customer: { phone: "" },
 		recipient: { fullName: "", phone: "", email: "", saveRecipient: false },
+		contactPreference: "customer" as const,
 		delivery: { method: "self_pickup" as const, saveAddress: false },
 		paymentMethod: "invoice" as const,
 	});

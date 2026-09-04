@@ -81,6 +81,8 @@ export interface Config {
     'pickup-points': PickupPoint;
     'transport-companies': TransportCompany;
     discounts: Discount;
+    'promo-codes': PromoCode;
+    'promo-code-redemptions': PromoCodeRedemption;
     companies: Company;
     'knowledge-categories': KnowledgeCategory;
     'knowledge-sections': KnowledgeSection;
@@ -115,6 +117,8 @@ export interface Config {
     'pickup-points': PickupPointsSelect<false> | PickupPointsSelect<true>;
     'transport-companies': TransportCompaniesSelect<false> | TransportCompaniesSelect<true>;
     discounts: DiscountsSelect<false> | DiscountsSelect<true>;
+    'promo-codes': PromoCodesSelect<false> | PromoCodesSelect<true>;
+    'promo-code-redemptions': PromoCodeRedemptionsSelect<false> | PromoCodeRedemptionsSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
     'knowledge-categories': KnowledgeCategoriesSelect<false> | KnowledgeCategoriesSelect<true>;
     'knowledge-sections': KnowledgeSectionsSelect<false> | KnowledgeSectionsSelect<true>;
@@ -477,9 +481,29 @@ export interface Order {
     | 'cancelled'
     | 'refunded'
     | 'awaiting_invoice';
+  /**
+   * Звонить нужно по номеру из поля «Номер для связи» — его выбрал сам покупатель при оформлении. Определять номер по остальным полям заказа не требуется
+   */
+  contact?: {
+    /**
+     * Заполняется автоматически из выбора покупателя. Чтобы изменить — исправьте телефон заказчика или получателя ниже
+     */
+    phone?: string | null;
+    /**
+     * У заказов, оформленных до разделения номеров, подставляется единственный известный номер — он принадлежит получателю
+     */
+    preferred?: ('customer' | 'recipient') | null;
+    /**
+     * Номер человека, оформившего заказ. Пусто у заказов, оформленных до разделения номеров
+     */
+    customerPhone?: string | null;
+  };
   recipient: {
     fullName: string;
-    phone: string;
+    /**
+     * Указывается, только если заказ получает другой человек
+     */
+    phone?: string | null;
     email: string;
     contactPerson?: string | null;
   };
@@ -535,6 +559,7 @@ export interface Order {
     productDiscounts?: number | null;
     centralDiscountAmount?: number | null;
     centralDiscountPercent?: number | null;
+    promoDiscountAmount?: number | null;
     discount?: number | null;
     shippingCost?: number | null;
     total: number;
@@ -557,6 +582,13 @@ export interface Order {
         id?: string | null;
       }[]
     | null;
+  promoCode?: {
+    promoCodeId?: (number | null) | PromoCode;
+    code?: string | null;
+    discountType?: ('percentage' | 'fixed') | null;
+    discountPercent?: number | null;
+    discountAmount?: number | null;
+  };
   companyInfo?: {
     companyId?: (number | null) | Company;
     name?: string | null;
@@ -685,6 +717,65 @@ export interface Discount {
    * ID документа в старой базе (заполняется только миграцией)
    */
   legacyId?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Промокоды применяются покупателем вручную при оформлении заказа и не зависят от коллекции «Скидки».
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "promo-codes".
+ */
+export interface PromoCode {
+  id: number;
+  /**
+   * Латиница, цифры, дефис и подчёркивание. Регистр не важен — код всегда сохраняется заглавными.
+   */
+  code: string;
+  /**
+   * Для внутреннего использования — покупателю не показывается.
+   */
+  description?: string | null;
+  discountType: 'percentage' | 'fixed';
+  discountPercent?: number | null;
+  /**
+   * Потолок для процентной скидки: «−20 %, но не более 5000 ₽». Пусто — без ограничения.
+   */
+  maxDiscountAmount?: number | null;
+  fixedAmount?: number | null;
+  /**
+   * Считается по сумме товаров после товарных скидок и до корзинных. Пусто — без порога.
+   */
+  minOrderAmount?: number | null;
+  /**
+   * Выключено — промокод и действующая скидка взаимоисключают друг друга, применяется выгодная покупателю. Включено — промокод применяется поверх скидки, к остатку суммы.
+   */
+  combinable?: boolean | null;
+  isActive?: boolean | null;
+  startAt: string;
+  /**
+   * Пусто — бессрочно.
+   */
+  endAt?: string | null;
+  /**
+   * Пусто — без ограничения.
+   */
+  maxUses?: number | null;
+  /**
+   * Пусто — без ограничения.
+   */
+  maxUsesPerUser?: number | null;
+  appliesToAllProducts?: boolean | null;
+  applicableCategories?: (number | Category)[] | null;
+  applicableProducts?: (number | Product)[] | null;
+  /**
+   * Непогашенные активации. Уменьшается при отмене заказа — см. коллекцию «Активации промокодов».
+   */
+  totalUses?: number | null;
+  totalDiscountAmount?: number | null;
+  createdBy?: (number | null) | Admin;
+  updatedBy?: (number | null) | Admin;
+  isCurrentlyActive?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -825,6 +916,31 @@ export interface Banner {
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * Журнал только для чтения. Записи создаются при оформлении заказа и погашаются при его отмене.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "promo-code-redemptions".
+ */
+export interface PromoCodeRedemption {
+  id: number;
+  promoCode: number | PromoCode;
+  /**
+   * Код на момент активации. Хранится копией: переименование промокода не должно менять историю заказов.
+   */
+  code: string;
+  user: number | User;
+  order?: (number | null) | Order;
+  discountAmount: number;
+  /**
+   * «Погашена» — заказ отменён, активация возвращена в лимит промокода.
+   */
+  status: 'applied' | 'revoked';
+  revokedAt?: string | null;
+  revokeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * Верхний уровень базы знаний. Внутри раздела статьи можно дополнительно сгруппировать по секциям.
@@ -1266,6 +1382,10 @@ export interface CheckoutPreference {
   user: number | User;
   recipient?: {
     fullName?: string | null;
+    customerPhone?: string | null;
+    /**
+     * У предпочтений, сохранённых до разделения номеров, здесь лежит единственный введённый тогда номер — чей именно, неизвестно, поэтому в форму он не подставляется
+     */
     phone?: string | null;
     email?: string | null;
   };
@@ -1374,6 +1494,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'discounts';
         value: number | Discount;
+      } | null)
+    | ({
+        relationTo: 'promo-codes';
+        value: number | PromoCode;
+      } | null)
+    | ({
+        relationTo: 'promo-code-redemptions';
+        value: number | PromoCodeRedemption;
       } | null)
     | ({
         relationTo: 'companies';
@@ -1744,6 +1872,13 @@ export interface OrdersSelect<T extends boolean = true> {
   orderNumber?: T;
   user?: T;
   status?: T;
+  contact?:
+    | T
+    | {
+        phone?: T;
+        preferred?: T;
+        customerPhone?: T;
+      };
   recipient?:
     | T
     | {
@@ -1804,6 +1939,7 @@ export interface OrdersSelect<T extends boolean = true> {
         productDiscounts?: T;
         centralDiscountAmount?: T;
         centralDiscountPercent?: T;
+        promoDiscountAmount?: T;
         discount?: T;
         shippingCost?: T;
         total?: T;
@@ -1827,6 +1963,15 @@ export interface OrdersSelect<T extends boolean = true> {
         discountAmount?: T;
         message?: T;
         id?: T;
+      };
+  promoCode?:
+    | T
+    | {
+        promoCodeId?: T;
+        code?: T;
+        discountType?: T;
+        discountPercent?: T;
+        discountAmount?: T;
       };
   companyInfo?:
     | T
@@ -1990,6 +2135,51 @@ export interface DiscountsSelect<T extends boolean = true> {
   updatedBy?: T;
   isCurrentlyActive?: T;
   legacyId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "promo-codes_select".
+ */
+export interface PromoCodesSelect<T extends boolean = true> {
+  code?: T;
+  description?: T;
+  discountType?: T;
+  discountPercent?: T;
+  maxDiscountAmount?: T;
+  fixedAmount?: T;
+  minOrderAmount?: T;
+  combinable?: T;
+  isActive?: T;
+  startAt?: T;
+  endAt?: T;
+  maxUses?: T;
+  maxUsesPerUser?: T;
+  appliesToAllProducts?: T;
+  applicableCategories?: T;
+  applicableProducts?: T;
+  totalUses?: T;
+  totalDiscountAmount?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  isCurrentlyActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "promo-code-redemptions_select".
+ */
+export interface PromoCodeRedemptionsSelect<T extends boolean = true> {
+  promoCode?: T;
+  code?: T;
+  user?: T;
+  order?: T;
+  discountAmount?: T;
+  status?: T;
+  revokedAt?: T;
+  revokeReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2288,6 +2478,7 @@ export interface CheckoutPreferencesSelect<T extends boolean = true> {
     | T
     | {
         fullName?: T;
+        customerPhone?: T;
         phone?: T;
         email?: T;
       };

@@ -3,6 +3,9 @@
 import type { Where } from "payload";
 import { CheckoutSubmitInput } from "@/modules/checkout";
 import { composeAddressLine } from "@/modules/checkout/lib/address";
+import { resolveOrderContact } from "@/modules/orders/lib/order-contact";
+import type { CheckoutPricing } from "@/modules/promo/lib/promo-resolution";
+import type { PromoAcceptance } from "@/modules/promo/types";
 import type { Order } from "../../../payload-types";
 import { CartView } from "../../modules/cart";
 import { createRelationshipUser } from "../access/createRelationshipUser";
@@ -13,6 +16,21 @@ export interface CreateOrderInput {
 	cart: CartView;
 	form: CheckoutSubmitInput;
 	meta: { ip: string; userAgent: string };
+	/**
+	 * Итоговые цены заказа — считаются вызывающим через
+	 * `calculateCheckoutPricing`, а не здесь.
+	 *
+	 * Так снимок цен в заказе получается ровно тем же расчётом, который
+	 * покупатель видел при нажатии «Применить»: одна функция, один результат.
+	 * Считай их этот сервис самостоятельно — появилась бы вторая реализация
+	 * порядка применения скидок, и разойтись они могли бы незаметно.
+	 */
+	pricing: CheckoutPricing;
+	/**
+	 * Применённый промокод — уже перепроверенный на сервере. null, если кода
+	 * не было или он не применился.
+	 */
+	promo: PromoAcceptance | null;
 }
 
 export interface GetOrdersOptions {
@@ -207,6 +225,8 @@ export async function createOrderFromCheckout({
 	cart,
 	form,
 	meta,
+	pricing,
+	promo,
 }: CreateOrderInput) {
 	const payload = await getPayloadInstance();
 
@@ -219,13 +239,20 @@ export async function createOrderFromCheckout({
 		totalPrice: item.subtotal,
 	}));
 
-	const appliedDiscounts = cart.discounts.applied.map((d) => ({
-		discountId: Number(d.id),
-		name: d.name,
-		discountPercent: d.discountPercent,
-		discountAmount: d.amount,
-		message: d.message,
-	}));
+	// Центральная скидка попадает в снимок заказа, ТОЛЬКО если она в нём
+	// действительно участвовала. Промокод с combinable = false вытесняет её
+	// целиком (см. promo-resolution), и записать её при этом означало бы
+	// заказ, в котором перечислены скидки на большую сумму, чем в него
+	// заложено — а расхождение снимка с итогом делает заказ неразбираемым.
+	const appliedDiscounts = pricing.centralDiscountSuppressed
+		? []
+		: cart.discounts.applied.map((d) => ({
+				discountId: Number(d.id),
+				name: d.name,
+				discountPercent: d.discountPercent,
+				discountAmount: d.amount,
+				message: d.message,
+			}));
 
 	const companyInfo = form.company?.isCompany
 		? {
@@ -240,6 +267,15 @@ export async function createOrderFromCheckout({
 			}
 		: undefined;
 
+	// Единственное место, где решается «куда звонить по заказу»: тот же
+	// резолвер работает в хуке коллекции и при чтении заказа, поэтому
+	// расхождение между оформлением, админкой и письмами невозможно.
+	const contact = resolveOrderContact({
+		customerPhone: form.customer.phone,
+		recipientPhone: form.recipient.phone,
+		preferred: form.contactPreference,
+	});
+
 	const order = await payload.create({
 		collection: "orders",
 		data: {
@@ -248,8 +284,15 @@ export async function createOrderFromCheckout({
 			status: "pending",
 			recipient: {
 				fullName: form.recipient.fullName,
-				phone: form.recipient.phone,
+				// Пустая строка формы («получаю сам») должна лечь в базу как NULL:
+				// у заказа либо есть отдельный номер получателя, либо его нет.
+				phone: contact.recipientPhone || undefined,
 				email: form.recipient.email,
+			},
+			contact: {
+				phone: contact.phone,
+				preferred: contact.owner ?? undefined,
+				customerPhone: contact.customerPhone || undefined,
 			},
 			delivery: {
 				method: form.delivery.method,
@@ -267,14 +310,18 @@ export async function createOrderFromCheckout({
 				notes: form.delivery.notes,
 			},
 			items,
+			// Снимок цен берётся ЦЕЛИКОМ из расчёта, а не из витрины корзины:
+			// корзина не знает о промокоде, и смешивать два источника значило бы
+			// записать заказ, в котором сумма скидок не сходится с итогом.
 			pricing: {
-				subtotal: cart.summary.priceWithoutDiscount,
-				productDiscounts: cart.summary.productDiscountAmount,
-				centralDiscountAmount: cart.summary.centralDiscountAmount,
-				centralDiscountPercent: cart.summary.centralDiscountPercent,
-				discount: cart.summary.totalDiscount,
+				subtotal: pricing.subtotal,
+				productDiscounts: pricing.productDiscount,
+				centralDiscountAmount: pricing.centralDiscountAmount,
+				centralDiscountPercent: pricing.centralDiscountPercent,
+				promoDiscountAmount: pricing.promoDiscountAmount,
+				discount: pricing.totalDiscount,
 				shippingCost: 0,
-				total: cart.summary.totalPrice,
+				total: pricing.total,
 				currency: "RUB",
 			},
 			payment: {
@@ -282,6 +329,19 @@ export async function createOrderFromCheckout({
 				status: "pending",
 			},
 			appliedDiscounts,
+			// Снимок промокода: код и величина скидки на момент заказа.
+			// Хранится копией, а не одной лишь связью, потому что промокод
+			// живёт своей жизнью — его переименуют, отключат или удалят, а
+			// заказ обязан навсегда объяснять, откуда взялась его скидка.
+			promoCode: promo
+				? {
+						promoCodeId: Number(promo.promoCodeId),
+						code: promo.code,
+						discountType: promo.discountType,
+						discountPercent: promo.discountPercent ?? undefined,
+						discountAmount: promo.discountAmount,
+					}
+				: undefined,
 			companyInfo,
 			notes: form.notes,
 			source: "web",

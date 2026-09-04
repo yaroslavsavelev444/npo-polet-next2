@@ -67,6 +67,20 @@ test.describe("витрина покупателя", () => {
 		await expect(dialog).toContainText("кв./офис 45");
 	});
 
+	test("у заказа без новых полей номер для связи всё равно виден", async ({
+		page,
+	}) => {
+		// Исторический заказ несёт единственный номер — в recipient.phone.
+		// Миграции данных нет, поэтому «куда звонить» вычисляется при чтении:
+		// пустого контакта на старом заказе быть не должно.
+		await page.goto("/orders");
+		await page.getByText(`Заказ №${LEGACY_SINGLE_LINE}`).click();
+
+		const dialog = page.getByRole("dialog");
+		await expect(dialog).toContainText("+79990001122");
+		await expect(dialog).toContainText(/менеджер звонит/i);
+	});
+
 	test("отсутствие новых полей не роняет страницу", async ({ page }) => {
 		// Ошибка вида «cannot read property of undefined» на историческом
 		// заказе — самый вероятный способ сломать витрину этой задачей.
@@ -83,8 +97,8 @@ test.describe("витрина покупателя", () => {
 	test("старые и новые заказы уживаются в одном списке", async ({ page }) => {
 		resetCart();
 		await openCheckout(page);
+		await page.locator(FIELD.customerPhone).fill("+79991234567");
 		await page.locator(FIELD.recipientFullName).fill("Иванов Иван Иванович");
-		await page.locator(FIELD.recipientPhone).fill("+79991234567");
 		await page.locator(FIELD.recipientEmail).fill("ivanov@example.com");
 		await page.getByRole("radio", { name: /E2E Пункт самовывоза/ }).click();
 		await submitButton(page).click();

@@ -117,8 +117,8 @@ test("записи снабжены названием раздела для н�
 		{ addressManualMode: true },
 	);
 
-	assert.equal(entries[0].section, "recipient");
-	assert.equal(entries[0].sectionLabel, "Данные получателя");
+	assert.equal(entries[0].section, "contacts");
+	assert.equal(entries[0].sectionLabel, "Контактные данные");
 });
 
 test("findFirstErrorTarget возвращает первое поле по порядку формы", () => {
@@ -133,6 +133,44 @@ test("findFirstErrorTarget возвращает первое поле по по�
 	// Пункт самовывоза расположен на странице выше данных получателя.
 	assert.equal(findFirstErrorTarget(entries), CHECKOUT_FIELD_IDS.pickupPoint);
 	assert.equal(findFirstErrorTarget([]), null);
+});
+
+test("контакты идут в порядке блоков: свой телефон → получатель → выбор", () => {
+	// Порядок в сводке обязан совпадать с порядком на странице: телефон
+	// заказчика стоит первым в блоке контактов, выбор номера — последним.
+	const entries = buildErrorEntries(
+		{
+			contactPreference: "Выберите номер для связи",
+			"recipient.phone": "Укажите корректный номер телефона получателя",
+			"customer.phone": "Укажите свой номер телефона",
+			"recipient.fullName": "Укажите ФИО получателя",
+		},
+		{ addressManualMode: true },
+	);
+
+	assert.deepEqual(
+		entries.map((entry) => entry.path),
+		[
+			"customer.phone",
+			"recipient.fullName",
+			"recipient.phone",
+			"contactPreference",
+		],
+	);
+	// Все контакты живут в одном разделе — пользователь чинит их не сходя с
+	// места.
+	assert.ok(entries.every((entry) => entry.section === "contacts"));
+});
+
+test("телефоны заказчика и получателя названы по-разному", () => {
+	// Два одинаковых «Телефон» в сводке ошибок не сказали бы, какой из них
+	// исправлять — а различие между ними и есть смысл этой формы.
+	assert.equal(CHECKOUT_FIELDS["customer.phone"].label, "Ваш телефон");
+	assert.equal(CHECKOUT_FIELDS["recipient.phone"].label, "Телефон получателя");
+	assert.notEqual(
+		CHECKOUT_FIELDS["customer.phone"].elementId,
+		CHECKOUT_FIELDS["recipient.phone"].elementId,
+	);
 });
 
 // ── Сводное сообщение об адресе ─────────────────────────────────────────────

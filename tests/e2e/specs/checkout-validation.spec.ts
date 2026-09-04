@@ -46,7 +46,10 @@ test("пустая форма при отправке показывает св�
 	const summary = errorSummary(page);
 	await expect(summary).toBeVisible();
 	await expect(summary).toContainText("ФИО получателя");
-	await expect(summary).toContainText("Телефон");
+	// Телефон заказчика назван «Ваш телефон» — в сводке он не должен путаться
+	// с телефоном получателя, который необязателен и ошибки не даёт.
+	await expect(summary).toContainText("Ваш телефон");
+	await expect(summary).not.toContainText("Телефон получателя");
 	await expect(summary).toContainText("Пункт самовывоза");
 
 	// Заказ не создан: остались на странице оформления.
@@ -91,10 +94,10 @@ test("исправление ошибок постепенно опустоша�
 	// Запись исчезает немедленно, без повторной отправки: ошибки
 	// пересчитываются из текущих значений, а не хранятся.
 	await expect(summary).not.toContainText("ФИО получателя");
-	await expect(summary).toContainText("Телефон");
+	await expect(summary).toContainText("Ваш телефон");
 
-	await page.locator(FIELD.recipientPhone).fill("+79991234567");
-	await expect(summary).not.toContainText("Телефон");
+	await page.locator(FIELD.customerPhone).fill("+79991234567");
+	await expect(summary).not.toContainText("Ваш телефон");
 
 	await page.getByRole("radio", { name: /E2E Пункт самовывоза/ }).click();
 

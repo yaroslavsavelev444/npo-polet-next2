@@ -13,73 +13,75 @@ import * as migration_20260719_140000_order_address_house_apartment from "./2026
 import * as migration_20260902_120000_sessions_payload_session_id from "./20260902_120000_sessions_payload_session_id.ts";
 import * as migration_20260902_180000_knowledge_module from "./20260902_180000_knowledge_module.ts";
 import * as migration_20260903_120000_order_address_structured from "./20260903_120000_order_address_structured.ts";
+import * as migration_20260904_120000_order_contact_phones from "./20260904_120000_order_contact_phones.ts";
+import * as migration_20260904_153241_promo_codes from "./20260904_153241_promo_codes.ts";
 
 export const migrations = [
-  {
-    up: migration_20260708_081550_initial.up,
-    down: migration_20260708_081550_initial.down,
-    name: '20260708_081550_initial',
-  },
-  {
-    up: migration_20260710_085725.up,
-    down: migration_20260710_085725.down,
-    name: '20260710_085725',
-  },
-  {
-    up: migration_20260710_100518_drop_legacy_audit_columns.up,
-    down: migration_20260710_100518_drop_legacy_audit_columns.down,
-    name: '20260710_100518_drop_legacy_audit_columns',
-  },
-  {
-    up: migration_20260710_100650_drop_legacy_audit_columns.up,
-    down: migration_20260710_100650_drop_legacy_audit_columns.down,
-    name: '20260710_100650_drop_legacy_audit_columns',
-  },
-  {
-    up: migration_20260710_120000_account_deletion_requests.up,
-    down: migration_20260710_120000_account_deletion_requests.down,
-    name: '20260710_120000_account_deletion_requests',
-  },
-  {
-    up: migration_20260713_080049_hero_background.up,
-    down: migration_20260713_080049_hero_background.down,
-    name: '20260713_080049_hero_background',
-  },
-  {
-    up: migration_20260713_093858_legacy_data_migration_support.up,
-    down: migration_20260713_093858_legacy_data_migration_support.down,
-    name: '20260713_093858_legacy_data_migration_support',
-  },
-  {
-    up: migration_20260714_115946_legacy_password_migrated_flag.up,
-    down: migration_20260714_115946_legacy_password_migrated_flag.down,
-    name: '20260714_115946_legacy_password_migrated_flag',
-  },
-  {
-    up: migration_20260717_121326_add_products_previous_slugs.up,
-    down: migration_20260717_121326_add_products_previous_slugs.down,
-    name: '20260717_121326_add_products_previous_slugs',
-  },
-  {
-    up: migration_20260717_170000_feedback_simplify.up,
-    down: migration_20260717_170000_feedback_simplify.down,
-    name: '20260717_170000_feedback_simplify',
-  },
-  {
-    up: migration_20260719_120000_auth_images.up,
-    down: migration_20260719_120000_auth_images.down,
-    name: '20260719_120000_auth_images',
-  },
-  {
-    up: migration_20260719_140000_order_address_house_apartment.up,
-    down: migration_20260719_140000_order_address_house_apartment.down,
-    name: '20260719_140000_order_address_house_apartment',
-  },
-  {
-    up: migration_20260902_120000_sessions_payload_session_id.up,
-    down: migration_20260902_120000_sessions_payload_session_id.down,
-    name: '20260902_120000_sessions_payload_session_id',
-  },
+	{
+		up: migration_20260708_081550_initial.up,
+		down: migration_20260708_081550_initial.down,
+		name: "20260708_081550_initial",
+	},
+	{
+		up: migration_20260710_085725.up,
+		down: migration_20260710_085725.down,
+		name: "20260710_085725",
+	},
+	{
+		up: migration_20260710_100518_drop_legacy_audit_columns.up,
+		down: migration_20260710_100518_drop_legacy_audit_columns.down,
+		name: "20260710_100518_drop_legacy_audit_columns",
+	},
+	{
+		up: migration_20260710_100650_drop_legacy_audit_columns.up,
+		down: migration_20260710_100650_drop_legacy_audit_columns.down,
+		name: "20260710_100650_drop_legacy_audit_columns",
+	},
+	{
+		up: migration_20260710_120000_account_deletion_requests.up,
+		down: migration_20260710_120000_account_deletion_requests.down,
+		name: "20260710_120000_account_deletion_requests",
+	},
+	{
+		up: migration_20260713_080049_hero_background.up,
+		down: migration_20260713_080049_hero_background.down,
+		name: "20260713_080049_hero_background",
+	},
+	{
+		up: migration_20260713_093858_legacy_data_migration_support.up,
+		down: migration_20260713_093858_legacy_data_migration_support.down,
+		name: "20260713_093858_legacy_data_migration_support",
+	},
+	{
+		up: migration_20260714_115946_legacy_password_migrated_flag.up,
+		down: migration_20260714_115946_legacy_password_migrated_flag.down,
+		name: "20260714_115946_legacy_password_migrated_flag",
+	},
+	{
+		up: migration_20260717_121326_add_products_previous_slugs.up,
+		down: migration_20260717_121326_add_products_previous_slugs.down,
+		name: "20260717_121326_add_products_previous_slugs",
+	},
+	{
+		up: migration_20260717_170000_feedback_simplify.up,
+		down: migration_20260717_170000_feedback_simplify.down,
+		name: "20260717_170000_feedback_simplify",
+	},
+	{
+		up: migration_20260719_120000_auth_images.up,
+		down: migration_20260719_120000_auth_images.down,
+		name: "20260719_120000_auth_images",
+	},
+	{
+		up: migration_20260719_140000_order_address_house_apartment.up,
+		down: migration_20260719_140000_order_address_house_apartment.down,
+		name: "20260719_140000_order_address_house_apartment",
+	},
+	{
+		up: migration_20260902_120000_sessions_payload_session_id.up,
+		down: migration_20260902_120000_sessions_payload_session_id.down,
+		name: "20260902_120000_sessions_payload_session_id",
+	},
 	{
 		up: migration_20260902_180000_knowledge_module.up,
 		down: migration_20260902_180000_knowledge_module.down,
@@ -89,5 +91,15 @@ export const migrations = [
 		up: migration_20260903_120000_order_address_structured.up,
 		down: migration_20260903_120000_order_address_structured.down,
 		name: "20260903_120000_order_address_structured",
+	},
+	{
+		up: migration_20260904_120000_order_contact_phones.up,
+		down: migration_20260904_120000_order_contact_phones.down,
+		name: "20260904_120000_order_contact_phones",
+	},
+	{
+		up: migration_20260904_153241_promo_codes.up,
+		down: migration_20260904_153241_promo_codes.down,
+		name: "20260904_153241_promo_codes",
 	},
 ];

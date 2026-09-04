@@ -16,6 +16,8 @@ const ROOT = path.resolve(DIRNAME, "../..");
  * изменению (он бы просто поехал вместе с кодом).
  */
 export const FIELD = {
+	customerPhone: "#checkout-customer-phone",
+	contactPreference: "#checkout-contact-preference",
 	recipientFullName: "#checkout-recipient-full-name",
 	recipientPhone: "#checkout-recipient-phone",
 	recipientEmail: "#checkout-recipient-email",
@@ -103,11 +105,41 @@ export function deliveryMethodButton(page: Page, label: string): Locator {
 	return page.getByRole("button", { name: new RegExp(label) });
 }
 
-/** Заполняет корректные данные получателя. */
+/**
+ * Заполняет корректные контактные данные в самом частом сценарии: заказ
+ * оформляет и получает один и тот же человек, отдельного номера получателя
+ * нет. Телефон получателя добавляется отдельно — см. fillSeparateRecipientPhone.
+ */
 export async function fillRecipient(page: Page): Promise<void> {
+	await page.locator(FIELD.customerPhone).fill("+79991234567");
 	await page.locator(FIELD.recipientFullName).fill("Иванов Иван Иванович");
-	await page.locator(FIELD.recipientPhone).fill("+79991234567");
 	await page.locator(FIELD.recipientEmail).fill("ivanov@example.com");
+}
+
+/**
+ * Включает отдельного получателя и вводит его номер. Пока переключатель
+ * выключен, поля телефона получателя нет в порядке табуляции (inert), поэтому
+ * заполнить его без переключателя нельзя — это и проверяется в тестах.
+ */
+export async function fillSeparateRecipientPhone(
+	page: Page,
+	phone = "+79997654321",
+): Promise<void> {
+	await page
+		.getByRole("checkbox", { name: "Заказ получит другой человек" })
+		.check();
+	await page.locator(FIELD.recipientPhone).fill(phone);
+}
+
+/** Выбирает, чей номер менеджер использует для связи по заказу. */
+export async function chooseCallTarget(
+	page: Page,
+	target: "Мне" | "Получателю",
+): Promise<void> {
+	await page
+		.locator(FIELD.contactPreference)
+		.getByRole("radio", { name: target })
+		.click();
 }
 
 /**

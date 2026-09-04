@@ -24,16 +24,21 @@ import Footer from "@/widgets/Footer/Footer";
 import { HeaderSpacer } from "@/widgets/Header/HeaderSpacer";
 import { StickyHeader } from "@/widgets/Header/StickyHeader";
 
+// Имена переменных намеренно НЕ --font-sans/--font-mono: эти два имени
+// принадлежат теме Tailwind (@theme inline в globals.css). Пока next/font
+// объявлял их сам, оба источника писали в одну переменную на <html>, и кто
+// победит, решал порядок подключения стилей. Теперь у каждой переменной один
+// владелец: next/font даёт сами шрифты, тема связывает их с --font-sans.
 const manrope = Manrope({
 	weight: ["200", "300", "400", "500", "600", "700"],
 	subsets: ["latin", "cyrillic"],
-	variable: "--font-sans",
+	variable: "--font-manrope",
 });
 
 const mono = IBM_Plex_Mono({
 	weight: ["100", "200", "300", "400", "500", "600", "700"],
 	subsets: ["latin", "cyrillic"],
-	variable: "--font-mono",
+	variable: "--font-ibm-plex-mono",
 });
 
 // Красит адресную строку/UI браузера на мобильных под тему ОС — то же значение,

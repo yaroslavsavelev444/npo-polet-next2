@@ -75,6 +75,7 @@ export function OrderDetailContent({
 				</OrderReveal>
 				<OrderReveal delay={260}>
 					<OrderInfoPanel
+						contact={detail.contact}
 						recipient={detail.recipient}
 						payment={detail.payment}
 						company={detail.companyInfo}
@@ -97,6 +98,7 @@ export function OrderDetailContent({
 					discount={detail.pricing.discount}
 					total={detail.pricing.total}
 					shippingCost={detail.pricing.shippingCost}
+					promo={detail.promo}
 					paymentStatus={detail.payment.status}
 				/>
 			</OrderReveal>

@@ -289,9 +289,12 @@ export class AccountDeletionService {
         UPDATE orders
         SET user_id = NULL,
             recipient_full_name = 'Удалено по запросу субъекта данных',
-            recipient_phone = '',
+            recipient_phone = NULL,
             recipient_email = CONCAT('deleted-order-', id, '@example.invalid'),
             recipient_contact_person = NULL,
+            contact_phone = NULL,
+            contact_preferred = NULL,
+            contact_customer_phone = NULL,
             delivery_address_street = NULL,
             delivery_address_city = NULL,
             delivery_address_postal_code = NULL,
