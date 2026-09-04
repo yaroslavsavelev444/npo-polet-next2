@@ -1,13 +1,18 @@
 "use client";
 
 import { CheckCircle2, Home, Info, Package, Store } from "lucide-react";
+import { useId } from "react";
 import { Input } from "@/UI/Input/Input";
 import { cn } from "@/utils/cn";
+import { type CheckoutAddress, createEmptyAddress } from "../lib/address";
+import { CHECKOUT_FIELD_IDS } from "../lib/checkout-fields";
+import type { CheckoutFieldErrors } from "../lib/checkout-schema";
 import type {
 	CheckoutDeliveryInput,
 	PickupPointOption,
 	TransportCompanyOption,
 } from "../types";
+import { AddressAutocomplete } from "./AddressAutocomplete";
 
 const METHODS = [
 	{
@@ -39,11 +44,26 @@ function InlineNotice({ children }: { children: React.ReactNode }) {
 	);
 }
 
+const MANUAL_FIELD_IDS = {
+	city: CHECKOUT_FIELD_IDS.addressCity,
+	street: CHECKOUT_FIELD_IDS.addressStreet,
+	house: CHECKOUT_FIELD_IDS.addressHouse,
+	postalCode: CHECKOUT_FIELD_IDS.addressPostalCode,
+};
+
 interface Props {
 	value: CheckoutDeliveryInput;
 	onChange: (next: CheckoutDeliveryInput) => void;
 	pickupPoints: PickupPointOption[];
 	transportCompanies: TransportCompanyOption[];
+	/** Видимые сейчас ошибки формы (пути схемы → сообщение). */
+	errors: CheckoutFieldErrors;
+	/** Единое сообщение об адресе для режима подсказок. */
+	addressSummaryError?: string;
+	onFieldBlur: (path: string) => void;
+	suggestionsEnabled: boolean;
+	addressManualMode: boolean;
+	onAddressManualModeChange: (manual: boolean) => void;
 }
 
 export function DeliveryMethodSelector({
@@ -51,20 +71,26 @@ export function DeliveryMethodSelector({
 	onChange,
 	pickupPoints,
 	transportCompanies,
+	errors,
+	addressSummaryError,
+	onFieldBlur,
+	suggestionsEnabled,
+	addressManualMode,
+	onAddressManualModeChange,
 }: Props) {
-	const address = value.address ?? {
-		city: "",
-		street: "",
-		house: "",
-		apartment: "",
-		postalCode: "",
-		country: "Россия",
-	};
+	const address: CheckoutAddress = value.address ?? createEmptyAddress();
+	const notesId = useId();
 
-	const hasDetails =
-		value.method === "door_to_door" ||
-		value.method === "pickup_point" ||
-		value.method === "self_pickup";
+	const needsAddress =
+		value.method === "door_to_door" || value.method === "pickup_point";
+	const isCourier = value.method === "door_to_door";
+
+	const transportCompanyError = errors["delivery.transportCompanyId"];
+	const pickupPointError = errors["delivery.pickupPointId"];
+
+	function updateAddress(next: CheckoutAddress) {
+		onChange({ ...value, address: next });
+	}
 
 	return (
 		<div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-6">
@@ -117,31 +143,42 @@ export function DeliveryMethodSelector({
 				})}
 			</div>
 
-			{hasDetails && (
-				<div className="mt-6 flex flex-col gap-4 border-t border-(--border) pt-6">
-					{/* Transport company (door_to_door / pickup_point) */}
-					{(value.method === "door_to_door" ||
-						value.method === "pickup_point") && (
-						<div>
-							<label
-								htmlFor="transport-company"
-								className="mb-1.5 block text-sm font-medium text-(--text-primary)"
-							>
-								Транспортная компания
-							</label>
-							{transportCompanies.length === 0 ? (
-								<InlineNotice>Нет доступных транспортных компаний</InlineNotice>
-							) : (
+			<div className="mt-6 flex flex-col gap-5 border-t border-(--border) pt-6">
+				{/* Transport company (door_to_door / pickup_point) */}
+				{needsAddress && (
+					<div className="flex flex-col gap-1.5">
+						<label
+							htmlFor={CHECKOUT_FIELD_IDS.transportCompany}
+							className="text-sm font-medium leading-none text-(--text-primary)"
+						>
+							Транспортная компания
+						</label>
+						{transportCompanies.length === 0 ? (
+							<InlineNotice>Нет доступных транспортных компаний</InlineNotice>
+						) : (
+							<>
 								<select
-									id="transport-company"
+									id={CHECKOUT_FIELD_IDS.transportCompany}
 									value={value.transportCompanyId ?? ""}
+									aria-invalid={transportCompanyError ? true : undefined}
+									aria-describedby={
+										transportCompanyError
+											? `${CHECKOUT_FIELD_IDS.transportCompany}-error`
+											: undefined
+									}
 									onChange={(e) =>
 										onChange({
 											...value,
 											transportCompanyId: e.target.value || undefined,
 										})
 									}
-									className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-transparent px-3 py-2.5 text-sm outline-none transition-colors focus:border-(--primary)"
+									onBlur={() => onFieldBlur("delivery.transportCompanyId")}
+									className={cn(
+										"w-full rounded-[var(--radius-sm)] border bg-transparent px-3 py-2.5 text-sm outline-none transition-colors",
+										transportCompanyError
+											? "border-(--error) focus:border-(--error)"
+											: "border-(--border) focus:border-(--primary)",
+									)}
 								>
 									<option value="">Выберите компанию</option>
 									{transportCompanies.map((tc) => (
@@ -150,143 +187,135 @@ export function DeliveryMethodSelector({
 										</option>
 									))}
 								</select>
-							)}
-						</div>
-					)}
+								{transportCompanyError && (
+									<p
+										id={`${CHECKOUT_FIELD_IDS.transportCompany}-error`}
+										className="text-xs leading-none text-(--error)"
+									>
+										{transportCompanyError}
+									</p>
+								)}
+							</>
+						)}
+					</div>
+				)}
 
-					{/* Address (door_to_door full address) */}
-					{value.method === "door_to_door" && (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							<Input
-								label="Город"
-								placeholder="Например, Москва"
-								value={address.city}
-								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, city: e.target.value },
-									})
-								}
-								required
-								wrapperClassName="sm:col-span-2"
-							/>
-							<Input
-								label="Улица"
-								placeholder="Например, Ленина"
-								value={address.street}
-								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, street: e.target.value },
-									})
-								}
-								required
-								wrapperClassName="sm:col-span-2"
-							/>
-							<Input
-								label="Дом"
-								placeholder="Например, 12к1"
-								value={address.house}
-								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, house: e.target.value },
-									})
-								}
-								required
-							/>
+				{/* Адрес доставки / адрес ПВЗ */}
+				{needsAddress && (
+					<AddressAutocomplete
+						value={address}
+						onChange={updateAddress}
+						onBlur={() => {
+							onFieldBlur("delivery.address.city");
+							onFieldBlur("delivery.address.street");
+							onFieldBlur("delivery.address.house");
+							onFieldBlur("delivery.address.postalCode");
+						}}
+						onFieldBlur={(field) => onFieldBlur(`delivery.address.${field}`)}
+						error={addressSummaryError}
+						fieldErrors={{
+							city: errors["delivery.address.city"],
+							street: errors["delivery.address.street"],
+							house: errors["delivery.address.house"],
+							postalCode: errors["delivery.address.postalCode"],
+						}}
+						requirePostalCode={isCourier}
+						suggestionsEnabled={suggestionsEnabled}
+						manualMode={addressManualMode}
+						onManualModeChange={onAddressManualModeChange}
+						label={isCourier ? "Адрес доставки" : "Адрес пункта выдачи"}
+						placeholder={
+							isCourier ? "Город, улица, дом" : "Город и адрес пункта выдачи"
+						}
+						inputId={CHECKOUT_FIELD_IDS.addressQuery}
+						manualFieldIds={MANUAL_FIELD_IDS}
+					/>
+				)}
+
+				{/* Данные для курьера — отдельно от адресной части: справочник
+				    адресов их не знает, и они не должны попадать в строку поиска. */}
+				{isCourier && (
+					<fieldset className="rounded-[var(--radius-md)] border border-(--border) p-4">
+						<legend className="px-1.5 text-xs font-medium uppercase tracking-wider text-(--text-secondary)">
+							Данные для курьера
+						</legend>
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 							<Input
 								label="Квартира / офис"
 								placeholder="Необязательно"
 								value={address.apartment}
 								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, apartment: e.target.value },
-									})
+									updateAddress({ ...address, apartment: e.target.value })
 								}
 							/>
 							<Input
-								label="Индекс"
-								placeholder="6 цифр"
+								label="Подъезд"
+								placeholder="Необязательно"
 								inputMode="numeric"
-								value={address.postalCode}
-								onChange={(e) => {
-									const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-									onChange({
-										...value,
-										address: { ...address, postalCode: val },
-									});
-								}}
-								required
-								wrapperClassName="sm:col-span-2"
+								value={address.entrance}
+								onChange={(e) =>
+									updateAddress({
+										...address,
+										entrance: e.target.value.slice(0, 10),
+									})
+								}
+							/>
+							<Input
+								label="Этаж"
+								placeholder="Необязательно"
+								inputMode="numeric"
+								value={address.floor}
+								onChange={(e) =>
+									updateAddress({
+										...address,
+										floor: e.target.value.slice(0, 10),
+									})
+								}
 							/>
 						</div>
-					)}
+					</fieldset>
+				)}
 
-					{/* Address (pickup_point: город/улица/дом — без квартиры и индекса) */}
-					{value.method === "pickup_point" && (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							<Input
-								label="Город назначения"
-								placeholder="Например, Москва"
-								value={address.city}
-								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, city: e.target.value },
-									})
-								}
-								required
-								wrapperClassName="sm:col-span-2"
-							/>
-							<Input
-								label="Улица"
-								placeholder="Например, Ленина"
-								value={address.street}
-								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, street: e.target.value },
-									})
-								}
-								required
-							/>
-							<Input
-								label="Дом"
-								placeholder="Например, 12к1"
-								value={address.house}
-								onChange={(e) =>
-									onChange({
-										...value,
-										address: { ...address, house: e.target.value },
-									})
-								}
-								required
-							/>
-						</div>
-					)}
-
-					{/* Pickup point (self_pickup) */}
-					{value.method === "self_pickup" && (
-						<div>
-							<p className="mb-1.5 text-sm font-medium text-(--text-primary)">
-								Пункт самовывоза
-							</p>
-							{pickupPoints.length === 0 ? (
-								<InlineNotice>Нет доступных пунктов самовывоза</InlineNotice>
-							) : (
-								<div className="flex flex-col gap-2">
+				{/* Pickup point (self_pickup) */}
+				{value.method === "self_pickup" && (
+					<div className="flex flex-col gap-1.5">
+						<p className="text-sm font-medium text-(--text-primary)">
+							Пункт самовывоза
+						</p>
+						{pickupPoints.length === 0 ? (
+							<InlineNotice>Нет доступных пунктов самовывоза</InlineNotice>
+						) : (
+							<>
+								<div
+									id={CHECKOUT_FIELD_IDS.pickupPoint}
+									// Группа выбора: роль radiogroup даёт скринридеру понять,
+									// что вариант ровно один, а aria-invalid связывает с ней
+									// сообщение об ошибке.
+									role="radiogroup"
+									aria-label="Пункт самовывоза"
+									aria-invalid={pickupPointError ? true : undefined}
+									aria-describedby={
+										pickupPointError
+											? `${CHECKOUT_FIELD_IDS.pickupPoint}-error`
+											: undefined
+									}
+									className={cn(
+										"flex flex-col gap-2 rounded-[var(--radius-md)]",
+										pickupPointError &&
+											"p-2 outline outline-1 outline-(--error)/50",
+									)}
+								>
 									{pickupPoints.map((point) => {
 										const isSelected = value.pickupPointId === point.id;
 										return (
 											<button
 												key={point.id}
 												type="button"
+												role="radio"
+												aria-checked={isSelected}
 												onClick={() =>
 													onChange({ ...value, pickupPointId: point.id })
 												}
-												aria-pressed={isSelected}
 												className={cn(
 													"flex items-start justify-between gap-3 rounded-[var(--radius-md)] border p-3.5 text-left transition-colors",
 													isSelected
@@ -317,15 +346,24 @@ export function DeliveryMethodSelector({
 										);
 									})}
 								</div>
-							)}
-						</div>
-					)}
-				</div>
-			)}
+								{pickupPointError && (
+									<p
+										id={`${CHECKOUT_FIELD_IDS.pickupPoint}-error`}
+										className="text-xs leading-none text-(--error)"
+									>
+										{pickupPointError}
+									</p>
+								)}
+							</>
+						)}
+					</div>
+				)}
+			</div>
 
 			{/* Delivery notes + save address */}
 			<div className="mt-6 flex flex-col gap-4 border-t border-(--border) pt-6">
 				<Input
+					id={notesId}
 					label="Комментарий к доставке"
 					placeholder="Например: позвоните перед доставкой"
 					value={value.notes ?? ""}
@@ -341,7 +379,7 @@ export function DeliveryMethodSelector({
 						}
 						className="h-4 w-4 shrink-0 accent-(--primary)"
 					/>
-					Сохранить адрес для следующих заказов
+					Сохранить данные доставки для следующих заказов
 				</label>
 			</div>
 		</div>

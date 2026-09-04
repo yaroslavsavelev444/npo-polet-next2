@@ -15,7 +15,12 @@ import { tryLegacyPasswordFallback } from "../lib/legacyPasswordFallback";
 import { createPendingAuth } from "../lib/pendingAuth";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { redis } from "../lib/redis";
-import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import {
+	actionError,
+	actionSuccess,
+	formValues,
+	getRequestMeta,
+} from "../lib/utils";
 import { loginSchema } from "../schemas/login.schema";
 import type { LoginResult } from "../types";
 
@@ -43,6 +48,12 @@ import type { LoginResult } from "../types";
  * залогиненного юзера, и это переживало перезагрузку страницы.
  */
 export async function loginAction(_prevState: unknown, formData: FormData) {
+	// Введённый email возвращаем при ЛЮБОЙ ошибке: React сбрасывает
+	// неуправляемые поля формы после каждого action, и без этого пользователь
+	// после «неверный пароль» перезаполнял бы и email тоже (см. AuthFormValues).
+	// Пароль сюда не попадает намеренно — его поле обязано очищаться.
+	const echo = formValues(formData, ["email"]);
+
 	const parsed = loginSchema.safeParse({
 		email: formData.get("email"),
 		password: formData.get("password"),
@@ -53,6 +64,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 			"Проверьте введённые данные",
 			parsed.error.flatten().fieldErrors,
 			"validation",
+			echo,
 		);
 	}
 
@@ -65,6 +77,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 			"Слишком много попыток входа. Попробуйте через час.",
 			undefined,
 			"rate_limited",
+			echo,
 		);
 	}
 
@@ -133,7 +146,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 			void notifyLockedOnce(payload, email);
 		}
 
-		return actionError(message, undefined, code);
+		return actionError(message, undefined, code, echo);
 	}
 
 	// Уведомление о новом входе (email + in-app), запись Session и обновление
@@ -153,6 +166,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 			"Не удалось начать вход. Попробуйте ещё раз через несколько минут.",
 			undefined,
 			"server_error",
+			echo,
 		);
 	}
 
@@ -176,6 +190,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 			"Не удалось начать вход. Попробуйте ещё раз через несколько минут.",
 			undefined,
 			"server_error",
+			echo,
 		);
 	}
 

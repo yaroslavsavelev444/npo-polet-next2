@@ -1,4 +1,5 @@
 import { postgresAdapter } from "@payloadcms/db-postgres";
+import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { ru } from "@payloadcms/translations/languages/ru";
 import path from "path";
 import { buildConfig } from "payload";
@@ -16,6 +17,8 @@ import { ContentBlocks } from "./src/payload/collections/ContentBlocks.ts";
 import { Discounts } from "./src/payload/collections/Discounts.ts";
 import { Faq } from "./src/payload/collections/Faq.ts";
 import { Feedbacks } from "./src/payload/collections/Feedbacks.ts";
+import { KnowledgeCategories } from "./src/payload/collections/KnowledgeCategories.ts";
+import { KnowledgeSections } from "./src/payload/collections/KnowledgeSections.ts";
 import { KnowledgeTopics } from "./src/payload/collections/KnowledgeTopics.ts";
 import { Media } from "./src/payload/collections/Media.ts";
 import { Notifications } from "./src/payload/collections/Notifications.ts";
@@ -56,6 +59,12 @@ export default buildConfig({
 		.map((origin) => origin.trim())
 		.filter(Boolean),
 
+	// Редактор по умолчанию для полей richText, которые не задали собственный.
+	// Обязателен: без него Payload падает на старте при первом же richText-поле.
+	// Содержимое статей базы знаний использует свою, расширенную конфигурацию
+	// (src/payload/lexical/knowledgeEditor.ts).
+	editor: lexicalEditor(),
+
 	globals: [Settings],
 	localization: {
 		locales: ["ru", "en"],
@@ -77,6 +86,8 @@ export default buildConfig({
 		TransportCompanies,
 		Discounts,
 		Companies,
+		KnowledgeCategories,
+		KnowledgeSections,
 		KnowledgeTopics,
 		Faq,
 		Wishlists,

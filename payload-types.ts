@@ -82,6 +82,8 @@ export interface Config {
     'transport-companies': TransportCompany;
     discounts: Discount;
     companies: Company;
+    'knowledge-categories': KnowledgeCategory;
+    'knowledge-sections': KnowledgeSection;
     'knowledge-topics': KnowledgeTopic;
     faq: Faq;
     wishlists: Wishlist;
@@ -114,6 +116,8 @@ export interface Config {
     'transport-companies': TransportCompaniesSelect<false> | TransportCompaniesSelect<true>;
     discounts: DiscountsSelect<false> | DiscountsSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
+    'knowledge-categories': KnowledgeCategoriesSelect<false> | KnowledgeCategoriesSelect<true>;
+    'knowledge-sections': KnowledgeSectionsSelect<false> | KnowledgeSectionsSelect<true>;
     'knowledge-topics': KnowledgeTopicsSelect<false> | KnowledgeTopicsSelect<true>;
     faq: FaqSelect<false> | FaqSelect<true>;
     wishlists: WishlistsSelect<false> | WishlistsSelect<true>;
@@ -482,12 +486,32 @@ export interface Order {
   delivery: {
     method: 'door_to_door' | 'pickup_point' | 'self_pickup';
     address?: {
-      city?: string | null;
-      street?: string | null;
-      house?: string | null;
-      apartment?: string | null;
+      /**
+       * Канонический адрес до дома. У заказов до внедрения подсказок пуст — адрес собирается из полей ниже
+       */
+      fullAddress?: string | null;
       postalCode?: string | null;
       country?: string | null;
+      region?: string | null;
+      area?: string | null;
+      city?: string | null;
+      settlement?: string | null;
+      street?: string | null;
+      house?: string | null;
+      block?: string | null;
+      apartment?: string | null;
+      entrance?: string | null;
+      floor?: string | null;
+      fiasId?: string | null;
+      fiasLevel?: string | null;
+      kladrId?: string | null;
+      geoLat?: string | null;
+      geoLon?: string | null;
+      qcGeo?: string | null;
+      /**
+       * Пусто у заказов, оформленных до внедрения подсказок адреса
+       */
+      source?: ('dadata' | 'manual') | null;
     };
     transportCompany?: (number | null) | TransportCompany;
     pickupPoint?: (number | null) | PickupPoint;
@@ -803,51 +827,113 @@ export interface Banner {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * Верхний уровень базы знаний. Внутри раздела статьи можно дополнительно сгруппировать по секциям.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "knowledge-categories".
+ */
+export interface KnowledgeCategory {
+  id: number;
+  title: string;
+  /**
+   * Часть адреса: /knowledge/<slug>. Заполняется автоматически из названия и не меняется при переименовании — менять вручную только осознанно.
+   */
+  slug: string;
+  /**
+   * Ведут на текущий адрес 301-редиректом.
+   */
+  previousSlugs?:
+    | {
+        slug?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Одно-два предложения. Видно на странице базы знаний под названием раздела.
+   */
+  description?: string | null;
+  /**
+   * Меньше — выше. Разделы с одинаковым числом сортируются по названию.
+   */
+  order?: number | null;
+  isActive?: boolean | null;
+  seo?: {
+    metaTitle?: string | null;
+    metaDescription?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Необязательный второй уровень. Нужен только там, где в разделе накопилось столько статей, что плоский список перестал читаться.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "knowledge-sections".
+ */
+export interface KnowledgeSection {
+  id: number;
+  title: string;
+  category: number | KnowledgeCategory;
+  /**
+   * Используется в параметре фильтра ?section=. В адресе статьи не участвует.
+   */
+  slug: string;
+  description?: string | null;
+  /**
+   * Порядок внутри раздела. Меньше — выше.
+   */
+  order?: number | null;
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Материалы базы знаний. Черновики не видны на сайте, не попадают в поиск и не индексируются.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "knowledge-topics".
  */
 export interface KnowledgeTopic {
   id: number;
   title: string;
-  slug: string;
+  /**
+   * 1–2 предложения. Показывается в списке материалов и подставляется в meta description, если SEO-описание не задано.
+   */
   description?: string | null;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Определяет адрес статьи: /knowledge/<раздел>/<статья>.
+   */
+  category: number | KnowledgeCategory;
+  /**
+   * Дополнительная группировка внутри раздела. Нужна только при большом количестве материалов.
+   */
+  section?: (number | null) | KnowledgeSection;
+  /**
+   * Порядок в списке = порядок на странице. Если ничего не выбрано, блок рекомендаций не отображается.
+   */
+  related?: (number | KnowledgeTopic)[] | null;
+  /**
+   * Показывается в списке материалов и используется как картинка для соцсетей, если не задана отдельная.
+   */
   image?: (number | null) | Media;
-  position?: number | null;
-  featured?: boolean | null;
-  published?: boolean | null;
-  publishedAt?: string | null;
-  author?: (number | null) | User;
-  content?:
-    | (
-        | {
-            text: string;
-            id?: string | null;
-            blockName?: string | null;
-            blockType: 'heading';
-          }
-        | {
-            content: string;
-            id?: string | null;
-            blockName?: string | null;
-            blockType: 'text';
-          }
-        | {
-            image: number | Media;
-            caption?: string | null;
-            id?: string | null;
-            blockName?: string | null;
-            blockType: 'image';
-          }
-        | {
-            label: string;
-            url: string;
-            id?: string | null;
-            blockName?: string | null;
-            blockType: 'link';
-          }
-      )[]
-    | null;
-  readingTime?: number | null;
+  /**
+   * Участвуют в поиске. На отдельные страницы тегов не ведут.
+   */
   tags?:
     | {
         tag?: string | null;
@@ -855,12 +941,53 @@ export interface KnowledgeTopic {
       }[]
     | null;
   seo?: {
+    /**
+     * Если пусто — берётся заголовок статьи.
+     */
     metaTitle?: string | null;
+    /**
+     * Если пусто — берётся краткое описание.
+     */
     metaDescription?: string | null;
+    /**
+     * Если пусто — берётся обложка статьи.
+     */
     ogImage?: (number | null) | Media;
   };
+  /**
+   * Уникален на весь сайт, поэтому статью можно перенести в другой раздел, не меняя адрес: старый путь сам уйдёт 301-редиректом на новый.
+   */
+  slug: string;
+  /**
+   * Ведут на текущий адрес 301-редиректом.
+   */
+  previousSlugs?:
+    | {
+        slug?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Порядок внутри раздела/секции. Меньше — выше.
+   */
+  position?: number | null;
+  /**
+   * Такие статьи показываются отдельным блоком в начале базы знаний.
+   */
+  featured?: boolean | null;
+  /**
+   * Показывается читателю и уходит в структурированные данные. Если пусто — берётся дата создания.
+   */
+  publishedAt?: string | null;
+  author?: (number | null) | User;
+  /**
+   * Считается автоматически по объёму текста при сохранении.
+   */
+  readingTime?: number | null;
+  searchText?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * Часто задаваемые вопросы, сгруппированные по темам
@@ -1145,12 +1272,26 @@ export interface CheckoutPreference {
   delivery?: {
     method?: ('door_to_door' | 'pickup_point' | 'self_pickup') | null;
     address?: {
-      city?: string | null;
-      street?: string | null;
-      house?: string | null;
-      apartment?: string | null;
+      fullAddress?: string | null;
       postalCode?: string | null;
       country?: string | null;
+      region?: string | null;
+      area?: string | null;
+      city?: string | null;
+      settlement?: string | null;
+      street?: string | null;
+      house?: string | null;
+      block?: string | null;
+      apartment?: string | null;
+      entrance?: string | null;
+      floor?: string | null;
+      fiasId?: string | null;
+      fiasLevel?: string | null;
+      kladrId?: string | null;
+      geoLat?: string | null;
+      geoLon?: string | null;
+      qcGeo?: string | null;
+      source?: ('dadata' | 'manual') | null;
     };
     transportCompany?: (number | null) | TransportCompany;
     pickupPoint?: (number | null) | PickupPoint;
@@ -1237,6 +1378,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'companies';
         value: number | Company;
+      } | null)
+    | ({
+        relationTo: 'knowledge-categories';
+        value: number | KnowledgeCategory;
+      } | null)
+    | ({
+        relationTo: 'knowledge-sections';
+        value: number | KnowledgeSection;
       } | null)
     | ({
         relationTo: 'knowledge-topics';
@@ -1610,12 +1759,26 @@ export interface OrdersSelect<T extends boolean = true> {
         address?:
           | T
           | {
-              city?: T;
-              street?: T;
-              house?: T;
-              apartment?: T;
+              fullAddress?: T;
               postalCode?: T;
               country?: T;
+              region?: T;
+              area?: T;
+              city?: T;
+              settlement?: T;
+              street?: T;
+              house?: T;
+              block?: T;
+              apartment?: T;
+              entrance?: T;
+              floor?: T;
+              fiasId?: T;
+              fiasLevel?: T;
+              kladrId?: T;
+              geoLat?: T;
+              geoLon?: T;
+              qcGeo?: T;
+              source?: T;
             };
         transportCompany?: T;
         pickupPoint?: T;
@@ -1849,53 +2012,55 @@ export interface CompaniesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "knowledge-categories_select".
+ */
+export interface KnowledgeCategoriesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  previousSlugs?:
+    | T
+    | {
+        slug?: T;
+        id?: T;
+      };
+  description?: T;
+  order?: T;
+  isActive?: T;
+  seo?:
+    | T
+    | {
+        metaTitle?: T;
+        metaDescription?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "knowledge-sections_select".
+ */
+export interface KnowledgeSectionsSelect<T extends boolean = true> {
+  title?: T;
+  category?: T;
+  slug?: T;
+  description?: T;
+  order?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "knowledge-topics_select".
  */
 export interface KnowledgeTopicsSelect<T extends boolean = true> {
   title?: T;
-  slug?: T;
   description?: T;
+  content?: T;
+  category?: T;
+  section?: T;
+  related?: T;
   image?: T;
-  position?: T;
-  featured?: T;
-  published?: T;
-  publishedAt?: T;
-  author?: T;
-  content?:
-    | T
-    | {
-        heading?:
-          | T
-          | {
-              text?: T;
-              id?: T;
-              blockName?: T;
-            };
-        text?:
-          | T
-          | {
-              content?: T;
-              id?: T;
-              blockName?: T;
-            };
-        image?:
-          | T
-          | {
-              image?: T;
-              caption?: T;
-              id?: T;
-              blockName?: T;
-            };
-        link?:
-          | T
-          | {
-              label?: T;
-              url?: T;
-              id?: T;
-              blockName?: T;
-            };
-      };
-  readingTime?: T;
   tags?:
     | T
     | {
@@ -1909,8 +2074,22 @@ export interface KnowledgeTopicsSelect<T extends boolean = true> {
         metaDescription?: T;
         ogImage?: T;
       };
+  slug?: T;
+  previousSlugs?:
+    | T
+    | {
+        slug?: T;
+        id?: T;
+      };
+  position?: T;
+  featured?: T;
+  publishedAt?: T;
+  author?: T;
+  readingTime?: T;
+  searchText?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2119,12 +2298,26 @@ export interface CheckoutPreferencesSelect<T extends boolean = true> {
         address?:
           | T
           | {
-              city?: T;
-              street?: T;
-              house?: T;
-              apartment?: T;
+              fullAddress?: T;
               postalCode?: T;
               country?: T;
+              region?: T;
+              area?: T;
+              city?: T;
+              settlement?: T;
+              street?: T;
+              house?: T;
+              block?: T;
+              apartment?: T;
+              entrance?: T;
+              floor?: T;
+              fiasId?: T;
+              fiasLevel?: T;
+              kladrId?: T;
+              geoLat?: T;
+              geoLon?: T;
+              qcGeo?: T;
+              source?: T;
             };
         transportCompany?: T;
         pickupPoint?: T;
@@ -2350,6 +2543,51 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "KnowledgeVideoEmbedBlock".
+ */
+export interface KnowledgeVideoEmbedBlock {
+  /**
+   * YouTube, Vimeo, VK Видео или Rutube. Ссылка со страницы ролика — она будет преобразована в embed автоматически.
+   */
+  url: string;
+  /**
+   * Подставляется в title фрейма — его читают скринридеры. Если пусто, будет использовано название статьи.
+   */
+  title?: string | null;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'videoEmbed';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "KnowledgeVideoFileBlock".
+ */
+export interface KnowledgeVideoFileBlock {
+  video: number | Media;
+  /**
+   * Кадр, который виден до запуска. Без него браузер показывает пустой чёрный прямоугольник.
+   */
+  poster?: (number | null) | Media;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'videoFile';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "KnowledgeNoteBlock".
+ */
+export interface KnowledgeNoteBlock {
+  variant: 'info' | 'warning' | 'tip';
+  title?: string | null;
+  text: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'note';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

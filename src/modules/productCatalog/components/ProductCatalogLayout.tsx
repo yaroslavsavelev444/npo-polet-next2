@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { BreadcrumbItem } from "@/components/Breadcrumbs/Breadcrumbs";
+import { CategoryPageHeader } from "@/modules/category/components/CategoryPageHeader";
 import type {
 	CatalogFilters,
 	PriceBounds,
@@ -20,6 +22,7 @@ interface CategorySummary {
 interface ProductCatalogLayoutProps {
 	category: CategorySummary;
 	categoryId: string;
+	breadcrumbs: BreadcrumbItem[];
 	filters: CatalogFilters;
 	priceBounds: PriceBounds;
 	initialPage: ProductsPageResponse;
@@ -28,6 +31,7 @@ interface ProductCatalogLayoutProps {
 export function ProductCatalogLayout({
 	category,
 	categoryId,
+	breadcrumbs,
 	filters,
 	priceBounds,
 	initialPage,
@@ -36,27 +40,37 @@ export function ProductCatalogLayout({
 	const [mobileSortOpen, setMobileSortOpen] = useState(false);
 
 	return (
-		<div className="flex flex-col gap-8">
-			<header className="flex flex-col gap-2">
-				<h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-					{category.name}
-				</h1>
-				{category.description && (
-					<p className="max-w-2xl text-base text-[var(--text-secondary)]">
-						{category.description}
-					</p>
-				)}
-			</header>
-
-			<CatalogToolbar
-				totalDocs={initialPage.totalDocs}
-				onOpenFilters={() => setMobileFiltersOpen(true)}
-				onOpenSort={() => setMobileSortOpen(true)}
+		<div className="flex flex-col">
+			<CategoryPageHeader
+				name={category.name}
+				description={category.description}
+				breadcrumbs={breadcrumbs}
 			/>
 
-			<div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-				<aside className="hidden shrink-0 lg:block lg:w-72">
-					<div className="sticky top-[calc(var(--sticky-header-height)+1.5rem)]">
+			{/* Панель липкая, поэтому отступ до неё принадлежит шапке, а отступ
+			    после — сетке: расстояния не зависят от того, есть ли у категории
+			    описание и активны ли фильтры. */}
+			<div className="mt-6 sm:mt-[2rem]">
+				<CatalogToolbar
+					totalDocs={initialPage.totalDocs}
+					priceBounds={priceBounds}
+					onOpenFilters={() => setMobileFiltersOpen(true)}
+					onOpenSort={() => setMobileSortOpen(true)}
+				/>
+			</div>
+
+			{/* Без lg:items-start: колонки тянутся на всю высоту ряда, и вертикальная
+			    линия у <aside> идёт вдоль всего каталога, а не обрывается там, где
+			    кончились фильтры. Липкость самих фильтров это не ломает — она на
+			    вложенном блоке. */}
+			<div className="mt-6 flex flex-col gap-8 lg:flex-row lg:gap-8">
+				{/* Разделительная линия висит на самом <aside>, а не на липком
+				    блоке внутри: так она идёт колонтитулом во всю высоту каталога,
+				    а не обрывается там, где кончились фильтры. */}
+				<aside className="hidden shrink-0 border-r border-[var(--hairline)] pr-6 lg:block lg:w-[17rem] xl:w-[19rem]">
+					{/* Смещение больше, чем у панели выдачи: иначе верх фильтров
+					    оказывался под ней. */}
+					<div className="sticky top-[calc(var(--sticky-header-height)+5.5rem)]">
 						<DesktopFiltersSidebar priceBounds={priceBounds} />
 					</div>
 				</aside>

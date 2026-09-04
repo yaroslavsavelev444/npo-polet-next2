@@ -3,15 +3,24 @@
 /**
  * modules/productCard/components/ProductQuantitySelector.tsx
  *
- * CTA цепочка карточки товара с тремя состояниями:
- *  - товар недоступен (out_of_stock/discontinued) — заблокированная кнопка;
- *  - товар уже в корзине — переключатель, при наведении меняющий вид на
- *    "убрать" (иконка + подсказка меняются местами, не требуя доп. текста);
- *  - товар не в корзине — степпер количества + кнопка добавления.
+ * CTA-цепочка товара. Два варианта раскладки:
  *
- * Степпер собран вручную (кнопки + нативный <input type="number">), а не
- * через готовый NumberInput — тот заточен под формы, а не под плотный
- * e-commerce виджет в карточке.
+ *  - "card" — одна кнопка во всю ширину. В сетке каталога колонка бывает
+ *    170–230 px, и степпер (фиксированные ~100 px) вместе с кнопкой в неё не
+ *    помещался: кнопка сжималась в оранжевую полоску шириной с иконку, а на
+ *    самых узких колонках выезжала за карточку. Количество здесь не
+ *    настраивается — в корзину уходит минимальная партия, а точное число
+ *    задаётся на странице товара и в самой корзине.
+ *
+ *  - "full" — степпер + кнопка. Используется там, где ширины заведомо хватает:
+ *    блок покупки на странице товара и липкая панель на мобильном.
+ *
+ * Оба варианта проходят через одни и те же хуки корзины, поэтому поведение
+ * (тосты, редирект на логин, синхронизация счётчика) везде одинаковое.
+ *
+ * Степпер собран вручную (кнопки + нативный <input type="number">), а не через
+ * готовый NumberInput — тот заточен под формы, а не под плотный e-commerce
+ * виджет.
  */
 
 import { Check, Minus, Plus, ShoppingCart, X } from "lucide-react";
@@ -28,10 +37,13 @@ interface Props extends ProductQuantitySelectorProps {
 	product: ProductCardData;
 }
 
+const CTA_HEIGHT = "h-10";
+
 export function ProductQuantitySelector({
 	product,
 	minOrderQuantity,
 	maxOrderQuantity,
+	variant = "full",
 }: Props) {
 	const { quantity, isOutOfRange, setQuantity, increase, decrease } =
 		useProductQuantity(minOrderQuantity, maxOrderQuantity);
@@ -39,20 +51,28 @@ export function ProductQuantitySelector({
 	const { isRemoving, removeFromCart } = useRemoveFromCart();
 	const isInCart = useCartItemsStore((s) => s.productIds.has(product.id));
 
+	const isCompact = variant === "card";
 	const isUnavailable =
 		product.status === "out_of_stock" || product.status === "discontinued";
 
 	if (isUnavailable) {
 		return (
-			<Button
-				variant="secondary"
-				size="md"
-				fullWidth
+			<button
+				type="button"
 				disabled
-				className="cursor-not-allowed"
+				className={cn(
+					CTA_HEIGHT,
+					"w-full cursor-not-allowed truncate rounded-[var(--radius-sm)] border border-[var(--hairline)]",
+					"px-3 text-[13px] font-medium text-[var(--text-muted)]",
+				)}
 			>
-				{PRODUCT_STATUS_LABELS[product.status]}
-			</Button>
+				{/* В карточке точный статус уже напечатан в служебной строке, и
+				    повторять его на кнопке — значит сказать одно и то же дважды в
+				    одном блоке. Кнопке остаётся назвать только исход. На странице
+				    товара служебной строки нет, поэтому там статус называется
+				    полностью. */}
+				{isCompact ? "Недоступно" : PRODUCT_STATUS_LABELS[product.status]}
+			</button>
 		);
 	}
 
@@ -62,50 +82,83 @@ export function ProductQuantitySelector({
 				type="button"
 				disabled={isRemoving}
 				onClick={() => void removeFromCart(product.id, product.title)}
-				aria-label="Убрать из корзины"
+				aria-label={`Убрать «${product.title}» из корзины`}
 				className={cn(
-					"group/cta flex h-10 w-full items-center justify-center gap-1.5 rounded-md text-sm font-medium",
-					"bg-[var(--success)]/15 text-[var(--success)] transition-colors duration-150",
+					CTA_HEIGHT,
+					"group/cta flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] text-[13px] font-medium",
+					"bg-[var(--success)]/12 text-[var(--success)] transition-colors duration-150",
 					"hover:bg-[var(--error)]/15 hover:text-[var(--error)]",
+					"focus-visible:bg-[var(--error)]/15 focus-visible:text-[var(--error)]",
 					"disabled:pointer-events-none disabled:opacity-60",
 				)}
 			>
 				<Check
-					size={16}
-					className="shrink-0 group-hover/cta:!hidden"
+					size={15}
 					aria-hidden="true"
+					className="shrink-0 group-hover/cta:!hidden group-focus-visible/cta:!hidden"
 				/>
 				<X
-					size={16}
-					className="hidden shrink-0 group-hover/cta:!block"
+					size={15}
 					aria-hidden="true"
+					className="hidden shrink-0 group-hover/cta:!block group-focus-visible/cta:!block"
 				/>
-				<span className="group-hover/cta:!hidden">В корзине</span>
-				<span className="hidden group-hover/cta:!inline">Убрать</span>
+				<span className="group-hover/cta:!hidden group-focus-visible/cta:!hidden">
+					В корзине
+				</span>
+				<span className="hidden group-hover/cta:!inline group-focus-visible/cta:!inline">
+					Убрать
+				</span>
 			</button>
 		);
 	}
 
 	const handleAddToCart = () => {
 		if (isOutOfRange) return;
-		void addToCart(product, quantity);
+		void addToCart(
+			product,
+			isCompact ? Math.max(minOrderQuantity, 1) : quantity,
+		);
 	};
 
+	if (isCompact) {
+		const batchSize = Math.max(minOrderQuantity, 1);
+
+		return (
+			<Button
+				variant="primary"
+				size="md"
+				fullWidth
+				loading={isAdding}
+				onClick={handleAddToCart}
+				aria-label={
+					batchSize > 1
+						? `Добавить «${product.title}» в корзину — минимальная партия ${batchSize} шт.`
+						: `Добавить «${product.title}» в корзину`
+				}
+				className={cn(CTA_HEIGHT, "gap-2 px-3 text-[13px]")}
+			>
+				<ShoppingCart className="h-4 w-4 shrink-0" aria-hidden="true" />
+				<span className="truncate">В корзину</span>
+			</Button>
+		);
+	}
+
 	return (
-		// @container: показываем текст «В корзину» только когда самой CTA-строке
-		// реально хватает ширины (иначе на узких карточках текст вылезал за кнопку).
-		// Порог привязан к ширине строки, а не к вьюпорту, поэтому корректен при
-		// любом числе колонок сетки.
-		<div className="@container flex w-full items-stretch gap-1.5">
-			<div className="flex h-10 shrink-0 items-center overflow-hidden rounded-md border border-[var(--border)]">
+		<div className="flex w-full items-stretch gap-2">
+			<div
+				className={cn(
+					CTA_HEIGHT,
+					"flex shrink-0 items-center overflow-hidden rounded-[var(--radius-sm)] border border-[var(--hairline)]",
+				)}
+			>
 				<button
 					type="button"
 					disabled={quantity <= minOrderQuantity}
 					onClick={decrease}
 					aria-label="Уменьшить количество"
-					className="flex h-full w-8 items-center justify-center text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] disabled:opacity-40"
+					className="flex h-full w-9 items-center justify-center text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:hover:bg-transparent"
 				>
-					<Minus size={13} aria-hidden="true" />
+					<Minus size={14} aria-hidden="true" />
 				</button>
 
 				<input
@@ -118,7 +171,12 @@ export function ProductQuantitySelector({
 						setQuantity(Number(e.target.value) || minOrderQuantity)
 					}
 					aria-label="Количество товара"
-					className="h-full w-9 border-0 bg-transparent text-center text-sm font-medium tabular-nums text-[var(--text-primary)] outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+					aria-invalid={isOutOfRange || undefined}
+					className={cn(
+						"h-full w-10 border-0 bg-transparent text-center text-sm font-medium tabular-nums outline-none",
+						"[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+						isOutOfRange ? "text-[var(--error)]" : "text-[var(--text-primary)]",
+					)}
 				/>
 
 				<button
@@ -126,9 +184,9 @@ export function ProductQuantitySelector({
 					disabled={quantity >= maxOrderQuantity}
 					onClick={increase}
 					aria-label="Увеличить количество"
-					className="flex h-full w-8 items-center justify-center text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] disabled:opacity-40"
+					className="flex h-full w-9 items-center justify-center text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:hover:bg-transparent"
 				>
-					<Plus size={13} aria-hidden="true" />
+					<Plus size={14} aria-hidden="true" />
 				</button>
 			</div>
 
@@ -138,12 +196,10 @@ export function ProductQuantitySelector({
 				loading={isAdding}
 				disabled={isOutOfRange}
 				onClick={handleAddToCart}
-				className="h-10 min-w-0 flex-1 whitespace-nowrap px-2"
+				className={cn(CTA_HEIGHT, "min-w-0 flex-1 gap-2 px-[1rem] text-sm")}
 			>
-				<span className="flex items-center justify-center gap-1.5">
-					<ShoppingCart className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-					<span className="hidden @[13.5rem]:inline">В корзину</span>
-				</span>
+				<ShoppingCart className="h-4 w-4 shrink-0" aria-hidden="true" />
+				<span className="truncate">В корзину</span>
 			</Button>
 		</div>
 	);

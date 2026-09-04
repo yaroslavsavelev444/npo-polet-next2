@@ -1,75 +1,284 @@
-# .github/workflows/deploy.yml
-name: CI/CD
+# Выкладка на VPS при попадании кода в master.
+#
+# ─── Главное решение: образы собираются здесь, а не на сервере ──────────────
+#
+# Раньше выкладка сводилась к `ssh vps 'git pull && docker compose build'`.
+# Для этого продукта это плохой обмен:
+#
+#  * `next build` с Payload — тяжёлая сборка. На VPS она конкурирует за память
+#    с работающей базой и приложением, а при нехватке падает по OOM: отказ
+#    выкладки вызывается не кодом, а тем, что рядом кто-то открыл страницу;
+#  * сборка на сервере означает, что НЕУДАЧНАЯ СБОРКА ПРОИСХОДИТ В ПРОДЕ,
+#    поверх уже выполненного `git reset --hard`;
+#  * откат при сборке на месте — это ещё одна сборка. Здесь предыдущий образ
+#    уже лежит на диске, и откат — это `up -d` с прошлым тегом, секунды;
+#  * на сервере накопилось 20 ГБ build-кэша — прямая цена сборки в проде.
+#
+# Поэтому: CI собирает два образа, кладёт их в GHCR с тегом = SHA коммита, и
+# сервер их СКАЧИВАЕТ. На VPS не нужен ни исходный код, ни инструментарий, ни
+# buildx.
+#
+# ─── И почему на сервере больше нет git ─────────────────────────────────────
+#
+# Конфигурацию (docker-compose.prod.yml и deploy/) привозит по SSH сам этот
+# workflow, в каталог releases/<sha>/. Раньше её забирал `git fetch` на
+# сервере — и падал с «could not read Username for https://github.com»,
+# потому что репозиторий приватный, remote указан по HTTPS, а учётных данных
+# в неинтерактивной сессии нет и быть не может. Механизма больше нет, вместе
+# с ним нет и класса ошибок: доступ к приватному репозиторию с боевой машины
+# не требуется вовсе.
+
+name: Deploy
 
 on:
   push:
     branches: [master]
-  pull_request:
-    branches: [master]
+  # Ручной запуск: перевыкатить текущий master, не делая пустого коммита.
+  workflow_dispatch:
 
-# Минимальные права GITHUB_TOKEN на весь workflow: ни одному из шагов не нужен
-# доступ на запись в репозиторий, пакеты или деплойменты, а токен по умолчанию
-# доступен любому шагу, в том числе коду из pull request.
-permissions:
-  contents: read
+# ⚠ `cancel-in-progress: false`, в отличие от CI. Отменённая на середине
+# выкладка оставляет сервер в состоянии, которого не хотел никто. Второй пуш
+# дождётся первого.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  NODE_VERSION: "22"
 
 jobs:
-  build-and-test:
+  # ── Проверки перед сборкой ────────────────────────────────────────────────
+  #
+  # Дублируют CI намеренно: `workflow_dispatch` и слияние в обход защиты ветки
+  # не должны приводить к выкладке непроверенного кода. Барьер стоит там, где
+  # последствия, а не там, где удобно.
+  verify:
+    name: Проверки
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm type-check
+        env:
+          PAYLOAD_SECRET: ci-placeholder-secret
+          DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
+      - run: node scripts/verify-payload-graph.mjs
+      # См. комментарий в ci.yml: tests/checkout пока не в git.
+      - run: pnpm test:security
+        env:
+          PAYLOAD_SECRET: ci-placeholder-secret
+          DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
+
+  # ── Сборка и публикация образов ───────────────────────────────────────────
+  build:
+    name: Образы
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: verify
+    permissions:
+      contents: read
+      # Право писать в GitHub Container Registry. Токен выдаётся на один
+      # прогон — отдельный секрет с паролем реестра заводить не нужно.
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      # Версия pnpm НЕ задаётся здесь: action читает её из поля
-      # packageManager в package.json. Раньше тут было жёстко прописано
-      # `version: 9`, а lock-файл и pnpm-workspace.yaml писались локальной
-      # pnpm 11 — из-за чего `--frozen-lockfile` падал с
-      # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH: pnpm 9 вообще не читает секцию
-      # overrides из pnpm-workspace.yaml (она переехала туда в pnpm 10+),
-      # видела пустой конфиг и не совпадала с lock-файлом. Единственный
-      # источник правды о версии — packageManager.
-      - uses: pnpm/action-setup@v4
+      - uses: docker/setup-buildx-action@v3
 
-      - uses: actions/setup-node@v4
+      - uses: docker/login-action@v3
         with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: pnpm install --frozen-lockfile
+      # Имена образов должны быть в нижнем регистре: GHCR отвергает теги с
+      # заглавными буквами, а github.repository повторяет написание владельца
+      # и репозитория как есть.
+      - name: Имя образа
+        id: name
+        run: echo "repo=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-      # На pull_request прод-секреты в сборку НЕ передаются: код в PR
-      # выполняется в этом же job'е и может вывести любое доступное ему
-      # значение в лог/наружу. Ни type-check, ни next build реального
-      # подключения не требуют — payload.config.ts валидируется схемой env.ts,
-      # а Local API на этапе сборки подменяется заглушкой (см.
-      # src/payload/services/getPayload.ts), поэтому placeholder'ов достаточно.
-      - run: pnpm type-check
-        env:
-          PAYLOAD_SECRET: ${{ github.event_name == 'pull_request' && 'ci-placeholder-secret' || secrets.PAYLOAD_SECRET }}
-          DATABASE_URI: ${{ github.event_name == 'pull_request' && 'postgres://ci:ci@localhost:5432/ci' || secrets.DATABASE_URI }}
+      # ⚠ NEXT_PUBLIC_* — АРГУМЕНТЫ СБОРКИ, а не переменные запуска: Next
+      # подставляет их в код на этапе компиляции. Задать их в .env.production
+      # на сервере недостаточно — в образе уже стоит то, что было при сборке.
+      # Секретов среди них нет и быть не должно: боевые ключи читаются при
+      # запуске из .env.production, и сборка их не видит вовсе.
+      - name: Образ приложения
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.name.outputs.repo }}-app:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.name.outputs.repo }}-app:latest
+          build-args: |
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_YM_ID=${{ vars.NEXT_PUBLIC_YM_ID }}
+          # Кеш слоёв между прогонами: без него каждая сборка ставит
+          # зависимости заново.
+          #
+          # ⚠ `ignore-error=true` — потому что выгрузка кеша не имеет права
+          # ронять выкладку: образ к этому моменту уже собран и отправлен в
+          # реестр, а кеш — всего лишь ускорение следующего прогона.
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max,ignore-error=true
 
-      - run: pnpm build
-        env:
-          PAYLOAD_SECRET: ${{ github.event_name == 'pull_request' && 'ci-placeholder-secret' || secrets.PAYLOAD_SECRET }}
-          DATABASE_URI: ${{ github.event_name == 'pull_request' && 'postgres://ci:ci@localhost:5432/ci' || secrets.DATABASE_URI }}
+      - name: Образ инструментов (миграции, воркеры)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: tools
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.name.outputs.repo }}-tools:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.name.outputs.repo }}-tools:latest
+          # ⚠ `mode=min`, а не `max`. С `mode=max` сюда выгружались бы слои
+          # всех промежуточных стадий, включая node_modules целиком. Кеш
+          # GitHub Actions ограничен 10 ГБ на репозиторий; два образа по
+          # `mode=max` в него не помещаются, и каждый прогон вытеснял бы
+          # предыдущий, переписывая гигабайты — сборка выглядит зависшей на
+          # «exporting to GitHub Actions Cache» до отмены по таймауту.
+          # Стадии до `base-builder` всё равно общие с образом приложения и
+          # приезжают из его кеша.
+          cache-from: |
+            type=gha,scope=tools
+            type=gha,scope=app
+          cache-to: type=gha,scope=tools,mode=min,ignore-error=true
 
-      # Регрессионные security-тесты (access control, open redirect, OTP).
-      # Не требуют ни БД, ни сети — если падают, деплоить нельзя.
-      - run: pnpm test:security
-
+  # ── Выкладка ──────────────────────────────────────────────────────────────
   deploy:
-    needs: build-and-test
-    # Явно и push, и ветка: одного `github.ref` мало как гарантии — условие
-    # должно читаться как «деплоим только то, что уже влито в master».
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    name: Выкладка на VPS
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+    # Токен, который уезжает на сервер как GHCR_TOKEN, должен уметь ровно одно
+    # — скачать образ. Без явного блока он получил бы права по умолчанию, то
+    # есть в типовой настройке запись во всё. Секрет, передаваемый по SSH на
+    # другую машину, не должен быть шире задачи.
+    permissions:
+      contents: read
+      packages: read
+    environment:
+      name: production
+      url: ${{ vars.NEXT_PUBLIC_APP_URL }}
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - uses: actions/checkout@v4
+
+      # То же приведение к нижнему регистру, что и в job'е сборки: имя образа
+      # должно совпасть с тем, под которым он опубликован, иначе `docker pull`
+      # на сервере не найдёт тег.
+      - name: Имя образа
+        id: name
+        run: echo "repo=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Ключ SSH
+        # Ключ живёт в агенте, а не в файле на диске раннера: файл пришлось бы
+        # удалять самому, и любой упавший шаг оставил бы его лежать.
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: 48965
-          key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 15m
-          script: bash /home/y4s/polet-next/deploy.sh
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Отпечаток сервера
+        # known_hosts из секрета, а НЕ `StrictHostKeyChecking=no`: отключённая
+        # проверка означает, что выкладка пойдёт на любой сервер, который
+        # окажется по этому адресу.
+        #
+        # ⚠ Секрет снимается командой `ssh-keyscan -p 48965 <хост>`. При
+        # нестандартном порте запись имеет вид `[адрес]:порт` и с записью,
+        # снятой без `-p`, не совпадёт — проверка отклонит соединение.
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      # Конфигурация уезжает на сервер архивом по SSH — без git, без rsync и
+      # без промежуточных файлов на диске раннера. В bundle только то, что
+      # нужно для запуска и обслуживания; исходный код на сервере не нужен, он
+      # уже внутри образа.
+      - name: Доставка конфигурации в releases/${{ github.sha }}
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+          PORT: ${{ secrets.VPS_SSH_PORT }}
+          SHA: ${{ github.sha }}
+          PROJECT_DIR: ${{ vars.VPS_PROJECT_DIR || '/home/y4s/polet-next' }}
+        run: |
+          set -euo pipefail
+          # Каталог создаётся заново на каждую выкладку: остатки предыдущей
+          # попытки не должны смешиваться с новой конфигурацией.
+          ssh -p "$PORT" "$USER@$HOST" \
+            "rm -rf '$PROJECT_DIR/releases/$SHA' && mkdir -p '$PROJECT_DIR/releases/$SHA'"
+          tar czf - docker-compose.prod.yml deploy scripts/backup \
+            | ssh -p "$PORT" "$USER@$HOST" \
+              "tar xzf - -C '$PROJECT_DIR/releases/$SHA' && chmod +x '$PROJECT_DIR/releases/$SHA/deploy/'*.sh"
+
+      # ⚠ `bash <путь>`, а не `<путь>` напрямую. Скрипт приезжает архивом, и
+      # его права зависят от режима файла в дереве git. `bash` убирает саму
+      # зависимость: выкладка не может сломаться от того, что кто-то создал
+      # файл редактором с другим umask.
+      - name: Запуск выкладки
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+          # SSH на этом сервере слушает нестандартный порт. Значение живёт в
+          # секрете, а не в коде: адрес и порт вместе — это карта входа.
+          PORT: ${{ secrets.VPS_SSH_PORT }}
+          SHA: ${{ github.sha }}
+          PROJECT_DIR: ${{ vars.VPS_PROJECT_DIR || '/home/y4s/polet-next' }}
+        run: |
+          set -euo pipefail
+          ssh -p "$PORT" "$USER@$HOST" \
+            "GIT_SHA='$SHA' \
+             REGISTRY='${{ env.REGISTRY }}' \
+             REPO='${{ steps.name.outputs.repo }}' \
+             GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+             GHCR_USER='${{ github.actor }}' \
+             PROJECT_DIR='$PROJECT_DIR' \
+             bash '$PROJECT_DIR/releases/$SHA/deploy/deploy.sh'"
+
+  # ── Дымовая проверка снаружи ──────────────────────────────────────────────
+  #
+  # Отдельным job'ом и ПОСЛЕ выкладки: скрипт на сервере проверяет здоровье
+  # изнутри сети compose, а этот шаг — снаружи, через настоящий домен и
+  # настоящий TLS. Разница существенная: приложение может быть здорово, а
+  # nginx — отдавать 502.
+  smoke:
+    name: Дымовая проверка
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: deploy
+    steps:
+      - name: Публичные страницы отвечают
+        env:
+          BASE: ${{ vars.NEXT_PUBLIC_APP_URL }}
+        run: |
+          set -euo pipefail
+          # /sitemap.xml намеренно не проверяется: он обходит все товары и
+          # категории, и на медленном ответе дымовая проверка красила бы
+          # успешную выкладку в красный, ничего не сообщая о её качестве.
+          for path in / /category /robots.txt; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 "$BASE$path")
+            echo "$path → $code"
+            [ "$code" = "200" ] || { echo "❌ $path вернул $code"; exit 1; }
+          done
+
+      - name: Здоровье приложения
+        # /api/health отвечает 200 только когда Payload инициализирован и
+        # Postgres доступен. `-f` уронил бы шаг на 503, но тогда в логе не
+        # осталось бы тела ответа — поэтому оно сначала печатается.
+        env:
+          BASE: ${{ vars.NEXT_PUBLIC_APP_URL }}
+        run: |
+          set -euo pipefail
+          body=$(curl -sS --max-time 25 -w '\n%{http_code}' "$BASE/api/health")
+          echo "$body"
+          [ "$(echo "$body" | tail -n1)" = "200" ] || { echo "❌ health вернул не 200"; exit 1; }

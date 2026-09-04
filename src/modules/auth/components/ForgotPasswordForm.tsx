@@ -1,8 +1,12 @@
 "use client";
 
+import { ArrowLeft, MailCheck } from "lucide-react";
 import Link from "next/link";
 import { useActionState } from "react";
+import { Button } from "@/UI/Button/Button";
+import { Input } from "@/UI/Input/Input";
 import { forgotPasswordAction } from "../actions/initiatePasswordReset";
+import { AuthAlert } from "./AuthAlert";
 
 /**
  * Форма запроса сброса пароля.
@@ -14,23 +18,31 @@ export function ForgotPasswordForm() {
 
   if (state?.success) {
     return (
-      <div className="w-full max-w-md mx-auto">
-        <div className="rounded-lg bg-green-50 border border-green-200 p-6 text-center">
-          <div className="mb-3 text-3xl">✉️</div>
-          <h2 className="text-lg font-semibold text-green-800 mb-2">
+      <div className="mx-auto w-full max-w-md">
+        <div className="flex flex-col items-center gap-3 rounded-[var(--radius-md)] border border-[var(--success)]/30 bg-[var(--success)]/10 !p-6 text-center animate-[fade-in-up_260ms_cubic-bezier(0.16,1,0.3,1)]">
+          <MailCheck
+            className="h-7 w-7 text-[var(--success)]"
+            strokeWidth={1.5}
+            aria-hidden
+          />
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             Письмо отправлено
           </h2>
-          <p className="text-sm text-green-700">{state.data.message}</p>
-          <p className="mt-3 text-xs text-green-600">
+          <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+            {state.data.message}
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">
             Проверьте папку «Спам», если письмо не пришло.
           </p>
         </div>
-        <div className="mt-4 text-center">
+
+        <div className="mt-5 text-center">
           <Link
             href="/auth/login"
-            className="text-sm text-blue-600 hover:text-blue-500"
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)]"
           >
-            ← Вернуться к входу
+            <ArrowLeft size={14} aria-hidden />
+            Вернуться к входу
           </Link>
         </div>
       </div>
@@ -38,67 +50,58 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="mx-auto w-full max-w-md">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Сброс пароля</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+          Сброс пароля
+        </h1>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
           Введите email — отправим ссылку для восстановления
         </p>
       </div>
 
       <form action={action} className="space-y-4">
         {state && !state.success && (
-          <div
-            role="alert"
-            className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700"
-          >
-            {state.error}
-          </div>
+          <AuthAlert message={state.error} code={state.code} />
         )}
 
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            disabled={isPending}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                       placeholder-gray-400 focus:border-blue-500 focus:outline-none
-                       focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            placeholder="name@example.com"
-          />
-          {state?.fieldErrors?.email && (
-            <p className="mt-1 text-xs text-red-600">
-              {state.fieldErrors.email[0]}
-            </p>
-          )}
-        </div>
-
-        <button
-          type="submit"
+        {/* defaultValue из ответа action'а: React после каждого form action
+            сбрасывает неуправляемые поля к их defaultValue, и пустой default
+            стирал бы уже введённый адрес при ошибке. */}
+        <Input
+          id="email"
+          name="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
           disabled={isPending}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold
-                     text-white hover:bg-blue-500 focus:outline-none focus:ring-2
-                     focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60
-                     disabled:cursor-not-allowed transition-colors"
+          placeholder="name@example.com"
+          defaultValue={state && !state.success ? (state.values?.email ?? "") : ""}
+          errorMessage={
+            state && !state.success ? state.fieldErrors?.email?.[0] : undefined
+          }
+          fullWidth
+        />
+
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          fullWidth
+          loading={isPending}
+          disabled={isPending}
         >
-          {isPending ? "Отправка..." : "Отправить ссылку"}
-        </button>
+          Отправить ссылку
+        </Button>
 
         <div className="text-center">
           <Link
             href="/auth/login"
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
           >
-            ← Вернуться к входу
+            <ArrowLeft size={14} aria-hidden />
+            Вернуться к входу
           </Link>
         </div>
       </form>

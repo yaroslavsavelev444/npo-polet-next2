@@ -12,9 +12,11 @@ interface LoginFormProps {
   onRequiresOtp: (email: string) => void;
 }
 
+type LoginState = Awaited<ReturnType<typeof loginAction>> | null;
+
 // Вспомогательная функция с поддержкой null
 function getFieldError(
-  state: Awaited<ReturnType<typeof loginAction>> | null,
+  state: LoginState,
   field: string
 ): string | undefined {
   if (!state || state.success) return undefined;
@@ -50,6 +52,11 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
           <AuthAlert message={state.error} code={state.code} />
         )}
 
+        {/* defaultValue из ответа action'а, а не пустая строка: React после
+            каждого form action сбрасывает неуправляемые поля к их defaultValue,
+            и «пустой» default стирал бы только что введённый email при любой
+            ошибке входа. Пароль намеренно без defaultValue — он должен
+            очищаться. */}
         <Input
           id="email"
           name="email"
@@ -59,6 +66,7 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
           required
           disabled={isPending}
           placeholder="name@example.com"
+          defaultValue={state && !state.success ? (state.values?.email ?? '') : ''}
           errorMessage={getFieldError(state, 'email')}
           fullWidth
         />

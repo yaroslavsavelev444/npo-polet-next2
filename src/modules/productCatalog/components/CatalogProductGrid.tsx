@@ -58,7 +58,7 @@ export function CatalogProductGrid({
 
 	if (status === "error") {
 		return (
-			<div className="flex flex-col items-center gap-3 py-16 text-center">
+			<div className="flex flex-col items-center gap-3 py-[4rem] text-center">
 				<p className="text-sm text-[var(--text-secondary)]">
 					{error instanceof Error
 						? error.message
@@ -88,7 +88,7 @@ export function CatalogProductGrid({
 				}
 				message="Ничего не найдено"
 				description="Попробуйте изменить фильтры или сбросить их — так вы увидите больше товаров"
-				className="py-20"
+				className="py-[5rem]"
 			/>
 		);
 	}
@@ -98,7 +98,7 @@ export function CatalogProductGrid({
 			<ProductGrid products={products} />
 
 			{hasNextPage && (
-				<div ref={sentinelRef} className="flex justify-center py-8">
+				<div ref={sentinelRef} className="flex justify-center py-[2rem]">
 					{isFetchingNextPage && (
 						<Spinner size="md" label="Загружаем ещё товары" />
 					)}
@@ -106,8 +106,12 @@ export function CatalogProductGrid({
 			)}
 
 			{!hasNextPage && products.length > 0 && (
-				<p className="py-8 text-center text-sm text-[var(--text-muted)]">
-					Показаны все {products.length} {pluralizeProducts(products.length)}
+				<p className="py-[2rem] text-center text-sm text-[var(--text-muted)]">
+					{/* «Показаны все 1 товар» — согласование числительного ломалось на
+					    единственном числе, а категория с одной позицией не редкость. */}
+					{products.length === 1
+						? "Показан 1 товар"
+						: `Показаны все ${products.length} ${pluralizeProducts(products.length)}`}
 				</p>
 			)}
 		</div>

@@ -53,14 +53,13 @@ export interface OrderDetailView extends OrderListItemView {
 	};
 	delivery: {
 		method: Order["delivery"]["method"];
-		address?: {
-			city?: string | null;
-			street?: string | null;
-			house?: string | null;
-			apartment?: string | null;
-			postalCode?: string | null;
-			country?: string | null;
-		} | null;
+		/**
+		 * Адрес приходит из коллекции как есть и может быть любого поколения:
+		 * от «вся строка в street» у перенесённых заказов до полного разбора с
+		 * идентификаторами ФИАС. Отображение — formatAddress из
+		 * modules/checkout/lib/address, он покрывает все варианты.
+		 */
+		address?: Order["delivery"]["address"] | null;
 		transportCompanyName?: string | null;
 		pickupPointName?: string | null;
 		transportCompanyPhone?: string | null;

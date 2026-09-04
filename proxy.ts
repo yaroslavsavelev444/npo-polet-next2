@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PENDING_AUTH_COOKIE } from "./src/modules/auth/lib/pendingAuth.ts";
+import { ALLOWED_EMBED_FRAME_SRC } from "./src/modules/knowledge/lib/videoEmbed.ts";
 import { resolveSafeRedirect } from "./src/modules/auth/lib/safeRedirect.ts";
 import { resolveSessionStatus } from "./src/modules/auth/lib/session.ts";
 import { getPayloadInstance } from "./src/payload/services/getPayload.ts";
@@ -60,6 +61,13 @@ function safeRedirectTarget(req: NextRequest): string {
  * mc.yandex.ru — домены Яндекс.Метрики (скрипт грузится только после согласия
  * на аналитические cookie, см. AnalyticsGate).
  *
+ * frame-src дополнительно перечисляет видеохостинги, ролики с которых можно
+ * встроить в статью базы знаний. Список берётся из того же модуля, что и
+ * разбор ссылок (ALLOWED_EMBED_FRAME_SRC в modules/knowledge/lib/videoEmbed):
+ * если хост разрешён в парсере, но не в CSP, фрейм молча не загрузится — а
+ * держать два расходящихся списка гарантированно значит однажды об этом
+ * забыть.
+ *
  * В dev добавляются 'unsafe-eval' (React использует eval для отладки) и ws:
  * (HMR); upgrade-insecure-requests в dev выключен — локалка работает по http.
  */
@@ -71,7 +79,7 @@ function buildCsp(nonce: string, isDev: boolean): string {
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
     `connect-src 'self' https://mc.yandex.ru https://mc.yandex.com${isDev ? " ws: wss:" : ""}`,
-    `frame-src 'self' https://mc.yandex.ru`,
+    `frame-src 'self' https://mc.yandex.ru ${ALLOWED_EMBED_FRAME_SRC.join(" ")}`,
     `worker-src 'self' blob:`,
     `object-src 'none'`,
     `base-uri 'self'`,
@@ -100,7 +108,10 @@ export async function proxy(req: NextRequest) {
         return NextResponse.redirect(new URL("/admin", req.url));
       }
     } else {
-      // На витрине /admin полностью недоступен
+      // На витрине /admin полностью недоступен. Рерайт на несуществующий
+      // путь отдаёт кастомную 404 (app/global-not-found.tsx) со статусом 404 —
+      // то есть снаружи админки на этом домене просто нет, без намёка на
+      // редирект или запрет.
       if (pathname.startsWith("/admin")) {
         return NextResponse.rewrite(new URL("/404", req.url));
       }

@@ -3,9 +3,10 @@ import { ProductListContainer } from "@/modules/productCard/components/ProductLi
 
 interface Props {
 	products: ProductCardData[];
+	className?: string;
 }
 
-export function ProductRelated({ products }: Props) {
+export function ProductRelated({ products, className }: Props) {
 	if (products.length === 0) return null;
 
 	return (
@@ -13,6 +14,7 @@ export function ProductRelated({ products }: Props) {
 			products={products}
 			totalProducts={products.length}
 			title="Похожие товары"
+			className={className}
 		/>
 	);
 }

@@ -1,10 +1,49 @@
+# Боевой стек polet-next.
+#
+# ⚠ Образы здесь только ЗАПУСКАЮТСЯ. Секции `build:` в этом файле больше нет:
+# оба образа собирает GitHub Actions и кладёт в GHCR, а deploy/deploy.sh их
+# скачивает и подставляет теги через IMAGE_APP/IMAGE_TOOLS. Файл читается
+# только как часть выкладки — прямой `docker compose up` без этих переменных
+# намеренно падает с понятной ошибкой (см. `:?` ниже), а не поднимает
+# что-нибудь не то.
+#
+# ─── Данные ─────────────────────────────────────────────────────────────────
+#
+# У томов проставлены ЯВНЫЕ имена. Без них имя тома складывается из имени
+# проекта и ключа (`polet-next` + `postgres_data`), то есть переименование
+# проекта, запуск без `-p` или переезд каталога тихо создают ПУСТОЙ том и
+# поднимают чистую базу рядом с боевой. Явное имя делает это невозможным:
+# том находится по имени, откуда бы ни запускали compose.
+#
+# Имена сверены с сервером (`docker volume ls`): polet-next_postgres_data,
+# polet-next_media_data, polet-next_redis_data — это существующие тома с
+# боевыми данными. Менять их нельзя.
+
+# ─── Пути внутри файла ──────────────────────────────────────────────────────
+#
+# `.env.production` и другие относительные пути разрешаются от КАТАЛОГА
+# ПРОЕКТА, а не от места, где лежит этот файл. Сам файл живёт в
+# /home/y4s/polet-next/releases/<sha>/, поэтому deploy/deploy.sh всегда
+# передаёт `--project-directory /home/y4s/polet-next`. Так запись ниже
+# остаётся простым `.env.production`, а секреты не копируются в каждую
+# выкладку.
+
 name: polet-next
+
+x-logging: &default-logging
+  # Без ограничения json-file растёт до размера диска. Ротация — не оптимизация,
+  # а защита от «сервер встал, потому что кончилось место под логи».
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
   postgres:
     image: postgres:17
     container_name: polet-next-postgres-prod
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: npo_polet
       POSTGRES_USER: npo_user
@@ -22,6 +61,7 @@ services:
     image: redis:8-alpine
     container_name: polet-next-redis-prod
     restart: unless-stopped
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -31,16 +71,14 @@ services:
       - redis_data:/data
     networks: [internal]
 
-  # Одноразовый служебный контейнер: миграции и graph-guard.
-  # Запускается ТОЛЬКО через `--profile tools run --rm migrate <команда>`.
+  # Одноразовый служебный контейнер: миграции Payload и статический guard
+  # графа импортов payload.config.ts.
+  #
+  # Запускается ТОЛЬКО как `--profile tools run --rm migrate`, поэтому у него
+  # нет ни restart, ни healthcheck: обычный `up` его не касается вовсе.
   migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: base-builder
-    image: polet-next-migrate:${IMAGE_TAG:-latest}
+    image: ${IMAGE_TOOLS:?IMAGE_TOOLS не задан — запускать этот compose-файл нужно через deploy/deploy.sh}
     env_file: .env.production
-    command: ["pnpm", "payload", "migrate"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,21 +86,14 @@ services:
     profiles: ["tools"]
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
-      # network: polet-next-internal
-      # Секреты сборки (DATABASE_URI/PAYLOAD_SECRET) передаются через
-      # BuildKit-секрет prod_env вместо build args — так они не оседают в
-      # слоях/метаданных образа. Извлекаются в Dockerfile (builder-стейдж).
-      secrets:
-        - prod_env
-    image: polet-next:${IMAGE_TAG:-latest}
+    image: ${IMAGE_APP:?IMAGE_APP не задан — запускать этот compose-файл нужно через deploy/deploy.sh}
     container_name: polet-next-app-prod
     restart: unless-stopped
+    logging: *default-logging
     env_file: .env.production
     ports:
+      # Наружу порт не публикуется: перед приложением стоит nginx на хосте
+      # (/etc/nginx/sites-enabled/npo-polet.ru.conf → upstream 127.0.0.1:3004).
       - "127.0.0.1:3004:3004"
     depends_on:
       postgres:
@@ -73,45 +104,47 @@ services:
       - media_data:/app/media
     networks: [internal]
 
-  # Отдельный long-running процесс: обрабатывает отложенные заявки на удаление
-  # после 14-дневного периода. Не запускаем его внутри Next.js, чтобы рестарты
-  # веб-приложения не теряли работу очереди.
+  # Отложенное удаление аккаунтов: отдельный long-running процесс, чтобы
+  # рестарты веб-приложения не теряли работу очереди.
+  #
+  # ⚠ В профиле, то есть обычным `up` НЕ поднимается — и это осознанно.
+  # На сервере этот воркер не запускался никогда (на момент перехода в
+  # проекте polet-next работали ровно три контейнера: postgres, redis, app).
+  # Он безвозвратно удаляет пользовательские данные по истечении 14 дней,
+  # поэтому включать его «заодно», в рамках правки процесса выкладки, нельзя:
+  # это изменение поведения продукта, а не инфраструктуры, и решение принимает
+  # владелец.
+  #
+  # Включить осознанно (после проверки, что накопившиеся заявки — те, которые
+  # действительно нужно исполнить):
+  #   cd /home/y4s/polet-next/current
+  #   IMAGE_TOOLS=<тег из .deploy-state/last_successful_sha> \
+  #     docker compose --env-file ../.env.production -p polet-next \
+  #     --profile workers up -d account-deletion-worker
+  # Чтобы он поднимался при каждой выкладке — добавьте "workers" в
+  # COMPOSE_PROFILES в deploy/deploy.sh.
   account-deletion-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      # Отдельный стейдж вместо base-builder: тот не задаёт USER, и этот
-      # долгоживущий процесс работал в проде от root. Стейдж worker — то же
-      # содержимое, но под непривилегированным nextjs (см. Dockerfile).
-      # ВНИМАНИЕ: образ переименован, поэтому после выката его нужно один раз
-      # пересобрать явно:
-      #   docker compose -f docker-compose.prod.yml build account-deletion-worker
-      #   docker compose -f docker-compose.prod.yml up -d account-deletion-worker
-      # (deploy.sh этот сервис не трогает вовсе — см. отчёт по аудиту).
-      target: worker
-    image: polet-next-worker:${IMAGE_TAG:-latest}
+    image: ${IMAGE_TOOLS:?IMAGE_TOOLS не задан — запускать этот compose-файл нужно через deploy/deploy.sh}
     container_name: polet-next-account-deletion-worker-prod
     restart: unless-stopped
+    logging: *default-logging
     env_file: .env.production
-    command: ["pnpm", "worker:account-deletion"]
+    command: ["node_modules/.bin/tsx", "src/modules/account-deletion/worker.ts"]
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks: [internal]
+    profiles: ["workers"]
 
 volumes:
   postgres_data:
+    name: polet-next_postgres_data
   redis_data:
+    name: polet-next_redis_data
   media_data:
-
-# Секрет сборки: весь .env.production монтируется в builder-стейдж только на
-# время RUN (см. Dockerfile) и не попадает в слои образа. На хосте файл уже
-# обязателен для деплоя (deploy.sh проверяет его наличие).
-secrets:
-  prod_env:
-    file: .env.production
+    name: polet-next_media_data
 
 networks:
   internal:

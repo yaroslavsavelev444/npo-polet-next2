@@ -5,6 +5,7 @@ export const revalidate = 3600;
 import type { MetadataRoute } from "next";
 import { getCachedCategories } from "@/payload/services/categories.service";
 import { getCachedConsents } from "@/payload/services/consents.service";
+import { getKnowledgeSitemapEntries } from "@/payload/services/knowledge.service";
 import { getCachedProducts } from "@/payload/services/products.service";
 import type { Category } from "@/payload-types";
 import { baseURL } from "@/resources/content";
@@ -16,6 +17,7 @@ const STATIC_ROUTES: Array<{
 }> = [
   { path: "", changeFrequency: "daily", priority: 1 },
   { path: "/category", changeFrequency: "daily", priority: 0.9 },
+  { path: "/knowledge", changeFrequency: "weekly", priority: 0.8 },
   { path: "/contacts", changeFrequency: "monthly", priority: 0.5 },
   { path: "/consents", changeFrequency: "yearly", priority: 0.3 },
 ];
@@ -27,18 +29,24 @@ function resolveCategorySlug(category: unknown): string | null {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [categoriesResult, consentsResult, productsResult] = await Promise.all([
+  const [categoriesResult, consentsResult, productsResult, knowledgeEntries] =
+    await Promise.all([
     getCachedCategories({ isActive: true, limit: 200 }),
     getCachedConsents({ isActive: true, limit: 100 }),
     // NOTE: при росте каталога выше ~40-45k товаров (лимит одного sitemap —
     // 50 000 URL) переходить на generateSitemaps() с чанкованием по id.
-    getCachedProducts({
-      isVisible: true,
-      limit: 5000,
-      sort: "-updatedAt",
-      depth: 1,
-    }),
-  ]);
+      getCachedProducts({
+        isVisible: true,
+        limit: 5000,
+        sort: "-updatedAt",
+        depth: 1,
+      }),
+      // Черновики сюда не попадают: сервис фильтрует по _status: published
+      // (см. knowledge.service.ts). Снятая с публикации статья исчезает из
+      // sitemap при следующей его генерации — то есть перестаёт предлагаться
+      // поисковику ровно тогда же, когда пропадает с сайта.
+      getKnowledgeSitemapEntries(),
+    ]);
 
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((route) => ({
     url: `${baseURL}${route.path}`,
@@ -78,6 +86,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   );
 
+  const knowledgeSitemap: MetadataRoute.Sitemap = knowledgeEntries.map(
+    (entry) => ({
+      url: `${baseURL}${entry.path}`,
+      lastModified: new Date(entry.updatedAt),
+      changeFrequency: "monthly",
+      // Раздел базы знаний (два сегмента) чуть выше отдельной статьи (три):
+      // он агрегирует материалы и меняется реже.
+      priority: entry.path.split("/").length === 3 ? 0.7 : 0.6,
+    }),
+  );
+
   const consentEntries: MetadataRoute.Sitemap = consentsResult.docs.map(
     (consent) => ({
       url: `${baseURL}/consents/${consent.slug}`,
@@ -91,6 +110,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...staticEntries,
     ...categoryEntries,
     ...productEntries,
+    ...knowledgeSitemap,
     ...consentEntries,
   ];
 }

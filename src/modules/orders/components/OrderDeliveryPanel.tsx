@@ -8,6 +8,7 @@ import {
 	Truck,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { formatAddress } from "@/modules/checkout/lib/address";
 import { formatOrderDate } from "../lib/format-date";
 import { DELIVERY_METHOD_LABELS } from "../lib/labels";
 import type { OrderDetailView } from "../types";
@@ -29,28 +30,6 @@ const METHOD_ICON: Record<
 	self_pickup: Store,
 };
 
-function formatAddress(address: NonNullable<Delivery["address"]>): string {
-	// Обратная совместимость: у старых заказов весь адрес лежит в street, полей
-	// house/apartment нет — тогда просто выводим street как есть. У новых заказов
-	// house/apartment заполнены и добавляются к улице отдельными сегментами.
-	const streetLine = [
-		address.street,
-		address.house ? `д. ${address.house}` : null,
-		address.apartment ? `кв. ${address.apartment}` : null,
-	]
-		.filter(Boolean)
-		.join(", ");
-
-	return [
-		address.postalCode,
-		address.city,
-		streetLine || null,
-		address.country && address.country !== "Россия" ? address.country : null,
-	]
-		.filter(Boolean)
-		.join(", ");
-}
-
 /**
  * Детали доставки с учётом способа получения. Показываются только заполненные
  * поля: у самовывоза — пункт выдачи, у курьера — адрес и перевозчик, у ПВЗ —
@@ -58,7 +37,14 @@ function formatAddress(address: NonNullable<Delivery["address"]>): string {
  */
 export function OrderDeliveryPanel({ delivery }: OrderDeliveryPanelProps) {
 	const MethodIcon = METHOD_ICON[delivery.method];
-	const addressText = delivery.address ? formatAddress(delivery.address) : "";
+	// Одна функция форматирования на весь проект (см. checkout/lib/address):
+	// она поддерживает все три поколения адресов — строку целиком в `street`,
+	// разбитые поля и канонический `fullAddress` из подсказок. Квартира,
+	// подъезд и этаж выводятся отдельными сегментами и только для курьера:
+	// в ПВЗ и самовывозе их не существует.
+	const addressText = formatAddress(delivery.address, {
+		withUnitDetails: delivery.method === "door_to_door",
+	});
 
 	return (
 		<section className={`flex flex-col gap-6 p-4 sm:p-5 ${ORDER_CARD_CLASS}`}>

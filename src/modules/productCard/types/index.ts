@@ -99,11 +99,14 @@ export interface ProductPriceProps {
   finalPrice: number;
   originalPrice: number;
   hasDiscount: boolean;
-}
-
-export interface ProductRatingProps {
-  rating: number;
-  reviewsCount: number;
+  /**
+   * "card" — одна строка с итоговой ценой (сетка каталога);
+   * "detail" — крупная цена со старой ценой и процентом скидки.
+   */
+  size?: "card" | "detail";
+  /** Показывается только при size="detail" рядом со старой ценой. */
+  discountPercentage?: number | null;
+  className?: string;
 }
 
 export interface ProductTitleProps {
@@ -117,4 +120,9 @@ export interface ProductStatusBadgeProps {
 export interface ProductQuantitySelectorProps {
   minOrderQuantity: number;
   maxOrderQuantity: number;
+  /**
+   * "card" — одна кнопка во всю ширину (узкая колонка сетки, количество не
+   * настраивается); "full" — степпер + кнопка (страница товара, липкая панель).
+   */
+  variant?: "card" | "full";
 }

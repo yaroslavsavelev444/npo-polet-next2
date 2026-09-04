@@ -34,10 +34,18 @@ function getFieldError(
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const router = useRouter()
   const [state, action, isPending] = useActionState(resetPasswordAction, null)
+  // Зеркало пароля только для индикатора надёжности. Само поле неуправляемое:
+  // React сбрасывает поля формы после каждого action, и управляемое поле
+  // разошлось бы с DOM — индикатор показывал бы силу уже стёртого пароля.
   const [passwordValue, setPasswordValue] = useState('')
 
   useEffect(() => {
-    if (state?.success) {
+    if (!state) return
+
+    // Форма сброшена React'ом — синхронизируем зеркало значения.
+    setPasswordValue('')
+
+    if (state.success) {
       // Небольшая задержка чтобы пользователь увидел сообщение
       const timer = setTimeout(() => router.push('/auth/login'), 2500)
       return () => clearTimeout(timer)
@@ -61,7 +69,10 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   if (state?.success) {
     return (
       <div className="w-full max-w-md mx-auto">
-        <div className="rounded-lg bg-[var(--success-light)] border border-[var(--success)]/30 p-6 text-center">
+        {/* Фон берём как прозрачный тинт --success, а не светлый
+            --success-light: последний — почти белый (#E8F5E9) и в тёмной теме
+            даёт светлый прямоугольник, на котором зелёный текст едва читается. */}
+        <div className="rounded-[var(--radius-md)] border border-[var(--success)]/30 bg-[var(--success)]/10 !p-6 text-center">
           <Typography variant="h4" color="success" className="mb-2">
             Пароль изменён
           </Typography>
@@ -113,7 +124,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             required
             disabled={isPending}
             placeholder="Минимум 8 символов"
-            value={passwordValue}
             onChange={(e) => setPasswordValue(e.target.value)}
             errorMessage={getFieldError(state, 'password')}
             fullWidth

@@ -1,109 +1,105 @@
-'use client';
+/**
+ * modules/productCard/components/ProductImage.tsx
+ *
+ * Кадр товара в карточке каталога.
+ *
+ * Геометрия кадра НЕ зависит от снимка. Раньше это было не так только на
+ * словах: соотношение сторон было фиксированным, но внутренний отступ задавался
+ * в пикселях (p-4), поэтому на узкой карточке широкий снимок превращался в
+ * полоску, а вертикальный — в столб от края до края. Здесь отступ задан в
+ * процентах: он резолвится от ширины контейнера, а контейнер квадратный, —
+ * значит поле вокруг снимка визуально одинаково на любой ширине колонки.
+ *
+ * Подложка — общий токен --media-plate. Он чуть светлее поверхности карточки,
+ * поэтому снимок с залитым белым фоном и снимок с прозрачным фоном садятся на
+ * одну и ту же плашку и читаются как один набор, а не как случайная нарезка.
+ */
 
-import Image from 'next/image';
-import { Ban, Clock, ShoppingCart } from 'lucide-react';
-import { cn } from '@/utils/cn';
-import { PRODUCT_STATUS_LABELS } from '../lib/status';
-import type { ProductImageProps } from '../types';
+import { ImageOff } from "lucide-react";
+import Image from "next/image";
+import { cn } from "@/utils/cn";
+import type { ProductImageProps } from "../types";
 
 function getImageUrl(media: unknown): string | null {
-  if (!media) return null;
-  if (typeof media === 'object' && media !== null) {
-    // Прямой url
-    if ('url' in media && typeof (media as any).url === 'string') {
-      return (media as any).url;
-    }
-    // Вложенный image.url
-    if ('image' in media && (media as any).image && typeof (media as any).image === 'object') {
-      const img = (media as any).image;
-      if ('url' in img && typeof img.url === 'string') {
-        return img.url;
-      }
-    }
-  }
-  return null;
+	if (!media || typeof media !== "object") return null;
+
+	const record = media as Record<string, unknown>;
+	if (typeof record.url === "string") return record.url;
+
+	const nested = record.image;
+	if (nested && typeof nested === "object") {
+		const nestedUrl = (nested as Record<string, unknown>).url;
+		if (typeof nestedUrl === "string") return nestedUrl;
+	}
+
+	return null;
+}
+
+function getImageAlt(media: unknown, fallback: string): string {
+	if (!media || typeof media !== "object") return fallback;
+
+	const record = media as Record<string, unknown>;
+	if (typeof record.alt === "string" && record.alt) return record.alt;
+
+	const nested = record.image;
+	if (nested && typeof nested === "object") {
+		const nestedAlt = (nested as Record<string, unknown>).alt;
+		if (typeof nestedAlt === "string" && nestedAlt) return nestedAlt;
+	}
+
+	return fallback;
 }
 
 export function ProductImage({
-  images,
-  productId,
-  hasDiscount,
-  discountPercentage,
-  status,
-  priority = false,
+	images,
+	productId,
+	hasDiscount,
+	discountPercentage,
+	status,
+	priority = false,
 }: ProductImageProps) {
-  const firstMedia = images?.[0];
-  const imageUrl = getImageUrl(firstMedia);
+	const firstMedia = images?.[0];
+	const imageUrl = getImageUrl(firstMedia);
+	const imageAlt = getImageAlt(firstMedia, `Изображение товара ${productId}`);
 
-  let imageAlt = `Изображение товара ${productId}`;
-  if (firstMedia && typeof firstMedia === 'object') {
-    if ('alt' in firstMedia && typeof firstMedia.alt === 'string') {
-      imageAlt = firstMedia.alt;
-    } else if ('image' in firstMedia && firstMedia.image && typeof firstMedia.image === 'object' && 'alt' in firstMedia.image) {
-      imageAlt = (firstMedia.image as any).alt || imageAlt;
-    }
-  }
+	const isUnavailable = status === "out_of_stock" || status === "discontinued";
 
-  const isUnavailable = status === 'out_of_stock' || status === 'discontinued';
-  const isPreorder = status === 'preorder';
+	return (
+		<div className="relative aspect-square w-full shrink-0 overflow-hidden border-b border-[var(--hairline)] bg-[var(--media-plate)]">
+			{imageUrl ? (
+				<Image
+					src={imageUrl}
+					alt={imageAlt}
+					fill
+					sizes="(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 20vw"
+					preload={priority}
+					quality={85}
+					// Отступ в процентах от ширины квадратного контейнера — поле вокруг
+					// снимка масштабируется вместе с колонкой сетки.
+					className={cn(
+						"object-contain p-[9%] transition-transform duration-500 ease-out motion-reduce:!transform-none",
+						isUnavailable
+							? "opacity-45 grayscale"
+							: "group-hover:!scale-[1.04]",
+					)}
+				/>
+			) : (
+				<div
+					className="flex h-full w-full items-center justify-center text-[var(--border-light)]"
+					aria-hidden="true"
+				>
+					<ImageOff className="h-1/5 w-1/5" strokeWidth={1.25} />
+				</div>
+			)}
 
-  return (
-    <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-[var(--surface-secondary)]">
-      {(hasDiscount || isPreorder) && (
-        <div className="absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
-          {hasDiscount && discountPercentage ? (
-            <span className="rounded-[var(--radius-sm)] bg-[var(--error)] px-2 py-1 text-xs font-bold leading-none text-white shadow-sm">
-              -{discountPercentage}%
-            </span>
-          ) : null}
-          {isPreorder && (
-            <span className="flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--warning)] px-2 py-1 text-xs font-semibold leading-none text-[var(--text-dark)] shadow-sm">
-              <Clock size={12} aria-hidden="true" />
-              {PRODUCT_STATUS_LABELS.preorder}
-            </span>
-          )}
-        </div>
-      )}
-
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={imageAlt}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          preload={priority}
-          quality={85}
-          className={cn(
-            'object-contain p-4 transition-transform duration-300 ease-out',
-            isUnavailable ? 'opacity-40 grayscale' : 'group-hover:!scale-[1.03]',
-          )}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <ShoppingCart className="h-10 w-10 text-[var(--text-muted)]" aria-hidden="true" />
-        </div>
-      )}
-
-      {isUnavailable && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="flex items-center gap-1.5 rounded-full bg-[var(--surface)]/95 px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] shadow-[0_2px_10px_var(--shadow-color)]">
-            <Ban size={13} aria-hidden="true" />
-            {PRODUCT_STATUS_LABELS[status]}
-          </span>
-        </div>
-      )}
-
-      {!isUnavailable && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-2 opacity-0 transition-opacity duration-200 group-hover:!opacity-100"
-        >
-          <span className="absolute left-0 top-0 h-3 w-3 border-l-2 border-t-2 border-[var(--primary)]" />
-          <span className="absolute right-0 top-0 h-3 w-3 border-r-2 border-t-2 border-[var(--primary)]" />
-          <span className="absolute bottom-0 left-0 h-3 w-3 border-b-2 border-l-2 border-[var(--primary)]" />
-          <span className="absolute bottom-0 right-0 h-3 w-3 border-b-2 border-r-2 border-[var(--primary)]" />
-        </div>
-      )}
-    </div>
-  );
+			{/* Скидка — единственный бейдж на кадре. Статус наличия ушёл в
+			    текстовую строку карточки: два ярлыка поверх снимка спорили друг с
+			    другом и закрывали товар. */}
+			{hasDiscount && discountPercentage ? (
+				<span className="absolute left-2 top-2 rounded-[var(--radius-sm)] bg-[var(--primary)] px-1.5 py-[0.25rem] text-[11px] font-bold leading-none tabular-nums text-white">
+					−{discountPercentage}%
+				</span>
+			) : null}
+		</div>
+	);
 }

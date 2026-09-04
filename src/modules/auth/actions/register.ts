@@ -11,7 +11,12 @@ import {
 } from "../lib/errorHandling";
 import { createPendingAuth } from "../lib/pendingAuth";
 import { RATE_LIMITS } from "../lib/rateLimit";
-import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import {
+  actionError,
+  actionSuccess,
+  formValues,
+  getRequestMeta,
+} from "../lib/utils";
 import {
   AcceptedConsentInput,
   acceptedConsentSchema,
@@ -20,6 +25,12 @@ import {
 import type { RegisterResult } from "../types";
 
 export async function registerAction(_prevState: unknown, formData: FormData) {
+  // Email и имя возвращаем форме при любой ошибке: React сбрасывает
+  // неуправляемые поля после каждого form action, и без этого пользователь
+  // перезаполнял бы всю анкету заново из-за одной опечатки в пароле
+  // (см. AuthFormValues). Пароли сюда не кладём — их поля обязаны очищаться.
+  const echo = formValues(formData, ["email", "name"]);
+
   // 1. Валидация
   const raw = {
     email: formData.get("email"),
@@ -35,6 +46,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       "Проверьте введённые данные",
       parsed.error.flatten().fieldErrors,
       "validation",
+      echo,
     );
   }
 
@@ -48,7 +60,12 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       acceptedConsentSchema.parse(c),
     );
   } catch {
-    return actionError("Некорректные данные согласий", undefined, "validation");
+    return actionError(
+      "Некорректные данные согласий",
+      undefined,
+      "validation",
+      echo,
+    );
   }
 
   const { ip, userAgent } = await getRequestMeta();
@@ -60,6 +77,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       "Слишком много попыток регистрации. Попробуйте позже.",
       undefined,
       "rate_limited",
+      echo,
     );
   }
 
@@ -91,6 +109,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       "Необходимо принять все обязательные соглашения",
       { consents: [`Не приняты: ${missing.join(", ")}`] },
       "validation",
+      echo,
     );
   }
 
@@ -134,7 +153,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       } catch (e) {
         logUnexpectedAuthError("register.createDecoyPendingAuth", e);
       }
-      return actionSuccess<RegisterResult>({ requiresOtp: true });
+      return actionSuccess<RegisterResult>({ requiresOtp: true, email });
     }
     // Любая другая ошибка создания (неожиданная валидация Payload, сбой БД
     // и т.п.) раньше пробрасывалась дальше (`throw err`) и роняла рендер
@@ -146,6 +165,7 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
       "Не удалось создать аккаунт. Попробуйте позже.",
       undefined,
       "server_error",
+      echo,
     );
   }
 
@@ -259,5 +279,5 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
     logUnexpectedAuthError("register.notifyOtpCode", err);
   }
 
-  return actionSuccess<RegisterResult>({ requiresOtp: true });
+  return actionSuccess<RegisterResult>({ requiresOtp: true, email });
 }

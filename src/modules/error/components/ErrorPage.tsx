@@ -1,55 +1,61 @@
 "use client";
 
-import { Button, Column, Flex, Heading, Text } from "@once-ui-system/core";
-import { useRouter } from "next/navigation";
+import { Home, RotateCw } from "lucide-react";
+import Link from "next/link";
+import { buttonStyles } from "@/UI/Button/Button.styles";
 import type { ErrorPageProps } from "./../types";
-import { ErrorActions } from "./ErrorActions";
-import { ErrorIllustration } from "./ErrorIllustration";
+import { BackButton } from "./BackButton";
+import { ErrorView } from "./ErrorView";
 
+/**
+ * Страница непредвиденной ошибки (error.tsx). Делит оболочку с 404, чтобы обе
+ * читались как один продукт: разница только в акцентном цвете кода и в наборе
+ * действий — здесь главное действие «Повторить», а не «На главную».
+ */
 export function ErrorPage({
-  code,
-  title,
-  description,
-  retry,
-  showBackButton = true,
+	code,
+	title,
+	description,
+	retry,
+	showBackButton = true,
 }: ErrorPageProps) {
-  const router = useRouter();
+	return (
+		<ErrorView
+			code={code}
+			title={title}
+			description={description}
+			accent="error"
+			actions={
+				<>
+					{retry && (
+						<button
+							type="button"
+							onClick={retry}
+							className={buttonStyles(
+								"primary",
+								"md",
+								false,
+								"active:scale-[0.98] transition-[background-color,transform] duration-150",
+							)}
+						>
+							<RotateCw size={16} aria-hidden />
+							Повторить
+						</button>
+					)}
 
-  return (
-    <Flex
-      fillWidth
-      minHeight="70vh"
-      horizontal="center"
-      vertical="center"
-      padding="l"
-    >
-      <Column
-        maxWidth="s"
-        gap="24"
-        horizontal="center"
-        style={{ textAlign: "center" }}
-      >
-        {/* Иллюстрация (можно передать кастомную) */}
-        <ErrorIllustration code={code} />
+					<Link
+						href="/"
+						className={buttonStyles(retry ? "outline" : "primary", "md", false)}
+					>
+						<Home size={16} aria-hidden />
+						На главную
+					</Link>
 
-        <Text
-          variant="display-default-xl"
-          onBackground="brand-strong"
-          style={{ fontWeight: 700 }}
-        >
-          {code}
-        </Text>
-
-        <Heading variant="display-default-m">{title}</Heading>
-
-        <Text onBackground="neutral-medium">{description}</Text>
-
-        <ErrorActions
-          retry={retry}
-          showBackButton={showBackButton}
-          onBack={() => router.back()}
-        />
-      </Column>
-    </Flex>
-  );
+					{showBackButton && <BackButton />}
+				</>
+			}
+		/>
+	);
 }
+
+export default ErrorPage;

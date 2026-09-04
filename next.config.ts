@@ -73,6 +73,13 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
+    // Кастомная 404 для URL, не совпавших ни с одним маршрутом. Без флага
+    // такие адреса получают дефолтную страницу Next.js: в проекте два
+    // корневых layout'а (витрина и админка Payload), поэтому обычный
+    // not-found.tsx внутри группы (frontend) их не перехватывает — см.
+    // app/global-not-found.tsx и not-found.md в доках Next.
+    globalNotFound: true,
+
     // По умолчанию Next.js буферизует тело запроса через proxy лимитом 10MB
     // и молча обрезает всё, что больше, без ошибки клиенту. Загрузка
     // видео-фона Hero через /api/media (Payload REST) легко превышает это,

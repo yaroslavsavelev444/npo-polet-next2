@@ -19,9 +19,11 @@ interface RegisterFormProps {
   onRequiresOtp: (email: string) => void;
 }
 
+type RegisterState = Awaited<ReturnType<typeof registerAction>> | null;
+
 // Вспомогательная функция с поддержкой null
 function getFieldError(
-  state: Awaited<ReturnType<typeof registerAction>> | null,
+  state: RegisterState,
   field: string
 ): string | undefined {
   if (!state || state.success) return undefined;
@@ -31,11 +33,28 @@ function getFieldError(
   return undefined;
 }
 
+/**
+ * Значение поля, к которому React вернёт форму после отработки action'а.
+ *
+ * React сбрасывает неуправляемые поля формы к их `defaultValue` сразу после
+ * каждого form action (recursivelyResetForms в react-dom). Сброс происходит
+ * ПОСЛЕ рендера с новым состоянием, поэтому подставленное сюда значение и
+ * становится тем, что пользователь увидит в поле. Возвращая эхо введённых
+ * данных, мы сохраняем анкету при ошибке; отсутствие эха для паролей
+ * очищает их — ровно то поведение, которого ждут от формы входа.
+ */
+function getFieldValue(state: RegisterState, field: 'email' | 'name'): string {
+  if (!state || state.success) return '';
+  return state.values?.[field] ?? '';
+}
+
 export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
   const [state, action, isPending] = useActionState(registerAction, null);
   const [checkedSlugs, setCheckedSlugs] = useState<Record<string, boolean>>({});
-  const [emailValue, setEmailValue] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>(undefined);
+  // Зеркало пароля только для индикатора надёжности. Само поле неуправляемое,
+  // иначе React-состояние и очищенный сбросом DOM разошлись бы: индикатор
+  // показывал бы силу уже стёртого пароля.
   const [passwordValue, setPasswordValue] = useState('');
 
   const requiredConsents = consents.filter((c) => c.isRequired);
@@ -45,15 +64,20 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
   // (lib/email). Настоящая проверка всё равно повторяется в registerAction —
   // это только UX. Пустое поле не подсвечиваем: об этом скажет required.
   const handleEmailChange = (value: string) => {
-    setEmailValue(value);
     setEmailError(value.trim() ? (validateEmail(value) ?? undefined) : undefined);
   };
 
   useEffect(() => {
-    if (state?.success && state.data.requiresOtp) {
-      onRequiresOtp(emailValue);
+    if (!state) return;
+
+    // Форма сброшена React'ом — синхронизируем производные состояния полей,
+    // которые сброс не затрагивает (они живут в React, а не в DOM).
+    setPasswordValue('');
+
+    if (state.success && state.data.requiresOtp) {
+      onRequiresOtp(state.data.email);
     }
-  }, [state, emailValue, onRequiresOtp]);
+  }, [state, onRequiresOtp]);
 
   const toggleConsent = (slug: string) => {
     setCheckedSlugs((prev) => ({ ...prev, [slug]: !prev[slug] }));
@@ -94,7 +118,7 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
           required
           disabled={isPending}
           placeholder="name@example.com"
-          value={emailValue}
+          defaultValue={getFieldValue(state, 'email')}
           onChange={(e) => handleEmailChange(e.target.value)}
           errorMessage={emailError ?? getFieldError(state, 'email')}
           fullWidth
@@ -109,6 +133,7 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
           required
           disabled={isPending}
           placeholder="Иван"
+          defaultValue={getFieldValue(state, 'name')}
           errorMessage={getFieldError(state, 'name')}
           fullWidth
         />
@@ -123,7 +148,6 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
             required
             disabled={isPending}
             placeholder="Минимум 8 символов"
-            value={passwordValue}
             onChange={(e) => setPasswordValue(e.target.value)}
             errorMessage={getFieldError(state, 'password')}
             fullWidth

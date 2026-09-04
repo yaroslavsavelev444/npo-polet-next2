@@ -1,128 +1,113 @@
-"use client";
+/**
+ * components/Breadcrumbs/Breadcrumbs.tsx
+ *
+ * Навигационная цепочка. Раньше это была обёртка над antd Breadcrumb внутри
+ * скруглённой «таблетки» с блюром и тенью: на странице товара она разрасталась
+ * в двухстрочный серый блок во всю ширину и перетягивала на себя внимание,
+ * хотя это вспомогательная навигация. Здесь — только семантика (nav > ol > li)
+ * и типографика; ни контейнера, ни фона, ни рамок.
+ *
+ * На узком экране остаётся ровно одно звено — родительский раздел, поданный
+ * как ссылка «назад». Текущая страница оттуда убрана намеренно: её название
+ * стоит заголовком строкой ниже, и в цепочке оно только переносилось на
+ * вторую строку. Скрытые звенья не выкидываются из разметки, а прячутся
+ * классом sr-only: визуально их нет, но скринридер и краулер читают цепочку
+ * целиком. Никакого клиентского JS и никакой развилки рендера — значит, нет и
+ * расхождения с SSR.
+ *
+ * Компонент серверный: это убирает antd из клиентского бандла всех страниц,
+ * где показывается цепочка.
+ */
 
-import { RightOutlined } from "@ant-design/icons";
-import { Breadcrumb } from "antd";
-import type { ItemType } from "antd/es/breadcrumb/Breadcrumb";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import type { ReactNode } from "react";
+import { cn } from "@/utils/cn";
 
-interface BreadcrumbsProps {
-  /** Массив элементов хлебных крошек */
-  items: ItemType[];
-  /** Дополнительный CSS-класс для контейнера */
-  className?: string;
-  /** Вариант оформления */
-  variant?: "default" | "light" | "dark" | "transparent" | "white";
-  /** Выравнивание */
-  align?: "start" | "center" | "end";
+export interface BreadcrumbItem {
+	title: ReactNode;
+	/** Без href элемент рендерится как текущая страница (последний в цепочке). */
+	href?: string;
 }
 
-/**
- * Улучшенный компонент хлебных крошек
- */
-export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
-  items,
-  className = "",
-  variant = "default",
-  align = "start",
-}) => {
-  const isWhiteText =
-    variant === "default" || variant === "dark" || variant === "white";
+interface BreadcrumbsProps {
+	items: BreadcrumbItem[];
+	className?: string;
+}
 
-  // Стили контейнера
-  const getContainerStyles = () => {
-    const base = `
-      inline-flex items-center gap-2 px-5 py-3
-      rounded-2xl min-h-[48px] w-fit
-      transition-all duration-200 backdrop-blur-md
-    `;
+export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
+	if (items.length === 0) return null;
 
-    switch (variant) {
-      case "light":
-        return `${base} border bg-[var(--surface)] border-[var(--border)] text-[var(--text-primary)]`;
+	// Единственное звено, видимое на узком экране: родитель текущей страницы
+	// (а если цепочка из одного элемента — он сам).
+	const mobileVisibleIndex = Math.max(0, items.length - 2);
 
-      case "dark":
-        return `${base} bg-[var(--text-primary)] text-white`;
+	return (
+		<nav
+			aria-label="Навигационная цепочка"
+			className={cn("text-[13px] leading-5", className)}
+		>
+			<ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+				{items.map((item, index) => {
+					const isLast = index === items.length - 1;
+					const isMobileVisible = index === mobileVisibleIndex;
 
-      case "white":
-        return `${base} bg-[var(--border-light)] text-white`;
+					return (
+						<li
+							key={`${index}-${item.href ?? "current"}`}
+							className={cn(
+								"flex min-w-0 items-center gap-1.5",
+								!isMobileVisible && "sr-only sm:not-sr-only sm:flex",
+							)}
+						>
+							{/* На мобильном единственное видимое звено читается как
+							    «назад», поэтому стрелка перед ним смотрит влево. */}
+							{isMobileVisible && index > 0 && (
+								<ChevronLeft
+									aria-hidden="true"
+									className="h-4 w-4 shrink-0 text-[var(--text-muted)] sm:hidden"
+								/>
+							)}
 
-      case "transparent":
-        return `${base} bg-transparent px-0 py-2`;
+							{index > 0 && (
+								<ChevronRight
+									aria-hidden="true"
+									className="hidden h-3.5 w-3.5 shrink-0 text-[var(--border-light)] sm:block"
+								/>
+							)}
 
-      case "default":
-      default:
-        return `${base} border bg-zinc-900/70 border-white/20 text-white shadow-lg`;
-    }
-  };
+							{isLast || !item.href ? (
+								<span
+									aria-current={isLast ? "page" : undefined}
+									// Последним звеном обычно идёт название товара — оно бывает
+									// в сотню символов. Обрезаем по ширине, а не по числу
+									// строк: цепочка обязана оставаться однострочной.
+									className="max-w-[14rem] truncate text-[var(--text-secondary)] sm:max-w-[20rem] lg:max-w-[30rem]"
+									title={
+										typeof item.title === "string" ? item.title : undefined
+									}
+								>
+									{item.title}
+								</span>
+							) : (
+								<Link
+									href={item.href}
+									className="max-w-[18rem] truncate rounded-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] sm:max-w-none"
+								>
+									{item.title}
+								</Link>
+							)}
+						</li>
+					);
+				})}
+			</ol>
+		</nav>
+	);
+}
 
-  const containerClass = `
-    ${getContainerStyles()}
-    ${
-      align === "center"
-        ? "justify-center"
-        : align === "end"
-          ? "justify-end"
-          : "justify-start"
-    }
-    ${className}
-  `;
-
-  return (
-    <div className={containerClass}>
-      <Breadcrumb
-        separator={
-          <RightOutlined
-            style={{
-              fontSize: "14px",
-              opacity: 0.75,
-              color: isWhiteText ? "#fff" : "var(--text-primary)",
-            }}
-          />
-        }
-        items={items}
-        itemRender={(route, params, routes) => {
-          const isLast = route === routes[routes.length - 1];
-
-          const content = (
-            <span
-              className={`
-        transition-colors duration-200
-        ${isWhiteText ? "text-white" : ""}
-        ${
-          isLast
-            ? "font-medium cursor-default"
-            : isWhiteText
-              ? "hover:text-white/80 hover:underline cursor-pointer"
-              : "hover:text-[var(--primary)] hover:underline cursor-pointer"
-        }
-      `}
-            >
-              {route.title}
-            </span>
-          );
-
-          if (isLast) {
-            return content;
-          }
-
-          return (
-            <Link href={route.href || "#"} className="no-underline">
-              {content}
-            </Link>
-          );
-        }}
-      />
-    </div>
-  );
-};
-
-// Вспомогательная функция
 export const createBreadcrumbItem = (
-  title: React.ReactNode,
-  href?: string,
-  disabled?: boolean,
-): ItemType => ({
-  title,
-  href,
-});
+	title: ReactNode,
+	href?: string,
+): BreadcrumbItem => ({ title, href });
+
+export default Breadcrumbs;

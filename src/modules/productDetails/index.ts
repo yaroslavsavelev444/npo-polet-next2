@@ -1,6 +1,7 @@
 export { ProductGallery } from "./components/gallery/ProductGallery";
-export { ProductDetailTabs } from "./components/ProductDetailTabs";
-export { ProductHeader } from "./components/ProductHeader";
+export { ProductBuyPanel } from "./components/ProductBuyPanel";
+export { ProductInformation } from "./components/ProductInformation";
+export { ProductPageHeader } from "./components/ProductPageHeader";
 export { ProductRelated } from "./components/ProductRelated";
 export { ProductStickyBar } from "./components/ProductStickyBar";
 

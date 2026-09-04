@@ -1,6 +1,37 @@
 @import "tailwindcss";
 @import "./theme.css";
 
+/* ===========================================================================
+   ВНИМАНИЕ: конфликт утилит отступов с @once-ui-system
+   ===========================================================================
+   Глобальные стили once-ui (подключаются в app/(frontend)/layout.tsx) объявляют
+   СВОИ классы отступов по пиксельной шкале: `.px-4 { padding-inline: 4px }`,
+   `.mt-12 { margin-top: 12px }` и так далее. Они не завёрнуты в @layer, а
+   утилиты Tailwind v4 — завёрнуты, и неслоистый CSS в каскаде всегда сильнее
+   слоистого. Поэтому в этом проекте once-ui выигрывает у Tailwind на всех
+   пересекающихся классах.
+
+   Задеты числа: 0 1 2 4 8 12 16 20 24 32 40 48 56 64 80 104 128 160
+   для префиксов p, px, py, pt, pr, pb, pl, m, mx, my, mt, mr, mb, ml.
+   То есть `px-4` даёт 4px вместо 16px, `mt-12` — 12px вместо 48px, и молча:
+   ошибку видно только линейкой в devtools.
+
+   НЕ задеты: gap-* (у once-ui свой префикс g-*), любые дробные значения
+   (p-3.5, py-2.5), все остальные числа (3 5 6 7 9 10 11 14 18 ...) и
+   произвольные значения в скобках.
+
+   Как писать, чтобы не наступить: для перечисленных чисел берите
+   произвольное значение — `px-[1rem]`, `mt-[3rem]`, `pb-[4rem]`. Оно даёт
+   класс, которого у once-ui нет, и работает предсказуемо.
+
+   Полное решение — завернуть импорты once-ui в собственный слой
+   (`@layer once-ui`), объявленный до слоёв Tailwind. Здесь оно не сделано
+   намеренно: once-ui-компоненты получают те же классы из числовых пропсов
+   (TopHeader — paddingX="16" paddingY="8", страницы согласий — paddingY="12"),
+   и после смены приоритета эти места поедут. Менять каскад стоит отдельной
+   задачей, вместе с переводом таких пропсов на явные значения.          */
+
+
 :root {
 	--foreground: #ecedee;
 	/* Мобильная шапка = только navbar (topbar скрыт, см. TopHeader.tsx). */
@@ -28,6 +59,49 @@ body {
 	font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ===========================================================================
+   Поверхности, которые рисует браузер
+   ===========================================================================
+   Выделение, каретка, полосы прокрутки и кольцо фокуса по умолчанию приходят
+   из системной палитры и на тёмной витрине выглядят чужеродно (синее
+   выделение, белый скроллбар, белый ореол вокруг кнопки). Задаём их один раз
+   здесь — дальше они наследуются всеми страницами.                          */
+
+::selection {
+	background: color-mix(in srgb, var(--primary) 32%, transparent);
+	color: var(--text-primary);
+}
+
+:root {
+	/* Tailwind рисует focus:ring-offset поверх цвета из --tw-ring-offset-color.
+	   По умолчанию он белый, поэтому у кнопок при клике появлялся белый
+	   ободок. Привязываем его к фону страницы. */
+	--tw-ring-offset-color: var(--background);
+	scrollbar-color: var(--border-light) transparent;
+	scrollbar-width: thin;
+	accent-color: var(--primary);
+}
+
+input,
+textarea,
+[contenteditable] {
+	caret-color: var(--primary);
+}
+
+/* Клавиатурный фокус виден всегда и одинаково. Мышиный клик кольцо не
+   рисует — за это отвечает :focus-visible, а не :focus. */
+:where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+/* Цифры в ценах, характеристиках и счётчиках не должны «прыгать» по ширине
+   при смене значения. */
+.tnum {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum" 1;
+}
+
 /* Анимация появления выпадающего меню поиска (src/modules/search) */
 @keyframes dropdown-in {
 	from {
@@ -51,6 +125,37 @@ body {
 	to {
 		opacity: 1;
 		transform: translateY(0);
+	}
+}
+
+/* Тот же жест, но с амплитудой, заметной на крупных блоках (.reveal-up). */
+@keyframes reveal-up {
+	from {
+		opacity: 0;
+		transform: translateY(12px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Каскадное появление контента (страницы 404/500, блоки базы знаний).
+   Задержка задаётся инлайн через --reveal-delay. Базовое состояние скрыто,
+   поэтому блок prefers-reduced-motion ниже принудительно возвращает
+   видимость. */
+.reveal-up {
+	opacity: 0;
+	animation: reveal-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+	animation-delay: var(--reveal-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reveal-up {
+		animation: none !important;
+		opacity: 1 !important;
+		transform: none !important;
 	}
 }
 
@@ -235,5 +340,160 @@ body {
 
 	.order-ring-echo {
 		display: none;
+	}
+}
+
+/* ===========================================================================
+   Содержимое статьи базы знаний (src/modules/knowledge)
+   ===========================================================================
+   Типографика тела статьи задана здесь, а не классами в конвертерах lexical:
+   абзацы, списки, цитаты и инлайновый код приходят из штатных конвертеров
+   @payloadcms/richtext-lexical без единого класса, и навесить на них Tailwind
+   можно только сверху. Плагин @tailwindcss/typography в проекте не
+   используется — это единственный набор prose-стилей, и он согласован с
+   остальной витриной (те же токены цвета и радиусов).                        */
+
+.knowledge-prose {
+	color: var(--text-primary);
+	font-size: 1.0625rem;
+	line-height: 1.75;
+	/* Кириллица в Manrope выигрывает от чуть более плотного трекинга в
+	   основном тексте — иначе длинные технические слова «рассыпаются». */
+	letter-spacing: -0.003em;
+	/* Длинные артикулы и адреса не должны растягивать колонку. */
+	overflow-wrap: break-word;
+}
+
+.knowledge-prose > p {
+	margin: 1.25em 0;
+}
+
+.knowledge-prose > p:first-child {
+	margin-top: 0;
+}
+
+.knowledge-prose a {
+	color: var(--accent);
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+	text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+	transition: color 0.15s ease-out, text-decoration-color 0.15s ease-out;
+}
+
+.knowledge-prose a:hover {
+	color: var(--accent-hover);
+	text-decoration-color: currentColor;
+}
+
+.knowledge-prose ul,
+.knowledge-prose ol {
+	margin: 1.25em 0;
+	padding-left: 1.5em;
+}
+
+.knowledge-prose ul {
+	list-style: disc;
+}
+
+.knowledge-prose ol {
+	list-style: decimal;
+}
+
+.knowledge-prose ul ul,
+.knowledge-prose ol ol,
+.knowledge-prose ul ol,
+.knowledge-prose ol ul {
+	margin: 0.5em 0;
+}
+
+.knowledge-prose li {
+	margin: 0.4em 0;
+	padding-left: 0.25em;
+}
+
+.knowledge-prose li::marker {
+	color: var(--primary);
+}
+
+/* Чек-лист lexical: пункты со своей разметкой, маркер списка не нужен. */
+.knowledge-prose ul[class*="checklist"] {
+	list-style: none;
+	padding-left: 0;
+}
+
+.knowledge-prose blockquote {
+	margin: 1.75em 0;
+	padding: 0.15em 0 0.15em 1.25em;
+	border-left: 1px solid var(--border-light);
+	color: var(--text-secondary);
+	font-style: italic;
+}
+
+.knowledge-prose blockquote p {
+	margin: 0.5em 0;
+}
+
+.knowledge-prose hr {
+	margin: 2.5em 0;
+	border: 0;
+	border-top: 1px solid var(--border);
+}
+
+.knowledge-prose code {
+	padding: 0.15em 0.4em;
+	border-radius: 4px;
+	background: var(--surface-secondary);
+	color: var(--primary-300);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.875em;
+}
+
+.knowledge-prose strong {
+	font-weight: 650;
+	color: var(--text-primary);
+}
+
+.knowledge-prose sub,
+.knowledge-prose sup {
+	font-size: 0.75em;
+	line-height: 0;
+}
+
+/* Курсор и выделение — те детали, которые браузер иначе нарисует
+   «по-своему», вне палитры сайта. */
+.knowledge-prose ::selection {
+	background: color-mix(in srgb, var(--primary) 28%, transparent);
+	color: var(--text-primary);
+}
+
+/* Липкая панель поиска и фильтров базы знаний.
+   Полупрозрачный слой: список материалов проезжает под панелью, а не
+   упирается в глухую полосу — так на невысоком экране видно, что список
+   продолжается. Само размытие ставится утилитами Tailwind на элементе
+   (backdrop-blur-xl / backdrop-saturate-150): написанный здесь
+   backdrop-filter вырезает Lightning CSS при сборке Tailwind v4, и панель
+   оставалась просто полупрозрачной. */
+.knowledge-toolbar {
+	background: color-mix(in srgb, var(--background) 82%, transparent);
+}
+
+/* Липкая панель выдачи каталога (src/modules/productCatalog).
+   Тот же приём, что и у .knowledge-toolbar: полупрозрачный слой, под которым
+   видно продолжение сетки товаров. Само размытие ставится утилитами Tailwind
+   на элементе (backdrop-blur-xl / backdrop-saturate-150) — backdrop-filter,
+   написанный здесь, вырезает Lightning CSS при сборке Tailwind v4. */
+.catalog-toolbar {
+	background: color-mix(in srgb, var(--background) 86%, transparent);
+}
+
+/* Прозрачность — это украшение, без которого содержимое обязано остаться
+   читаемым. Пользователю, попросившему её убрать, отдаём плотный фон. */
+@media (prefers-reduced-transparency: reduce) {
+	.knowledge-toolbar,
+	.catalog-toolbar {
+		background: var(--background);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 	}
 }

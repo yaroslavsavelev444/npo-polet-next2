@@ -7,7 +7,12 @@ import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordCh
 import { notifyPasswordReset } from "@/services/notifications/notifyPasswordReset";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { revokeAllUserSessions } from "../lib/session";
-import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import {
+  actionError,
+  actionSuccess,
+  formValues,
+  getRequestMeta,
+} from "../lib/utils";
 import {
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -31,6 +36,11 @@ export async function forgotPasswordAction(
   _prevState: unknown,
   formData: FormData,
 ) {
+  // Возвращаем email форме: React сбрасывает неуправляемые поля после каждого
+  // form action, и без эха пользователь перенабирал бы адрес после rate limit
+  // или опечатки (см. AuthFormValues).
+  const echo = formValues(formData, ["email"]);
+
   const parsed = forgotPasswordSchema.safeParse({
     email: formData.get("email"),
   });
@@ -38,6 +48,8 @@ export async function forgotPasswordAction(
     return actionError(
       "Введите корректный email",
       parsed.error.flatten().fieldErrors,
+      undefined,
+      echo,
     );
   }
 
@@ -47,7 +59,12 @@ export async function forgotPasswordAction(
   // Rate limit
   const rl = await RATE_LIMITS.forgotPassword(ip);
   if (!rl.allowed) {
-    return actionError("Слишком много запросов. Попробуйте позже.");
+    return actionError(
+      "Слишком много запросов. Попробуйте позже.",
+      undefined,
+      undefined,
+      echo,
+    );
   }
 
   const payload = await getPayloadInstance();

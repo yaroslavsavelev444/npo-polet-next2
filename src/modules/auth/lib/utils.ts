@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { AuthErrorCode } from '../types'
+import { AuthErrorCode, AuthFormValues } from '../types'
 
 
 /**
@@ -33,13 +33,34 @@ export async function getRequestMeta() {
  * категория (см. AuthErrorCode) для UI, которая позволяет форме показывать
  * разное оформление (например предупреждение для временной блокировки
  * вместо обычной ошибки для неверного пароля), не парся текст сообщения.
+ *
+ * `values` — безопасные значения полей, которые форма подставит обратно в
+ * `defaultValue`, чтобы пользователь не перезаполнял их после ошибки
+ * (см. AuthFormValues). Пароли туда не кладём никогда.
  */
 export function actionError(
   message: string,
   fieldErrors?: Record<string, string[]>,
   code?: AuthErrorCode,
+  values?: AuthFormValues,
 ) {
-  return { success: false as const, error: message, fieldErrors, code }
+  return { success: false as const, error: message, fieldErrors, code, values }
+}
+
+/**
+ * Достаёт безопасные значения из сырой FormData — так их можно вернуть форме
+ * даже тогда, когда валидация не прошла и типизированных данных ещё нет.
+ */
+export function formValues(
+  formData: FormData,
+  fields: ReadonlyArray<keyof AuthFormValues>,
+): AuthFormValues {
+  const values: AuthFormValues = {}
+  for (const field of fields) {
+    const raw = formData.get(field)
+    if (typeof raw === 'string') values[field] = raw
+  }
+  return values
 }
 
 export function actionSuccess<T>(data: T) {

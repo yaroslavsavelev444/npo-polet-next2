@@ -1,0 +1,102 @@
+# Проверки. Идут на каждый pull request и на каждый пуш в master.
+#
+# ─── Зачем отдельно от выкладки ─────────────────────────────────────────────
+#
+# Проверки должны отработать ДО слияния — на PR, когда их ещё можно прочитать
+# и что-то исправить. Выкладка обязана идти только ПОСЛЕ слияния. Один
+# workflow на оба случая означал бы либо выкладку с ветки, либо проверки,
+# которые никто не видит вовремя.
+#
+# На master они повторяются намеренно: слияние может дать состояние, которого
+# не было ни в одной ветке.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# Новый пуш в ту же ветку отменяет предыдущий прогон: проверять код, который
+# уже заменён, — трата минут раннера. В deploy.yml отмена, наоборот,
+# выключена — по противоположной причине.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Ничего, кроме чтения кода. Без этого блока прогон получает права по
+# умолчанию для репозитория, и GITHUB_TOKEN с правом записи оказывается в
+# окружении каждого шага — включая `pnpm install`, который выполняет
+# постустановочные скрипты зависимостей.
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Типы, линт, тесты
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Версия pnpm НЕ задаётся здесь: action читает её из поля packageManager
+      # в package.json. Раньше тут было жёстко прописано `version: 9`, а
+      # lock-файл писался pnpm 11 — и `--frozen-lockfile` падал с
+      # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH, потому что pnpm 9 не читает секцию
+      # overrides из pnpm-workspace.yaml (она переехала туда в pnpm 10+).
+      # Единственный источник правды о версии — packageManager.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # ⚠ Боевые секреты сюда НЕ передаются, и это не упущение.
+      #
+      # Ни type-check, ни тесты подключения к базе не требуют, а схема
+      # src/env.ts проверяет только форму значений: DATABASE_URI обязан быть
+      # валидным URL, PAYLOAD_SECRET — непустым. Раньше в эти шаги уезжали
+      # secrets.DATABASE_URI и secrets.PAYLOAD_SECRET — то есть боевая строка
+      # подключения оказывалась в окружении job'а, где выполняется в том числе
+      # код зависимостей.
+      - name: Типы
+        run: pnpm type-check
+        env:
+          PAYLOAD_SECRET: ci-placeholder-secret
+          DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
+
+      # ⚠ Не блокирует. На момент перехода `biome check .` даёт 393 ошибки и
+      # 7 предупреждений — почти целиком расхождения форматирования (в дереве
+      # смешаны табы и пробелы). Сделать это жёстким барьером сейчас значит
+      # заблокировать любую выкладку до разовой уборки всего репозитория,
+      # которая к процессу деплоя отношения не имеет. Шаг оставлен видимым,
+      # чтобы число не росло молча; убрать `continue-on-error` — отдельная
+      # задача, после `pnpm exec biome check --write .`.
+      - name: Линт (biome, информационно)
+        run: pnpm lint
+        continue-on-error: true
+
+      # Статический guard графа импортов payload.config.ts. Ни базы, ни сети
+      # не требует — раньше зачем-то выполнялся на боевом сервере посреди
+      # выкладки, в отдельно собираемом для этого Docker-образе.
+      - name: Граф импортов payload.config.ts
+        run: node scripts/verify-payload-graph.mjs
+
+      # ⚠ `test:security`, а не `test`. Скрипт `pnpm test` перечисляет ещё и
+      # tests/checkout/*.test.ts, а этот каталог на момент перехода в git не
+      # добавлен (`git status` показывает его как untracked). В свежем
+      # checkout'е шаблон не раскроется, и node упадёт на несуществующем
+      # файле — то есть CI был бы красным из-за состояния рабочей копии, а не
+      # из-за кода.
+      #
+      # Когда tests/checkout попадёт в репозиторий, здесь и в deploy.yml
+      # достаточно заменить на `pnpm test`.
+      - name: Тесты (безопасность: access control, open redirect, OTP)
+        run: pnpm test:security
+        env:
+          PAYLOAD_SECRET: ci-placeholder-secret
+          DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci

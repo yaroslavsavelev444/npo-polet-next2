@@ -1,15 +1,19 @@
 /**
- * Мостик между шапкой товара (рейтинг) и блоком вкладок: клик по рейтингу
- * должен открыть вкладку «Отзывы» и прокрутить к ней. Шапка — серверный
- * компонент, вкладки — клиентский; связываем их через DOM-событие, не поднимая
- * состояние в общий клиентский родитель.
+ * Мостик между блоком покупки (клик по рейтингу) и секцией отзывов.
+ *
+ * Раньше отзывы жили во вкладке, и по клику приходилось не только прокручивать
+ * страницу, но и переключать вкладку — для этого через window слалось событие,
+ * которое ловил клиентский компонент вкладок. Теперь отзывы — обычная секция в
+ * потоке страницы: достаточно прокрутки к якорю, и никакой синхронизации
+ * состояния между блоками не нужно.
+ *
+ * scroll-mt у секции учитывает высоту липкой шапки — иначе заголовок «Отзывы»
+ * уезжал бы под неё.
  */
-export const OPEN_REVIEWS_EVENT = "npo:open-product-reviews";
-export const PRODUCT_TABS_ANCHOR_ID = "product-tabs";
+export const PRODUCT_REVIEWS_ANCHOR_ID = "product-reviews";
 
 export function requestOpenReviews() {
-	window.dispatchEvent(new CustomEvent(OPEN_REVIEWS_EVENT));
 	document
-		.getElementById(PRODUCT_TABS_ANCHOR_ID)
+		.getElementById(PRODUCT_REVIEWS_ANCHOR_ID)
 		?.scrollIntoView({ behavior: "smooth", block: "start" });
 }

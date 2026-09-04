@@ -4,7 +4,6 @@ export const revalidate = 0;
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
 import { getImageData } from "@/modules/category/components/CategoryCard";
 import type { ProductQuery } from "@/modules/productCard/types/query";
 import { ProductCatalogLayout } from "@/modules/productCatalog/components/ProductCatalogLayout";
@@ -15,6 +14,7 @@ import {
 	getCatalogData,
 } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
+import { PageContainer } from "@/shared/components/PageContainer";
 
 interface Props {
 	params: Promise<{ categorySlug: string }>;
@@ -80,13 +80,12 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 	];
 
 	return (
-		<main className="min-h-screen pb-16">
-			<div className="container mx-auto px-4 py-8">
-				<Breadcrumbs items={breadcrumbItems} variant="white" className="mb-6" />
-
+		<main className="w-full min-h-screen pb-[4rem]">
+			<PageContainer className="pb-6 pt-6 sm:pt-[2rem]">
 				<ProductCatalogLayout
 					category={category}
 					categoryId={categoryId}
+					breadcrumbs={breadcrumbItems}
 					filters={filters}
 					priceBounds={priceBounds}
 					initialPage={{
@@ -96,7 +95,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 							: null,
 					}}
 				/>
-			</div>
+			</PageContainer>
 		</main>
 	);
 }

@@ -1,4 +1,17 @@
 # syntax=docker/dockerfile:1
+#
+# Образы собираются в GitHub Actions и уезжают в GHCR (см.
+# .github/workflows/deploy.yml). На VPS сборки больше не происходит — там
+# только `docker pull`. Из этого следует главное свойство файла: он не имеет
+# права зависеть ни от чего, что есть только на боевом сервере, — ни от
+# `.env.production`, ни от работающего Postgres.
+#
+# Собираются два таргета:
+#   runner — боевое приложение (Next.js standalone), минимальный образ;
+#   tools  — миграции Payload и фоновые воркеры; нужен весь исходник и
+#            node_modules, поэтому образ большой и в проде не обслуживает
+#            запросы.
+
 FROM node:22-alpine AS base
 # Версия pnpm нигде не дублируется: её единственный источник — поле
 # packageManager в package.json, которое читает corepack (`corepack install`
@@ -13,63 +26,103 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # corepack install — отдельным шагом до install: так несоответствие версии
 # видно сразу и отдельной ошибкой, а не посреди установки зависимостей.
 RUN corepack install
 RUN pnpm install --frozen-lockfile --dangerously-allow-all-builds
 
 # ── base-builder: полный исходный код + зависимости, БЕЗ next build ────────
-# Используется для payload migrate и bootstrap-admin: им нужен payload.config.ts
-# и весь src/, который он импортирует, но next build им не требуется.
+# Общая основа для `builder` (сборка Next.js) и `tools` (миграции, воркеры).
 FROM base AS base-builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# Кладём pnpm в СЛОЙ ОБРАЗА: на этом стейдже основаны migrate и worker, чей
-# CMD — `pnpm ...`. Без этого шага corepack пытался бы скачать pnpm при каждом
-# старте контейнера, и сетевой сбой означал бы, что не поднимается воркер
-# отложенного удаления аккаунтов.
+# Кладём pnpm в СЛОЙ ОБРАЗА: иначе corepack пытался бы скачать его при каждом
+# старте контейнера, и сетевой сбой означал бы неподнявшийся воркер.
 RUN corepack install
 
-# ── builder: полноценная сборка Next.js ─────────────────────────────────────
-# ВАЖНО: next build здесь обращается к Payload -> Postgres на этапе
-# "Collecting page data" (generateMetadata, Server Components). Поэтому сборка
-# ЭТОГО таргета обязана выполняться с сетевым доступом к уже поднятому
-# и уже промигрированному Postgres — см. build.network в docker-compose.prod.yml
-# и порядок операций в deploy.sh.
+# ── builder: сборка Next.js ────────────────────────────────────────────────
+#
+# ⚠ Живой Postgres здесь НЕ нужен, и это не случайность: на этапе
+# «Generating static pages» Next один раз рендерит дерево серверных
+# компонентов каждого маршрута, но все обращения к Payload идут через
+# src/payload/services/getPayload.ts, который на фазе PHASE_PRODUCTION_BUILD
+# возвращает заглушку. Раньше об этом свойстве не знали, и Dockerfile
+# монтировал боевой .env.production BuildKit-секретом ради строки
+# подключения, которой сборка всё равно не пользуется.
 FROM base-builder AS builder
-ENV NEXT_TELEMETRY_DISABLED=1
-# DATABASE_URI и PAYLOAD_SECRET нужны build-команде (payload:types/next build),
-# но НЕ должны попадать в слои образа. Раньше они передавались через ARG/ENV и
-# оседали в метаданных промежуточного образа (docker history). Теперь .env.
-# production монтируется как BuildKit-секрет ТОЛЬКО на время этого RUN
-# (/run/secrets/prod_env не сохраняется ни в одном слое), а нужные значения
-# извлекаются в переменные окружения самого процесса сборки.
-RUN --mount=type=secret,id=prod_env \
-    export DATABASE_URI="$(grep -E '^DATABASE_URI=' /run/secrets/prod_env | cut -d= -f2-)" && \
-    export PAYLOAD_SECRET="$(grep -E '^PAYLOAD_SECRET=' /run/secrets/prod_env | cut -d= -f2-)" && \
-    pnpm payload:types && \
-    pnpm build
 
-# ── worker: long-running фоновые обработчики ────────────────────────────────
-# Тот же контент, что и base-builder (worker'у нужен payload.config.ts и весь
-# src/), но НЕ под root. base-builder — это build-стейдж: в нём нет USER,
-# поэтому account-deletion-worker, работавший прямо на нём, крутился в
-# production сутками от root'а с доступом к Postgres и Redis и полным набором
-# сборочного инструментария. Долгоживущий процесс обязан быть непривилегированным
-# ровно так же, как runner.
-FROM base-builder AS worker
+# Значения-заглушки. Схема src/env.ts требует, чтобы DATABASE_URI был
+# валидным URL, а PAYLOAD_SECRET — непустым; содержимое при сборке не
+# используется никем. Реальные значения приходят при ЗАПУСКЕ из
+# .env.production на сервере и в образ не попадают вовсе.
+ENV DATABASE_URI=postgresql://build:build@127.0.0.1:5432/build
+ENV PAYLOAD_SECRET=build-time-placeholder-not-a-secret
+
+# ⚠ NEXT_PUBLIC_* — это АРГУМЕНТЫ СБОРКИ, а не переменные запуска. Next
+# подставляет их значения прямо в код на этапе компиляции, поэтому задать их
+# в .env.production на сервере недостаточно: в собранном образе уже стоит то,
+# что было при сборке.
+#
+# Именно из-за этого до перехода на сборку в CI в образ попадал
+# NEXT_PUBLIC_APP_URL=http://localhost:3000 (значение по умолчанию из
+# src/env.ts): старый Dockerfile извлекал из .env.production только
+# DATABASE_URI и PAYLOAD_SECRET. Отсюда шли неверные абсолютные ссылки на
+# медиа (payload.config.ts, serverURL) и адреса в письмах.
+#
+# Следствие, которое важно понимать: образ пригоден только для того домена, с
+# которым собран. Для staging нужна отдельная сборка, а не другой набор
+# переменных при запуске.
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_YM_ID
+
+# ⚠ Значения проносятся в сборку через RUN, а не через `ENV`, и это не стиль.
+#
+# `vars.NEXT_PUBLIC_YM_ID` в GitHub Actions, если переменная не заведена,
+# подставляется ПУСТОЙ СТРОКОЙ, а не отсутствует. Для zod-схемы в src/env.ts
+# это разные вещи: `.optional()` разрешает `undefined`, но пустая строка не
+# проходит `.regex(/^\d+$/)`. Вариант с `ENV NEXT_PUBLIC_YM_ID=$ARG` ронял
+# сборку на «Invalid client environment variables» ровно в самой частой
+# конфигурации — когда счётчик Метрики не подключён.
+#
+# Поэтому пустое значение здесь ЯВНО превращается в «переменная не задана».
+RUN set -e; \
+    if [ -z "${NEXT_PUBLIC_APP_URL:-}" ]; then \
+        echo "NEXT_PUBLIC_APP_URL не передан в сборку." >&2; \
+        echo "Заведите переменную NEXT_PUBLIC_APP_URL в GitHub:" >&2; \
+        echo "  Settings -> Secrets and variables -> Actions -> Variables" >&2; \
+        echo "Значение попадает в код на этапе компиляции, и подставить его" >&2; \
+        echo "позже, при запуске, уже нельзя — см. deploy/README.md." >&2; \
+        exit 1; \
+    fi; \
+    export NEXT_PUBLIC_APP_URL; \
+    if [ -n "${NEXT_PUBLIC_YM_ID:-}" ]; then export NEXT_PUBLIC_YM_ID; else unset NEXT_PUBLIC_YM_ID; fi; \
+    pnpm payload:types && pnpm build
+
+# ── tools: миграции Payload и фоновые воркеры ──────────────────────────────
+#
+# Тот же контент, что и base-builder (нужен payload.config.ts и весь src/), но
+# НЕ под root. base-builder — build-стейдж, в нём нет USER, и долгоживущий
+# процесс, запущенный прямо на нём, работал бы в проде от root с доступом к
+# Postgres, Redis и полным набором сборочного инструментария.
+#
+# ⚠ uid/gid 1001 менять нельзя. Docker на этом сервере работает с
+# userns-remap, а том polet-next_media_data уже создан с владельцем,
+# производным от 1001. Другой uid — это EACCES при записи медиа.
+FROM base-builder AS tools
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs \
     && chown -R nextjs:nodejs /app
 USER nextjs
-# Запускаем tsx напрямую, а не через `pnpm worker:account-deletion`: corepack
-# кэширует менеджер пакетов в домашнем каталоге ТОГО пользователя, который его
-# ставил (root на стейдже выше), поэтому под непривилегированным nextjs pnpm
-# пришлось бы качать заново при каждом старте контейнера — сетевой сбой
-# означал бы неподнявшийся воркер. Команда та же, что в скрипте
-# worker:account-deletion в package.json.
-CMD ["node_modules/.bin/tsx", "src/modules/account-deletion/worker.ts"]
+# Команду задаёт docker-compose.prod.yml (миграции или воркер). CMD по
+# умолчанию — миграции: самое частое применение этого образа.
+#
+# Запускаем node напрямую, а не через `pnpm ...`: corepack кэширует менеджер
+# пакетов в домашнем каталоге ТОГО пользователя, который его ставил (root на
+# стейдже выше), поэтому под непривилегированным nextjs pnpm пришлось бы
+# качать заново при каждом старте контейнера — сетевой сбой означал бы
+# несостоявшуюся миграцию.
+CMD ["node", "--experimental-strip-types", "scripts/payload-cli.mts", "migrate"]
 
 # ── runner: минимальный production-образ ────────────────────────────────────
 FROM base AS runner

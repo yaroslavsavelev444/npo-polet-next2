@@ -1,21 +1,26 @@
 /**
  * modules/productCard/components/ProductTitle.tsx
  *
- * Заголовок товара с обрезкой до 2 строк (line-clamp). В старом UI это
- * делал antd Paragraph.ellipsis + Tooltip; здесь — чистый Tailwind
- * line-clamp-2 + нативный title-атрибут для подсказки при наведении
- * (не требует JS, доступнее).
+ * Название товара в карточке: ровно две строки, всегда.
+ *
+ * line-clamp-2 отвечает за верхнюю границу, min-height — за нижнюю: короткое
+ * название занимает столько же места, сколько длинное, поэтому кнопка покупки
+ * в соседних карточках стоит на одной высоте без распорок.
+ *
+ * Цвет — основной, а не приглушённый: название идентифицирует товар, и в
+ * промышленном каталоге, где позиции различаются одним индексом в конце
+ * строки, читаемость названия важнее контраста с ценой.
  */
 
 import type { ProductTitleProps } from "../types";
 
 export function ProductTitle({ title }: ProductTitleProps) {
-  return (
-    <h3
-      title={title}
-      className="line-clamp-2 min-h-[2.6em] break-words text-sm leading-[1.3] text-[var(--text-secondary)]"
-    >
-      {title}
-    </h3>
-  );
+	return (
+		<h3
+			title={title}
+			className="line-clamp-2 min-h-[2.7em] break-words text-[13px] font-medium leading-[1.35] text-[var(--text-primary)]"
+		>
+			{title}
+		</h3>
+	);
 }

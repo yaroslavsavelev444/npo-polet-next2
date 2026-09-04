@@ -1,56 +1,60 @@
-// src/modules/product/components/ProductsSection.tsx
-import type { ProductCardData } from '@/modules/productCard/types';
-import { ProductGrid } from './productGrid';
+// modules/productCard/components/ProductsSection.tsx
+
+import type { ProductCardData } from "@/modules/productCard/types";
+import { Empty } from "@/UI";
+import { ProductGrid } from "./productGrid";
 
 interface ProductsSectionProps {
-  products: ProductCardData[];
-  title?: string;
-  description?: string;
-  emptyMessage?: string;
-  showQuickView?: boolean;
-  onQuickView?: (product: ProductCardData) => void;
-  className?: string;
+	products: ProductCardData[];
+	title?: string;
+	description?: string;
+	emptyMessage?: string;
+	showQuickView?: boolean;
+	onQuickView?: (product: ProductCardData) => void;
+	className?: string;
 }
 
+/**
+ * Именованная секция со списком товаров — «Похожие товары», «Избранное»,
+ * подборка на главной. Заголовок оформлен так же, как заголовки секций на
+ * странице товара (одна ступень шкалы, тот же вес и трекинг), чтобы блоки из
+ * разных модулей на одной странице не выглядели собранными из разных систем.
+ */
 export function ProductsSection({
-  products = [], 
-  title,
-  description,
-  emptyMessage = 'Товаров не найдено.',
-  showQuickView,
-  onQuickView,
-  className,
+	products = [],
+	title,
+	description,
+	emptyMessage = "Товаров не найдено.",
+	showQuickView,
+	onQuickView,
+	className,
 }: ProductsSectionProps) {
-  return (
-    <section className={className}>
-      {/* Заголовок и описание */}
-      {(title || description) && (
-        <div className="mb-6">
-          {title && <h2 className="text-2xl font-bold">{title}</h2>}
-          {description && <p className="text-muted-foreground">{description}</p>}
-        </div>
-      )}
+	return (
+		<section className={className}>
+			{(title || description) && (
+				<div className="mb-5 flex flex-col gap-1">
+					{title && (
+						<h2 className="text-xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] sm:text-2xl">
+							{title}
+						</h2>
+					)}
+					{description && (
+						<p className="max-w-[60ch] text-sm text-[var(--text-secondary)]">
+							{description}
+						</p>
+					)}
+				</div>
+			)}
 
-      {/* Слот для будущего Toolbar (сортировка, переключение вида) */}
-      <div className="mb-4 flex items-center justify-between">
-        {/* Переключатель Grid/List (пока заглушка) */}
-      </div>
-
-      {/* Grid или список */}
-      {products.length === 0 ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed">
-          <p className="text-muted-foreground">{emptyMessage}</p>
-        </div>
-      ) : (
-        <ProductGrid
-          products={products}
-          showQuickView={showQuickView}
-          onQuickView={onQuickView}
-        />
-      )}
-
-      {/* Слот для будущей пагинации */}
-      <div className="mt-8">{/* Pagination */}</div>
-    </section>
-  );
+			{products.length === 0 ? (
+				<Empty message={emptyMessage} className="py-14" />
+			) : (
+				<ProductGrid
+					products={products}
+					showQuickView={showQuickView}
+					onQuickView={onQuickView}
+				/>
+			)}
+		</section>
+	);
 }

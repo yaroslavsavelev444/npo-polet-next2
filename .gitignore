@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# E2E (Playwright)
+# Раннер живёт отдельно от node_modules проекта: CI ставит зависимости с
+# --frozen-lockfile, и браузерный раннер в основном lock-файле заставлял бы
+# пересобирать всё дерево на каждой машине. Установка: pnpm e2e:install.
+/tests/e2e/.runner/node_modules
+/tests/e2e/node_modules
+/tests/e2e/.auth
+/tests/e2e/.output
+/tests/e2e/.report

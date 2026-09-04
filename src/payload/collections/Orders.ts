@@ -314,17 +314,100 @@ export const Orders: CollectionConfig = {
 							siblingData?.method === DeliveryMethod.DOOR_TO_DOOR ||
 							siblingData?.method === DeliveryMethod.PICKUP_POINT,
 					},
+					// ВСЕ поля адреса опциональны и остаются такими навсегда.
+					// В коллекции сосуществуют три поколения адресов:
+					//   1) исторические заказы из старой системы — весь адрес одной
+					//      строкой в `street`;
+					//   2) заказы после разбиения на поля — city/street/house/apartment;
+					//   3) текущие — плюс `fullAddress` и справочные идентификаторы,
+					//      если адрес выбран из подсказок.
+					// Обязательное поле здесь сломало бы чтение и правку заказов
+					// первых двух поколений в админке; требования к заполненности
+					// живут в схеме оформления (modules/checkout/lib/checkout-schema),
+					// где они зависят от способа доставки.
 					fields: [
-						{ name: "city", type: "text" },
-						{ name: "street", type: "text" },
+						{
+							name: "fullAddress",
+							type: "text",
+							label: "Адрес одной строкой",
+							admin: {
+								description:
+									"Канонический адрес до дома. У заказов до внедрения подсказок пуст — адрес собирается из полей ниже",
+							},
+						},
+						{ name: "postalCode", type: "text", label: "Индекс" },
+						{ name: "country", type: "text", defaultValue: "Россия" },
+						{ name: "region", type: "text", label: "Регион" },
+						{ name: "area", type: "text", label: "Район" },
+						{ name: "city", type: "text", label: "Город" },
+						{ name: "settlement", type: "text", label: "Населённый пункт" },
+						{ name: "street", type: "text", label: "Улица" },
 						// house/apartment добавлены позже — исторические заказы хранят
 						// весь адрес в одном поле street, поэтому они опциональны, а код
-						// отображения (OrderDeliveryPanel.formatAddress) поддерживает
+						// отображения (lib/address.formatAddress) поддерживает
 						// оба формата.
 						{ name: "house", type: "text", label: "Дом" },
-						{ name: "apartment", type: "text", label: "Квартира" },
-						{ name: "postalCode", type: "text" },
-						{ name: "country", type: "text", defaultValue: "Россия" },
+						{ name: "block", type: "text", label: "Корпус / строение" },
+
+						// Данные, которых нет в адресных справочниках: их вводит
+						// покупатель, и они нужны только курьерской доставке.
+						{ name: "apartment", type: "text", label: "Квартира / офис" },
+						{ name: "entrance", type: "text", label: "Подъезд" },
+						{ name: "floor", type: "text", label: "Этаж" },
+
+						// Справочные идентификаторы. Заполнены только у адресов,
+						// выбранных из подсказок; для логистики это единственный
+						// способ сопоставить адрес с ФИАС без повторного разбора.
+						{
+							name: "fiasId",
+							type: "text",
+							label: "ФИАС ID",
+							admin: { readOnly: true },
+						},
+						{
+							name: "fiasLevel",
+							type: "text",
+							label: "Уровень ФИАС",
+							admin: { readOnly: true },
+						},
+						{
+							name: "kladrId",
+							type: "text",
+							label: "КЛАДР ID",
+							admin: { readOnly: true },
+						},
+						{
+							name: "geoLat",
+							type: "text",
+							label: "Широта",
+							admin: { readOnly: true },
+						},
+						{
+							name: "geoLon",
+							type: "text",
+							label: "Долгота",
+							admin: { readOnly: true },
+						},
+						{
+							name: "qcGeo",
+							type: "text",
+							label: "Точность координат",
+							admin: { readOnly: true },
+						},
+						{
+							name: "source",
+							type: "select",
+							label: "Источник адреса",
+							options: [
+								{ label: "Подсказки (DaData)", value: "dadata" },
+								{ label: "Ручной ввод", value: "manual" },
+							],
+							admin: {
+								readOnly: true,
+								description:
+									"Пусто у заказов, оформленных до внедрения подсказок адреса",
+							},
+						},
 					],
 				},
 				{

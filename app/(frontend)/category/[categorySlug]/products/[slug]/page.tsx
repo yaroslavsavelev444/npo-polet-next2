@@ -14,9 +14,10 @@ import {
 import {
 	getRelatedProducts,
 	mapProductToDetailData,
-	ProductDetailTabs,
+	ProductBuyPanel,
 	ProductGallery,
-	ProductHeader,
+	ProductInformation,
+	ProductPageHeader,
 	ProductRelated,
 	ProductStickyBar,
 } from "@/modules/productDetails";
@@ -29,6 +30,7 @@ import {
 import { getProductRatingBreakdown } from "@/payload/services/reviews.service";
 import { baseURL } from "@/resources/content";
 import { JsonLd } from "@/shared/components/JsonLd";
+import { PageContainer } from "@/shared/components/PageContainer";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
 
 interface Props {
@@ -135,52 +137,62 @@ export default async function ProductDetailPage({ params }: Props) {
 	];
 
 	return (
-		<main className="min-h-screen pb-24 lg:pb-16">
+		<main className="w-full min-h-screen pb-[6.5rem] lg:pb-[4rem]">
 			<JsonLd data={jsonLd} />
 			<JsonLd data={buildBreadcrumbSchema(breadcrumbItems)} />
 
-			<div className="container mx-auto px-4 py-6 sm:py-8">
-				<Breadcrumbs items={breadcrumbItems} variant="white" />
+			<PageContainer className="pt-6 sm:pt-[2rem]">
+				<Breadcrumbs items={breadcrumbItems} />
 
-				{/* Верх: галерея + блок покупки. На десктопе блок покупки липкий.
-				    Ширину верхнего блока ограничиваем (~840px), а колонку покупки
-				    фиксируем в 380px — так квадратный кадр галереи держится в пределах
-				    ~420px и не раздувается на весь первый экран на широких мониторах. */}
-				<div className="mt-6 grid grid-cols-1 gap-8 lg:max-w-[840px] lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-10">
-					<ProductGallery images={detailData.images} title={detailData.title} />
+				<div className="mt-5 sm:mt-6">
+					<ProductPageHeader
+						product={detailData}
+						rating={{
+							average: ratingBreakdown.average,
+							count: ratingBreakdown.count,
+						}}
+					/>
+				</div>
 
-					<div className="lg:sticky lg:top-24 lg:self-start">
-						<ProductHeader
-							product={detailData}
-							cardData={cardData}
-							rating={{
-								average: ratingBreakdown.average,
-								count: ratingBreakdown.count,
-							}}
+				{/*
+				 * Одна сетка на всю страницу товара: слева галерея и вся
+				 * информационная часть, справа — липкий блок покупки.
+				 *
+				 * Раньше верхний блок жил в собственной сетке шириной 840 px,
+				 * описание — в колонке 768 px, а характеристики растягивались на
+				 * всю ширину контейнера: три разные меры на одной странице, из-за
+				 * чего казалось, что у каждого блока свои отступы. Здесь у всех
+				 * секций общие левая и правая границы, а блок покупки остаётся на
+				 * виду всё время, пока читают характеристики.
+				 *
+				 * Порядок в разметке — галерея, покупка, информация — верен для
+				 * мобильной одноколоночной раскладки; на десктопе явные
+				 * col-start/row-start возвращают информацию под галерею.
+				 */}
+				<div className="mt-[2rem] grid grid-cols-1 items-start gap-x-10 gap-y-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_22rem] xl:gap-x-14 xl:grid-cols-[minmax(0,1fr)_25rem]">
+					<div className="min-w-0 lg:col-start-1 lg:row-start-1">
+						<ProductGallery
+							images={detailData.images}
+							title={detailData.title}
 						/>
 					</div>
+
+					<div className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-[calc(var(--sticky-header-height)+1.5rem)]">
+						<ProductBuyPanel product={detailData} cardData={cardData} />
+					</div>
+
+					<ProductInformation
+						product={detailData}
+						reviewsData={reviewsData}
+						className="min-w-0 lg:col-start-1 lg:row-start-2"
+					/>
 				</div>
 
-				{/* Описание — отдельной секцией, чтобы не оттеснять кнопку покупки вниз */}
-				{detailData.description && (
-					<section className="mt-12 max-w-3xl">
-						<h2 className="mb-3 text-lg font-semibold text-[var(--text-primary)]">
-							Описание
-						</h2>
-						<p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">
-							{detailData.description}
-						</p>
-					</section>
-				)}
-
-				<div className="mt-12">
-					<ProductDetailTabs product={detailData} reviewsData={reviewsData} />
-				</div>
-
-				<div className="mt-16">
-					<ProductRelated products={relatedProducts} />
-				</div>
-			</div>
+				<ProductRelated
+					products={relatedProducts}
+					className="mt-[4rem] border-t border-[var(--hairline)] pt-[3rem] lg:mt-[5rem]"
+				/>
+			</PageContainer>
 
 			<ProductStickyBar product={detailData} cardData={cardData} />
 		</main>
