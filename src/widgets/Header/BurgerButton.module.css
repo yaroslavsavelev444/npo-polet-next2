@@ -1,0 +1,43 @@
+/* Кнопка-бургер мобильной шапки.
+   Две линии вместо трёх: в закрытом состоянии они читаются как «меню», в
+   открытом складываются в крест поворотом на ±45°. Третья линия при таком
+   переходе лишняя — её пришлось бы гасить по opacity, и в середине анимации
+   на месте креста возникает грязное пятно.
+
+   Анимируется только transform — свойство композитора, поэтому морфинг не
+   вызывает пересчёта раскладки даже на слабых телефонах. */
+
+.lines {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	width: 18px;
+}
+
+.line {
+	display: block;
+	width: 18px;
+	height: 1.5px;
+	border-radius: 2px;
+	background: currentColor;
+	transition: transform 380ms
+		var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+/* 3.25px = половина (высота линии + gap): именно на столько нужно сдвинуть
+   каждую линию к центру, чтобы после поворота они пересеклись в одной точке. */
+.button[data-open="true"] .line:first-child {
+	transform: translateY(3.25px) rotate(45deg);
+}
+
+.button[data-open="true"] .line:last-child {
+	transform: translateY(-3.25px) rotate(-45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.line {
+		transition: none;
+	}
+}

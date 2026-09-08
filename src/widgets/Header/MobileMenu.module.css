@@ -1,0 +1,469 @@
+/* ===========================================================================
+   Мобильное меню
+   ===========================================================================
+   Модуль, а не глобальный файл: имена классов хешируются, поэтому правила
+   гарантированно не пересекаются с утилитами @once-ui-system, которые
+   подключаются вне слоёв и перебивают Tailwind (подробности — в шапке
+   app/(frontend)/globals.css). Здесь же это даёт возможность спокойно
+   называть классы .link/.label, не боясь совпадений.
+
+   Значения времени и кривых берутся из home.css (--ease-out-expo,
+   --ease-out-quart) — на сайте одна система движения, и меню не должно
+   заводить собственную.                                                    */
+
+/* ---------------------------------------------------------------------------
+   Оверлей
+   ---------------------------------------------------------------------------
+   Начинается ПОД шапкой (top: --sticky-header-height), а не поверх неё. Это
+   принципиально: шапка остаётся на месте и рабочей, бургер физически тот же
+   самый элемент, который складывается в крест, — не появляется его копия
+   поверх панели. Заодно снимается вопрос про z-index плавающих элементов:
+   значение 70 выше баннера cookie (60) и кнопки обратной связи (50), поэтому
+   они не просвечивают сквозь меню, а сама шапка (20) не перекрывается, так
+   как оверлей до неё геометрически не достаёт.
+
+   Появление — срез сверху вниз (clip-path). Это тот же приём, которым
+   раскрываются секции главной ([data-reveal] в home.css): панель не
+   «выезжает», а проявляется, и потому не тянет за собой ощущение сдвига
+   раскладки.                                                               */
+.overlay {
+	position: fixed;
+	/* --menu-top приходит инлайн замером шапки; токен — запасной вариант на
+	   первый кадр и на случай, если шапки в DOM не оказалось. */
+	top: var(--menu-top, var(--sticky-header-height));
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: 70;
+	display: flex;
+	flex-direction: column;
+	overflow-y: auto;
+	/* Докрутив меню до конца, нельзя утащить за собой страницу под ним. */
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+	background: var(--void);
+	color: var(--text-primary);
+
+	clip-path: inset(0 0 100% 0);
+	transition: clip-path 300ms var(--ease-out-quart);
+}
+
+.overlay[data-open="true"] {
+	clip-path: inset(0 0 0 0);
+	transition-duration: 560ms;
+	transition-timing-function: var(--ease-out-expo);
+}
+
+/* Тёплое пятно у верхнего края — единственная декорация панели. Без него
+   сплошной --void на всю высоту выглядит провалом, а не поверхностью. */
+.overlay::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 auto 0;
+	height: 42vh;
+	pointer-events: none;
+	background: radial-gradient(
+		120% 100% at 50% 0%,
+		color-mix(in srgb, var(--primary) 9%, transparent) 0%,
+		transparent 70%
+	);
+}
+
+.inner {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	width: 100%;
+	max-width: 42rem;
+	margin: 0 auto;
+	padding: clamp(1.5rem, 6vw, 2.5rem) clamp(1.25rem, 5vw, 2.5rem)
+		calc(clamp(1.5rem, 6vw, 2.5rem) + env(safe-area-inset-bottom));
+}
+
+/* ---------------------------------------------------------------------------
+   Каскадное появление содержимого
+   ---------------------------------------------------------------------------
+   Порядковый номер приходит инлайн через --i, шаг — 46 мс. Меньше 40 мс
+   каскад перестаёт читаться и превращается в общий сдвиг, больше 60 мс —
+   последний пункт заметно опаздывает за панелью.
+
+   Закрытие короче открытия (200 мс против 620) и без задержек: уход из
+   интерфейса не должен требовать ожидания.                                 */
+.reveal {
+	opacity: 0;
+	transform: translate3d(0, 20px, 0);
+	transition:
+		opacity 200ms var(--ease-out-quart),
+		transform 200ms var(--ease-out-quart);
+}
+
+.overlay[data-open="true"] .reveal {
+	opacity: 1;
+	transform: translate3d(0, 0, 0);
+	transition-duration: 620ms;
+	transition-timing-function: var(--ease-out-expo);
+	transition-delay: calc(90ms + var(--i, 0) * 46ms);
+}
+
+/* ---------------------------------------------------------------------------
+   Крупные ссылки
+   --------------------------------------------------------------------------- */
+.primary {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.link {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.55rem;
+	padding: 0.3rem 0;
+	text-decoration: none;
+	color: var(--text-primary);
+	transition: color 240ms var(--ease-out-quart);
+}
+
+/* Индекс — моноширинный, поднят к верхней линии прописных, как номер
+   позиции в спецификации. Кегль намеренно мелкий: это не второй уровень
+   навигации, а разметка списка. */
+.idx {
+	flex: 0 0 auto;
+	padding-top: 0.28em;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.68rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.08em;
+	line-height: 1;
+	color: var(--text-muted);
+	transition: color 240ms var(--ease-out-quart);
+}
+
+.label {
+	font-family: var(--font-display);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: -0.005em;
+	/* 7.4vw подобрано под самую длинную подпись («КОНТАКТЫ», 8 знаков): у
+	   PaluiSP2 знак занимает ~1.2em, то есть слово тянет ~9.6em и обязано
+	   уместиться в колонку даже на экране 320px. */
+	font-size: clamp(1.5rem, 7.4vw, 2.5rem);
+	line-height: 1.05;
+}
+
+.link:hover,
+.link:focus-visible,
+.link:active,
+.link[aria-current="page"] {
+	color: var(--primary);
+}
+
+.link:hover .idx,
+.link:focus-visible .idx,
+.link:active .idx,
+.link[aria-current="page"] .idx {
+	color: var(--primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Перекат букв
+   ---------------------------------------------------------------------------
+   Знак дублируется тенью ровно на одну строку ниже; при наведении строка
+   уезжает вверх, и на месте буквы оказывается её копия. Никакого второго
+   слоя разметки, только transform — поэтому эффект дешёвый даже на подписи
+   из 11 знаков.
+
+   Задержка на знак приходит инлайн (12 мс), чтобы перекат шёл слева
+   направо, а не сплошным блоком.                                          */
+.roll {
+	display: inline-block;
+	position: relative;
+	overflow: hidden;
+	vertical-align: bottom;
+	white-space: nowrap;
+	line-height: 1.12;
+
+	/* Окно обрезки выше строки на 0.18em, и вот почему. У PaluiSP2 краска
+	   знака поднимается на 0.916em над базовой линией (бреве над «Й»), а
+	   строка высотой 1.12em держит базовую линию на 0.755em от верха — то
+	   есть 0.16em краски оказывается ВЫШЕ строки и срезается. Поднять
+	   line-height до 1.45em, чтобы «Й» уместился, значило бы разогнать весь
+	   список: строка задаёт и шаг переката. Поэтому окно расширяется
+	   padding'ом, а отрицательный margin возвращает высоту в раскладке. */
+	padding-top: 0.18em;
+	margin-top: -0.18em;
+}
+
+.roll > span {
+	display: inline-block;
+	position: relative;
+	/* 1.3em = высота окна (0.18 + 1.12). Копия знака стоит ровно на границе
+	   и в покое не видна, а после сдвига на те же 1.3em встаёт точно на
+	   место оригинала — перекат получается без стыка. */
+	text-shadow: currentColor 0 1.3em;
+	/* rotate(0.001deg) заставляет браузер растеризовать знак на отдельном
+	   слое — без него перекат в WebKit «дрожит» на субпиксельной сетке. */
+	transform: translateY(0) rotate(0.001deg);
+	transition: transform 600ms var(--ease-out-expo);
+}
+
+.link:hover .roll > span,
+.link:focus-visible .roll > span,
+.link:active .roll > span,
+.footLink:hover .roll > span,
+.footLink:focus-visible .roll > span {
+	transform: translateY(-1.3em) rotate(0.001deg);
+}
+
+/* ---------------------------------------------------------------------------
+   Категории
+   --------------------------------------------------------------------------- */
+.section {
+	margin-top: clamp(1.5rem, 5vw, 2.25rem);
+}
+
+.sectionLabel {
+	margin: 0 0 0.75rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.64rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.chip {
+	display: inline-block;
+	/* Названия категорий приходят из админки и бывают длиной в предложение
+	   («Комплексы радиоэлектронного подавления и антидроновой защиты...»).
+	   В три строки такая плитка ломает ряд, поэтому строка одна, а хвост
+	   срезается многоточием — полное название остаётся в title. */
+	max-width: min(100%, 15rem);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0.42rem 0.85rem;
+	border: 1px solid var(--hairline);
+	border-radius: 999px;
+	font-size: 0.82rem;
+	line-height: 1.2;
+	color: var(--text-secondary);
+	text-decoration: none;
+	transition:
+		color 200ms var(--ease-out-quart),
+		border-color 200ms var(--ease-out-quart),
+		background-color 200ms var(--ease-out-quart);
+}
+
+.chip:hover,
+.chip:focus-visible,
+.chip[aria-current="page"] {
+	color: var(--text-primary);
+	border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Целевое действие и контакты
+   --------------------------------------------------------------------------- */
+.cta {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 1rem;
+	margin-top: clamp(1.5rem, 5vw, 2.25rem);
+}
+
+.ctaButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.85rem 1.35rem;
+	border-radius: 999px;
+	background: var(--primary);
+	color: var(--text-inverse);
+	font-size: 0.95rem;
+	font-weight: 600;
+	line-height: 1;
+	text-decoration: none;
+	transition:
+		background-color 200ms var(--ease-out-quart),
+		transform 200ms var(--ease-out-quart);
+}
+
+.ctaButton:hover,
+.ctaButton:focus-visible {
+	background: var(--primary-hover);
+}
+
+.ctaButton:active {
+	transform: scale(0.97);
+}
+
+.ctaCount {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.35rem;
+	height: 1.35rem;
+	padding: 0 0.35rem;
+	border-radius: 999px;
+	background: rgb(255 255 255 / 0.22);
+	font-size: 0.72rem;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+}
+
+.ctaIcon {
+	width: 1.05rem;
+	height: 1.05rem;
+	flex: 0 0 auto;
+}
+
+.talk {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem 1.5rem;
+}
+
+.talkLink {
+	font-size: 0.82rem;
+	letter-spacing: 0.02em;
+	color: var(--text-secondary);
+	text-decoration: none;
+	transition: color 200ms var(--ease-out-quart);
+}
+
+.talkLink:hover,
+.talkLink:focus-visible {
+	color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Подпись и нижний ряд
+   ---------------------------------------------------------------------------
+   margin-top: auto прижимает пару «подпись + мелкие ссылки» к низу панели на
+   высоком экране и не мешает ей ехать вместе с содержимым на низком.       */
+.strap {
+	margin: auto 0 0;
+	padding-top: clamp(2rem, 8vw, 3.25rem);
+	max-width: 16ch;
+	font-family: var(--font-display);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: -0.005em;
+	line-height: 1.02;
+	font-size: clamp(1rem, 4vw, 1.35rem);
+	color: var(--text-muted);
+}
+
+.foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 1.35rem;
+	margin-top: 1.35rem;
+	padding-top: 1.35rem;
+	border-top: 1px solid var(--hairline);
+}
+
+.footLink {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.3rem 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	line-height: 1.2;
+	text-transform: uppercase;
+	text-decoration: none;
+	color: var(--text-secondary);
+	transition: color 200ms var(--ease-out-quart);
+}
+
+.footLink:hover,
+.footLink:focus-visible {
+	color: var(--text-primary);
+}
+
+.footLogout {
+	color: var(--error);
+}
+
+.footLogout:hover,
+.footLogout:focus-visible {
+	color: var(--error-hover);
+}
+
+/* Кнопка закрытия для клавиатуры и скринридеров. Визуально её нет — роль
+   «закрыть» несёт бургер в шапке, — но она обязана быть первой в порядке
+   обхода, иначе диалог не сообщает о способе выхода. */
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+.srOnly:focus-visible {
+	position: static;
+	width: auto;
+	height: auto;
+	margin: 0;
+	padding: 0.5rem 0.75rem;
+	overflow: visible;
+	clip: auto;
+	clip-path: none;
+	border-radius: var(--radius-sm);
+	background: var(--surface);
+	color: var(--text-primary);
+	font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Просьба уменьшить движение
+   ---------------------------------------------------------------------------
+   Срез и каскад — украшение; смысл панели от них не зависит. Остаётся
+   короткое проявление, чтобы переход не был рывком.                        */
+@media (prefers-reduced-motion: reduce) {
+	.overlay,
+	.overlay[data-open="true"] {
+		clip-path: none;
+		opacity: 0;
+		transition: opacity 120ms linear;
+	}
+
+	.overlay[data-open="true"] {
+		opacity: 1;
+	}
+
+	.reveal,
+	.overlay[data-open="true"] .reveal {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+
+	.roll > span,
+	.link,
+	.chip,
+	.ctaButton {
+		transition: none;
+	}
+}

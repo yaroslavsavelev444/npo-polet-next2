@@ -1,12 +1,12 @@
 "use client";
 
 import { Flex } from "@once-ui-system/core";
-import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CartIcon } from "@/modules/cart/components/CartIcon";
 import { NotificationBell } from "@/modules/notifications";
 import { WishlistIcon } from "@/modules/wishlist";
 import type { Category, Setting, User } from "@/payload-types";
+import { BurgerButton } from "./BurgerButton";
 import Logo from "./Logo";
 import MobileMenu from "./MobileMenu";
 import NavMenus from "./NavMenus";
@@ -23,6 +23,8 @@ interface Props {
 	unreadNotificationCount: number;
 }
 
+const MOBILE_MENU_ID = "mobile-nav-panel";
+
 export default function NavbarClientIsland({
 	user,
 	categories,
@@ -33,6 +35,25 @@ export default function NavbarClientIsland({
 	unreadNotificationCount,
 }: Props) {
 	const [isMobileOpen, setIsMobileOpen] = useState(false);
+	const burgerRef = useRef<HTMLButtonElement>(null);
+
+	// На lg бургер исчезает вместе с мобильной вёрсткой. Если ширина
+	// перевалила за порог при открытом меню (поворот планшета, изменение
+	// размера окна), закрыть его станет нечем — кнопки больше нет. Поэтому
+	// переход через границу закрывает панель сам.
+	useEffect(() => {
+		if (!isMobileOpen) return;
+		const query = window.matchMedia("(min-width: 1024px)");
+		if (query.matches) {
+			setIsMobileOpen(false);
+			return;
+		}
+		const onChange = (event: MediaQueryListEvent) => {
+			if (event.matches) setIsMobileOpen(false);
+		};
+		query.addEventListener("change", onChange);
+		return () => query.removeEventListener("change", onChange);
+	}, [isMobileOpen]);
 
 	return (
 		<>
@@ -57,39 +78,52 @@ export default function NavbarClientIsland({
 						<NavMenus categories={categories} />
 					</div>
 					{user && <WishlistIcon initialProductIds={wishlistProductIds} />}
+					{/* Корзина на desktop остаётся ровно там, где была. На мобильных
+					    она рисуется вторым экземпляром — вплотную к бургеру (ниже),
+					    потому что там это последнее, до чего дотягивается большой
+					    палец. Два экземпляра дешевле, чем условная перестановка
+					    порядка: desktop-раскладку тогда пришлось бы менять. */}
 					{user && (
-						<CartIcon
-							initialCount={cartItemCount}
-							initialProductIds={cartProductIds}
-						/>
+						<div className="hidden lg:flex">
+							<CartIcon
+								initialCount={cartItemCount}
+								initialProductIds={cartProductIds}
+							/>
+						</div>
 					)}
 					{user && (
 						<NotificationBell initialUnreadCount={unreadNotificationCount} />
 					)}
 					<UserMenu user={user} />
 
-					{/* Burger */}
-					<button
-						type="button"
+					{/* Mobile: корзина рядом с бургером. Показывается и гостю —
+					    переход уводит на вход с возвратом на /cart. */}
+					<div className="flex lg:hidden">
+						<CartIcon
+							initialCount={cartItemCount}
+							initialProductIds={cartProductIds}
+							isAuthenticated={Boolean(user)}
+						/>
+					</div>
+
+					<BurgerButton
+						ref={burgerRef}
+						isOpen={isMobileOpen}
 						onClick={() => setIsMobileOpen((prev) => !prev)}
-						className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition-colors hover:bg-white/10 lg:hidden"
-						aria-label={isMobileOpen ? "Закрыть меню" : "Открыть меню"}
-						aria-expanded={isMobileOpen}
-					>
-						{isMobileOpen ? (
-							<X className="h-5 w-5" />
-						) : (
-							<Menu className="h-5 w-5" />
-						)}
-					</button>
+						controls={MOBILE_MENU_ID}
+					/>
 				</Flex>
 			</Flex>
 
 			<MobileMenu
+				panelId={MOBILE_MENU_ID}
+				triggerRef={burgerRef}
 				isOpen={isMobileOpen}
 				onClose={() => setIsMobileOpen(false)}
 				user={user}
 				categories={categories}
+				settings={settings}
+				cartItemCount={cartItemCount}
 			/>
 		</>
 	);
