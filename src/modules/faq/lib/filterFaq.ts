@@ -1,41 +1,56 @@
-// import type { FaqTopicViewModel } from '../types'
-// import { buildSearchIndex } from './searchIndex'
+import type { FaqTopicView } from "../types";
 
-// export function filterTopics(
-//   topics: FaqTopicViewModel[],
-//   search: string
-// ): FaqTopicViewModel[] {
-//   if (!search.trim()) return topics
+/**
+ * Поиск по FAQ.
+ *
+ * Ищет по названию темы, тексту вопроса и тексту ответа. Тема остаётся в
+ * выдаче, если совпал хотя бы один её вопрос; совпадение по названию темы
+ * показывает её целиком — человек, набравший «доставка», ожидает увидеть весь
+ * раздел о доставке, а не один вопрос из него.
+ *
+ * Отдельного поискового индекса здесь нет намеренно: вопросов в FAQ десятки, а
+ * не десятки тысяч, и прямой перебор укладывается в доли миллисекунды. Индекс
+ * добавил бы структуру, которую нужно поддерживать в согласии с данными, ради
+ * незаметного выигрыша.
+ *
+ * Нормализация приводит регистр и убирает различие ё/е: «полет» должен
+ * находить «полёт», иначе поиск выглядит сломанным для половины запросов на
+ * русском.
+ */
 
-//   const lowerSearch = search.toLowerCase()
-//   const index = buildSearchIndex(topics)
+function normalize(value: string): string {
+	return value.toLowerCase().replace(/ё/g, "е").trim();
+}
 
-//   const matchedTopicIds = new Set<string>()
-//   const matchedQuestionIds = new Map<string, Set<string>>() // topicId -> Set<questionId>
+export function filterFaqTopics(
+	topics: FaqTopicView[],
+	query: string,
+): FaqTopicView[] {
+	const needle = normalize(query);
+	if (!needle) return topics;
 
-//   for (const [, entries] of index.entries()) {
-//     for (const entry of entries) {
-//       if (entry.text.toLowerCase().includes(lowerSearch)) {
-//         matchedTopicIds.add(entry.topicId)
-//         if (entry.questionId) {
-//           if (!matchedQuestionIds.has(entry.topicId)) {
-//             matchedQuestionIds.set(entry.topicId, new Set())
-//           }
-//           matchedQuestionIds.get(entry.topicId)!.add(entry.questionId)
-//         }
-//       }
-//     }
-//   }
+	return topics
+		.map((topic) => {
+			const topicMatches =
+				normalize(topic.title).includes(needle) ||
+				(topic.description
+					? normalize(topic.description).includes(needle)
+					: false);
 
-//   // Если тема совпала целиком — показываем все вопросы
-//   return topics
-//     .filter(topic => matchedTopicIds.has(topic.id))
-//     .map(topic => {
-//       const matchedQuestions = matchedQuestionIds.get(topic.id)
-//       if (!matchedQuestions) return topic // тема совпала полностью, все вопросы
-//       return {
-//         ...topic,
-//         questions: topic.questions.filter(q => matchedQuestions.has(q.id!)),
-//       }
-//     })
-// }
+			if (topicMatches) return topic;
+
+			const questions = topic.questions.filter(
+				(question) =>
+					normalize(question.question).includes(needle) ||
+					normalize(question.plainAnswer).includes(needle),
+			);
+
+			return questions.length > 0 ? { ...topic, questions } : null;
+		})
+		.filter((topic): topic is FaqTopicView => topic !== null);
+}
+
+/** Сколько вопросов всего — для строки «найдено N». */
+export function countQuestions(topics: FaqTopicView[]): number {
+	return topics.reduce((total, topic) => total + topic.questions.length, 0);
+}

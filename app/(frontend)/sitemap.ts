@@ -18,6 +18,9 @@ const STATIC_ROUTES: Array<{
   { path: "", changeFrequency: "daily", priority: 1 },
   { path: "/category", changeFrequency: "daily", priority: 0.9 },
   { path: "/knowledge", changeFrequency: "weekly", priority: 0.8 },
+  // FAQ меняется реже каталога, но это посадочная страница под
+  // информационные запросы — приоритет выше служебных страниц.
+  { path: "/faq", changeFrequency: "monthly", priority: 0.7 },
   { path: "/contacts", changeFrequency: "monthly", priority: 0.5 },
   { path: "/consents", changeFrequency: "yearly", priority: 0.3 },
 ];

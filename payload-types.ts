@@ -77,6 +77,7 @@ export interface Config {
     orders: Order;
     consents: Consent;
     feedbacks: Feedback;
+    'contact-requests': ContactRequest;
     banners: Banner;
     'pickup-points': PickupPoint;
     'transport-companies': TransportCompany;
@@ -113,6 +114,7 @@ export interface Config {
     orders: OrdersSelect<false> | OrdersSelect<true>;
     consents: ConsentsSelect<false> | ConsentsSelect<true>;
     feedbacks: FeedbacksSelect<false> | FeedbacksSelect<true>;
+    'contact-requests': ContactRequestsSelect<false> | ContactRequestsSelect<true>;
     banners: BannersSelect<false> | BannersSelect<true>;
     'pickup-points': PickupPointsSelect<false> | PickupPointsSelect<true>;
     'transport-companies': TransportCompaniesSelect<false> | TransportCompaniesSelect<true>;
@@ -882,6 +884,33 @@ export interface Feedback {
   createdAt: string;
 }
 /**
+ * Сообщения, отправленные через форму на странице «Контакты»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contact-requests".
+ */
+export interface ContactRequest {
+  id: number;
+  name: string;
+  email: string;
+  message: string;
+  status?: ('new' | 'in_progress' | 'done') | null;
+  /**
+   * Момент, когда отправитель подтвердил согласие. Проставляется сервером.
+   */
+  consentAcceptedAt: string;
+  /**
+   * Slug соглашения, на которое ссылалась форма в момент отправки.
+   */
+  consentDocument?: string | null;
+  /**
+   * С какого устройства/браузера отправлено сообщение. Проставляется автоматически из заголовков запроса.
+   */
+  userAgent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Промо-баннеры и системные уведомления
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1115,12 +1144,41 @@ export interface Faq {
   id: number;
   title: string;
   description?: string | null;
+  /**
+   * Заполняется автоматически из названия. Менять только если ссылка на тему уже где-то опубликована.
+   */
+  slug?: string | null;
+  /**
+   * Меньше — выше в списке.
+   */
   order?: number | null;
   isActive?: boolean | null;
   questions?:
     | {
         question: string;
-        answer: string;
+        answer: {
+          root: {
+            type: string;
+            children: {
+              type: any;
+              version: number;
+              [k: string]: unknown;
+            }[];
+            direction: ('ltr' | 'rtl') | null;
+            format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+            indent: number;
+            version: number;
+          };
+          [k: string]: unknown;
+        };
+        /**
+         * Заполняется автоматически. Даёт прямую ссылку вида /faq#dostavka-sroki.
+         */
+        slug?: string | null;
+        /**
+         * На главную попадают отмеченные вопросы — не больше пяти, в общем порядке.
+         */
+        isFeatured?: boolean | null;
         order?: number | null;
         isActive?: boolean | null;
         id?: string | null;
@@ -1478,6 +1536,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'feedbacks';
         value: number | Feedback;
+      } | null)
+    | ({
+        relationTo: 'contact-requests';
+        value: number | ContactRequest;
       } | null)
     | ({
         relationTo: 'banners';
@@ -2049,6 +2111,21 @@ export interface FeedbacksSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contact-requests_select".
+ */
+export interface ContactRequestsSelect<T extends boolean = true> {
+  name?: T;
+  email?: T;
+  message?: T;
+  status?: T;
+  consentAcceptedAt?: T;
+  consentDocument?: T;
+  userAgent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "banners_select".
  */
 export interface BannersSelect<T extends boolean = true> {
@@ -2288,6 +2365,7 @@ export interface KnowledgeTopicsSelect<T extends boolean = true> {
 export interface FaqSelect<T extends boolean = true> {
   title?: T;
   description?: T;
+  slug?: T;
   order?: T;
   isActive?: T;
   questions?:
@@ -2295,6 +2373,8 @@ export interface FaqSelect<T extends boolean = true> {
     | {
         question?: T;
         answer?: T;
+        slug?: T;
+        isFeatured?: T;
         order?: T;
         isActive?: T;
         id?: T;

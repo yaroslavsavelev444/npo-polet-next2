@@ -10,7 +10,11 @@ import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 // а он кэшируется с тегом "products" (см. products.service.ts). Одобрение или
 // удаление отзыва меняет агрегат — без сброса тега карточки показывали бы
 // старый рейтинг до следующего изменения самого товара.
-const revalidateProducts = createRevalidateCacheHook("products");
+// Тег "reviews" добавлен для подборки последних отзывов на главной
+// (reviews.service → getLatestApprovedReviews). Она не привязана ни к одному
+// товару, поэтому сбросом тега "products" не обновляется: без второго тега
+// одобренный отзыв не появлялся бы на главной до редеплоя.
+const revalidateProducts = createRevalidateCacheHook("products", "reviews");
 
 export const ProductReviews: CollectionConfig = {
 	slug: "product-reviews",

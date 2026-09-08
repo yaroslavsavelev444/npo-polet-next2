@@ -17,6 +17,7 @@
 		"migrate:legacy": "node --experimental-strip-types scripts/db-migrate/run.ts",
 		"slugs:backfill": "node --experimental-strip-types scripts/backfill-product-slugs.ts",
 		"slug:regenerate": "node --experimental-strip-types scripts/regenerate-product-slug.ts",
+		"seed:faq": "node --experimental-strip-types scripts/seed-faq.ts",
 		"type-check": "tsc --noEmit",
 		"test:security": "node --experimental-strip-types --test tests/security/*.test.ts",
 		"test:checkout": "node --experimental-strip-types --test tests/checkout/*.test.ts",

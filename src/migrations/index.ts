@@ -15,6 +15,8 @@ import * as migration_20260902_180000_knowledge_module from "./20260902_180000_k
 import * as migration_20260903_120000_order_address_structured from "./20260903_120000_order_address_structured.ts";
 import * as migration_20260904_120000_order_contact_phones from "./20260904_120000_order_contact_phones.ts";
 import * as migration_20260904_153241_promo_codes from "./20260904_153241_promo_codes.ts";
+import * as migration_20260907_120000_faq_richtext_and_anchors from "./20260907_120000_faq_richtext_and_anchors.ts";
+import * as migration_20260907_160000_contact_requests from "./20260907_160000_contact_requests.ts";
 
 export const migrations = [
 	{
@@ -101,5 +103,15 @@ export const migrations = [
 		up: migration_20260904_153241_promo_codes.up,
 		down: migration_20260904_153241_promo_codes.down,
 		name: "20260904_153241_promo_codes",
+	},
+	{
+		up: migration_20260907_120000_faq_richtext_and_anchors.up,
+		down: migration_20260907_120000_faq_richtext_and_anchors.down,
+		name: "20260907_120000_faq_richtext_and_anchors",
+	},
+	{
+		up: migration_20260907_160000_contact_requests.up,
+		down: migration_20260907_160000_contact_requests.down,
+		name: "20260907_160000_contact_requests",
 	},
 ];

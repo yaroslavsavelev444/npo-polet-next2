@@ -1,0 +1,497 @@
+/* ===========================================================================
+   Страница контактов — визуальный язык и движение
+   ===========================================================================
+   Продолжение системы главной страницы (home.css), а не отдельный мир: те же
+   токены времени (--dur-*, --ease-*), та же разлиновка, тот же акцидентный
+   шрифт, то же появление по clip-path. Здесь описано только то, чего на
+   главной нет, потому что нужно исключительно здесь: линия, которая
+   дорисовывается при попадании в кадр, поля формы без рамок и строки каналов
+   связи.
+
+   Правило разделения: если приём понадобится третьей странице — он переезжает
+   в home.css (который де-факто и есть общий слой лендинговых страниц). Пока
+   всё ниже принадлежит /contacts.                                          */
+
+/* ===========================================================================
+   Линия, которая дорисовывается
+   ===========================================================================
+   Подпись страницы в движении. На главной характерный вход — «наводка на
+   резкость» (clip-path + blur), и он здесь тоже используется для текста и
+   блоков. Но линейка на этой странице несёт нагрузку: ею разделены каналы
+   связи, реквизиты, секции, и подчёркнуты поля формы. Раз линия — главный
+   структурный элемент, движение страницы строится вокруг неё: она приходит
+   не проявлением, а прочерком слева направо.
+
+   Один приём на всю страницу, а не набор разных — поэтому одна и та же
+   механика (scaleX от левого края) работает и на разделителях секций, и на
+   подчёркивании поля в фокусе. Разница только в длительности и цвете.
+
+   scaleX, а не width: трансформация считается на композиторе и не вызывает
+   пересчёта раскладки — на странице таких линий полтора десятка.           */
+
+.rule-draw {
+	position: relative;
+	height: 1px;
+	background: var(--rule);
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform var(--dur-slow) var(--ease-out-expo);
+	transition-delay: var(--reveal-delay, 0ms);
+}
+
+.rule-draw[data-drawn="true"] {
+	transform: scaleX(1);
+}
+
+/* Засечки — те же, что у .rule-ticked на главной: шкала, а не орнамент.
+   Гаснут к правому краю, потому что слева, где начинается чтение, они
+   информативны, а справа превратились бы в шум. */
+.rule-draw::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	top: 0;
+	height: 6px;
+	background-image: repeating-linear-gradient(
+		to right,
+		var(--rule) 0 1px,
+		transparent 1px 40px
+	);
+	mask-image: linear-gradient(to right, #000 0%, transparent 55%);
+}
+
+/* Вариант без засечек — внутри списков, где шкала на каждой строке
+   превратилась бы в рябь. */
+.rule-draw--plain::after {
+	display: none;
+}
+
+/* ===========================================================================
+   Строка канала связи
+   ===========================================================================
+   Телефон и почта набраны крупно и стоят каждый в своей строке, разделённой
+   волосяной линией. Это не карточки: карточка предполагает, что внутри
+   несколько разнородных сведений, а здесь у строки ровно одно содержание —
+   адрес, по которому можно связаться. Всё остальное (кому звонить, когда
+   отвечают) — подпись при нём.
+
+   При наведении строка не «поднимается» и не получает тень: она подсвечивается
+   в глубину — фон уходит в тёплый край палитры, значение сдвигается вправо на
+   ширину одного пробела, служебные кнопки проявляются. Ощущение — «строка
+   отзывается», а не «элемент всплыл».                                      */
+
+.channel-row {
+	position: relative;
+	transition:
+		background-color var(--dur-fast) var(--ease-out-quart),
+		color var(--dur-fast) var(--ease-out-quart);
+}
+
+/* Подсветка выходит за колонку текста на величину внутреннего отступа (сама
+   строка растянута отрицательным полем — см. разметку), чтобы читаться как
+   целая полоса, а не как подложка под словами.
+
+   inset: 0, а не отрицательные значения: строка обёрнута в появление, у
+   которого в показанном состоянии остаётся clip-path: inset(0). Всё, что
+   вылезает за границы блока, он бы обрезал — и подсветка получилась бы ровно
+   по ширине текста. */
+.channel-row::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--primary) 7%, transparent);
+	opacity: 0;
+	transition: opacity var(--dur-fast) var(--ease-out-quart);
+	pointer-events: none;
+}
+
+.channel-row:hover::before,
+.channel-row:focus-within::before {
+	opacity: 1;
+}
+
+.channel-row__value {
+	display: inline-block;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.channel-row:hover .channel-row__value,
+.channel-row:focus-within .channel-row__value {
+	transform: translate3d(0.25rem, 0, 0);
+}
+
+/* Служебные кнопки (копировать, позвонить) не занимают внимание, пока строка
+   не тронута, но и не появляются из ниоткуда: они всегда на месте, просто
+   приглушены. На тачскринах, где наведения не существует, они видны всегда —
+   поэтому базовая непрозрачность не ноль. */
+.channel-row__tools {
+	opacity: 0.45;
+	transition: opacity var(--dur-fast) var(--ease-out-quart);
+}
+
+.channel-row:hover .channel-row__tools,
+.channel-row:focus-within .channel-row__tools {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.channel-row__tools {
+		opacity: 1;
+	}
+}
+
+/* Разделитель внутри описательного списка реквизитов.
+   Отдельным элементом его сюда не вставить: спецификация разрешает внутри <dl>
+   только группы <div> с <dt>/<dd>, и лишний <div class="rule-draw"> сделал бы
+   разметку невалидной. Поэтому линия рисуется псевдоэлементом самой группы, а
+   переключает её тот же атрибут data-revealed, что и появление содержимого. */
+
+.contact-detail-row::before {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	top: 0;
+	height: 1px;
+	background: var(--rule);
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform var(--dur-slow) var(--ease-out-expo);
+	transition-delay: var(--reveal-delay, 0ms);
+}
+
+.contact-detail-row[data-revealed="true"]::before {
+	transform: scaleX(1);
+}
+
+.contact-detail-row:first-child::before {
+	content: none;
+}
+
+/* ===========================================================================
+   Поля формы
+   ===========================================================================
+   Полей нет — есть строки, на которых пишут. Рамка вокруг ввода нужна там,
+   где форма стоит среди другого содержимого и её границы неочевидны; здесь
+   форма занимает половину экрана на пустом тёмном поле, и рамки только
+   дробили бы её на прямоугольники.
+
+   Состояние фокуса рисуется тем же приёмом, что и разделители секций: поверх
+   спокойной линии прочерчивается вторая, акцентная. Страница получает одну
+   узнаваемую механику вместо трёх разных.                                  */
+
+.contact-field {
+	position: relative;
+	border-bottom: 1px solid var(--border);
+	transition: border-color var(--dur-fast) var(--ease-out-quart);
+}
+
+.contact-field:hover {
+	border-bottom-color: var(--border-light);
+}
+
+.contact-field::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	bottom: -1px;
+	height: 1px;
+	background: var(--primary);
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.contact-field:focus-within::after {
+	transform: scaleX(1);
+}
+
+/* Ошибка — состояние строки, а не сообщение рядом с ней: линия уже красная в
+   тот момент, когда взгляд ещё не дошёл до текста под полем. */
+.contact-field[data-invalid="true"] {
+	border-bottom-color: color-mix(in srgb, var(--error) 55%, transparent);
+}
+
+.contact-field[data-invalid="true"]::after {
+	background: var(--error);
+	transform: scaleX(1);
+}
+
+.contact-field__control {
+	width: 100%;
+	background: transparent;
+	border: 0;
+	outline: none;
+	color: var(--text-primary);
+	font: inherit;
+	padding: 0.5rem 0 0.75rem;
+}
+
+.contact-field__control::placeholder {
+	color: var(--text-muted);
+}
+
+/* Textarea тянется по содержимому в разумных пределах: сообщение из двух
+   строк не должно занимать поле высотой в пол-экрана, а длинное — заставлять
+   прокручивать вслепую внутри маленького окна. */
+.contact-field__control--area {
+	resize: vertical;
+	min-height: 6.5rem;
+	max-height: 22rem;
+	line-height: 1.6;
+}
+
+/* Собственное кольцо фокуса полю не нужно: его роль играет акцентная линия,
+   а глобальное правило :focus-visible на input не распространяется. Но при
+   навигации с клавиатуры подпись поля должна отзываться — иначе непонятно,
+   куда именно встал фокус в форме без рамок. */
+.contact-field:focus-within .contact-field__label {
+	color: var(--text-primary);
+}
+
+.contact-field__label {
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+/* Отступ пояснения под заголовком формы.
+   Своя утилита, а не ml-* из Tailwind: @once-ui объявляет собственные классы
+   с теми же именами (.ml-16 → var(--static-space-16)), и какое правило
+   победит, зависит от порядка подключения стилей. Здесь спорить не с чем.
+
+   Отступ не декоративный: он ставит абзац в подчинённое положение к
+   заголовку и задаёт направление чтения слева-сверху вниз-вправо — прямо к
+   первому полю формы. На узких экранах, где форма идёт под текстом, а не
+   справа, направление другое, и отступ убирается. */
+
+.contact-lead-indent {
+	margin-left: 0;
+}
+
+@media (min-width: 640px) {
+	.contact-lead-indent {
+		margin-left: clamp(0rem, 6vw, 5rem);
+	}
+}
+
+/* ===========================================================================
+   Согласие на обработку данных
+   ===========================================================================
+   Нативный чекбокс заменён нарисованным по одной причине: он обязан читаться
+   на тёмном поле и в состоянии ошибки, а системный отрисовывается средствами
+   ОС и ни на то, ни на другое не реагирует. Сам <input> при этом остаётся в
+   разметке (sr-only) — с ним работают клавиатура, скринридер и автозаполнение.
+
+   Галочка не появляется целиком, а прочерчивается — той же логикой, что и
+   линии на странице.                                                       */
+
+.consent-box {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 1.25rem;
+	height: 1.25rem;
+	flex-shrink: 0;
+	border: 1px solid var(--border-light);
+	border-radius: 4px;
+	background: transparent;
+	transition:
+		border-color var(--dur-fast) var(--ease-out-quart),
+		background-color var(--dur-fast) var(--ease-out-quart);
+}
+
+.consent-check {
+	stroke-dasharray: 22;
+	stroke-dashoffset: 22;
+	transition: stroke-dashoffset var(--dur-base) var(--ease-out-expo);
+}
+
+.consent-input:checked + .consent-box {
+	border-color: var(--primary);
+	background: var(--primary);
+}
+
+.consent-input:checked + .consent-box .consent-check {
+	stroke-dashoffset: 0;
+}
+
+.consent-input:focus-visible + .consent-box {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+.consent-label:hover .consent-box {
+	border-color: var(--text-secondary);
+}
+
+.consent-label[data-invalid="true"] .consent-box {
+	border-color: var(--error);
+}
+
+/* ===========================================================================
+   Кнопка отправки
+   ===========================================================================
+   Нажатие отзывается на pointer-down, а не по клику: обратная связь, которая
+   ждёт отпускания, ощущается как задержка. Масштаб выбран минимальный —
+   кнопка шириной в колонку при 0.97 заметно «проваливается».               */
+
+.contact-submit {
+	transition:
+		background-color var(--dur-fast) var(--ease-out-quart),
+		color var(--dur-fast) var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart);
+}
+
+.contact-submit:not([aria-disabled="true"]):active {
+	transform: scale(0.99);
+}
+
+/* Пока согласие не дано, кнопка выглядит недоступной, но остаётся кликабельной
+   и фокусируемой (aria-disabled вместо disabled). Настоящий disabled прячет
+   причину: посетитель видит серую кнопку и не знает, чего ей не хватает.
+   Здесь нажатие показывает ошибку и уводит фокус на чекбокс. */
+.contact-submit[aria-disabled="true"] {
+	background: var(--surface-secondary);
+	color: var(--text-muted);
+	cursor: not-allowed;
+}
+
+@keyframes contact-submit-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.contact-submit__spinner {
+	animation: contact-submit-spin 700ms linear infinite;
+}
+
+/* ===========================================================================
+   Успешная отправка
+   ===========================================================================
+   Форма не показывает всплывающее уведомление и не остаётся заполненной: она
+   заменяется подтверждением на своём же месте. Причина простая — тост
+   исчезает через несколько секунд, а вопрос «отправилось или нет» возникает
+   позже. Ответ должен оставаться на экране.                                */
+
+.contact-success {
+	animation: contact-success-in var(--dur-slow) var(--ease-out-expo) both;
+}
+
+@keyframes contact-success-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 12px, 0);
+		filter: blur(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+		filter: blur(0);
+	}
+}
+
+.contact-success__check {
+	stroke-dasharray: 48;
+	stroke-dashoffset: 48;
+	animation: contact-success-draw var(--dur-slow) var(--ease-out-expo) 180ms
+		forwards;
+}
+
+@keyframes contact-success-draw {
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+/* ===========================================================================
+   Ссылка-канал (соцсети, мессенджеры)
+   ===========================================================================
+   Цвет платформы живёт только в иконке и только при наведении. Раскрашенная
+   целиком плашка — самый быстрый способ развалить палитру страницы: шесть
+   чужих фирменных цветов рядом друг с другом не складываются ни во что.   */
+
+.net-link {
+	position: relative;
+	transition: background-color var(--dur-fast) var(--ease-out-quart);
+}
+
+.net-link__icon {
+	color: var(--text-muted);
+	transition:
+		color var(--dur-base) var(--ease-out-quart),
+		transform var(--dur-base) var(--ease-out-expo);
+}
+
+.net-link:hover .net-link__icon,
+.net-link:focus-visible .net-link__icon {
+	color: var(--net-tint, var(--primary));
+	transform: translate3d(0, -1px, 0);
+}
+
+.net-link__arrow {
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.net-link:hover .net-link__arrow,
+.net-link:focus-visible .net-link__arrow {
+	transform: translate3d(0.25rem, -0.25rem, 0);
+}
+
+/* ===========================================================================
+   Карта
+   ===========================================================================
+   Встроенная карта приходит с чужого домена и рисуется в своей световой
+   схеме — на тёмной странице она светится белым пятном. Приглушаем её до
+   уровня остального содержимого и возвращаем полную яркость при наведении,
+   когда с картой действительно работают.                                   */
+
+.map-frame {
+	/* invert + разворот тона — стандартный способ получить тёмную карту из
+     светлой плитки: инверсия делает подложку тёмной, а поворот оттенка на
+     180° возвращает зелени зелёный, а воде синий (без него парк становится
+     розовым). Насыщенность приглушена, иначе дороги начинают спорить с
+     акцентом страницы.
+
+     Просто затемнить яркость было мало: карта оставалась светлым
+     прямоугольником посреди тёмной страницы — единственным местом, куда
+     взгляд уходил сам. */
+	filter: invert(0.92) hue-rotate(180deg) saturate(0.7) contrast(0.92);
+	transition: filter var(--dur-slow) var(--ease-out-quart);
+}
+
+.map-frame:hover,
+.map-frame:focus-within {
+	filter: none;
+}
+
+/* ===========================================================================
+   Уважение к настройкам пользователя
+   =========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+	.rule-draw,
+	.contact-detail-row::before {
+		transform: none !important;
+		transition: none !important;
+	}
+
+	.contact-field::after,
+	.channel-row__value,
+	.net-link__icon,
+	.net-link__arrow,
+	.consent-check,
+	.contact-submit {
+		transition: none !important;
+	}
+
+	.contact-success,
+	.contact-success__check {
+		animation: none !important;
+		opacity: 1;
+		stroke-dashoffset: 0;
+	}
+
+	.map-frame {
+		transition: none !important;
+	}
+}

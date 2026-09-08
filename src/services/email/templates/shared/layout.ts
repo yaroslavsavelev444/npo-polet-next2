@@ -1,5 +1,18 @@
+import { escapeHtml } from "./escapeHtml.ts";
+
 interface EmailLayoutOptions {
+	/**
+	 * Строка предпросмотра в списке писем. ПЛАЙН-ТЕКСТ: экранируется здесь, а
+	 * не на стороне вызывающего.
+	 *
+	 * Так и должно быть: в предпросмотр почти всегда попадает пользовательский
+	 * ввод (имя отправителя, заголовок обращения), и шаблонов, которые об этом
+	 * помнят, не бывает — проверено, ни один из существующих не экранировал.
+	 * Разметка здесь не нужна ни одному письму, поэтому запрет ничего не
+	 * ломает, а дыру закрывает разом во всех шаблонах.
+	 */
 	previewText?: string;
+	/** Готовый HTML тела. Экранирование — забота шаблона. */
 	bodyHtml: string;
 }
 
@@ -24,7 +37,7 @@ export function renderEmailLayout({
     <title>${COMPANY_NAME}</title>
   </head>
   <body style="margin:0;padding:0;background-color:#F5F5F7;font-family:Arial,Helvetica,sans-serif;">
-    ${previewText ? `<div style="display:none;max-height:0;overflow:hidden;">${previewText}</div>` : ""}
+    ${previewText ? `<div style="display:none;max-height:0;overflow:hidden;">${escapeHtml(previewText)}</div>` : ""}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F5F7;padding:24px 0;">
       <tr>
         <td align="center">

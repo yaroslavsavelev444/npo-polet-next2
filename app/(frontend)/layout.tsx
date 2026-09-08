@@ -8,6 +8,7 @@ import "./globals.css";
 import { Column, Flex, Meta } from "@once-ui-system/core";
 import type { Viewport } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
+import localFont from "next/font/local";
 import { AnalyticsGate } from "@/modules/cookie-consent/components/AnalyticsGate";
 import { CookieConsentBanner } from "@/modules/cookie-consent/components/CookieConsentBanner";
 import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
@@ -33,6 +34,40 @@ const manrope = Manrope({
 	weight: ["200", "300", "400", "500", "600", "700"],
 	subsets: ["latin", "cyrillic"],
 	variable: "--font-manrope",
+});
+
+// Акцидентный шрифт заголовков. Лицензионный файл лежит в репозитории
+// (src/assets/fonts), поэтому подключается через next/font/local, а не с
+// Google Fonts: сборка не должна зависеть от внешней сети, а сам файл — от
+// того, кто и когда его положит в public.
+//
+// ВАЖНО: PaluiSP2 — унициальная гарнитура, строчные буквы в ней отображаются
+// теми же глифами, что и прописные (проверено: 'а' и 'А' указывают на один
+// глиф Acyrillic). Поэтому она пригодна ТОЛЬКО для текста в верхнем регистре
+// — за это отвечает класс .u-display в globals.css, который принудительно
+// ставит text-transform: uppercase. Кегль у неё мелкий относительно em
+// (капитель 700/1000), а начертание широкое, поэтому размеры подобраны
+// крупнее, чем для Manrope, а трекинг — плотнее.
+const display = localFont({
+	src: [
+		{
+			path: "../../src/assets/fonts/PaluiSP2-Bold.woff2",
+			weight: "700",
+			style: "normal",
+		},
+		{
+			path: "../../src/assets/fonts/PaluiSP2-Bold.woff",
+			weight: "700",
+			style: "normal",
+		},
+	],
+	variable: "--font-palui",
+	display: "swap",
+	// Подмена на Manrope до загрузки: без выравнивания метрик заголовок
+	// прыгает по высоте на swap. adjust-значения подобраны под капитель 700
+	// и широкое начертание Palui.
+	fallback: ["Manrope", "system-ui", "sans-serif"],
+	adjustFontFallback: false,
 });
 
 const mono = IBM_Plex_Mono({
@@ -85,7 +120,7 @@ export default async function RootLayout({
 				as="html"
 				lang="ru"
 				fillWidth
-				className={cn(manrope.variable, mono.variable)}
+				className={cn(manrope.variable, mono.variable, display.variable)}
 				style={{ height: "100%" }}
 			>
 				<Column

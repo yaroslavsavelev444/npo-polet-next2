@@ -3,6 +3,7 @@ import { newSessionLoginEmailTemplate } from "./auth/new-session-login.template.
 import { otpEmailTemplate } from "./auth/otp-code.template.ts";
 import { passwordChangedEmailTemplate } from "./auth/password-changed.template.ts";
 import { passwordResetEmailTemplate } from "./auth/password-reset.template.ts";
+import { contactRequestAdminEmailTemplate } from "./contact/contact-request-admin.template.ts";
 import { feedbackCreatedAdminEmailTemplate } from "./feedback/feedback-created-admin.template.ts";
 import { orderCancelledEmailTemplate } from "./orders/order-cancelled.template.ts";
 import { orderCreatedAdminEmailTemplate } from "./orders/order-created-admin.template.ts";
@@ -22,4 +23,5 @@ export const emailTemplates = {
 	orderCancelled: orderCancelledEmailTemplate,
 	reviewStatusChanged: reviewStatusChangedEmailTemplate,
 	feedbackCreatedAdmin: feedbackCreatedAdminEmailTemplate,
+	contactRequestAdmin: contactRequestAdminEmailTemplate,
 } as const;

@@ -1,5 +1,7 @@
 import { sql } from "@payloadcms/db-postgres";
+import { unstable_cache } from "next/cache";
 import type { ProductReview, User } from "../../../payload-types";
+import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
 
 /**
@@ -183,6 +185,72 @@ export async function getApprovedReviewsForProduct(
 		hasNextPage: result.hasNextPage,
 	};
 }
+
+/**
+ * Последние одобренные отзывы по ВСЕМУ каталогу — для блока доверия на
+ * главной.
+ *
+ * Отличается от getApprovedReviewsForProduct тем, что не фильтрует по товару и
+ * дополнительно отдаёт название товара: вне карточки товара отзыв без
+ * указания, о чём он, бесполезен.
+ *
+ * Кэшируется тегом "reviews" — тем же, который сбрасывает хук коллекции при
+ * одобрении отзыва, поэтому свежий отзыв появляется на главной сразу, а не
+ * после редеплоя. В разработке кэш обходится: иначе правки в админке не видны.
+ */
+export interface HomepageReview extends ReviewView {
+	productTitle: string | null;
+	productHref: string | null;
+}
+
+async function fetchLatestApprovedReviews(
+	limit: number,
+): Promise<HomepageReview[]> {
+	const payload = await getPayloadInstance();
+
+	const result = await payload.find({
+		collection: "product-reviews",
+		where: {
+			and: [
+				{ status: { equals: APPROVED } },
+				// Пустой комментарий встречается: оценку можно поставить без
+				// текста. В витрине такой отзыв — пустая карточка.
+				{ comment: { not_equals: "" } },
+			],
+		},
+		sort: "-createdAt",
+		limit,
+		// depth 2: нужен и сам товар, и его категория — из неё строится ссылка.
+		depth: 2,
+		overrideAccess: true,
+	});
+
+	return (result.docs as unknown as ProductReview[]).map((doc) => {
+		const product = typeof doc.product === "object" ? doc.product : null;
+		const category =
+			product && typeof product.category === "object" ? product.category : null;
+
+		return {
+			...mapReview(doc),
+			productTitle: product?.title ?? null,
+			productHref:
+				product?.slug && category?.slug
+					? `/category/${category.slug}/products/${product.slug}`
+					: null,
+		};
+	});
+}
+
+export const getLatestApprovedReviews = (limit = 3) => {
+	if (env.NODE_ENV === "development") {
+		return fetchLatestApprovedReviews(limit);
+	}
+	return unstable_cache(
+		() => fetchLatestApprovedReviews(limit),
+		[`latest-approved-reviews-${limit}`],
+		{ tags: ["reviews"], revalidate: false },
+	)();
+};
 
 /** Существующий отзыв пользователя на товар (в любом статусе) или null. */
 export async function getUserReviewForProduct(

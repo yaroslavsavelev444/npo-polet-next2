@@ -13,6 +13,7 @@ import { Categories } from "./src/payload/collections/Categories.ts";
 import { CheckoutPreferences } from "./src/payload/collections/CheckoutPreferences.ts";
 import { Companies } from "./src/payload/collections/Companies.ts";
 import { Consents } from "./src/payload/collections/Consents.ts";
+import { ContactRequests } from "./src/payload/collections/ContactRequests.ts";
 import { ContentBlocks } from "./src/payload/collections/ContentBlocks.ts";
 import { Discounts } from "./src/payload/collections/Discounts.ts";
 import { Faq } from "./src/payload/collections/Faq.ts";
@@ -83,6 +84,7 @@ export default buildConfig({
 		Orders,
 		Consents,
 		Feedbacks,
+		ContactRequests,
 		Banners,
 		PickupPoints,
 		TransportCompanies,

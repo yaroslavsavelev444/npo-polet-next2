@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PENDING_AUTH_COOKIE } from "./src/modules/auth/lib/pendingAuth.ts";
+import { ALLOWED_MAP_FRAME_SRC } from "./src/modules/contact/lib/map-embed.ts";
 import { ALLOWED_EMBED_FRAME_SRC } from "./src/modules/knowledge/lib/videoEmbed.ts";
 import { resolveSafeRedirect } from "./src/modules/auth/lib/safeRedirect.ts";
 import { resolveSessionStatus } from "./src/modules/auth/lib/session.ts";
@@ -62,11 +63,12 @@ function safeRedirectTarget(req: NextRequest): string {
  * на аналитические cookie, см. AnalyticsGate).
  *
  * frame-src дополнительно перечисляет видеохостинги, ролики с которых можно
- * встроить в статью базы знаний. Список берётся из того же модуля, что и
- * разбор ссылок (ALLOWED_EMBED_FRAME_SRC в modules/knowledge/lib/videoEmbed):
- * если хост разрешён в парсере, но не в CSP, фрейм молча не загрузится — а
- * держать два расходящихся списка гарантированно значит однажды об этом
- * забыть.
+ * встроить в статью базы знаний, и картографические сервисы, виджет которых
+ * показывает страница контактов. Оба списка берутся из тех же модулей, что и
+ * разбор ссылок (ALLOWED_EMBED_FRAME_SRC в modules/knowledge/lib/videoEmbed,
+ * ALLOWED_MAP_FRAME_SRC в modules/contact/lib/map-embed): если хост разрешён в
+ * парсере, но не в CSP, фрейм молча не загрузится — а держать расходящиеся
+ * списки гарантированно значит однажды об этом забыть.
  *
  * В dev добавляются 'unsafe-eval' (React использует eval для отладки) и ws:
  * (HMR); upgrade-insecure-requests в dev выключен — локалка работает по http.
@@ -79,7 +81,7 @@ function buildCsp(nonce: string, isDev: boolean): string {
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
     `connect-src 'self' https://mc.yandex.ru https://mc.yandex.com${isDev ? " ws: wss:" : ""}`,
-    `frame-src 'self' https://mc.yandex.ru ${ALLOWED_EMBED_FRAME_SRC.join(" ")}`,
+    `frame-src 'self' https://mc.yandex.ru ${ALLOWED_EMBED_FRAME_SRC.join(" ")} ${ALLOWED_MAP_FRAME_SRC.join(" ")}`,
     `worker-src 'self' blob:`,
     `object-src 'none'`,
     `base-uri 'self'`,

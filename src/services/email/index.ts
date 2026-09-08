@@ -17,6 +17,8 @@ export { otpEmailTemplate } from "./templates/auth/otp-code.template.ts";
 export { passwordChangedEmailTemplate } from "./templates/auth/password-changed.template.ts";
 export type { PasswordResetEmailData } from "./templates/auth/password-reset.template.ts";
 export { passwordResetEmailTemplate } from "./templates/auth/password-reset.template.ts";
+export type { ContactRequestAdminEmailData } from "./templates/contact/contact-request-admin.template.ts";
+export { contactRequestAdminEmailTemplate } from "./templates/contact/contact-request-admin.template.ts";
 export type { FeedbackCreatedAdminEmailData } from "./templates/feedback/feedback-created-admin.template.ts";
 export { feedbackCreatedAdminEmailTemplate } from "./templates/feedback/feedback-created-admin.template.ts";
 export { orderCancelledEmailTemplate } from "./templates/orders/order-cancelled.template.ts";
