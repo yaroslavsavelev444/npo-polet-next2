@@ -6,6 +6,7 @@ import { FaqSection } from "@/modules/home/components/FaqSection";
 import { FinalCta } from "@/modules/home/components/FinalCta";
 import { HomeHero } from "@/modules/home/components/HomeHero";
 import { ManifestoSection } from "@/modules/home/components/ManifestoSection";
+import { OffersSection } from "@/modules/home/components/OffersSection";
 import { PrincipleSection } from "@/modules/home/components/PrincipleSection";
 import { ProductionSection } from "@/modules/home/components/ProductionSection";
 import { ProductsShowcase } from "@/modules/home/components/ProductsShowcase";
@@ -38,9 +39,13 @@ export const metadata: Metadata = {
  * СТРУКТУРА
  * ────────────────────────────────────────────────────────────────────────────
  * Порядок секций отвечает на вопросы в том порядке, в каком они возникают:
- * что это → почему именно так → что бывает → что купить → как это работает →
- * подойдёт ли мне → кто это делает → давно ли → чем подтверждается → что
- * ещё спрашивают → действие.
+ * что это → почему именно так → что бывает → что купить → на каких условиях →
+ * как это работает → подойдёт ли мне → кто это делает → давно ли → чем
+ * подтверждается → что ещё спрашивают → действие.
+ *
+ * «Скидки» стоят сразу за карточками, а не в конце: вопрос о цене возникает
+ * у того, кто уже посмотрел изделия, и ответ на него не должен ждать пяти
+ * экранов рассказа о компании.
  *
  * Продукция стоит четвёртой, а не в конце: сюда приходят по запросам вида
  * «сеткомет купить», то есть с уже готовым намерением, и заставлять такого
@@ -108,6 +113,7 @@ export default async function Home() {
 			<ManifestoSection />
 			<DirectionsSection />
 			<ProductsShowcase products={catalog.products} />
+			<OffersSection />
 			<PrincipleSection />
 			<AudienceSection />
 			<ProductionSection />

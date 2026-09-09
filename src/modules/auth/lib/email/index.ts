@@ -1,8 +1,4 @@
 export {
-	ALLOWED_EMAIL_DOMAINS,
-	isAllowedEmailDomain,
-} from "./allowedEmailDomains";
-export {
 	DISPOSABLE_EMAIL_DOMAINS,
 	isDisposableEmailDomain,
 	isReservedPlaceholderDomain,
@@ -16,7 +12,6 @@ export {
 export {
 	EMAIL_ERROR_MESSAGES,
 	type EmailParts,
-	isSupportedEmailDomain,
 	splitEmail,
 	validateEmail,
 	validateEmailFormat,

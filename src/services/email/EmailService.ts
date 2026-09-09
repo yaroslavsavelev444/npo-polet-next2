@@ -5,6 +5,7 @@ import { getEmailTransporter } from "./transport.ts";
 import type {
 	EmailAddress,
 	EmailTemplate,
+	RenderedEmail,
 	SendEmailOptions,
 	SendEmailResult,
 } from "./types.ts";
@@ -53,7 +54,7 @@ export class EmailService {
 			return { success: true, attempts: 0 };
 		}
 
-		let rendered;
+		let rendered: RenderedEmail;
 		try {
 			rendered = template.render(data);
 		} catch (error) {
@@ -67,12 +68,77 @@ export class EmailService {
 			);
 		}
 
+		// Каждому получателю — отдельное письмо, а не один конверт со списком
+		// в To.
+		//
+		// Так было раньше, и это давало ровно ту картину, с которой пришла
+		// задача: «письмо получил только один из администраторов». Один
+		// конверт на всех — это одна SMTP-транзакция: если сервер отвечает
+		// отказом на чей-то RCPT TO (адрес с опечаткой, переполненный ящик,
+		// греи-листинг), под удар попадает вся рассылка, а `info.rejected`
+		// никто не проверял — в журнале оставалась запись «письмо успешно
+		// отправлено».
+		//
+		// Отдельные письма изолируют получателей друг от друга (у каждого
+		// свои ретраи) и заодно перестают показывать всему персоналу список
+		// служебных адресов в шапке письма.
+		const results = await Promise.all(
+			recipients.map((recipient) =>
+				this.deliverTo(recipient, template.id, rendered, options.replyTo),
+			),
+		);
+
+		const delivered = results.filter((r) => r.success);
+		const failed = results.filter((r) => !r.success);
+		const attempts = results.reduce((sum, r) => sum + r.attempts, 0);
+
+		if (failed.length > 0) {
+			emailLogger.error("Письмо доставлено не всем получателям", {
+				templateId: template.id,
+				deliveredTo: delivered.map((r) => r.recipient.email),
+				failedFor: failed.map((r) => r.recipient.email),
+			});
+		}
+
+		// Провал ВСЕХ адресов — это отказ отправки, и он должен всплыть
+		// исключением, как раньше (на этом построена обработка ошибок в
+		// notify*-сервисах). Частичная доставка исключением не является:
+		// остановить её уже нельзя, а терять доставленные письма из-за
+		// одного плохого адреса — хуже, чем сообщить о нём в журнал.
+		if (delivered.length === 0) {
+			throw new EmailDeliveryError(
+				`Не удалось отправить письмо по шаблону "${template.id}" ни одному из ${recipients.length} получателей`,
+				attempts,
+				{ cause: failed[0]?.error },
+			);
+		}
+
+		return {
+			success: failed.length === 0,
+			messageId: delivered[0]?.messageId,
+			attempts,
+		};
+	}
+
+	/** Доставка одному адресату с ретраями. Не бросает — возвращает исход. */
+	private async deliverTo(
+		recipient: EmailAddress,
+		templateId: string,
+		rendered: RenderedEmail,
+		replyTo: string | undefined,
+	): Promise<{
+		recipient: EmailAddress;
+		success: boolean;
+		messageId?: string;
+		attempts: number;
+		error?: unknown;
+	}> {
+		const config = getEmailConfig();
 		const transporter = getEmailTransporter();
 		const from = formatAddress({
-			email: config.EMAIL_FROM_ADDRESS, //
+			email: config.EMAIL_FROM_ADDRESS,
 			name: config.EMAIL_FROM_NAME,
 		});
-		const to = recipients.map(formatAddress).join(", ");
 		const maxAttempts = config.EMAIL_MAX_RETRIES + 1;
 
 		let lastError: unknown;
@@ -80,25 +146,42 @@ export class EmailService {
 			try {
 				const info = await transporter.sendMail({
 					from,
-					to,
-					replyTo: options.replyTo,
+					to: formatAddress(recipient),
+					replyTo,
 					subject: rendered.subject,
 					html: rendered.html,
 					text: rendered.text,
 				});
 
+				// nodemailer резолвит промис и тогда, когда сервер принял
+				// письмо не для всех адресов. Раньше этот случай уходил в лог
+				// как успех — теперь считаем отказом и ретраим.
+				if (info.rejected?.length) {
+					throw new Error(
+						`SMTP-сервер отклонил адрес: ${info.rejected.join(", ")}${
+							info.response ? ` (${info.response})` : ""
+						}`,
+					);
+				}
+
 				emailLogger.info("Письмо успешно отправлено", {
-					templateId: template.id,
-					recipients: recipients.map((r) => r.email),
+					templateId,
+					recipient: recipient.email,
 					messageId: info.messageId,
 					attempt,
 				});
 
-				return { success: true, messageId: info.messageId, attempts: attempt };
+				return {
+					recipient,
+					success: true,
+					messageId: info.messageId,
+					attempts: attempt,
+				};
 			} catch (error) {
 				lastError = error;
 				emailLogger.warn("Попытка отправки письма завершилась ошибкой", {
-					templateId: template.id,
+					templateId,
+					recipient: recipient.email,
 					attempt,
 					maxAttempts,
 					error: error instanceof Error ? error.message : String(error),
@@ -109,16 +192,17 @@ export class EmailService {
 		}
 
 		emailLogger.error("Не удалось отправить письмо после всех попыток", {
-			templateId: template.id,
-			recipients: recipients.map((r) => r.email),
+			templateId,
+			recipient: recipient.email,
 			attempts: maxAttempts,
 		});
 
-		throw new EmailDeliveryError(
-			`Не удалось отправить письмо по шаблону "${template.id}" после ${maxAttempts} попыток`,
-			maxAttempts,
-			{ cause: lastError },
-		);
+		return {
+			recipient,
+			success: false,
+			attempts: maxAttempts,
+			error: lastError,
+		};
 	}
 }
 

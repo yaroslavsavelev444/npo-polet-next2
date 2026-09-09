@@ -1,8 +1,16 @@
 /**
  * Основной валидатор email, объединяющий проверки из соседних файлов:
  *  - формат              → emailPatterns.ts (EMAIL_FORMAT_REGEX);
- *  - разрешённый домен    → allowedEmailDomains.ts (allowlist);
  *  - безопасность         → blockedEmailDomains.ts + emailPatterns.ts (blocklist).
+ *
+ * Регистрация открыта для почты ЛЮБОГО домена. Раньше здесь была третья
+ * проверка — allowlist российских почтовых сервисов (allowedEmailDomains.ts):
+ * адрес на gmail.com или outlook.com регистрацию не проходил. Это была
+ * ошибочная трактовка запрета на авторизацию через иностранные сервисы:
+ * запрет касается входа через чужой identity provider, а не доменной зоны
+ * почтового ящика. Allowlist и функция isSupportedEmailDomain удалены
+ * целиком; техническая валидация (формат, одноразовые и зарезервированные
+ * домены, служебные local-part) осталась на месте.
  *
  * Функции чистые и изоморфные (без server-only зависимостей) — один и тот же
  * код используется и на клиенте (мгновенная подсказка в форме регистрации), и
@@ -11,7 +19,6 @@
  * отправить в обход формы.
  */
 
-import { isAllowedEmailDomain } from "./allowedEmailDomains";
 import {
 	isDisposableEmailDomain,
 	isReservedPlaceholderDomain,
@@ -27,8 +34,6 @@ export const EMAIL_ERROR_MESSAGES = {
 	disposableDomain:
 		"Одноразовые/временные почтовые сервисы не поддерживаются. Используйте постоянный email",
 	suspiciousLocalPart: "Такой адрес не может быть использован для регистрации",
-	unsupportedDomain:
-		"Для регистрации используйте электронную почту одного из поддерживаемых сервисов",
 } as const;
 
 export interface EmailParts {
@@ -63,17 +68,10 @@ export const validateEmailFormat = (email: string): string | null => {
 	return null;
 };
 
-/** Бизнес-правило: домен присутствует в allowlist поддерживаемых сервисов. */
-export const isSupportedEmailDomain = (email: string): boolean => {
-	const parts = splitEmail(email);
-	if (!parts) return false;
-	return isAllowedEmailDomain(parts.domain);
-};
-
 /**
- * Дополнительный слой защиты поверх allowlist'а: явно и с понятным сообщением
- * отсекает заведомо тестовые/одноразовые адреса и подозрительные local-part.
- * Возвращает текст ошибки или null.
+ * Отсекает заведомо тестовые/одноразовые адреса и подозрительные local-part —
+ * с понятным сообщением, а не общим «неверный формат». Возвращает текст
+ * ошибки или null.
  */
 export const validateEmailSecurity = (email: string): string | null => {
 	const parts = splitEmail(email);
@@ -94,18 +92,14 @@ export const validateEmailSecurity = (email: string): string | null => {
 };
 
 /**
- * Полная проверка email для формы регистрации: формат → безопасность →
- * поддерживаемый домен. Возвращает первую сработавшую ошибку или null.
+ * Полная проверка email для формы регистрации: формат → безопасность.
+ * Возвращает первую сработавшую ошибку или null. Доменная зона не
+ * ограничивается ничем: yandex.ru, gmail.com, outlook.com и любой другой
+ * корректный домен проходят одинаково.
  */
 export const validateEmail = (email: string): string | null => {
 	const formatError = validateEmailFormat(email);
 	if (formatError) return formatError;
 
-	const securityError = validateEmailSecurity(email);
-	if (securityError) return securityError;
-
-	if (!isSupportedEmailDomain(email))
-		return EMAIL_ERROR_MESSAGES.unsupportedDomain;
-
-	return null;
+	return validateEmailSecurity(email);
 };
