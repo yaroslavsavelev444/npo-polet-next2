@@ -33,6 +33,7 @@ export default async function Navbar() {
       cartProductIds={cartProductIds}
       wishlistProductIds={wishlistProductIds}
       unreadNotificationCount={unreadNotificationCount}
+      cartOnboardingSeen={Boolean(user?.cartOnboardingSeenAt)}
     />
   );
 }

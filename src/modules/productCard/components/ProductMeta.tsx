@@ -4,18 +4,17 @@
  * Служебная строка карточки — единственное место, где карточка сообщает
  * состояние товара: наличие слева, вторичный факт покупки справа.
  *
- * Раньше в этом слоте жила только строка «Нет отзывов». На витрине, где
- * отзывов почти нет, она занимала место в каждой карточке и не сообщала
- * ничего, а статус наличия дублировался дважды — ярлыком поверх кадра и
- * текстом на заблокированной кнопке. Здесь статус печатается ровно один раз,
- * а кнопка называет только действие.
+ * Набрана моноширинным верхним регистром с разрядкой — тем же служебным
+ * голосом, которым говорят индексы в мобильном меню, подписи в корзине и
+ * сводка в панели каталога. У этой строки в карточке новая работа: она стоит
+ * первой под кадром и на месте бывшей рамки отбивает начало текстового блока.
  *
  * Правый слот занимает рейтинг, если отзывы есть, иначе — минимальная партия,
  * если она больше единицы. Оба факта относятся к покупке, взаимно редки и
  * никогда не нужны одновременно: рейтинг важнее, потому что влияет на выбор,
  * а не на оформление.
  *
- * Высота строки фиксирована (h-4) независимо от содержимого — на ней держится
+ * Высота строки фиксирована независимо от содержимого — на ней держится
  * вертикальное выравнивание всех карточек ряда.
  */
 
@@ -24,6 +23,7 @@ import { cn } from "@/utils/cn";
 import { formatReviewsCount } from "../lib/format";
 import { PRODUCT_STATUS_LABELS } from "../lib/status";
 import type { ProductAvailabilityStatus } from "../types";
+import styles from "./ProductCard.module.css";
 
 interface ProductMetaProps {
 	status: ProductAvailabilityStatus;
@@ -64,34 +64,29 @@ export function ProductMeta({
 	const showBatch = reviewsCount === 0 && minOrderQuantity > 1;
 
 	return (
-		<div className="flex h-4 items-center justify-between gap-2 text-[11px] leading-none">
-			<span className={cn("flex min-w-0 items-center gap-1.5", tone.text)}>
-				<span
-					className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)}
-					aria-hidden="true"
-				/>
-				<span className="truncate">{PRODUCT_STATUS_LABELS[status]}</span>
+		<div className={styles.meta}>
+			<span className={cn(styles.metaStatus, tone.text)}>
+				<span className={cn(styles.metaDot, tone.dot)} aria-hidden="true" />
+				<span className={styles.metaTruncate}>
+					{PRODUCT_STATUS_LABELS[status]}
+				</span>
 			</span>
 
 			{reviewsCount > 0 && (
-				<span className="flex shrink-0 items-center gap-1 text-[var(--text-muted)]">
+				<span className={styles.metaSide}>
 					<Star
 						className="h-3 w-3 fill-[var(--warning)] text-[var(--warning)]"
 						aria-hidden="true"
 					/>
-					<span className="font-semibold tabular-nums text-[var(--text-primary)]">
+					<span className="font-semibold text-[var(--text-primary)]">
 						{rating.toFixed(1)}
 					</span>
-					<span className="tabular-nums">
-						{formatReviewsCount(reviewsCount)}
-					</span>
+					<span>{formatReviewsCount(reviewsCount)}</span>
 				</span>
 			)}
 
 			{showBatch && (
-				<span className="shrink-0 tabular-nums text-[var(--text-muted)]">
-					от {minOrderQuantity} шт
-				</span>
+				<span className={styles.metaSide}>от {minOrderQuantity} шт</span>
 			)}
 		</div>
 	);

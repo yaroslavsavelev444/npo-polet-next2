@@ -1,13 +1,22 @@
 "use client";
 
-import { ArrowUpDown, SlidersHorizontal } from "lucide-react";
+import {
+	ArrowDownUp,
+	PackageCheck,
+	RotateCcw,
+	SlidersHorizontal,
+	Tag,
+	X,
+} from "lucide-react";
 import { formatPrice } from "@/modules/productCard";
-import { Badge, FilterChip } from "@/UI";
-import { cn } from "@/utils/cn";
 import { useProductFilters } from "../hooks/useProductFilters";
 import { pluralizeProducts, statusLabel } from "../lib/catalogOptions";
 import type { PriceBounds } from "../types/filters";
+import styles from "./Catalog.module.css";
+import { CatalogPopover } from "./CatalogPopover";
+import { PriceFilter } from "./PriceFilter";
 import { SortMenu } from "./SortMenu";
+import { StatusFilter } from "./StatusFilter";
 
 interface CatalogToolbarProps {
 	totalDocs: number;
@@ -16,27 +25,29 @@ interface CatalogToolbarProps {
 	onOpenSort: () => void;
 }
 
-const sheetButtonClass =
-	"flex h-9 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--surface)] px-3 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-light)]";
-
 /**
- * Панель выдачи: сводка слева, управление справа.
+ * Единственный орган управления каталогом: сводка слева, фильтры и сортировка
+ * справа. Панель липкая и садится ровно под шапку сайта — на выдаче в
+ * несколько экранов управление обязано оставаться под рукой, а не оставаться
+ * наверху.
  *
- * Панель липкая и «приклеена» к шапке верхней волосяной линией — именно она
- * связывает верх страницы с сеткой ниже. Пока панель просто стояла в потоке,
- * между заголовком и товарами зияла полоса пустоты, а на длинном каталоге
- * сортировка и фильтры уезжали за экран и до них приходилось скроллить вверх.
- * Особенно это било по мобильному, где фильтры доступны только отсюда.
+ * ─── Почему фильтры здесь, а не в боковой колонке ───────────────────────────
+ * У этого каталога ровно два измерения фильтрации: цена и наличие. Боковая
+ * колонка в 17–19rem под два органа управления — это четверть ширины страницы
+ * ради двух строк: снизу колонка пустая, а сетка теряет колонку товаров
+ * (четыре вместо пяти на 1440px). Горизонтальная панель отдаёт сетке всю
+ * ширину и собирает управление в одном месте — том же, куда смотрят на
+ * телефоне.
  *
- * Липкое смещение считается от --sticky-header-height — той же переменной, по
- * которой позиционируется шапка сайта, поэтому панель садится ровно под неё
- * и на мобильном (шапка ниже), и на десктопе.
+ * Каноничность здесь именно в этом: боковая панель канонична там, где
+ * фильтров десять и они с фасетами. Под два фильтра канонична панель.
  *
- * Панель занимает ровно ширину контента и не «вылезает» за неё отрицательными
- * полями: полоса между краем контента и краем экрана принадлежит внешним
- * отступам макета, товары в неё не заходят, и размывать там нечего. Попытка
- * растянуть панель туда давала горизонтальную прокрутку на планшете —
- * собственные поля контейнера шире внешнего отступа макета.
+ * ─── Десктоп и телефон — разные интерфейсы, а не масштаб ────────────────────
+ * На широком экране наличие развёрнуто в сегментированный переключатель прямо
+ * в панели (один клик), цена — в поповере у своей кнопки, сортировка — в меню
+ * у своей. На узком всё это ушло в нижние листы: там управление занимает всю
+ * ширину, строки набраны под палец, а панель остаётся в одну строку и не
+ * съедает высоту экрана.
  */
 export function CatalogToolbar({
 	totalDocs,
@@ -53,82 +64,175 @@ export function CatalogToolbar({
 	const hasPriceRange =
 		totalDocs > 0 && priceBounds.max > 0 && priceBounds.max > priceBounds.min;
 
-	return (
-		<div
-			className={cn(
-				"catalog-toolbar sticky z-30 flex flex-col gap-2.5 py-3",
-				"border-t border-[var(--hairline)] backdrop-blur-xl backdrop-saturate-150",
-			)}
-			style={{ top: "var(--sticky-header-height)" }}
-		>
-			<div className="flex items-center justify-between gap-3">
-				<p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[13px] text-[var(--text-muted)]">
-					<span className="whitespace-nowrap">
-						<span className="font-semibold tabular-nums text-[var(--text-primary)]">
-							{totalDocs}
-						</span>{" "}
-						{pluralizeProducts(totalDocs)}
-					</span>
+	const priceChipLabel = `${
+		filters.priceFrom !== undefined ? formatPrice(filters.priceFrom) : "от 0"
+	} — ${filters.priceTo !== undefined ? formatPrice(filters.priceTo) : "∞"}`;
 
-					{hasPriceRange && (
-						<span className="hidden whitespace-nowrap tabular-nums sm:inline">
-							<span aria-hidden="true" className="mr-[0.5rem] text-[var(--border-light)]">
-								·
-							</span>
-							{formatPrice(priceBounds.min)} — {formatPrice(priceBounds.max)}
-						</span>
-					)}
+	return (
+		<div className={styles.rail}>
+			<div className={styles.railRow}>
+				<p className={styles.summary}>
+					<span className={styles.summaryValue}>{totalDocs}</span>
+					<span className={styles.micro}>{pluralizeProducts(totalDocs)}</span>
 				</p>
 
-				<div className="hidden shrink-0 lg:block">
+				{hasPriceRange && (
+					<p className={`${styles.micro} ${styles.summaryRange}`}>
+						{formatPrice(priceBounds.min)} — {formatPrice(priceBounds.max)}
+					</p>
+				)}
+
+				<span className={styles.railSpacer} />
+
+				{/* Десктоп: управление развёрнуто в панели */}
+				<div className="hidden shrink-0 items-center gap-2 lg:flex">
+					{/* Наличие раскрывается в сегментированный переключатель только
+					    там, где для него действительно есть место. Между 1024 и 1280
+					    четыре варианта вместе со сводкой, ценой и сортировкой не
+					    влезали в строку и давали горизонтальную прокрутку всей
+					    страницы; там наличие живёт в поповере ровно того же вида,
+					    что и цена. Ниже 1024 оба фильтра уходят в нижний лист.
+
+					    Обёртки — обычные div без классов модуля: правила display из
+					    CSS-модуля перебивают утилиты Tailwind (модуль не в слое, см.
+					    шапку globals.css), и hidden/xl:hidden на самом элементе
+					    молча не срабатывали бы. */}
+					<div className="hidden shrink-0 xl:block">
+						<StatusFilter variant="segmented" />
+					</div>
+
+					<div className="shrink-0 xl:hidden">
+						<CatalogPopover
+							align="start"
+							active={hasStatusFilter}
+							label="Фильтр по наличию"
+							trigger={
+								<>
+									<PackageCheck
+										size={14}
+										aria-hidden
+										className={styles.controlIcon}
+									/>
+									{hasStatusFilter ? statusLabel(filters.status) : "Наличие"}
+								</>
+							}
+						>
+							<StatusFilter variant="list" />
+						</CatalogPopover>
+					</div>
+
+					<CatalogPopover
+						align="start"
+						active={hasPriceFilter}
+						label="Фильтр по цене"
+						trigger={
+							<>
+								<Tag size={14} aria-hidden className={styles.controlIcon} />
+								{hasPriceFilter ? priceChipLabel : "Цена"}
+							</>
+						}
+					>
+						<PriceFilter priceBounds={priceBounds} showLabel={false} />
+					</CatalogPopover>
+
+					{/* Сброс появляется только когда есть что сбрасывать, и стоит в
+					    группе фильтров, а не рядом с сортировкой: сортировка не
+					    сбрасывается. */}
+					{activeFiltersCount > 0 && (
+						<button
+							type="button"
+							onClick={resetFilters}
+							aria-label="Сбросить все фильтры"
+							title="Сбросить все фильтры"
+							className={styles.controlIconOnly}
+						>
+							<RotateCcw size={14} aria-hidden />
+						</button>
+					)}
+
+					<span className={styles.railDivider} />
+
 					<SortMenu />
 				</div>
 
+				{/* Телефон и планшет: управление живёт в нижних листах */}
 				<div className="flex shrink-0 items-center gap-2 lg:hidden">
 					<button
 						type="button"
-						onClick={onOpenFilters}
-						className={sheetButtonClass}
+						onClick={onOpenSort}
+						aria-label="Сортировка"
+						className={`${styles.control} ${styles.controlCompact}`}
 					>
-						<SlidersHorizontal size={14} aria-hidden />
+						<ArrowDownUp size={14} aria-hidden className={styles.controlIcon} />
+						<span className={styles.controlText}>Сортировка</span>
+					</button>
+
+					<button
+						type="button"
+						onClick={onOpenFilters}
+						aria-label="Фильтры"
+						data-active={activeFiltersCount > 0 || undefined}
+						className={styles.control}
+					>
+						<SlidersHorizontal
+							size={14}
+							aria-hidden
+							className={styles.controlIcon}
+						/>
 						Фильтры
 						{activeFiltersCount > 0 && (
-							<Badge variant="primary" size="sm">
-								{activeFiltersCount}
-							</Badge>
+							<span className={styles.controlBadge}>{activeFiltersCount}</span>
 						)}
-					</button>
-					<button type="button" onClick={onOpenSort} className={sheetButtonClass}>
-						<ArrowUpDown size={14} aria-hidden />
-						Сортировка
 					</button>
 				</div>
 			</div>
 
+			{/* Строка активных фильтров — ТОЛЬКО на узком экране. На десктопе
+			    состояние уже напечатано на самих органах управления (залитый
+			    сегмент наличия, диапазон на кнопке цены), и чипы повторяли бы то
+			    же самое второй строкой; сброс там живёт кнопкой в панели. На
+			    телефоне управление спрятано в листах, и чипы — единственное
+			    место, где видно, что выдача сужена, и единственный способ снять
+			    фильтр по одному.
+
+			    Строка появляется только когда есть что снимать, поэтому у панели
+			    два роста — и потому она проявляется, а не возникает рывком. */}
 			{activeFiltersCount > 0 && (
-				<div className="flex flex-wrap items-center gap-2 animate-[fade-in_0.2s_ease-out]">
+				<div className={styles.activeRow}>
 					{hasPriceFilter && (
-						<FilterChip
-							label={`${filters.priceFrom !== undefined ? formatPrice(filters.priceFrom) : "от 0"} — ${
-								filters.priceTo !== undefined
-									? formatPrice(filters.priceTo)
-									: "∞"
-							}`}
-							onRemove={() =>
-								updateFilters({ priceFrom: undefined, priceTo: undefined })
-							}
-						/>
+						<span className={styles.activeChip}>
+							{priceChipLabel}
+							<button
+								type="button"
+								onClick={() =>
+									updateFilters({ priceFrom: undefined, priceTo: undefined })
+								}
+								aria-label={`Убрать фильтр по цене: ${priceChipLabel}`}
+								className={styles.activeChipRemove}
+							>
+								<X size={11} aria-hidden />
+							</button>
+						</span>
 					)}
+
 					{hasStatusFilter && (
-						<FilterChip
-							label={statusLabel(filters.status)}
-							onRemove={() => updateFilters({ status: "all" })}
-						/>
+						<span className={styles.activeChip}>
+							{statusLabel(filters.status)}
+							<button
+								type="button"
+								onClick={() => updateFilters({ status: "all" })}
+								aria-label={`Убрать фильтр: ${statusLabel(filters.status)}`}
+								className={styles.activeChipRemove}
+							>
+								<X size={11} aria-hidden />
+							</button>
+						</span>
 					)}
+
 					<button
 						type="button"
 						onClick={resetFilters}
-						className="rounded-sm text-xs font-medium text-[var(--text-muted)] underline-offset-2 transition-colors hover:text-[var(--text-primary)] hover:underline"
+						className={styles.resetLink}
 					>
 						Сбросить всё
 					</button>

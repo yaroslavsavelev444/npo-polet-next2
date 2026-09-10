@@ -17,6 +17,7 @@ import * as migration_20260904_120000_order_contact_phones from "./20260904_1200
 import * as migration_20260904_153241_promo_codes from "./20260904_153241_promo_codes.ts";
 import * as migration_20260907_120000_faq_richtext_and_anchors from "./20260907_120000_faq_richtext_and_anchors.ts";
 import * as migration_20260907_160000_contact_requests from "./20260907_160000_contact_requests.ts";
+import * as migration_20260909_120000_cart_onboarding_seen from "./20260909_120000_cart_onboarding_seen.ts";
 
 export const migrations = [
 	{
@@ -113,5 +114,10 @@ export const migrations = [
 		up: migration_20260907_160000_contact_requests.up,
 		down: migration_20260907_160000_contact_requests.down,
 		name: "20260907_160000_contact_requests",
+	},
+	{
+		up: migration_20260909_120000_cart_onboarding_seen.up,
+		down: migration_20260909_120000_cart_onboarding_seen.down,
+		name: "20260909_120000_cart_onboarding_seen",
 	},
 ];

@@ -546,20 +546,16 @@ textarea,
 	background: color-mix(in srgb, var(--background) 82%, transparent);
 }
 
-/* Липкая панель выдачи каталога (src/modules/productCatalog).
-   Тот же приём, что и у .knowledge-toolbar: полупрозрачный слой, под которым
-   видно продолжение сетки товаров. Само размытие ставится утилитами Tailwind
-   на элементе (backdrop-blur-xl / backdrop-saturate-150) — backdrop-filter,
-   написанный здесь, вырезает Lightning CSS при сборке Tailwind v4. */
-.catalog-toolbar {
-	background: color-mix(in srgb, var(--background) 86%, transparent);
-}
-
 /* Прозрачность — это украшение, без которого содержимое обязано остаться
-   читаемым. Пользователю, попросившему её убрать, отдаём плотный фон. */
+   читаемым. Пользователю, попросившему её убрать, отдаём плотный фон.
+
+   Липкая панель каталога сюда больше не входит: она переехала в CSS-модуль
+   (src/modules/productCatalog/components/Catalog.module.css) вместе со своим
+   размытием и своим правилом на этот запрос. Модули Lightning CSS не
+   переписывает, поэтому backdrop-filter там доживает до браузера — из-за
+   этого приёма панель и жила когда-то здесь. */
 @media (prefers-reduced-transparency: reduce) {
-	.knowledge-toolbar,
-	.catalog-toolbar {
+	.knowledge-toolbar {
 		background: var(--background);
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;

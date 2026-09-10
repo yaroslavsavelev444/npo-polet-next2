@@ -1,0 +1,1394 @@
+/* ===========================================================================
+   Корзина
+   ===========================================================================
+   Модуль, а не глобальный файл, по той же причине, что и MobileMenu.module.css:
+   глобальные утилиты @once-ui-system подключаются вне слоёв и перебивают
+   Tailwind (подробности — в шапке app/(frontend)/globals.css). Хешированные
+   имена классов эту войну обходят стороной.
+
+   Времена и кривые берутся из home.css (--ease-out-expo, --ease-out-quart,
+   --dur-*). Своей системы движения у корзины нет и быть не должно: панель
+   открывается на той же странице, где только что проехали секции главной.
+
+   Материалы взяты у мобильного меню: панель — --void, то есть ТЕМНЕЕ витрины
+   (--background). Всплывающее не может быть светлее лежащего под ним, иначе
+   оно читается как заплатка поверх страницы, а не как слой над ней.        */
+
+/* ---------------------------------------------------------------------------
+   Затемнение
+   ---------------------------------------------------------------------------
+   Перекрывает всё, включая липкую шапку (z-index шапки 20, cookie-баннера 60,
+   мобильного меню 70). Корзина — модальный слой: пока она открыта, за её
+   пределами взаимодействовать не с чем, и «просвечивающая» сквозь неё кнопка
+   обратной связи была бы приглашением нажать мимо.
+
+   Размытие фона слабое (4px). Сильное превращает страницу под панелью в
+   бесформенное пятно и лишает ощущения, что корзина открыта ПОВЕРХ конкретного
+   места, куда можно вернуться.                                             */
+.overlay {
+	/* absolute, а не fixed: слой и так лежит внутри .root, растянутого на весь
+	   экран. Отдельный fixed здесь лишний и опасен — стоит любому предку
+	   получить transform или filter, и точкой отсчёта для fixed станет он, а
+	   не окно.
+
+	   z-index НЕ задаётся намеренно. Раньше здесь стояло 80 — столько же,
+	   сколько у .root, — и затемнение оказывалось ВЫШЕ панели: панель уходила
+	   под чёрный слой (оттого и выглядела приглушённой), а любой клик по ней
+	   попадал в оверлей и закрывал корзину. Порядок задаётся исключительно
+	   z-index панели ниже; оверлею достаточно быть первым в разметке. */
+	position: absolute;
+	inset: 0;
+	background: color-mix(in srgb, #000 62%, transparent);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	opacity: 0;
+	transition: opacity 260ms var(--ease-out-quart);
+}
+
+.root[data-open="true"] .overlay {
+	opacity: 1;
+	transition-duration: 420ms;
+}
+
+/* Слой-контейнер: сам по себе прозрачен и не ловит события, чтобы страница
+   под ним оставалась доступной для чтения скринридером до тех пор, пока
+   панель не смонтирована. */
+.root {
+	position: fixed;
+	inset: 0;
+	z-index: 80;
+}
+
+/* Пока панель уезжает (300 мс) слой ещё смонтирован и растянут на весь экран.
+   Без этого он продолжал бы перехватывать нажатия: закрыв корзину и сразу
+   ткнув в страницу, пользователь попадал бы в пустоту. */
+.root:not([data-open="true"]) {
+	pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Панель
+   ---------------------------------------------------------------------------
+   Ширина задана clamp, а не ступенями брейкпойнтов: строка товара содержит
+   кадр, название, степпер и цену, и её удобство меняется непрерывно вместе с
+   шириной окна. 21rem — минимум, при котором степпер и цена ещё стоят в одну
+   строку; 28.5rem — предел, после которого панель начинает читаться как
+   вторая страница, а не как слой над текущей.
+
+   На узких экранах (<= 40rem) панель занимает экран целиком: полупанель на
+   телефоне оставляет справа полоску страницы, до которой невозможно
+   дотянуться осмысленно, зато легко промахнуться.                          */
+.panel {
+	position: absolute;
+	/* Единственный элемент слоя с собственным z-index — так панель гарантированно
+	   лежит НАД затемнением, а не под ним. Значение маленькое: оно работает
+	   внутри контекста наложения, который создаёт .root (z-index: 80), и с
+	   внешними слоями страницы не соревнуется. */
+	z-index: 1;
+	inset-block: 0;
+	right: 0;
+	display: flex;
+	flex-direction: column;
+	width: clamp(21rem, 34vw, 28.5rem);
+	max-width: 100%;
+	background: var(--void);
+	border-left: 1px solid var(--rule);
+	box-shadow: var(--shadow-xl);
+	color: var(--text-primary);
+
+	transform: translate3d(100%, 0, 0);
+	transition: transform 300ms var(--ease-out-quart);
+	will-change: transform;
+}
+
+.root[data-open="true"] .panel {
+	transform: translate3d(0, 0, 0);
+	/* Вход длиннее выхода (440 против 300): появление должно успеть быть
+	   замеченным, уход — не задерживать. */
+	transition-duration: 440ms;
+	transition-timing-function: var(--ease-out-expo);
+}
+
+@media (max-width: 40rem) {
+	.panel {
+		width: 100%;
+		border-left: 0;
+	}
+}
+
+/* Тёплое пятно у верхнего края — та же единственная декорация, что и в
+   мобильном меню. Без него сплошной --void на всю высоту выглядит провалом,
+   а не поверхностью. */
+.panel::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 auto 0;
+	height: 28vh;
+	pointer-events: none;
+	background: radial-gradient(
+		120% 100% at 80% 0%,
+		color-mix(in srgb, var(--primary) 8%, transparent) 0%,
+		transparent 72%
+	);
+}
+
+/* ---------------------------------------------------------------------------
+   Шапка панели
+   --------------------------------------------------------------------------- */
+.header {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex: 0 0 auto;
+	padding: max(1.15rem, env(safe-area-inset-top)) 1.15rem 1.15rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+.title {
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-primary);
+}
+
+.titleCount {
+	font-size: 0.68rem;
+	letter-spacing: 0.06em;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+	text-transform: none;
+}
+
+.close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	margin-left: auto;
+	width: 2.25rem;
+	height: 2.25rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart);
+}
+
+.close:hover,
+.close:focus-visible {
+	color: var(--text-primary);
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.close:active {
+	transform: scale(0.94);
+}
+
+/* ---------------------------------------------------------------------------
+   Прогресс до скидки
+   ---------------------------------------------------------------------------
+   Полоса стоит СРАЗУ под шапкой и не уезжает вместе со списком: это условие
+   сделки, а не строка контента. Отправив её вниз к итогу, мы бы показывали её
+   ровно тогда, когда решение уже принято.
+
+   Шкала с засечками — тот же приём, что у разлиновки секций главной
+   (.rule-ticked): полоса читается как измерительная, а не как индикатор
+   загрузки.                                                                */
+.progress {
+	position: relative;
+	flex: 0 0 auto;
+	padding: 0.9rem 1.15rem 1rem;
+	border-bottom: 1px solid var(--rule);
+	background: color-mix(in srgb, var(--primary) 4%, transparent);
+}
+
+.progress[data-reached="true"] {
+	background: color-mix(in srgb, var(--success) 7%, transparent);
+}
+
+.progressHead {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.6rem;
+}
+
+.progressMessage {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.35;
+	color: var(--text-secondary);
+}
+
+.progressMessage strong {
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.progress[data-reached="true"] .progressMessage,
+.progress[data-reached="true"] .progressMessage strong {
+	color: var(--success);
+}
+
+.progressValue {
+	flex: 0 0 auto;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.65rem;
+	letter-spacing: 0.1em;
+	font-variant-numeric: tabular-nums;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.progressTrack {
+	position: relative;
+	height: 4px;
+	border-radius: 999px;
+	background: var(--rule);
+	overflow: hidden;
+}
+
+/* Засечки поверх дорожки: четверти пути. Ими шкала получает единицу
+   измерения — без них «полоса заполнилась наполовину» ничего не сообщает о
+   том, сколько ещё осталось. */
+.progressTrack::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background-image: repeating-linear-gradient(
+		to right,
+		transparent 0 calc(25% - 1px),
+		color-mix(in srgb, var(--void) 70%, transparent) calc(25% - 1px) 25%
+	);
+}
+
+.progressFill {
+	height: 100%;
+	border-radius: 999px;
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--primary) 70%, transparent),
+		var(--primary)
+	);
+	transform-origin: left center;
+	transition: width 620ms var(--ease-out-expo);
+}
+
+.progress[data-reached="true"] .progressFill {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--success) 70%, transparent),
+		var(--success)
+	);
+}
+
+/* Блик пробегает по заполненной части ровно один раз, в момент достижения
+   порога. Повторяющаяся анимация на статичном элементе — это уже мигающая
+   реклама, а не подтверждение. */
+.progressFill[data-celebrate="true"]::after {
+	content: "";
+	display: block;
+	height: 100%;
+	width: 40%;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		color-mix(in srgb, #fff 55%, transparent),
+		transparent
+	);
+	animation: cart-sheen 900ms var(--ease-out-quart) 1;
+}
+
+@keyframes cart-sheen {
+	from {
+		transform: translateX(-120%);
+	}
+	to {
+		transform: translateX(320%);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Список
+   --------------------------------------------------------------------------- */
+.body {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	/* Докрутив список до конца, нельзя утащить за собой страницу под панелью. */
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+}
+
+.list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* Обёртка строки существует только ради ухода: сетка с одной строкой
+   схлопывается из 1fr в 0fr, и это единственный способ анимировать высоту
+   содержимого, которую заранее никто не знает (длина названия у товаров
+   разная). max-height с запасом дал бы рывок в конце. */
+.row {
+	display: grid;
+	grid-template-rows: 1fr;
+	transition:
+		grid-template-rows 260ms var(--ease-out-quart),
+		opacity 200ms var(--ease-out-quart);
+}
+
+.row > * {
+	overflow: hidden;
+}
+
+/* Появление содержимого строки живёт на ВНУТРЕННЕМ элементе, а не на самой
+   строке: см. комментарий в CartLineItem.tsx — два `transition` на одном
+   элементе не складываются, побеждает один. */
+
+.row[data-removing="true"] {
+	grid-template-rows: 0fr;
+	opacity: 0;
+}
+
+/* Каскад появления при открытии панели: тот же шаг и та же кривая, что в
+   мобильном меню. Задержка ограничена сверху — в корзине на 30 позиций
+   последняя строка не должна появляться через полторы секунды. */
+.reveal {
+	opacity: 0;
+	transform: translate3d(0, 14px, 0);
+}
+
+.root[data-open="true"] .reveal {
+	opacity: 1;
+	transform: translate3d(0, 0, 0);
+	transition:
+		opacity 480ms var(--ease-out-expo),
+		transform 480ms var(--ease-out-expo);
+	transition-delay: calc(120ms + min(var(--i, 0), 7) * 42ms);
+}
+
+.item {
+	display: grid;
+	grid-template-columns: 4.5rem 1fr;
+	gap: 0.9rem;
+	padding: 1rem 1.15rem;
+	border-bottom: 1px solid var(--hairline);
+	transition: background-color 200ms var(--ease-out-quart);
+}
+
+.item:hover {
+	background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+
+/* Пока строка ждёт ответа сервера, она приглушена и не принимает нажатий:
+   иначе третье нажатие «+» уходит в очередь к первым двум, а пользователь
+   видит только неподвижное число и жмёт ещё. */
+.item[data-busy="true"] {
+	opacity: 0.55;
+	pointer-events: none;
+}
+
+.thumb {
+	position: relative;
+	display: block;
+	aspect-ratio: 1;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+	overflow: hidden;
+	border: 1px solid var(--hairline);
+	transition: border-color 200ms var(--ease-out-quart);
+}
+
+.thumb:hover,
+.thumb:focus-visible {
+	border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+.thumbImage {
+	object-fit: contain;
+	padding: 0.35rem;
+}
+
+.thumbEmpty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--text-muted);
+}
+
+.itemMain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+	min-width: 0;
+}
+
+.itemHead {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+}
+
+.itemTitle {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-width: 0;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1.35;
+	letter-spacing: var(--tracking-tight);
+	color: var(--text-primary);
+	text-decoration: none;
+	transition: color 180ms var(--ease-out-quart);
+}
+
+.itemTitle:hover,
+.itemTitle:focus-visible {
+	color: var(--primary);
+}
+
+.itemMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.3rem 0.7rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.itemMetaWarning {
+	color: var(--warning);
+}
+
+.remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	/* Отрицательный отступ ТОЛЬКО сверху — он подтягивает кнопку к первой
+	   строке названия. Такой же по горизонтали выносил бы её за пределы
+	   колонки (строка получала 5px переполнения, и правый край иконки
+	   срезался обрезкой строки). Иконка и без него стоит на одной вертикали
+	   с ценой ниже. */
+	margin: -0.35rem 0 0 auto;
+	width: 1.9rem;
+	height: 1.9rem;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart);
+}
+
+/* На устройствах с указателем кнопка удаления появляется при наведении на
+   строку — она не должна конкурировать за внимание с названием и ценой. На
+   сенсорных экранах наведения не существует, поэтому там она видна всегда:
+   спрятанное за hover на телефоне недоступно вовсе. */
+@media (hover: hover) and (pointer: fine) {
+	.item:hover .remove,
+	.remove:focus-visible {
+		opacity: 1;
+	}
+}
+
+@media not all and (hover: hover) {
+	.remove {
+		opacity: 1;
+	}
+}
+
+.remove:hover,
+.remove:focus-visible {
+	opacity: 1;
+	color: var(--error);
+	background: color-mix(in srgb, var(--error) 12%, transparent);
+}
+
+.itemFoot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-top: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Счётчик количества
+   --------------------------------------------------------------------------- */
+.stepper {
+	display: inline-flex;
+	align-items: center;
+	height: 2rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	overflow: hidden;
+	background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+
+.stepperButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 100%;
+	border: 0;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart);
+}
+
+.stepperButton:hover:not(:disabled),
+.stepperButton:focus-visible:not(:disabled) {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.stepperButton:active:not(:disabled) {
+	background: color-mix(in srgb, var(--primary) 22%, transparent);
+	color: var(--text-primary);
+}
+
+.stepperButton:disabled {
+	opacity: 0.32;
+	cursor: not-allowed;
+}
+
+.stepperValue {
+	width: 2.1rem;
+	height: 100%;
+	border: 0;
+	border-inline: 1px solid var(--rule);
+	background: transparent;
+	color: var(--text-primary);
+	font: inherit;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+	outline: none;
+	appearance: textfield;
+}
+
+.stepperValue::-webkit-inner-spin-button,
+.stepperValue::-webkit-outer-spin-button {
+	appearance: none;
+	margin: 0;
+}
+
+.stepperValue:focus-visible {
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.stepperValue[aria-invalid="true"] {
+	color: var(--warning);
+}
+
+/* ---------------------------------------------------------------------------
+   Цена строки
+   --------------------------------------------------------------------------- */
+.itemPrice {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.1rem;
+	flex: 0 0 auto;
+	text-align: right;
+}
+
+.itemPriceOld {
+	font-size: 0.6875rem;
+	line-height: 1;
+	color: var(--text-muted);
+	text-decoration: line-through;
+}
+
+.itemPriceNow {
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1.1;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: var(--tracking-tight);
+	color: var(--text-primary);
+}
+
+/* Цена, изменившаяся от действия пользователя, коротко подсвечивается — это
+   подтверждение, что нажатие учтено, там же, где смотрят глаза. Ключ
+   элемента меняется вместе со значением, поэтому анимация перезапускается
+   на каждое новое число. */
+.itemPriceNow[data-changed="true"] {
+	animation: cart-price-bump 420ms var(--ease-out-quart) 1;
+}
+
+@keyframes cart-price-bump {
+	0% {
+		color: var(--primary);
+		transform: translateY(-1px);
+	}
+	100% {
+		color: var(--text-primary);
+		transform: translateY(0);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Служебные полосы: недоступные товары, минимальная партия, ошибки
+   --------------------------------------------------------------------------- */
+.notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	margin: 0;
+	padding: 0.8rem 1.15rem;
+	border-bottom: 1px solid var(--hairline);
+	font-size: 0.75rem;
+	line-height: 1.45;
+	color: var(--text-secondary);
+	background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
+.notice[data-tone="error"] {
+	background: color-mix(in srgb, var(--error) 10%, transparent);
+}
+
+.noticeIcon {
+	flex: 0 0 auto;
+	margin-top: 0.1rem;
+	color: var(--warning);
+}
+
+.notice[data-tone="error"] .noticeIcon {
+	color: var(--error);
+}
+
+.noticeList {
+	margin: 0.3rem 0 0;
+	padding-left: 1rem;
+	list-style: disc;
+}
+
+.noticeAction {
+	margin-top: 0.45rem;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--text-primary);
+	font: inherit;
+	font-weight: 600;
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+	cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+   Итог и целевое действие
+   ---------------------------------------------------------------------------
+   Самый тёмный слой панели (--void-deep) — тот же приём, что у служебной
+   полосы шапки сайта: тяжёлая поверхность отделяет область, лёгкая привлекает
+   внимание к действию. Нижняя часть закреплена и не уезжает со списком:
+   сумма и кнопка обязаны быть на экране в любой момент прокрутки.          */
+.footer {
+	position: relative;
+	flex: 0 0 auto;
+	padding: 1rem 1.15rem calc(1rem + env(safe-area-inset-bottom));
+	border-top: 1px solid var(--rule);
+	background: var(--void-deep);
+}
+
+.totals {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-bottom: 0.9rem;
+	transition: opacity 200ms var(--ease-out-quart);
+}
+
+/* Пока идёт запись, итог показан по прошлым данным. Лёгкое приглушение —
+   честный способ сказать «это ещё не окончательное число», не подменяя
+   сумму спиннером: скачущий на месте цены индикатор читается хуже, чем
+   слегка притушенная, но настоящая цифра. */
+.totals[data-stale="true"] {
+	opacity: 0.55;
+}
+
+.totalsRow {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	font-size: 0.8125rem;
+	color: var(--text-secondary);
+}
+
+.totalsValue {
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+.totalsRow[data-tone="discount"],
+.totalsRow[data-tone="discount"] .totalsValue {
+	color: var(--success);
+}
+
+.totalsGrand {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-top: 0.35rem;
+	padding-top: 0.7rem;
+	border-top: 1px solid var(--rule);
+}
+
+.totalsGrandLabel {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.68rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.totalsGrandValue {
+	font-size: 1.375rem;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: var(--tracking-heading);
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+.cta {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.55rem;
+	width: 100%;
+	min-height: 3rem;
+	padding: 0 1.25rem;
+	border: 0;
+	border-radius: 999px;
+	background: var(--primary);
+	color: var(--text-inverse);
+	font: inherit;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background-color 200ms var(--ease-out-quart),
+		transform 200ms var(--ease-out-quart),
+		opacity 200ms var(--ease-out-quart);
+}
+
+.cta:hover:not(:disabled),
+.cta:focus-visible:not(:disabled) {
+	background: var(--primary-hover);
+}
+
+.cta:active:not(:disabled) {
+	transform: scale(0.985);
+}
+
+.cta:disabled {
+	background: var(--surface-secondary);
+	color: var(--text-muted);
+	cursor: not-allowed;
+}
+
+.ctaArrow {
+	transition: transform 260ms var(--ease-out-expo);
+}
+
+.cta:hover:not(:disabled) .ctaArrow {
+	transform: translateX(3px);
+}
+
+.ctaNote {
+	margin: 0.65rem 0 0;
+	font-size: 0.6875rem;
+	line-height: 1.4;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.ctaNoteBlocked {
+	color: var(--warning);
+}
+
+.secondaryRow {
+	display: flex;
+	justify-content: center;
+	gap: 1.25rem;
+	margin-top: 0.7rem;
+}
+
+.secondaryLink {
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	text-decoration: none;
+	cursor: pointer;
+	transition: color 180ms var(--ease-out-quart);
+}
+
+.secondaryLink:hover,
+.secondaryLink:focus-visible {
+	color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Пустая корзина
+   --------------------------------------------------------------------------- */
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	padding: clamp(1.5rem, 6vw, 2.25rem) 1.15rem 1.5rem;
+}
+
+/* Знак пустой корзины — не иконка из набора, а тот же язык, которым нарисована
+   схема перехвата на главной: уголковые метки вокруг пустого кадра. Пустая
+   рамка честно говорит «сюда ещё ничего не положили». */
+.emptyMark {
+	position: relative;
+	width: 100%;
+	max-width: 9rem;
+	aspect-ratio: 4 / 3;
+	margin-bottom: 1.4rem;
+	border: 1px dashed var(--rule);
+	border-radius: var(--radius-sm);
+	overflow: hidden;
+}
+
+.emptyMark::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	opacity: 0.07;
+	background-image: repeating-linear-gradient(
+		135deg,
+		var(--text-primary) 0 1px,
+		transparent 1px 10px
+	);
+}
+
+.emptyMarkIcon {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	opacity: 0.5;
+}
+
+.emptyTitle {
+	margin: 0 0 0.5rem;
+	font-family: var(--font-display);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: -0.005em;
+	line-height: 1.02;
+	font-size: clamp(1.35rem, 5.5vw, 1.75rem);
+	color: var(--text-primary);
+}
+
+.emptyText {
+	margin: 0 0 1.35rem;
+	max-width: 34ch;
+	font-size: 0.8125rem;
+	line-height: 1.55;
+	color: var(--text-secondary);
+}
+
+.emptyActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+	margin-bottom: 1.75rem;
+}
+
+.emptyPrimary {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.75rem 1.25rem;
+	border-radius: 999px;
+	background: var(--primary);
+	color: var(--text-inverse);
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1;
+	text-decoration: none;
+	transition:
+		background-color 200ms var(--ease-out-quart),
+		transform 200ms var(--ease-out-quart);
+}
+
+.emptyPrimary:hover,
+.emptyPrimary:focus-visible {
+	background: var(--primary-hover);
+}
+
+.emptyPrimary:active {
+	transform: scale(0.97);
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.chip {
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0.4rem 0.8rem;
+	border: 1px solid var(--hairline);
+	border-radius: 999px;
+	font-size: 0.75rem;
+	line-height: 1.2;
+	color: var(--text-secondary);
+	text-decoration: none;
+	transition:
+		color 200ms var(--ease-out-quart),
+		border-color 200ms var(--ease-out-quart),
+		background-color 200ms var(--ease-out-quart);
+}
+
+.chip:hover,
+.chip:focus-visible {
+	color: var(--text-primary);
+	border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.sectionLabel {
+	margin: 0 0 0.75rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+/* Рекомендации: те же строки, что и позиции корзины, но без счётчика — так
+   пустая панель не выглядит другим экраном, а показывает, что здесь будет. */
+.suggestion {
+	display: grid;
+	grid-template-columns: 3rem 1fr auto;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.65rem 0;
+	border-top: 1px solid var(--hairline);
+	text-decoration: none;
+	color: inherit;
+}
+
+.suggestionTitle {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-width: 0;
+	font-size: 0.75rem;
+	line-height: 1.35;
+	color: var(--text-secondary);
+	transition: color 180ms var(--ease-out-quart);
+}
+
+.suggestion:hover .suggestionTitle,
+.suggestion:focus-visible .suggestionTitle {
+	color: var(--text-primary);
+}
+
+.suggestionPrice {
+	font-size: 0.75rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Загрузка
+   ---------------------------------------------------------------------------
+   Скелет повторяет геометрию строки товара один в один, поэтому появление
+   настоящих данных не сдвигает ни пикселя. Пульсация мягкая: резкая делает
+   ожидание длиннее, чем оно есть.                                          */
+.skeletonRow {
+	display: grid;
+	grid-template-columns: 4.5rem 1fr;
+	gap: 0.9rem;
+	padding: 1rem 1.15rem;
+	border-bottom: 1px solid var(--hairline);
+}
+
+.skeletonBlock {
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+	animation: cart-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cart-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.45;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Первое знакомство
+   ---------------------------------------------------------------------------
+   Подсказка не заменяет содержимое панели и не встаёт модалкой поверх сайта:
+   товар, только что добавленный, обязан быть виден — ради него панель и
+   открылась. Поэтому карточка объяснения садится над нижней частью, а список
+   остаётся на месте, лишь слегка притушенный.                              */
+.onboardingScrim {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	background: color-mix(in srgb, var(--void-deep) 55%, transparent);
+	opacity: 0;
+	animation: cart-fade-in 320ms var(--ease-out-quart) forwards;
+}
+
+.onboardingCard {
+	position: absolute;
+	inset: auto 1rem calc(1rem + env(safe-area-inset-bottom)) 1rem;
+	z-index: 3;
+	padding: 1.15rem 1.2rem 1.2rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
+	border-radius: var(--radius-lg);
+	background: var(--surface);
+	box-shadow: var(--shadow-xl);
+	opacity: 0;
+	transform: translate3d(0, 18px, 0);
+	animation: cart-onboarding-in 520ms var(--ease-out-expo) 140ms forwards;
+}
+
+@keyframes cart-onboarding-in {
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes cart-fade-in {
+	to {
+		opacity: 1;
+	}
+}
+
+.onboardingBadge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-bottom: 0.6rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--primary);
+}
+
+.onboardingTitle {
+	margin: 0 0 0.4rem;
+	font-size: 1rem;
+	font-weight: 700;
+	letter-spacing: var(--tracking-tight);
+	color: var(--text-primary);
+}
+
+.onboardingText {
+	margin: 0 0 1rem;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.onboardingButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-height: 2.6rem;
+	border: 0;
+	border-radius: 999px;
+	background: var(--primary);
+	color: var(--text-inverse);
+	font: inherit;
+	font-size: 0.875rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background-color 200ms var(--ease-out-quart),
+		transform 200ms var(--ease-out-quart);
+}
+
+.onboardingButton:hover,
+.onboardingButton:focus-visible {
+	background: var(--primary-hover);
+}
+
+.onboardingButton:active {
+	transform: scale(0.98);
+}
+
+/* Кольцо, обводящее шапку панели: показывает, куда именно смотреть. Гаснет
+   само — постоянная подсветка через несколько секунд перестаёт читаться как
+   указание и начинает мешать. */
+.onboardingRing {
+	position: absolute;
+	inset: 0.35rem;
+	z-index: 4;
+	border: 1px solid var(--primary);
+	border-radius: var(--radius-md);
+	pointer-events: none;
+	animation: cart-ring 2.4s var(--ease-out-quart) 2;
+}
+
+@keyframes cart-ring {
+	0% {
+		opacity: 0;
+		transform: scale(1.03);
+	}
+	18% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	60% {
+		opacity: 0.25;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Служебная кнопка для клавиатуры
+   --------------------------------------------------------------------------- */
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Просьба уменьшить движение
+   ---------------------------------------------------------------------------
+   Выезд, каскад, блик и кольцо — украшение; смысл панели от них не зависит.
+   Остаётся короткое проявление, чтобы открытие не было рывком.             */
+@media (prefers-reduced-motion: reduce) {
+	.panel,
+	.root[data-open="true"] .panel {
+		transform: none;
+		opacity: 0;
+		transition: opacity 140ms linear;
+	}
+
+	.root[data-open="true"] .panel {
+		opacity: 1;
+	}
+
+	.reveal,
+	.root[data-open="true"] .reveal {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+
+	.row,
+	.progressFill,
+	.totals,
+	.close,
+	.cta,
+	.chip,
+	.item,
+	.stepperButton,
+	.itemTitle,
+	.remove {
+		transition: none;
+	}
+
+	.progressFill[data-celebrate="true"]::after,
+	.onboardingRing,
+	.skeletonBlock,
+	.itemPriceNow[data-changed="true"] {
+		animation: none;
+	}
+
+	.onboardingCard,
+	.onboardingScrim {
+		opacity: 1;
+		transform: none;
+		animation: none;
+	}
+
+	/* Уход строки без анимации высоты: она просто исчезает вместе с данными. */
+	.row[data-removing="true"] {
+		opacity: 0.4;
+	}
+}
+
+/* ===========================================================================
+   Страница корзины
+   ===========================================================================
+   Страница осталась и не превратилась в редирект: у выдвижной панели ширина
+   в 28rem, а заказ на два десятка позиций разбирают на всю ширину экрана.
+   Плюс на неё ведут прямые ссылки и возврат с оформления, когда корзина
+   опустела.
+
+   Разметка своя, но НИ ОДНОГО собственного компонента: строка, прогресс,
+   итог и пустое состояние — те же, что в панели. Иначе через месяц это были
+   бы две корзины с разным поведением.                                      */
+
+.page {
+	width: 100%;
+	max-width: 72rem;
+	margin: 0 auto;
+	padding: clamp(1.25rem, 4vw, 2.5rem) 0 clamp(2rem, 6vw, 4rem);
+}
+
+.pageHead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5rem 1rem;
+	margin-bottom: clamp(1.25rem, 3vw, 2rem);
+}
+
+.pageTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: -0.005em;
+	line-height: 1;
+	font-size: clamp(1.75rem, 1.2rem + 2.4vw, 3rem);
+	color: var(--text-primary);
+}
+
+.pageCount {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.7rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+/* Одна колонка до 60rem: на планшете в портрете две колонки дают строку
+   товара шириной с телефон и итог шириной с ладонь — хуже, чем одна
+   нормальная колонка. */
+.pageGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: clamp(1.25rem, 3vw, 2rem);
+	align-items: start;
+}
+
+@media (min-width: 60rem) {
+	.pageGrid {
+		grid-template-columns: minmax(0, 1fr) 21rem;
+	}
+}
+
+/* На странице список лежит на поверхности витрины, а не на --void: панель —
+   слой НАД страницей и потому темнее, а сама страница остаётся собой. */
+.pageList {
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius-lg);
+	background: var(--surface);
+	overflow: hidden;
+}
+
+.pageList .item:hover {
+	background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.pageList .list > li:last-child .item {
+	border-bottom: 0;
+}
+
+.pageAside {
+	position: sticky;
+	/* Липкий итог не должен заезжать под шапку. */
+	top: calc(var(--sticky-header-height) + 1rem);
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius-lg);
+	overflow: hidden;
+}
+
+/* Внутри страницы у нижней части нет собственной рамки и safe-area: она уже
+   не прижата к краю экрана, а лежит карточкой в колонке. */
+.pageAside .footer {
+	padding: 1.15rem;
+	border-top: 0;
+	background: var(--surface);
+}
+
+.pageAside .progress {
+	border-bottom: 1px solid var(--hairline);
+}
+
+.pageEmpty {
+	border: 1px solid var(--hairline);
+	border-radius: var(--radius-lg);
+	background: var(--surface);
+}
+
+/* Каскад появления принадлежит панели: он привязан к её открытию
+   (.root[data-open]). На странице открывать нечего, и строки обязаны быть
+   видны с первого кадра. */
+.page .reveal {
+	opacity: 1;
+	transform: none;
+}

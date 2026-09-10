@@ -1,0 +1,1134 @@
+/* ===========================================================================
+   Каталог: шапка, панель управления, фильтры, сортировка
+   ===========================================================================
+   Модуль, а не глобальный файл, по той же причине, что и Cart.module.css с
+   MobileMenu.module.css: глобальные утилиты @once-ui-system подключаются вне
+   слоёв и перебивают Tailwind (подробности — в шапке app/(frontend)/globals.css).
+   Хешированные имена классов эту войну обходят стороной, и здесь это особенно
+   важно: панель управления живёт на числовых отступах, которые once-ui как раз
+   и перехватывает.
+
+   Материалы и движение взяты у уже обновлённых поверхностей — главной, шапки
+   и корзины. Своей системы у каталога нет и быть не должно:
+
+     • всплывающее (поповер, лист) — --void, то есть ТЕМНЕЕ витрины, с
+       разлиновкой --rule. Слой над страницей не может быть светлее страницы;
+     • микроподписи — моноширинный верхний регистр с разрядкой. Так набраны
+       индексы в мобильном меню и служебные строки корзины;
+     • времена и кривые — --ease-out-expo / --ease-out-quart / --dur-* из
+       home.css.                                                             */
+
+/* ---------------------------------------------------------------------------
+   Микроподпись
+   ---------------------------------------------------------------------------
+   Единственный служебный голос каталога: число позиций, диапазон цен, имена
+   групп фильтров, подпись текущей сортировки. Моноширинный здесь работает по
+   прямому назначению — выравнивает цифры в колонку и держит одинаковую ширину
+   при смене значения, поэтому счётчик не дёргает соседей.                   */
+.micro {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Шапка страницы
+   --------------------------------------------------------------------------- */
+
+/* Название категории набрано акцидентной PaluiSP2 (класс .u-display в
+   home.css поднимает регистр и включает словарный перенос).
+
+   Кегль подобран под саму гарнитуру, а не «по шкале заголовков»: у PaluiSP2
+   знак занимает ~1.2em против ~0.5em у Manrope, то есть строка тянет вдвое
+   шире при том же размере. Верхняя граница выведена из самого длинного
+   СЛОВА, которое обязано уместиться в строку: «СТАЦИОНАРНЫЕ» — 12 знаков,
+   ~14.5em, и при 3.5rem оно перестаёт влезать в колонку 1440-го экрана,
+   уходя в перенос по слогам из-за десятка пикселей. При 3.25rem слово стоит
+   целиком, а перенос остаётся там, где он действительно неизбежен, — на
+   узких экранах и на названиях вроде «РАДИОЭЛЕКТРОННОГО». Нижняя граница
+   1.6rem — предел читаемости капители у этой гарнитуры на 320px.
+
+   Мера строки задана в em, а НЕ в ch: у этой гарнитуры знак «0» шириной с
+   полтора обычных, и 20ch резолвились в 1287px, то есть ни во что. 17em —
+   это ~5 слов в строке; ограничение вступает в силу только когда у категории
+   нет описания и заголовок получает весь ряд: без него название вроде
+   «КОМПЛЕКСЫ РАДИОЭЛЕКТРОННОГО ПОДАВЛЕНИЯ И АНТИДРОНОВОЙ ЗАЩИТЫ ПЕРИМЕТРА
+   ОСОБО ВАЖНЫХ ОБЪЕКТОВ» растягивалось на 1232px пятью строками капслока и
+   читалось стеной. Когда описание есть, ширину колонки задаёт раскладка
+   шапки, и мера не срабатывает.
+
+   Интерлиньяж 0.96: у .u-display он 0.92, но там строки короткие (одно-два
+   слова в hero). У названия категории строк бывает три, и на 0.92 они
+   начинают слипаться выносными. */
+.title {
+	max-width: 17em;
+	margin: 0;
+	font-size: clamp(1.6rem, 1rem + 2.4vw, 3.25rem);
+	line-height: 0.96;
+	color: var(--text-primary);
+}
+
+/* Описание категории. Мера 52ch — это потолок для одноколоночной раскладки
+   (до lg); в две колонки ширину задаёт сама шапка. Короче 62ch потому, что
+   колонка стоит рядом с очень широким заголовком, и длинная строка рядом с
+   ним читается как «хвост». */
+.lede {
+	max-width: 52ch;
+	margin: 0;
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Панель управления выдачей
+   ---------------------------------------------------------------------------
+   Панель липкая и садится ровно под шапку сайта (--sticky-header-height) —
+   на длинном каталоге сортировка и фильтры не должны уезжать за экран.
+
+   Полупрозрачный слой с размытием: сетка проезжает ПОД панелью, и по краю
+   видно, что список продолжается. Плотный фон здесь читался бы как вторая
+   шапка. Размытие живёт в этом же файле (а не утилитами Tailwind, как у
+   .catalog-toolbar раньше), потому что CSS-модули Lightning CSS не
+   переписывает и backdrop-filter доживает до браузера.                     */
+.rail {
+	position: sticky;
+	top: var(--sticky-header-height);
+	z-index: 30;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 0.75rem 0;
+	border-top: 1px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+	background: color-mix(in srgb, var(--background) 86%, transparent);
+	backdrop-filter: blur(20px) saturate(160%);
+	-webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	.rail {
+		background: var(--background);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+}
+
+.railRow {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+/* Сводка выдачи. Само число — основным цветом и крупнее подписи: это
+   единственная величина в панели, которую читают, а не проглядывают. */
+.summary {
+	display: flex;
+	align-items: baseline;
+	gap: 0.4rem;
+	flex: 0 0 auto;
+}
+
+.summaryValue {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.02em;
+	color: var(--text-primary);
+}
+
+/* Диапазон цен — факт о выдаче, а не фильтр. Прячется первым при нехватке
+   ширины. */
+.summaryRange {
+	display: none;
+	flex: 0 0 auto;
+	padding-left: 0.75rem;
+	border-left: 1px solid var(--rule);
+}
+
+@media (min-width: 40rem) {
+	.summaryRange {
+		display: block;
+	}
+}
+
+/* Разделитель между сводкой и органами управления. Волосяная линия вместо
+   точки-разделителя: та же разлиновка, что держит всю страницу. */
+.railDivider {
+	flex: 0 0 auto;
+	align-self: stretch;
+	width: 1px;
+	background: var(--rule);
+}
+
+.railSpacer {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Орган управления: кнопка панели
+   ---------------------------------------------------------------------------
+   Высота 2.25rem на десктопе и 2.5rem на сенсорных экранах — там же, где нет
+   курсора, цель обязана быть не меньше ~44px по вертикали вместе с полями
+   панели.                                                                   */
+.control {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	height: 2.25rem;
+	padding: 0 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: transparent;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+	.control {
+		height: 2.5rem;
+		padding: 0 0.9rem;
+	}
+}
+
+.control:hover {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.control:active {
+	transform: scale(0.98);
+}
+
+/* Открытый поповер и активный фильтр читаются одинаково — «здесь сейчас
+   что-то происходит», но разными средствами: открытый подсвечен рамкой,
+   активный — заливкой акцента. */
+.control[data-open="true"] {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.control[data-active="true"] {
+	border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	color: var(--primary-200);
+}
+
+.controlIcon {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	transition: color 180ms var(--ease-out-quart);
+}
+
+.control[data-active="true"] .controlIcon,
+.control[data-open="true"] .controlIcon {
+	color: currentColor;
+}
+
+/* Стрелка поповера доворачивает при открытии — состояние читается без
+   подписи. */
+.controlChevron {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	transition: transform 220ms var(--ease-out-quart);
+}
+
+.control[data-open="true"] .controlChevron {
+	transform: rotate(180deg);
+}
+
+/* На узком экране подпись сортировки уходит, остаётся знак.
+   Порог 24rem (384px) не выбран «на глаз»: сводка выдачи и две кнопки с
+   подписями требуют ~330px, а у телефона шириной 360px под контент остаётся
+   328 — строка панели переполнялась и тянула за собой горизонтальную
+   прокрутку всей страницы. Подпись снимается именно у сортировки: у фильтров
+   на кнопке висит счётчик активных, и без слова «Фильтры» он повисает
+   непонятно на чём.
+
+   Знак при этом остаётся квадратной целью 2.5rem, а имя органа управления
+   никуда не девается — оно в aria-label и в заголовке листа. */
+@media (max-width: 24rem) {
+	.controlCompact {
+		width: 2.5rem;
+		padding: 0;
+		justify-content: center;
+	}
+
+	.controlCompact .controlText {
+		display: none;
+	}
+}
+
+/* Орган управления без подписи — только знак. Квадратная цель того же роста,
+   что и кнопки с подписью, поэтому строка панели не «прыгает» по высоте. */
+.controlIconOnly {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart);
+	animation: catalog-fade-in 240ms var(--ease-out-quart) both;
+}
+
+.controlIconOnly:hover {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+	color: var(--text-primary);
+}
+
+.controlIconOnly:active {
+	transform: scale(0.94);
+}
+
+/* Счётчик активных фильтров на кнопке мобильной панели. */
+.controlBadge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.125rem;
+	height: 1.125rem;
+	padding: 0 0.3rem;
+	border-radius: 999px;
+	background: var(--primary);
+	font-size: 0.625rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	color: #fff;
+}
+
+/* Текущее значение сортировки на кнопке: подпись «Сортировка» приглушена,
+   значение — основным цветом. Иерархия внутри одного органа управления. */
+.controlValue {
+	color: var(--text-primary);
+}
+
+.controlLabel {
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Быстрые фильтры наличия (десктоп)
+   ---------------------------------------------------------------------------
+   Самый частый фильтр каталога вынесен прямо в панель: одно нажатие вместо
+   «открыть панель → выбрать → закрыть». Группа собрана как сегментированный
+   переключатель — соседние варианты взаимоисключающие, и разделять их
+   промежутком значило бы врать о том, что их можно выбрать несколько.     */
+.segmented {
+	display: flex;
+	align-items: center;
+	gap: 1px;
+	/* <fieldset> ради нативной группы radio: браузерные рамку, поля и
+	   min-inline-size: min-content снимаем вручную. */
+	min-width: 0;
+	margin: 0;
+	padding: 2px;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--void) 60%, transparent);
+}
+
+/* Нативный переключатель прячется, но остаётся НА МЕСТЕ и фокусируемым:
+   display: none и visibility: hidden выкидывают radio из группы для
+   клавиатуры, а вместе с ним и переход стрелками — то есть ровно то, ради
+   чего он здесь. Кольцо фокуса рисуется на видимой части (см. ниже). */
+.controlInput {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.segment {
+	display: inline-flex;
+	cursor: pointer;
+}
+
+.segmentBody {
+	display: inline-flex;
+	align-items: center;
+	height: 1.875rem;
+	padding: 0 0.75rem;
+	border-radius: 999px;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	color: var(--text-secondary);
+	transition:
+		color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart);
+}
+
+.segment:hover .segmentBody {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+/* Выбранный вариант и ВЫБРАННЫЙ ФИЛЬТР — разные вещи. «Все товары» — это
+   отсутствие фильтрации, и залитый акцентом по умолчанию он оказывался самым
+   громким элементом страницы, сообщая при этом «ничего не отобрано». Поэтому
+   выбор по умолчанию помечен нейтральной заливкой, а акцент достаётся только
+   действительно суженной выдаче — тому же состоянию, которое подтверждает
+   чип в строке активных фильтров. */
+.controlInput:checked ~ .segmentBody {
+	background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+	color: var(--text-primary);
+}
+
+.segment[data-filter="true"] .controlInput:checked ~ .segmentBody {
+	background: var(--primary);
+	color: #fff;
+}
+
+.controlInput:focus-visible ~ .segmentBody {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Активные фильтры
+   ---------------------------------------------------------------------------
+   Строка появляется только когда есть что показать, поэтому у панели два
+   роста. Чтобы это не читалось как рывок, строка проявляется с той же
+   кривой, что и всё остальное движение на сайте.                          */
+.activeRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	animation: catalog-fade-in 240ms var(--ease-out-quart) both;
+}
+
+/* Точка останова та же, что у Tailwind lg (64rem), но правило обязано жить
+   ЗДЕСЬ: display из CSS-модуля перебивает утилиты Tailwind, потому что модуль
+   не завёрнут в слой (см. шапку app/(frontend)/globals.css). Класс lg:hidden
+   на этом элементе не срабатывал вовсе, и на десктопе чипы дублировали
+   состояние, уже напечатанное на самих органах управления. */
+@media (min-width: 64rem) {
+	.activeRow {
+		display: none;
+	}
+}
+
+@keyframes catalog-fade-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, -4px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+.activeChip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	height: 1.75rem;
+	padding: 0 0.3rem 0 0.7rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+	font-size: 0.75rem;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	color: var(--primary-200);
+}
+
+.activeChipRemove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.125rem;
+	height: 1.125rem;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: inherit;
+	opacity: 0.65;
+	cursor: pointer;
+	transition:
+		opacity 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart);
+}
+
+.activeChipRemove:hover,
+.activeChipRemove:focus-visible {
+	opacity: 1;
+	background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.resetLink {
+	border: 0;
+	background: transparent;
+	padding: 0;
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	text-underline-offset: 0.25em;
+	cursor: pointer;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+.resetLink:hover {
+	color: var(--text-primary);
+	text-decoration: underline;
+}
+
+.resetLink:disabled {
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Поповер
+   ---------------------------------------------------------------------------
+   Всплывающее «материализуется», а не просто проявляется: одновременно
+   меняются размытие, масштаб и смещение. Начало отсчёта — сама кнопка
+   (transform-origin по краю привязки), поэтому связь «нажал здесь —
+   открылось отсюда» видна, а не додумывается.                             */
+.popoverWrap {
+	position: relative;
+	display: inline-flex;
+}
+
+.popover {
+	position: absolute;
+	top: calc(100% + 0.5rem);
+	z-index: 40;
+	/* 19rem — не «на глаз», а по самому широкому содержимому: два поля цены,
+	   в каждом до семи цифр (1 249 000) плюс знак валюты. На 15rem поле
+	   обрезало последнюю цифру, и максимум диапазона читался неверно. */
+	min-width: 19rem;
+	padding: 1rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-md);
+	background: var(--void);
+	box-shadow: var(--shadow-lg);
+	color: var(--text-primary);
+
+	opacity: 0;
+	transform: translate3d(0, -6px, 0) scale(0.97);
+	filter: blur(6px);
+	pointer-events: none;
+	transition:
+		opacity 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart),
+		filter 180ms var(--ease-out-quart);
+}
+
+.popover[data-align="start"] {
+	left: 0;
+	transform-origin: top left;
+}
+
+.popover[data-align="end"] {
+	right: 0;
+	transform-origin: top right;
+}
+
+.popover[data-open="true"] {
+	opacity: 1;
+	transform: translate3d(0, 0, 0) scale(1);
+	filter: blur(0px);
+	pointer-events: auto;
+	transition-duration: 260ms;
+	transition-timing-function: var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.popover {
+		transform: none;
+		filter: none;
+		transition: opacity 140ms linear;
+	}
+	.popover[data-open="true"] {
+		transform: none;
+	}
+	.activeRow {
+		animation: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Меню сортировки
+   ---------------------------------------------------------------------------
+   Не список с галочками справа, а список с отметкой слева: активная строка
+   помечена короткой вертикальной чертой акцента на месте, где у остальных
+   пусто. Глаз находит выбранное по левому краю, где начинается чтение, а не
+   по правому, куда приходит последним.                                     */
+.menu {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 13.5rem;
+	padding: 0.35rem;
+}
+
+.menuOption {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.55rem 0.7rem;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1.2;
+	text-align: left;
+	white-space: nowrap;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart);
+}
+
+.menuOption:hover {
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+	color: var(--text-primary);
+}
+
+.menuMark {
+	flex: 0 0 auto;
+	width: 2px;
+	height: 0.875rem;
+	border-radius: 1px;
+	background: transparent;
+	transition: background-color 150ms var(--ease-out-quart);
+}
+
+.menuOption[aria-checked="true"] {
+	color: var(--text-primary);
+}
+
+.menuOption[aria-checked="true"] .menuMark {
+	background: var(--primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Группа фильтров
+   --------------------------------------------------------------------------- */
+.group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+	/* Группа — <fieldset> ради нативной семантики legend + radio, поэтому
+	   браузерные рамку и поля снимаем вручную. */
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.groupHead {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.priceInputs {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+.priceField {
+	position: relative;
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.priceInput {
+	width: 100%;
+	height: 2.5rem;
+	padding: 0 1.6rem 0 0.7rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--void-deep) 70%, transparent);
+	font-size: 0.875rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+	outline: none;
+	appearance: textfield;
+	transition:
+		border-color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart);
+}
+
+.priceInput::-webkit-inner-spin-button,
+.priceInput::-webkit-outer-spin-button {
+	appearance: none;
+	margin: 0;
+}
+
+.priceInput:hover {
+	border-color: var(--border);
+}
+
+.priceInput:focus {
+	border-color: color-mix(in srgb, var(--primary) 70%, transparent);
+	background: color-mix(in srgb, var(--void-deep) 90%, transparent);
+}
+
+/* Знак валюты — часть поля, а не подпись над ним: так ясно, в чём вводят,
+   и не нужна отдельная строка «Цена, ₽». */
+.priceSuffix {
+	position: absolute;
+	top: 50%;
+	right: 0.6rem;
+	transform: translateY(-50%);
+	font-size: 0.8125rem;
+	line-height: 1;
+	color: var(--text-muted);
+	pointer-events: none;
+}
+
+.priceDash {
+	flex: 0 0 auto;
+	width: 0.6rem;
+	height: 1px;
+	background: var(--border);
+}
+
+/* --- Двухползунковая шкала ------------------------------------------------
+   Два наложенных нативных <input type="range">; дорожка и заполнение
+   рисуются отдельными слоями под ними. Без сторонних библиотек.
+
+   Ползунок крупнее визуального кружка за счёт прозрачной рамки: цель под
+   палец получается ~1.6rem при видимом диаметре 0.875rem.                 */
+.slider {
+	position: relative;
+	height: 1.5rem;
+	margin-top: 0.15rem;
+}
+
+.sliderTrack {
+	position: absolute;
+	inset-inline: 0;
+	top: 50%;
+	height: 3px;
+	transform: translateY(-50%);
+	border-radius: 999px;
+	background: var(--rule);
+}
+
+.sliderFill {
+	position: absolute;
+	top: 50%;
+	height: 3px;
+	transform: translateY(-50%);
+	border-radius: 999px;
+	background: var(--primary);
+}
+
+.sliderInput {
+	position: absolute;
+	inset-inline: 0;
+	top: 50%;
+	width: 100%;
+	height: 1.5rem;
+	margin: 0;
+	transform: translateY(-50%);
+	appearance: none;
+	background: transparent;
+	pointer-events: none;
+}
+
+.sliderInput::-webkit-slider-thumb {
+	appearance: none;
+	width: 0.875rem;
+	height: 0.875rem;
+	border: 2px solid var(--void);
+	border-radius: 999px;
+	background: var(--primary);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+	cursor: grab;
+	pointer-events: auto;
+	transition: transform 140ms var(--ease-out-quart);
+}
+
+.sliderInput::-moz-range-thumb {
+	width: 0.875rem;
+	height: 0.875rem;
+	border: 2px solid var(--void);
+	border-radius: 999px;
+	background: var(--primary);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+	cursor: grab;
+	pointer-events: auto;
+	transition: transform 140ms var(--ease-out-quart);
+}
+
+/* Отклик на нажатие, а не на отпускание: ползунок «берётся» в тот момент,
+   когда его коснулись. */
+.sliderInput:active::-webkit-slider-thumb {
+	transform: scale(1.18);
+	cursor: grabbing;
+}
+
+.sliderInput:active::-moz-range-thumb {
+	transform: scale(1.18);
+	cursor: grabbing;
+}
+
+.sliderInput:focus-visible::-webkit-slider-thumb {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+.sliderInput:focus-visible::-moz-range-thumb {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+/* --- Варианты наличия ----------------------------------------------------
+   В листе и поповере варианты стоят вертикальным списком с крупной целью, а
+   не «таблетками» в две строки: список на всю ширину читается сверху вниз и
+   попадает под палец с первого раза.                                      */
+.optionList {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.option {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	min-height: 2.75rem;
+	padding: 0 0.5rem;
+	border-radius: var(--radius-sm);
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart);
+}
+
+.option:hover {
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+	color: var(--text-primary);
+}
+
+/* Кольцо фокуса садится на саму метку выбора, а не на строку: это точка, на
+   которую смотрят, и правило обходится без :has() — то есть без развилки по
+   поддержке для единственного видимого признака фокуса. */
+.controlInput:focus-visible ~ .optionDot {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+.controlInput:checked ~ .optionLabel {
+	color: var(--text-primary);
+}
+
+/* Метка выбора рисуется рамкой и точкой: своего вида у нативного radio на
+   тёмной витрине нет — он приходит из системной палитры и выглядит чужим. */
+.optionDot {
+	position: relative;
+	flex: 0 0 auto;
+	width: 1rem;
+	height: 1rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	transition: border-color 150ms var(--ease-out-quart);
+}
+
+.controlInput:checked ~ .optionDot {
+	border-color: var(--primary);
+}
+
+.optionDot::after {
+	content: "";
+	position: absolute;
+	inset: 50%;
+	width: 0.5rem;
+	height: 0.5rem;
+	transform: translate(-50%, -50%) scale(0);
+	border-radius: 999px;
+	background: var(--primary);
+	transition: transform 180ms var(--ease-out-expo);
+}
+
+.controlInput:checked ~ .optionDot::after {
+	transform: translate(-50%, -50%) scale(1);
+}
+
+/* ---------------------------------------------------------------------------
+   Нижний лист (мобильные фильтры и сортировка)
+   ---------------------------------------------------------------------------
+   Своя реализация, а не общий UI/Drawer: у листа тот же материал, что у
+   корзины и мобильного меню (--void, --rule, моноширинный заголовок,
+   безопасные зоны), а Drawer построен на --surface со скруглением и
+   собственной шапкой. Смешивать два языка в одном каталоге хуже, чем
+   написать полсотни строк раскладки.                                      */
+.sheetRoot {
+	position: fixed;
+	inset: 0;
+	z-index: 80;
+}
+
+.sheetRoot:not([data-open="true"]) {
+	pointer-events: none;
+}
+
+.sheetOverlay {
+	position: absolute;
+	inset: 0;
+	background: color-mix(in srgb, #000 62%, transparent);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	opacity: 0;
+	transition: opacity 260ms var(--ease-out-quart);
+}
+
+.sheetRoot[data-open="true"] .sheetOverlay {
+	opacity: 1;
+	transition-duration: 420ms;
+}
+
+.sheetPanel {
+	position: absolute;
+	z-index: 1;
+	inset-inline: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	max-height: min(88vh, 40rem);
+	border-top: 1px solid var(--rule);
+	border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+	background: var(--void);
+	box-shadow: var(--shadow-xl);
+	color: var(--text-primary);
+
+	transform: translate3d(0, 100%, 0);
+	transition: transform 280ms var(--ease-out-quart);
+	will-change: transform;
+}
+
+.sheetRoot[data-open="true"] .sheetPanel {
+	transform: translate3d(0, 0, 0);
+	/* Вход длиннее выхода: появление должно успеть быть замеченным, уход —
+	   не задерживать. Те же значения, что у панели корзины. */
+	transition-duration: 440ms;
+	transition-timing-function: var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sheetPanel {
+		transform: none;
+		opacity: 0;
+		transition: opacity 180ms linear;
+	}
+	.sheetRoot[data-open="true"] .sheetPanel {
+		transform: none;
+		opacity: 1;
+	}
+}
+
+/* Тёплое пятно у верхнего края — та же единственная декорация, что у
+   мобильного меню и корзины. Без него сплошной --void читается провалом. */
+.sheetPanel::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 auto 0;
+	height: 40%;
+	border-radius: inherit;
+	pointer-events: none;
+	background: radial-gradient(
+		120% 100% at 50% 0%,
+		color-mix(in srgb, var(--primary) 8%, transparent) 0%,
+		transparent 72%
+	);
+}
+
+/* Хват — знак того, что лист принадлежит нижнему краю экрана. */
+.sheetGrabber {
+	position: relative;
+	flex: 0 0 auto;
+	width: 2.25rem;
+	height: 0.25rem;
+	margin: 0.6rem auto 0;
+	border-radius: 999px;
+	background: var(--border);
+}
+
+.sheetHeader {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex: 0 0 auto;
+	padding: 0.9rem 1.15rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+.sheetTitle {
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-primary);
+}
+
+.sheetClose {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	margin-left: auto;
+	width: 2.25rem;
+	height: 2.25rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart);
+}
+
+.sheetClose:hover,
+.sheetClose:focus-visible {
+	color: var(--text-primary);
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.sheetClose:active {
+	transform: scale(0.94);
+}
+
+.sheetBody {
+	position: relative;
+	flex: 1 1 auto;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+	padding: 1.15rem;
+}
+
+.sheetFooter {
+	position: relative;
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.9rem 1.15rem calc(0.9rem + env(safe-area-inset-bottom));
+	border-top: 1px solid var(--rule);
+	background: var(--void);
+}
+
+.sheetApply {
+	flex: 1 1 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	height: 3rem;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: var(--primary);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	color: #fff;
+	cursor: pointer;
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart);
+}
+
+.sheetApply:hover {
+	background: var(--primary-600);
+}
+
+.sheetApply:active {
+	transform: scale(0.985);
+}
+
+.sheetReset {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 3rem;
+	padding: 0 1.1rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart);
+}
+
+.sheetReset:hover {
+	color: var(--text-primary);
+	border-color: var(--border-light);
+}
+
+.sheetReset:disabled {
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+/* Разделитель между группами фильтров в листе. */
+.sheetGroups {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.sheetGroups > * + * {
+	padding-top: 1.5rem;
+	border-top: 1px solid var(--hairline);
+}

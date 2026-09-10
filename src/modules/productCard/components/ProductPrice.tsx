@@ -7,7 +7,7 @@
  * строкой. Зачёркнутая старая цена рядом с новой не помещалась в узкую
  * колонку и переносилась на вторую строку — из-за этого карточки со скидкой
  * оказывались выше соседних, ряд растягивался, и кнопки в нём разъезжались.
- * Факт скидки на карточке несёт бейдж «−15%» на кадре, а точная старая цена —
+ * Факт скидки на карточке несёт ярлык «−15%» на кадре, а точная старая цена —
  * атрибут страницы товара, где для неё есть место.
  *
  * Компонент отображающий, без "use client": рендерится на сервере как часть
@@ -17,6 +17,7 @@
 import { cn } from "@/utils/cn";
 import { formatPrice } from "../lib/format";
 import type { ProductPriceProps } from "../types";
+import styles from "./ProductCard.module.css";
 
 export function ProductPrice({
 	finalPrice,
@@ -28,14 +29,7 @@ export function ProductPrice({
 }: ProductPriceProps) {
 	if (size === "card") {
 		return (
-			<p
-				className={cn(
-					"flex h-7 items-center text-[17px] font-bold leading-none tracking-[-0.02em] tabular-nums text-[var(--text-primary)] sm:text-lg",
-					className,
-				)}
-			>
-				{formatPrice(finalPrice)}
-			</p>
+			<p className={cn(styles.price, className)}>{formatPrice(finalPrice)}</p>
 		);
 	}
 

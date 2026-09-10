@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { cn } from "@/utils/cn";
@@ -63,6 +63,30 @@ export function Drawer({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  // Возврат фокуса после закрытия.
+  //
+  // Обязателен именно из-за inert: закрытая панель исключена из обхода, и
+  // фокус, оставшийся внутри неё, оказывается в подветке, которой для
+  // клавиатуры больше не существует. Дальше Tab начинает обход с начала
+  // документа — то есть пользователь теряет место, где был.
+  //
+  // Внутрь панели при открытии фокус НЕ уводится: это осознанно оставлено как
+  // было, чтобы не менять поведение трёх существующих мест использования.
+  // Кнопка, которой панель открыли, и так получает фокус нажатием, поэтому
+  // возврат к ней — восстановление исходного положения, а не перенос.
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (open) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null;
+      return;
+    }
+    const restore = restoreFocusRef.current;
+    restoreFocusRef.current = null;
+    // Элемент мог исчезнуть вместе с перерисовкой — тогда фокус остаётся там,
+    // где был, а не улетает на <body>.
+    if (restore?.isConnected) restore.focus({ preventScroll: true });
+  }, [open]);
+
   // Портал в document.body недоступен при SSR. Раньше это проверялось через
   // `typeof window === "undefined"` прямо в рендере — сервер рендерил null,
   // а клиент на первом же проходе гидратации уже видел window и сразу
@@ -72,6 +96,14 @@ export function Drawer({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Идентификатор заголовка обязан быть УНИКАЛЬНЫМ. Раньше здесь стояла
+  // строковая константа "drawer-title", и это ломалось ровно там, где на
+  // странице живёт больше одной панели: в каталоге одновременно смонтированы
+  // «Фильтры» и «Сортировка», то есть в документе оказывалось два элемента с
+  // одним id. aria-labelledby у обеих панелей резолвился в ПЕРВЫЙ из них, и
+  // сортировка представлялась скринридеру как «Фильтры».
+  const titleId = useId();
+
   const drawerSize =
     placement === "left" || placement === "right"
       ? { width: typeof size === "number" ? `${size}px` : size }
@@ -80,10 +112,29 @@ export function Drawer({
   if (!mounted) return null;
 
   return createPortal(
+    // Панель ОСТАЁТСЯ в DOM и в закрытом состоянии — иначе оборвётся анимация
+    // ухода (см. transition-transform ниже). Но «присутствует в разметке» и
+    // «существует для пользователя» — разные вещи, и раньше они были склеены:
+    //
+    //   • aria-modal="true" висел всегда. Для скринридера это значит «всё
+    //     остальное на странице недоступно», поэтому на любой странице с
+    //     панелью (каталог монтирует сразу две) содержимое за её пределами
+    //     могло скрываться целиком — при том что визуально никакой панели нет.
+    //
+    //   • Содержимое закрытой панели оставалось в порядке обхода: pointer-events
+    //     отключают мышь, но не Tab. Проходя каталог с клавиатуры, пользователь
+    //     проваливался в невидимые «Фильтры» и «Сортировку».
+    //
+    // inert решает обе задачи разом: подветка исключается и из дерева
+    // доступности, и из обхода табом, и из попадания курсором. aria-modal при
+    // этом всё равно снимается — на случай браузера без поддержки inert
+    // (до Safari 15.5 / Firefox 112) модальная семантика не должна оставаться
+    // включённой у закрытой панели.
     <div
       role="dialog"
-      aria-modal="true"
-      aria-labelledby={title ? "drawer-title" : undefined}
+      aria-modal={open || undefined}
+      aria-labelledby={title ? titleId : undefined}
+      inert={!open}
       className={cn(
         "fixed inset-0 z-50",
         open ? "pointer-events-auto" : "pointer-events-none",
@@ -119,7 +170,7 @@ export function Drawer({
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
           {title && (
             <h2
-              id="drawer-title"
+              id={titleId}
               className="text-base font-semibold text-[var(--text-primary)]"
             >
               {title}

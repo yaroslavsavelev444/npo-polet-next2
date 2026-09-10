@@ -238,6 +238,7 @@ export interface User {
   twoFAVerified?: boolean | null;
   twoFAVerifiedAt?: string | null;
   emailVerified?: boolean | null;
+  cartOnboardingSeenAt?: string | null;
   lastLoginAt?: string | null;
   legacyPasswordHash?: string | null;
   legacyPasswordMigrated?: boolean | null;
@@ -1712,6 +1713,7 @@ export interface UsersSelect<T extends boolean = true> {
   lastLoginAt?: T;
   legacyPasswordHash?: T;
   legacyPasswordMigrated?: T;
+  cartOnboardingSeenAt?: T;
   legacyId?: T;
   updatedAt?: T;
   createdAt?: T;

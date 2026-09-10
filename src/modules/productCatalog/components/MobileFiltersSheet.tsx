@@ -1,7 +1,10 @@
 "use client";
 
-import { Button, Drawer } from "@/UI";
+import { useProductFilters } from "../hooks/useProductFilters";
+import { pluralizeProducts } from "../lib/catalogOptions";
 import type { PriceBounds } from "../types/filters";
+import styles from "./Catalog.module.css";
+import { CatalogSheet } from "./CatalogSheet";
 import { FiltersPanel } from "./FiltersPanel";
 
 interface Props {
@@ -11,28 +14,54 @@ interface Props {
 	resultCount: number;
 }
 
+/**
+ * Фильтры на узком экране.
+ *
+ * Подвал листа несёт оба исхода сразу: «Сбросить» слева и «Показать N» во всю
+ * оставшуюся ширину справа. Число в подписи — не украшение: оно обновляется по
+ * мере кручения фильтров и отвечает на единственный вопрос, который держит
+ * палец над кнопкой, — «а что там останется».
+ */
 export function MobileFiltersSheet({
 	open,
 	onClose,
 	priceBounds,
 	resultCount,
 }: Props) {
+	const { activeFiltersCount, resetFilters } = useProductFilters();
+
 	return (
-		<Drawer
+		<CatalogSheet
 			open={open}
 			onClose={onClose}
 			title="Фильтры"
-			placement="bottom"
-			size="min(88vh, 640px)"
-			className="overflow-hidden rounded-t-[var(--radius-lg)]"
+			titleNote={
+				activeFiltersCount > 0 ? (
+					<span className={styles.micro}>
+						{activeFiltersCount === 1
+							? "1 активен"
+							: `${activeFiltersCount} активны`}
+					</span>
+				) : undefined
+			}
 			footer={
-				<Button variant="primary" size="lg" fullWidth onClick={onClose}>
-					Показать {resultCount} {resultCount === 1 ? "товар" : "товаров"}
-				</Button>
+				<>
+					<button
+						type="button"
+						onClick={resetFilters}
+						disabled={activeFiltersCount === 0}
+						className={styles.sheetReset}
+					>
+						Сбросить
+					</button>
+					<button type="button" onClick={onClose} className={styles.sheetApply}>
+						Показать {resultCount} {pluralizeProducts(resultCount)}
+					</button>
+				</>
 			}
 		>
 			<FiltersPanel priceBounds={priceBounds} />
-		</Drawer>
+		</CatalogSheet>
 	);
 }
 

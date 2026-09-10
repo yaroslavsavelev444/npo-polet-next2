@@ -10,7 +10,6 @@ import type {
 } from "../types/filters";
 import { CatalogProductGrid } from "./CatalogProductGrid";
 import { CatalogToolbar } from "./CatalogToolbar";
-import { DesktopFiltersSidebar } from "./DesktopFiltersSidebar";
 import { MobileFiltersSheet } from "./MobileFiltersSheet";
 import { MobileSortSheet } from "./MobileSortSheet";
 
@@ -28,6 +27,22 @@ interface ProductCatalogLayoutProps {
 	initialPage: ProductsPageResponse;
 }
 
+/**
+ * Страница каталога в трёх ярусах: чем ниже, тем конкретнее.
+ *
+ *   1. шапка — что это за раздел;
+ *   2. липкая панель — сколько тут позиций и как их отобрать;
+ *   3. сетка — сами товары.
+ *
+ * Боковой колонки фильтров больше нет: под два фильтра она занимала четверть
+ * ширины и отбирала у сетки колонку товаров — разбор в шапке CatalogToolbar.
+ * Сетка идёт во всю ширину контента, и число колонок ей задают контейнерные
+ * запросы (см. productGrid), а не вьюпорт.
+ *
+ * Отступ до панели принадлежит шапке, отступ после — сетке: панель липкая, и
+ * расстояния не должны зависеть ни от наличия описания у категории, ни от
+ * того, активны ли фильтры.
+ */
 export function ProductCatalogLayout({
 	category,
 	categoryId,
@@ -47,10 +62,7 @@ export function ProductCatalogLayout({
 				breadcrumbs={breadcrumbs}
 			/>
 
-			{/* Панель липкая, поэтому отступ до неё принадлежит шапке, а отступ
-			    после — сетке: расстояния не зависят от того, есть ли у категории
-			    описание и активны ли фильтры. */}
-			<div className="mt-6 sm:mt-[2rem]">
+			<div className="mt-[2rem] sm:mt-[3rem]">
 				<CatalogToolbar
 					totalDocs={initialPage.totalDocs}
 					priceBounds={priceBounds}
@@ -59,29 +71,12 @@ export function ProductCatalogLayout({
 				/>
 			</div>
 
-			{/* Без lg:items-start: колонки тянутся на всю высоту ряда, и вертикальная
-			    линия у <aside> идёт вдоль всего каталога, а не обрывается там, где
-			    кончились фильтры. Липкость самих фильтров это не ломает — она на
-			    вложенном блоке. */}
-			<div className="mt-6 flex flex-col gap-8 lg:flex-row lg:gap-8">
-				{/* Разделительная линия висит на самом <aside>, а не на липком
-				    блоке внутри: так она идёт колонтитулом во всю высоту каталога,
-				    а не обрывается там, где кончились фильтры. */}
-				<aside className="hidden shrink-0 border-r border-[var(--hairline)] pr-6 lg:block lg:w-[17rem] xl:w-[19rem]">
-					{/* Смещение больше, чем у панели выдачи: иначе верх фильтров
-					    оказывался под ней. */}
-					<div className="sticky top-[calc(var(--sticky-header-height)+5.5rem)]">
-						<DesktopFiltersSidebar priceBounds={priceBounds} />
-					</div>
-				</aside>
-
-				<div className="min-w-0 flex-1">
-					<CatalogProductGrid
-						categoryId={categoryId}
-						filters={filters}
-						initialPage={initialPage}
-					/>
-				</div>
+			<div className="mt-[2rem] sm:mt-[2.5rem]">
+				<CatalogProductGrid
+					categoryId={categoryId}
+					filters={filters}
+					initialPage={initialPage}
+				/>
 			</div>
 
 			<MobileFiltersSheet

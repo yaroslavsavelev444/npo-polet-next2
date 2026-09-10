@@ -203,6 +203,23 @@ export const Users: CollectionConfig = {
 			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 
+		// ── Первое знакомство с корзиной ────────────────────────────────────────
+		// Отметка «человеку уже объяснили, где теперь лежат добавленные товары»
+		// (см. modules/cart, CartOnboarding). Хранится в ПРОФИЛЕ, а не в
+		// localStorage, сознательно: подсказка привязана к аккаунту, и вход с
+		// другого устройства или из другого браузера не должен показывать её
+		// заново. Дата, а не флаг: она же отвечает на вопрос «когда», если
+		// подсказку однажды придётся показать повторно после переработки.
+		{
+			name: "cartOnboardingSeenAt",
+			type: "date",
+			label: "Подсказка о корзине показана",
+			admin: { position: "sidebar", readOnly: true },
+			// Пишется только Server Action'ом (markCartOnboardingSeenAction) через
+			// overrideAccess: true — как и остальные служебные отметки профиля.
+			access: { create: staffOnlyField, update: staffOnlyField },
+		},
+
 		// ── Аудит входа ──────────────────────────────────────────────────────────
 		{
 			name: "lastLoginAt",

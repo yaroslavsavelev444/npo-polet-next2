@@ -3,6 +3,7 @@
 import { Flex } from "@once-ui-system/core";
 import { useEffect, useRef, useState } from "react";
 import { CartIcon } from "@/modules/cart/components/CartIcon";
+import { CartProvider } from "@/modules/cart/components/CartProvider";
 import { NotificationBell } from "@/modules/notifications";
 import { WishlistIcon } from "@/modules/wishlist";
 import type { Category, Setting, User } from "@/payload-types";
@@ -21,6 +22,8 @@ interface Props {
 	cartProductIds: string[];
 	wishlistProductIds: string[];
 	unreadNotificationCount: number;
+	/** Показывали ли пользователю объяснение про корзину (отметка в профиле). */
+	cartOnboardingSeen: boolean;
 }
 
 const MOBILE_MENU_ID = "mobile-nav-panel";
@@ -33,6 +36,7 @@ export default function NavbarClientIsland({
 	cartProductIds,
 	wishlistProductIds,
 	unreadNotificationCount,
+	cartOnboardingSeen,
 }: Props) {
 	const [isMobileOpen, setIsMobileOpen] = useState(false);
 	const burgerRef = useRef<HTMLButtonElement>(null);
@@ -82,22 +86,26 @@ export default function NavbarClientIsland({
 					    она рисуется вторым экземпляром — вплотную к бургеру (ниже),
 					    потому что там это последнее, до чего дотягивается большой
 					    палец. Два экземпляра дешевле, чем условная перестановка
-					    порядка: desktop-раскладку тогда пришлось бы менять. */}
-					{user && (
-						<div className="hidden lg:flex">
-							<CartIcon
-								initialCount={cartItemCount}
-								initialProductIds={cartProductIds}
-							/>
-						</div>
-					)}
+					    порядка: desktop-раскладку тогда пришлось бы менять.
+
+					    Гостю значок показывается наравне с вошедшим: корзина
+					    работает и без аккаунта (состав хранится локально и
+					    переносится после входа), а спрятанный значок означал бы
+					    спрятанную возможность покупки. */}
+					<div className="hidden lg:flex">
+						<CartIcon
+							initialCount={cartItemCount}
+							initialProductIds={cartProductIds}
+							isAuthenticated={Boolean(user)}
+						/>
+					</div>
 					{user && (
 						<NotificationBell initialUnreadCount={unreadNotificationCount} />
 					)}
 					<UserMenu user={user} />
 
-					{/* Mobile: корзина рядом с бургером. Показывается и гостю —
-					    переход уводит на вход с возвратом на /cart. */}
+					{/* Mobile: корзина рядом с бургером — последнее, до чего
+					    дотягивается большой палец. */}
 					<div className="flex lg:hidden">
 						<CartIcon
 							initialCount={cartItemCount}
@@ -114,6 +122,16 @@ export default function NavbarClientIsland({
 					/>
 				</Flex>
 			</Flex>
+
+			<CartProvider
+				userId={user ? String(user.id) : null}
+				onboardingSeen={cartOnboardingSeen}
+				categories={categories.map((category) => ({
+					id: String(category.id),
+					name: category.name,
+					slug: category.slug ?? "",
+				}))}
+			/>
 
 			<MobileMenu
 				panelId={MOBILE_MENU_ID}

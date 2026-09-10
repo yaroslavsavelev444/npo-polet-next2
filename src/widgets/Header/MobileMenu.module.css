@@ -281,6 +281,13 @@
 }
 
 .ctaButton {
+	/* Класс носят и ссылка «Войти», и кнопка корзины (панель открывается
+	   поверх страницы, а не переходом) — поэтому здесь сброс собственных
+	   стилей <button>: без него кнопка приходит с рамкой и системным шрифтом. */
+	border: 0;
+	font-family: inherit;
+	cursor: pointer;
+	text-align: left;
 	display: inline-flex;
 	align-items: center;
 	gap: 0.6rem;

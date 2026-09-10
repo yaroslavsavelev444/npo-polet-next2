@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { RemoveScroll } from "react-remove-scroll";
 import { logoutAction } from "@/modules/auth/actions/logout";
 import type { Category, Setting, User } from "@/payload-types";
+import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
 import { useCartStore } from "@/shared/store/cart.store";
 import { getPrimaryEmail, getPrimaryPhone } from "@/utils/settings-helpers";
 import styles from "./MobileMenu.module.css";
@@ -80,6 +81,7 @@ export default function MobileMenu({
 	const cartHydrated = useCartStore((s) => s.hydrated);
 	const cartCount = useCartStore((s) => s.itemCount);
 	const cartBadge = cartHydrated ? cartCount : cartItemCount;
+	const openCart = useCartPanel((s) => s.open);
 
 	useEffect(() => {
 		if (isOpen) {
@@ -291,17 +293,30 @@ export default function MobileMenu({
 						className={`${styles.cta} ${styles.reveal}`}
 						style={{ "--i": order++ } as React.CSSProperties}
 					>
-						{isAuthenticated ? (
-							<Link href="/cart" onClick={onClose} className={styles.ctaButton}>
-								<ShoppingCart className={styles.ctaIcon} aria-hidden />
-								Корзина
-								{cartBadge > 0 && (
-									<span className={styles.ctaCount}>
-										{cartBadge > 99 ? "99+" : cartBadge}
-									</span>
-								)}
-							</Link>
-						) : (
+						{/* Корзина открывается панелью поверх страницы, а не переходом:
+						    ровно так же, как со значка в шапке. Меню при этом
+						    закрывается — два наложенных слоя одновременно не нужны.
+						    Гостю кнопка показывается наравне с вошедшим: корзина
+						    работает и без аккаунта. */}
+						<button
+							type="button"
+							onClick={() => {
+								onClose();
+								openCart("user");
+							}}
+							aria-haspopup="dialog"
+							className={styles.ctaButton}
+						>
+							<ShoppingCart className={styles.ctaIcon} aria-hidden />
+							Корзина
+							{cartBadge > 0 && (
+								<span className={styles.ctaCount}>
+									{cartBadge > 99 ? "99+" : cartBadge}
+								</span>
+							)}
+						</button>
+
+						{!isAuthenticated && (
 							<Link
 								href="/auth/login"
 								onClick={onClose}

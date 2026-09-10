@@ -23,7 +23,7 @@
  * виджет.
  */
 
-import { Check, Minus, Plus, ShoppingCart, X } from "lucide-react";
+import { Check, Loader2, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { useCartItemsStore } from "@/shared/store/cartItems.store";
 import { Button } from "@/UI";
 import { cn } from "@/utils/cn";
@@ -32,6 +32,7 @@ import { useProductQuantity } from "../hooks/useProductQuantity";
 import { useRemoveFromCart } from "../hooks/useRemoveFromCart";
 import { PRODUCT_STATUS_LABELS } from "../lib/status";
 import type { ProductCardData, ProductQuantitySelectorProps } from "../types";
+import styles from "./ProductCard.module.css";
 
 interface Props extends ProductQuantitySelectorProps {
 	product: ProductCardData;
@@ -60,11 +61,15 @@ export function ProductQuantitySelector({
 			<button
 				type="button"
 				disabled
-				className={cn(
-					CTA_HEIGHT,
-					"w-full cursor-not-allowed truncate rounded-[var(--radius-sm)] border border-[var(--hairline)]",
-					"px-3 text-[13px] font-medium text-[var(--text-muted)]",
-				)}
+				className={
+					isCompact
+						? cn(styles.cta, styles.ctaUnavailable)
+						: cn(
+								CTA_HEIGHT,
+								"w-full cursor-not-allowed truncate rounded-[var(--radius-sm)] border border-[var(--hairline)]",
+								"px-3 text-[13px] font-medium text-[var(--text-muted)]",
+							)
+				}
 			>
 				{/* В карточке точный статус уже напечатан в служебной строке, и
 				    повторять его на кнопке — значит сказать одно и то же дважды в
@@ -83,29 +88,13 @@ export function ProductQuantitySelector({
 				disabled={isRemoving}
 				onClick={() => void removeFromCart(product.id, product.title)}
 				aria-label={`Убрать «${product.title}» из корзины`}
-				className={cn(
-					CTA_HEIGHT,
-					"group/cta flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] text-[13px] font-medium",
-					"bg-[var(--success)]/12 text-[var(--success)] transition-colors duration-150",
-					"hover:bg-[var(--error)]/15 hover:text-[var(--error)]",
-					"focus-visible:bg-[var(--error)]/15 focus-visible:text-[var(--error)]",
-					"disabled:pointer-events-none disabled:opacity-60",
-				)}
+				className={cn(styles.cta, styles.ctaInCart)}
 			>
-				<Check
-					size={15}
-					aria-hidden="true"
-					className="shrink-0 group-hover/cta:!hidden group-focus-visible/cta:!hidden"
-				/>
-				<X
-					size={15}
-					aria-hidden="true"
-					className="hidden shrink-0 group-hover/cta:!block group-focus-visible/cta:!block"
-				/>
-				<span className="group-hover/cta:!hidden group-focus-visible/cta:!hidden">
-					В корзине
+				<span className={styles.ctaInCartIdle}>
+					<Check size={15} aria-hidden="true" className="shrink-0" />В корзине
 				</span>
-				<span className="hidden group-hover/cta:!inline group-focus-visible/cta:!inline">
+				<span className={styles.ctaInCartHover}>
+					<X size={15} aria-hidden="true" className="shrink-0" />
 					Убрать
 				</span>
 			</button>
@@ -124,22 +113,33 @@ export function ProductQuantitySelector({
 		const batchSize = Math.max(minOrderQuantity, 1);
 
 		return (
-			<Button
-				variant="primary"
-				size="md"
-				fullWidth
-				loading={isAdding}
+			// Не UI/Button: в карточке без контейнера кнопка обязана быть тихой по
+			// умолчанию и заливаться акцентом только у той позиции, с которой
+			// сейчас работают (а на сенсорном экране — всегда). Это состояние
+			// РОДИТЕЛЯ, влияющее на потомка, плюс правило по типу указателя —
+			// см. .cta в ProductCard.module.css.
+			<button
+				type="button"
+				disabled={isAdding}
+				aria-busy={isAdding}
 				onClick={handleAddToCart}
 				aria-label={
 					batchSize > 1
 						? `Добавить «${product.title}» в корзину — минимальная партия ${batchSize} шт.`
 						: `Добавить «${product.title}» в корзину`
 				}
-				className={cn(CTA_HEIGHT, "gap-2 px-3 text-[13px]")}
+				className={styles.cta}
 			>
-				<ShoppingCart className="h-4 w-4 shrink-0" aria-hidden="true" />
+				{isAdding ? (
+					<Loader2
+						className="h-4 w-4 shrink-0 animate-spin"
+						aria-hidden="true"
+					/>
+				) : (
+					<ShoppingCart className="h-4 w-4 shrink-0" aria-hidden="true" />
+				)}
 				<span className="truncate">В корзину</span>
-			</Button>
+			</button>
 		);
 	}
 

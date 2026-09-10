@@ -90,6 +90,38 @@ export async function removeCartItem(
   return updated as unknown as Cart;
 }
 
+/**
+ * Записывает состав корзины целиком, одной операцией.
+ *
+ * Нужно слиянию гостевой корзины: там меняется сразу несколько позиций, и
+ * поштучные вызовы setCartItemQuantity дали бы столько же записей в базу —
+ * каждая со своим окном, в котором параллельная вкладка успевает записать
+ * своё. Один update означает, что корзина после слияния либо целиком новая,
+ * либо целиком прежняя.
+ */
+export async function setCartItems(
+  userId: string,
+  entries: { productId: string; quantity: number; addedAt?: string | null }[],
+  existingCart?: Cart,
+): Promise<Cart> {
+  const payload = await getPayloadInstance();
+  const cart = existingCart ?? (await getOrCreateCart(userId));
+
+  const updated = await payload.update({
+    collection: "carts",
+    id: cart.id,
+    data: {
+      items: entries.map((entry) => ({
+        product: Number(entry.productId),
+        quantity: entry.quantity,
+        addedAt: entry.addedAt ?? new Date().toISOString(),
+      })),
+    },
+    overrideAccess: true,
+  });
+  return updated as unknown as Cart;
+}
+
 export async function clearCartItems(userId: string): Promise<Cart> {
   const payload = await getPayloadInstance();
   const cart = await getOrCreateCart(userId);

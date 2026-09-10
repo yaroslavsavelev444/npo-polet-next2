@@ -1,24 +1,31 @@
 /**
  * modules/productCard/components/ProductImage.tsx
  *
- * Кадр товара в карточке каталога.
+ * Кадр товара в карточке каталога — единственная поверхность карточки после
+ * того, как контейнер вокруг товара исчез (разбор в шапке
+ * ProductCard.module.css).
  *
- * Геометрия кадра НЕ зависит от снимка. Раньше это было не так только на
- * словах: соотношение сторон было фиксированным, но внутренний отступ задавался
- * в пикселях (p-4), поэтому на узкой карточке широкий снимок превращался в
- * полоску, а вертикальный — в столб от края до края. Здесь отступ задан в
- * процентах: он резолвится от ширины контейнера, а контейнер квадратный, —
- * значит поле вокруг снимка визуально одинаково на любой ширине колонки.
+ * Геометрия кадра НЕ зависит от снимка: контейнер квадратный, поле вокруг
+ * снимка задано в процентах от его ширины, поэтому вертикальная панель,
+ * широкий блок и марка на прозрачном фоне занимают в сетке одинаковое место.
  *
- * Подложка — общий токен --media-plate. Он чуть светлее поверхности карточки,
- * поэтому снимок с залитым белым фоном и снимок с прозрачным фоном садятся на
- * одну и ту же плашку и читаются как один набор, а не как случайная нарезка.
+ * Подложка — общий токен --media-plate. Он чуть светлее витрины, поэтому
+ * снимок с залитым белым фоном и снимок с прозрачным фоном садятся на одну
+ * плашку и читаются как один набор, а не как случайная нарезка.
+ *
+ * Оверлейные действия приходят через children, а не рисуются здесь: кадр
+ * отвечает за кадр, а какие кнопки на нём лежат, решает карточка. Раньше они
+ * были соседями кадра внутри карточки и позиционировались от неё — стоило
+ * убрать у карточки контейнер, и «правый верхний угол» стал углом всей
+ * колонки, включая текст.
  */
 
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { cn } from "@/utils/cn";
 import type { ProductImageProps } from "../types";
+import styles from "./ProductCard.module.css";
 
 function getImageUrl(media: unknown): string | null {
 	if (!media || typeof media !== "object") return null;
@@ -57,7 +64,8 @@ export function ProductImage({
 	discountPercentage,
 	status,
 	priority = false,
-}: ProductImageProps) {
+	children,
+}: ProductImageProps & { children?: ReactNode }) {
 	const firstMedia = images?.[0];
 	const imageUrl = getImageUrl(firstMedia);
 	const imageAlt = getImageAlt(firstMedia, `Изображение товара ${productId}`);
@@ -65,41 +73,34 @@ export function ProductImage({
 	const isUnavailable = status === "out_of_stock" || status === "discontinued";
 
 	return (
-		<div className="relative aspect-square w-full shrink-0 overflow-hidden border-b border-[var(--hairline)] bg-[var(--media-plate)]">
+		<div className={styles.frame}>
 			{imageUrl ? (
 				<Image
 					src={imageUrl}
 					alt={imageAlt}
 					fill
-					sizes="(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 20vw"
+					// Сетка идёт во всю ширину контента (боковой панели фильтров
+					// больше нет), поэтому колонка на широком экране — это пятая
+					// часть страницы, а не четверть за вычетом панели.
+					sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
 					preload={priority}
 					quality={85}
-					// Отступ в процентах от ширины квадратного контейнера — поле вокруг
-					// снимка масштабируется вместе с колонкой сетки.
-					className={cn(
-						"object-contain p-[9%] transition-transform duration-500 ease-out motion-reduce:!transform-none",
-						isUnavailable
-							? "opacity-45 grayscale"
-							: "group-hover:!scale-[1.04]",
-					)}
+					className={cn(styles.image, isUnavailable && styles.imageUnavailable)}
 				/>
 			) : (
-				<div
-					className="flex h-full w-full items-center justify-center text-[var(--border-light)]"
-					aria-hidden="true"
-				>
+				<div className={styles.imageEmpty} aria-hidden="true">
 					<ImageOff className="h-1/5 w-1/5" strokeWidth={1.25} />
 				</div>
 			)}
 
-			{/* Скидка — единственный бейдж на кадре. Статус наличия ушёл в
-			    текстовую строку карточки: два ярлыка поверх снимка спорили друг с
-			    другом и закрывали товар. */}
+			{/* Скидка — единственный ярлык на кадре. Статус наличия ушёл в
+			    служебную строку под кадром: два ярлыка поверх снимка спорили друг
+			    с другом и закрывали товар. */}
 			{hasDiscount && discountPercentage ? (
-				<span className="absolute left-2 top-2 rounded-[var(--radius-sm)] bg-[var(--primary)] px-1.5 py-[0.25rem] text-[11px] font-bold leading-none tabular-nums text-white">
-					−{discountPercentage}%
-				</span>
+				<span className={styles.discount}>−{discountPercentage}%</span>
 			) : null}
+
+			{children}
 		</div>
 	);
 }

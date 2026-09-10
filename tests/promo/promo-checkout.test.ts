@@ -84,6 +84,7 @@ function cart(
 		},
 		validation: { isValid: true, issues: [] },
 		discounts: { applied: [], hints: [] },
+		unavailable: [],
 		updatedAt: NOW.toISOString(),
 	};
 }

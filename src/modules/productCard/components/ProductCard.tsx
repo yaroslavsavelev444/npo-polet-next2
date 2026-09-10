@@ -3,24 +3,32 @@
  *
  * Композиционный корень карточки.
  *
- * Геометрия карточки задана слотами, а не содержимым: квадратный кадр,
- * служебная строка ровно в 16 px, цена ровно в 28 px, название ровно в две
- * строки и кнопка, прижатая к низу через mt-auto. Ни соотношение сторон
- * снимка, ни длина названия, ни наличие скидки не могут сдвинуть кнопку по
- * вертикали — при любом наборе товаров ряд карточек читается как сетка, а не
- * как коллаж.
+ * У карточки нет карточки: ни поверхности, ни рамки, ни скругления вокруг
+ * товара — только квадратный кадр и текст под ним, выходящий на тот же левый
+ * край. Чем держится структура сетки без контейнеров, разобрано в шапке
+ * ProductCard.module.css.
+ *
+ * Порядок чтения: кадр → служебная строка → название → цена → действие. Он
+ * повторяет порядок решения: узнал по снимку, опознал по названию, оценил по
+ * цене, нажал. Раньше цена стояла ВЫШЕ названия, и карточка начинала разговор
+ * с суммы, ещё не сказав, за что она.
+ *
+ * Геометрия задана слотами, а не содержимым: служебная строка ровно 16 px,
+ * название ровно две строки, цена ровно 28 px, кнопка прижата к низу. Ни
+ * пропорции снимка, ни длина названия, ни наличие скидки не могут сдвинуть
+ * кнопку по вертикали.
  *
  * Карточка не является ссылкой целиком: вложенные интерактивные элементы
- * (избранное, кнопка добавления) внутри <a> невалидны. Кликабельную область
- * растягивает заголовок приёмом stretched link (before:absolute before:inset-0)
- * через ближайшего позиционированного предка — сам article; остальные
- * интерактивные элементы лежат поверх (z-10+) и остаются доступными.
+ * (избранное, кнопка покупки) внутри <a> невалидны. Кликабельную область
+ * растягивает заголовок приёмом stretched link; остальные действия лежат выше
+ * по z-index и остаются доступными.
  */
 import Link from "next/link";
 import { calculatePriceBreakdown } from "../lib/pricing";
 import { getProductHref } from "../lib/routing";
 import type { ProductCardProps } from "../types";
 import { ProductActions } from "./ProductActions";
+import styles from "./ProductCard.module.css";
 import { ProductImage } from "./ProductImage";
 import { ProductMeta } from "./ProductMeta";
 import { ProductPrice } from "./ProductPrice";
@@ -41,18 +49,7 @@ export function ProductCard({
 	const href = getProductHref(product, currentCategorySlug);
 
 	return (
-		<article
-			// isolate — карточка создаёт собственный контекст наложения, поэтому её
-			// внутренние z-index не «протекают» в корневой контекст и не
-			// перекрывают фиксированный хедер при скролле.
-			className={`group relative isolate flex h-full flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)] transition-colors duration-200 hover:border-[var(--border-light)] ${className ?? ""}`}
-		>
-			<ProductActions
-				product={product}
-				showQuickView={showQuickView}
-				onQuickView={onQuickView ? () => onQuickView(product) : undefined}
-			/>
-
+		<article className={`${styles.card} ${className ?? ""}`}>
 			<ProductImage
 				images={product.images}
 				productId={product.id}
@@ -60,9 +57,15 @@ export function ProductCard({
 				discountPercentage={discountPercentage}
 				status={product.status}
 				priority={priorityImage}
-			/>
+			>
+				<ProductActions
+					product={product}
+					showQuickView={showQuickView}
+					onQuickView={onQuickView ? () => onQuickView(product) : undefined}
+				/>
+			</ProductImage>
 
-			<div className="flex flex-1 flex-col p-3 sm:p-3.5">
+			<div className={styles.body}>
 				<ProductMeta
 					status={product.status}
 					rating={product.rating}
@@ -70,21 +73,17 @@ export function ProductCard({
 					minOrderQuantity={product.minOrderQuantity}
 				/>
 
+				<Link href={href} className={styles.titleLink}>
+					<ProductTitle title={product.title} />
+				</Link>
+
 				<ProductPrice
-					className="mt-[0.5rem]"
 					finalPrice={finalPrice}
 					originalPrice={product.priceForIndividual}
 					hasDiscount={hasDiscount}
 				/>
 
-				<Link
-					href={href}
-					className="mt-0.5 block rounded-sm before:absolute before:inset-0 before:z-0 before:content-['']"
-				>
-					<ProductTitle title={product.title} />
-				</Link>
-
-				<div className="relative z-10 mt-auto pt-3">
+				<div className={styles.ctaSlot}>
 					<ProductQuantitySelector
 						variant="card"
 						product={product}

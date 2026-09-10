@@ -99,6 +99,7 @@ export function buildProductWhere(options: GetProductsOptions): Where {
 
 function getProductsCacheKey(options?: GetProductsOptions): string {
 	const {
+		ids,
 		category,
 		status,
 		isVisible,
@@ -111,7 +112,14 @@ function getProductsCacheKey(options?: GetProductsOptions): string {
 		page,
 		depth,
 	} = options || {};
-	return `products-cat-${category || "any"}-st-${status || "any"}-vis-${isVisible ?? "any"}-main-${showOnMainPage ?? "any"}-pmin-${minPrice ?? "any"}-pmax-${maxPrice ?? "any"}-sort-${sort || "title"}-l-${limit || 100}-p-${page || 1}-d-${depth ?? 1}`;
+	// `ids` обязан входить в ключ. Пока его здесь не было, ЛЮБЫЕ две выборки
+	// по списку id с прочими одинаковыми параметрами делили одну запись кэша:
+	// блок «с этим товаром покупают» на второй карточке отдавал товары первой
+	// (см. get-related-products.ts), а корзина показала бы чужие позиции.
+	// Сортировка — чтобы один и тот же набор в разном порядке не заводил две
+	// записи: порядок выдачи вызывающая сторона всё равно задаёт сама.
+	const idsKey = ids && ids.length > 0 ? [...ids].sort().join(".") : "any";
+	return `products-ids-${idsKey}-cat-${category || "any"}-st-${status || "any"}-vis-${isVisible ?? "any"}-main-${showOnMainPage ?? "any"}-pmin-${minPrice ?? "any"}-pmax-${maxPrice ?? "any"}-sort-${sort || "title"}-l-${limit || 100}-p-${page || 1}-d-${depth ?? 1}`;
 }
 
 async function fetchProducts(options: GetProductsOptions = {}) {
