@@ -1,0 +1,687 @@
+/* ===========================================================================
+   Подвал
+   ===========================================================================
+   Продолжение того же визуального языка, что главная, контакты, каталог,
+   страница товара, корзина и мобильное меню, а не отдельный компонент:
+
+     • материал — --void-deep, самая тёмная поверхность шкалы. Подвал это дно
+       страницы, и он обязан быть темнее всего, что лежит на нём. На витрине
+       (--background) он читается как отбитый низ, на главной, где последняя
+       секция тоже --void-deep, — как продолжение той же плиты, отбитое
+       разлинованной чертой сверху;
+     • структуру держит разлиновка (--rule) и колонки, а не карточки с
+       рамками. Ровно так набраны каналы связи на контактах, полка фактов на
+       товаре и реквизиты компании;
+     • микроподписи — моноширинный верхний регистр с разрядкой. Тот же голос,
+       что в панели каталога, в корзине и в списке каналов связи;
+     • акцидентная PaluiSP2 появляется РОВНО ОДИН РАЗ — в строке-подписи под
+       знаком. Второй и третий раз превратили бы приём в оформление, а на
+       главной подвал идёт сразу за финальным призывом, набранным ею же
+       плакатным кеглем: повторять его размером нельзя;
+     • времена и кривые — --dur-* / --ease-out-expo / --ease-out-quart из
+       home.css. Движение на сайте одно.
+
+   Модуль, а не утилиты Tailwind: глобальные стили @once-ui-system
+   подключаются вне слоёв и перебивают любой слоистый CSS, в том числе
+   утилиты отступов Tailwind по числовой шкале (подробности — в шапке
+   app/(frontend)/globals.css). Хешированные имена классов эту войну обходят
+   стороной, а состояния родителя, влияющие на потомков, в утилитах всё равно
+   не записываются.                                                          */
+
+/* ---------------------------------------------------------------------------
+   Плита
+   --------------------------------------------------------------------------- */
+
+.footer {
+	position: relative;
+	/* Собственный контекст наложения: подсветка и разлиновка лежат под
+	   содержимым и не могут вылезти поверх плавающих элементов страницы
+	   (кнопка обратной связи, баннер cookie). */
+	isolation: isolate;
+	width: 100%;
+	background: var(--void-deep);
+	color: var(--text-primary);
+}
+
+/* Тёплое пятно у верхнего края — та же и единственная декорация, что в
+   мобильном меню и в панели корзины. Без него сплошной --void-deep высотой в
+   пол-экрана выглядит провалом, а не поверхностью.
+
+   Смещено влево, к знаку: подсветка отмечает начало чтения, а не центрируется
+   ради симметрии. */
+.glow {
+	position: absolute;
+	inset: 0 0 auto 0;
+	z-index: -1;
+	height: min(26rem, 70%);
+	pointer-events: none;
+	background: radial-gradient(
+		75% 100% at 16% 0%,
+		color-mix(in srgb, var(--primary) 9%, transparent) 0%,
+		transparent 68%
+	);
+}
+
+/* Разлинованная черта по верхнему краю — тот же шов, которым на главной
+   отбиты секции (.rule-ticked в home.css). Он нужен именно здесь: на главной
+   последняя секция набрана тем же --void-deep, и без черты подвал слился бы
+   с финальным призывом в одну бесконечную плиту. Засечки на нём — шкала,
+   гаснущая вправо, как и везде на сайте. */
+.seam {
+	position: absolute;
+	inset: 0 0 auto 0;
+}
+
+/* Единственная прочерчивающаяся линия подвала: она отбивает нижнюю строку с
+   реквизитами. Одна на блок — движение должно быть одним внятным моментом, а
+   не набором эффектов. */
+.rule {
+	margin-top: clamp(2.25rem, 4.5vw, 3.5rem);
+}
+
+/* Внутренняя колонка. Ширина и горизонтальные отступы совпадают с Container
+   главной и контактов до пикселя: левый край подписи в подвале обязан стоять
+   ровно под левым краем содержимого страницы, иначе низ выглядит приклеенным
+   от другого макета.
+
+   Нижний отступ учитывает безопасную зону — на телефонах с жестовой
+   навигацией последняя строка иначе уходит под системную полосу. */
+.inner {
+	position: relative;
+	width: 100%;
+	max-width: 80rem;
+	margin: 0 auto;
+	padding: clamp(2.75rem, 5vw, 4.25rem) 1.25rem
+		calc(clamp(1.75rem, 3vw, 2.5rem) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 40rem) {
+	.inner {
+		padding-inline: 2rem;
+	}
+}
+
+@media (min-width: 64rem) {
+	.inner {
+		padding-inline: 3rem;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Появление
+   ---------------------------------------------------------------------------
+   Один наблюдатель на весь подвал, а не по одному на блок. Подвал стоит на
+   КАЖДОЙ странице сайта, и семь отдельных IntersectionObserver'ов — это семь
+   клиентских компонентов в каждом маршруте ради украшения. Здесь наблюдатель
+   один (FooterReveal), он переключает data-shown, а каскад по блокам делает
+   CSS через порядковый номер --i.
+
+   Характер входа тот же, что у галереи товара: сдвиг снизу плюс расфокус,
+   уходящий в ноль. БЕЗ clip-path — общего для сайта среза здесь быть не
+   должно: подсветка строки канала выходит за границы блока и была бы срезана
+   оставшимся inset(0).
+
+   Шаг 70 мс: меньше — каскад сливается в общий сдвиг, больше — нижняя строка
+   заметно опаздывает за верхней.                                            */
+.item {
+	opacity: 0;
+	transform: translate3d(0, 16px, 0);
+	filter: blur(6px);
+	transition:
+		opacity var(--dur-base) var(--ease-out-expo),
+		transform var(--dur-slow) var(--ease-out-expo),
+		filter var(--dur-base) var(--ease-out-expo);
+	transition-delay: calc(var(--i, 0) * 70ms);
+	/* Подсказка композитору снимается сразу после входа: постоянный
+	   will-change на блоке, который есть на каждой странице, — это чистый
+	   расход видеопамяти. */
+	will-change: opacity, transform, filter;
+}
+
+.inner[data-shown="true"] .item {
+	opacity: 1;
+	transform: none;
+	filter: blur(0);
+	will-change: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Знак и подпись
+   --------------------------------------------------------------------------- */
+
+.head {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+.mark {
+	display: inline-flex;
+	align-items: center;
+	text-decoration: none;
+	color: inherit;
+	/* Ссылка-картинка обязана иметь площадь нажатия не меньше 44px даже когда
+	   сам знак ниже. */
+	min-height: 2.75rem;
+	border-radius: var(--radius-sm);
+	transition: opacity var(--dur-fast) var(--ease-out-quart);
+}
+
+.mark:hover,
+.mark:focus-visible {
+	opacity: 0.78;
+}
+
+.logo {
+	display: block;
+	height: clamp(2rem, 4vw, 2.5rem);
+	width: auto;
+}
+
+/* Запасной знак, когда логотип в настройках не задан. Набирается акцидентной
+   гарнитурой — это единственное место подвала, где она уместна как НАЗВАНИЕ. */
+.wordmark {
+	font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+	color: var(--text-primary);
+}
+
+/* Подпись под знаком — строка бренда, та же, что в мобильном меню.
+   Кегль намеренно далёк от плакатного: на главной подвал идёт сразу за
+   финальным призывом, набранным этой же гарнитурой в clamp(2rem…6rem), и
+   вторая крупная надпись подряд читалась бы как сбой вёрстки. Здесь она
+   работает подписью, поэтому и цвет приглушённый.
+
+   Мера 15ch и hyphens из .u-display держат её в двух строках на любом экране:
+   у PaluiSP2 знак занимает ~1.2em, и без переноса «ПОРАЖЕНИЕ» вылезало бы за
+   колонку на 320px. */
+.strap {
+	max-width: 15ch;
+	margin: 0;
+	font-size: clamp(1.0625rem, 0.9rem + 0.8vw, 1.625rem);
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Полка каналов связи
+   ---------------------------------------------------------------------------
+   Телефон и почта — это и есть целевое действие подвала, поэтому отдельных
+   кнопок «Написать нам» здесь нет: на главной подвал стоит сразу под финальным
+   призывом с ровно такими же кнопками («Смотреть продукцию», «Написать
+   менеджеру»), и третья пара повторила бы их через 80 пикселей.
+
+   Строки набраны так же, как каналы связи на контактах: моноширинная подпись
+   назначения сверху, крупное значение снизу. На широком экране они встают
+   рядом и разделяются волосяной чертой — это полка фактов со страницы товара,
+   тот же приём.                                                              */
+.channels {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	margin-top: clamp(1.75rem, 3.5vw, 2.75rem);
+	border-top: 1px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+}
+
+.channels > * + * {
+	border-top: 1px solid var(--rule);
+}
+
+@media (min-width: 48rem) {
+	.channels {
+		/* Число колонок приходит инлайн: ячеек бывает две (телефон, почта) или
+		   три (плюс график работы), и repeat(auto-fit) здесь не годится — он
+		   растянул бы две ячейки на всю ширину, оставив значения посреди
+		   пустоты. */
+		grid-template-columns: repeat(var(--channel-cols, 2), minmax(0, 1fr));
+	}
+
+	.channels > * + * {
+		border-top: 0;
+		border-left: 1px solid var(--rule);
+		padding-left: clamp(1.25rem, 3vw, 2.5rem);
+	}
+}
+
+.channel {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding-block: clamp(0.875rem, 1.6vw, 1.125rem);
+	text-decoration: none;
+	color: inherit;
+}
+
+/* Подсветка в глубину, а не всплытие: строка не поднимается и не получает
+   тень, у неё теплеет фон. Тот же жест, что у .channel-row на контактах. */
+.channel::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--primary) 7%, transparent);
+	opacity: 0;
+	transition: opacity var(--dur-fast) var(--ease-out-quart);
+	pointer-events: none;
+}
+
+a.channel:hover::before,
+a.channel:focus-visible::before {
+	opacity: 1;
+}
+
+.channelBody {
+	position: relative;
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+/* Назначение канала: моноширинный верхний регистр с разрядкой — тот же голос,
+   что у подписей полей на контактах и у микроподписей страницы товара. */
+.channelLabel {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.channelValue {
+	display: inline-block;
+	font-size: clamp(1rem, 0.9rem + 0.45vw, 1.3125rem);
+	font-weight: 500;
+	line-height: 1.25;
+	letter-spacing: -0.02em;
+	color: var(--text-primary);
+	/* Длинная почта на узком экране обязана переноситься, а не растягивать
+	   колонку и вместе с ней всю страницу. */
+	overflow-wrap: anywhere;
+	transition:
+		color var(--dur-fast) var(--ease-out-quart),
+		transform var(--dur-base) var(--ease-out-expo);
+}
+
+/* Значение сдвигается вправо на ширину пробела — строка «отзывается», а не
+   «всплывает». */
+a.channel:hover .channelValue,
+a.channel:focus-visible .channelValue {
+	color: var(--primary);
+	transform: translate3d(0.25rem, 0, 0);
+}
+
+/* График работы — не ссылка, звонить и писать по нему некуда, поэтому и кегль
+   у него меньше: это подпись при канале, а не канал. */
+.channelNote {
+	font-size: 0.9375rem;
+	font-weight: 400;
+	line-height: 1.4;
+	letter-spacing: normal;
+	color: var(--text-secondary);
+}
+
+.channelIcon {
+	position: relative;
+	width: 1.0625rem;
+	height: 1.0625rem;
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	transition:
+		color var(--dur-base) var(--ease-out-quart),
+		transform var(--dur-base) var(--ease-out-expo);
+}
+
+a.channel:hover .channelIcon,
+a.channel:focus-visible .channelIcon {
+	color: var(--primary);
+	transform: translate3d(0, -1px, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Колонки навигации
+   ---------------------------------------------------------------------------
+   Две колонки на телефоне, а не одна: пунктов пятнадцать, и в один столбец
+   подвал вытянулся бы на два экрана. Число колонок на широком приходит
+   инлайн — групп бывает три (без соцсетей) или четыре, а фиксированное
+   repeat(4) оставляло бы справа пустую ячейку.                              */
+.nav {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: clamp(1.75rem, 4vw, 2.5rem) clamp(1.25rem, 3vw, 2rem);
+	margin-top: clamp(2.25rem, 4.5vw, 3.5rem);
+}
+
+@media (min-width: 48rem) {
+	.nav {
+		grid-template-columns: repeat(var(--nav-cols, 3), minmax(0, 1fr));
+	}
+}
+
+.group {
+	min-width: 0;
+}
+
+/* Заголовок колонки. Моноширинный верхний регистр с разрядкой — тот же голос,
+   которым на всём сайте набраны названия полей, единицы и счётчики. */
+.groupTitle {
+	margin: 0 0 0.65rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.list {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* Площадь нажатия задана высотой строки, а не отступами вокруг текста: так
+   она предсказуема и не зависит от длины подписи. На тач-устройствах строка
+   выше — там промахнуться дороже. */
+.link {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-height: 2.125rem;
+	font-size: 0.875rem;
+	line-height: 1.4;
+	color: var(--text-secondary);
+	text-decoration: none;
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+	.link {
+		min-height: 2.75rem;
+	}
+}
+
+.link:hover,
+.link:focus-visible {
+	color: var(--text-primary);
+}
+
+/* Подчёркивание прочерчивается слева направо — та же механика, что у
+   разделителей секций и у линии под полем формы в фокусе. Одна узнаваемая
+   реакция на весь сайт вместо трёх разных.
+
+   Живёт на внутреннем span, а не на самой ссылке: строка выше текста ради
+   площади нажатия, и линия по её нижнему краю висела бы в воздухе. */
+.linkText {
+	position: relative;
+	min-width: 0;
+}
+
+.linkText::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	bottom: -0.15em;
+	height: 1px;
+	background: currentColor;
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.link:hover .linkText::after,
+.link:focus-visible .linkText::after {
+	transform: scaleX(1);
+}
+
+/* Названия категорий приходят из админки и бывают длиной в предложение.
+   В колонке шириной 140px такое название занимает пять строк и ломает ряд,
+   поэтому хвост срезается на второй строке, а полное имя остаётся в title. */
+.linkClamp {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+}
+
+/* Пункт «Все категории» замыкает список и по смыслу стоит на ступень выше
+   остальных — отбиваем его чертой и цветом. Черта принадлежит строке списка,
+   а не ссылке: ссылка выше своего текста ради площади нажатия, и линия по её
+   краю встала бы не там, где кончается предыдущий пункт. */
+.itemAll {
+	margin-top: 0.35rem;
+	padding-top: 0.4rem;
+	border-top: 1px solid var(--hairline);
+}
+
+.itemAll .link {
+	color: var(--text-primary);
+}
+
+.linkIcon {
+	width: 0.9375rem;
+	height: 0.9375rem;
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	transition:
+		color var(--dur-base) var(--ease-out-quart),
+		transform var(--dur-base) var(--ease-out-expo);
+}
+
+/* Цвет площадки живёт только в иконке и только при наведении: пять чужих
+   фирменных цветов, разложенных по подвалу постоянно, первыми разваливают
+   палитру. Тот же приём, что у .net-link на контактах. */
+.link:hover .linkIcon,
+.link:focus-visible .linkIcon {
+	color: var(--net-tint, var(--primary));
+	transform: translate3d(0, -1px, 0);
+}
+
+/* Стрелка «уходит на другой сайт». Цвет площадки на неё НЕ переносится: он
+   принадлежит знаку канала, а стрелка — служебный указатель направления, и
+   вторая деталь того же цвета в строке из трёх элементов превращает подсказку
+   в пестроту. Двигается по диагонали — туда, куда ведёт. */
+.linkArrow {
+	width: 0.8125rem;
+	height: 0.8125rem;
+	flex: 0 0 auto;
+	/* Прижата к правому краю колонки, а не к последнему слову. Иначе она
+	   гуляет: у подписи в одну строку стоит вплотную, у перенесённой на две —
+	   всё равно уезжает вправо (перенесённая строка занимает всю доступную
+	   ширину), и в одной колонке оказываются стрелки на разных вертикалях.
+	   Заодно это то же выравнивание, что у списка каналов на контактах. */
+	margin-left: auto;
+	color: var(--text-muted);
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.link:hover .linkArrow,
+.link:focus-visible .linkArrow {
+	transform: translate3d(0.2rem, -0.2rem, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Нижняя строка
+   --------------------------------------------------------------------------- */
+
+.legal {
+	display: flex;
+	flex-direction: column;
+	gap: clamp(1.25rem, 2.5vw, 1.75rem);
+	margin-top: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+@media (min-width: 64rem) {
+	.legal {
+		flex-direction: row;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: clamp(2rem, 4vw, 4rem);
+	}
+}
+
+.legalMeta {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	margin: 0;
+	max-width: 46ch;
+	font-size: 0.8125rem;
+	line-height: 1.6;
+	color: var(--text-muted);
+}
+
+.legalName {
+	color: var(--text-secondary);
+}
+
+/* Юридические ссылки и «Наверх» встают в один ряд с реквизитами на широком
+   экране, и ссылки при этом остаются ВЫРОВНЕННЫМИ ПО ЛЕВОМУ КРАЮ, а не по
+   правому.
+   Причина не в симметрии: шесть названий соглашений по-русски длиннее любой
+   доступной им ширины и переносятся на вторую строку всегда. При выравнивании
+   по правому краю у переноса нет общего края — обе строки начинаются в разных
+   местах, и блок читается как осыпь. При левом выравнивании у него есть ось. */
+.legalSide {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: clamp(1rem, 2vw, 1.25rem);
+}
+
+@media (min-width: 64rem) {
+	.legalSide {
+		flex: 1 1 auto;
+		min-width: 0;
+		flex-direction: row;
+		align-items: flex-start;
+		justify-content: flex-end;
+		gap: clamp(1.5rem, 3vw, 3rem);
+	}
+}
+
+.legalLinks {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 1.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+@media (min-width: 64rem) {
+	.legalLinks {
+		flex: 0 1 auto;
+		min-width: 0;
+	}
+}
+
+.legalLink {
+	font-size: 0.8125rem;
+	min-height: 1.875rem;
+}
+
+@media (pointer: coarse) {
+	.legalLink {
+		min-height: 2.5rem;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Наверх
+   ---------------------------------------------------------------------------
+   Остаётся ссылкой на #top, а не кнопкой: без JavaScript якорь на «top» —
+   штатный способ вернуться к началу документа, и подвал не должен зависеть от
+   гидратации ради базового действия. Плавность и перевод фокуса добавляет
+   обработчик (BackToTop.tsx).                                               */
+.toTop {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 0.55rem;
+	min-height: 2.75rem;
+	padding-inline: 1.1rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	line-height: 1;
+	text-transform: uppercase;
+	text-decoration: none;
+	color: var(--text-secondary);
+	background: transparent;
+	transition:
+		color var(--dur-fast) var(--ease-out-quart),
+		border-color var(--dur-fast) var(--ease-out-quart),
+		background-color var(--dur-fast) var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart);
+}
+
+.toTop:hover,
+.toTop:focus-visible {
+	color: var(--text-primary);
+	border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+/* Отклик на нажатие, а не на отпускание: обратная связь, которая ждёт клика,
+   ощущается задержкой. */
+.toTop:active {
+	transform: scale(0.97);
+}
+
+.toTopIcon {
+	width: 0.9375rem;
+	height: 0.9375rem;
+	flex: 0 0 auto;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+/* Стрелка подсказывает направление ещё до нажатия. */
+.toTop:hover .toTopIcon,
+.toTop:focus-visible .toTopIcon {
+	transform: translate3d(0, -3px, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Уважение к настройкам пользователя
+   ---------------------------------------------------------------------------
+   Отключается ДВИЖЕНИЕ, а не содержание: всё, что было спрятано ради входа,
+   принудительно показывается. Цветовые переходы остаются — они помогают
+   понять состояние и вестибулярный аппарат не трогают.                      */
+@media (prefers-reduced-motion: reduce) {
+	.item {
+		opacity: 1 !important;
+		transform: none !important;
+		filter: none !important;
+		transition: none !important;
+	}
+
+	.channelValue,
+	.channelIcon,
+	.linkIcon,
+	.linkArrow,
+	.linkText::after,
+	.toTop,
+	.toTopIcon {
+		transition: none !important;
+	}
+
+	.channelValue,
+	.channelIcon,
+	.linkIcon,
+	.linkArrow,
+	.toTopIcon {
+		transform: none !important;
+	}
+}

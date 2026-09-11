@@ -30,12 +30,20 @@ import {
 import { getProductRatingBreakdown } from "@/payload/services/reviews.service";
 import { baseURL } from "@/resources/content";
 import { JsonLd } from "@/shared/components/JsonLd";
+import { Reveal } from "@/shared/components/motion/Reveal";
 import { PageContainer } from "@/shared/components/PageContainer";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
 
 interface Props {
 	params: Promise<{ categorySlug: string; slug: string }>;
 }
+
+/**
+ * За этим элементом следит липкая панель покупки: пока блок виден, панели
+ * нет. Идентификатор живёт здесь, потому что связывает два соседних узла
+ * одной разметки, а не принадлежит какому-то одному компоненту.
+ */
+const BUY_PANEL_ID = "product-buy-panel";
 
 /**
  * Резолвит /category/[categorySlug]/products/[slug] в конкретный товар,
@@ -137,7 +145,7 @@ export default async function ProductDetailPage({ params }: Props) {
 	];
 
 	return (
-		<main className="w-full min-h-screen pb-[6.5rem] lg:pb-[4rem]">
+		<main className="w-full min-h-screen pb-[7rem]">
 			<JsonLd data={jsonLd} />
 			<JsonLd data={buildBreadcrumbSchema(breadcrumbItems)} />
 
@@ -155,46 +163,55 @@ export default async function ProductDetailPage({ params }: Props) {
 				</div>
 
 				{/*
-				 * Одна сетка на всю страницу товара: слева галерея и вся
-				 * информационная часть, справа — липкий блок покупки.
+				 * ПЕРВЫЙ ЭКРАН — разворот «галерея + покупка», и больше ничего.
 				 *
-				 * Раньше верхний блок жил в собственной сетке шириной 840 px,
-				 * описание — в колонке 768 px, а характеристики растягивались на
-				 * всю ширину контейнера: три разные меры на одной странице, из-за
-				 * чего казалось, что у каждого блока свои отступы. Здесь у всех
-				 * секций общие левая и правая границы, а блок покупки остаётся на
-				 * виду всё время, пока читают характеристики.
+				 * Раньше эта сетка тянулась на всю страницу: слева галерея и всё
+				 * содержимое, справа липкий блок покупки. На широком экране это
+				 * означало, что правая половина страницы ниже первого экрана
+				 * пустует до самого подвала — блок покупки короткий, а под ним
+				 * ничего нет. Здесь сетка заканчивается вместе с первым экраном,
+				 * а описание, характеристики, отзывы и похожие товары идут под
+				 * ней во всю меру. Доступность покупки на длинной странице
+				 * держит липкая панель снизу (ProductStickyBar): она поднимается
+				 * ровно тогда, когда блок покупки уходит из кадра.
 				 *
-				 * Порядок в разметке — галерея, покупка, информация — верен для
-				 * мобильной одноколоночной раскладки; на десктопе явные
-				 * col-start/row-start возвращают информацию под галерею.
+				 * Порядок в разметке — галерея, затем покупка — верен и для
+				 * мобильной одноколоночной раскладки: сначала смотрят товар,
+				 * потом решают.
 				 */}
-				<div className="mt-[2rem] grid grid-cols-1 items-start gap-x-10 gap-y-10 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_22rem] xl:gap-x-14 xl:grid-cols-[minmax(0,1fr)_25rem]">
-					<div className="min-w-0 lg:col-start-1 lg:row-start-1">
-						<ProductGallery
-							images={detailData.images}
-							title={detailData.title}
-						/>
-					</div>
+				<div className="mt-[clamp(1.75rem,3vw,2.75rem)] grid grid-cols-1 items-start gap-x-10 gap-y-[2rem] lg:grid-cols-[minmax(0,1fr)_22rem] xl:gap-x-14 xl:grid-cols-[minmax(0,1fr)_25rem]">
+					{/* Галерея появляется собственным входом, а не через <Reveal>:
+					    у общего появления в показанном состоянии остаётся
+					    clip-path: inset(0), то есть обрезка ровно по краю блока, —
+					    а подсветка за кадром выходит за его границы и была бы
+					    срезана. Вход при этом тот же по характеру (см.
+					    .galleryEnter). */}
+					<ProductGallery images={detailData.images} title={detailData.title} />
 
-					<div className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-[calc(var(--sticky-header-height)+1.5rem)]">
-						<ProductBuyPanel product={detailData} cardData={cardData} />
+					<div
+						id={BUY_PANEL_ID}
+						className="lg:sticky lg:top-[calc(var(--sticky-header-height)+1.5rem)]"
+					>
+						<Reveal delay={340}>
+							<ProductBuyPanel product={detailData} cardData={cardData} />
+						</Reveal>
 					</div>
-
-					<ProductInformation
-						product={detailData}
-						reviewsData={reviewsData}
-						className="min-w-0 lg:col-start-1 lg:row-start-2"
-					/>
 				</div>
 
-				<ProductRelated
-					products={relatedProducts}
-					className="mt-[4rem] border-t border-[var(--hairline)] pt-[3rem] lg:mt-[5rem]"
+				<ProductInformation
+					product={detailData}
+					reviewsData={reviewsData}
+					className="min-w-0"
 				/>
+
+				<ProductRelated products={relatedProducts} />
 			</PageContainer>
 
-			<ProductStickyBar product={detailData} cardData={cardData} />
+			<ProductStickyBar
+				product={detailData}
+				cardData={cardData}
+				watchId={BUY_PANEL_ID}
+			/>
 		</main>
 	);
 }

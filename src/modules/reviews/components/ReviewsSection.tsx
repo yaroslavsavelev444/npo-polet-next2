@@ -73,7 +73,11 @@ export function ReviewsSection({ data }: { data: ReviewsSectionData }) {
 	return (
 		<section className="flex flex-col gap-8">
 			{/* ── Верхний блок: сводка рейтинга + призыв оставить отзыв ── */}
-			<div className="flex flex-col gap-6 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+			{/* Сводка — утопленная в страницу панель (--void темнее витрины), тот же
+			    материал, что у блока покупки на странице товара. Прежняя светлая
+			    карточка на --surface читалась наклейкой поверх страницы: единственный
+			    светлый прямоугольник среди разлинованных разделов. */}
+			<div className="flex flex-col gap-6 rounded-[var(--radius-md)] border border-[var(--rule)] bg-[var(--void)] p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
 				{hasReviews ? (
 					<RatingSummary breakdown={breakdown} />
 				) : (
@@ -100,7 +104,7 @@ export function ReviewsSection({ data }: { data: ReviewsSectionData }) {
 			{/* ── Список отзывов ── */}
 			{hasReviews && (
 				<div className="flex flex-col">
-					<h3 className="mb-1 text-sm font-medium text-[var(--text-muted)]">
+					<h3 className="mb-1 font-mono text-[0.625rem] font-medium uppercase tracking-[0.12em] text-[var(--text-muted)] tabular-nums">
 						{breakdown.count} {pluralizeReviews(breakdown.count)}
 					</h3>
 					{reviews.map((review) => (

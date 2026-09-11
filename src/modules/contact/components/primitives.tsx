@@ -1,43 +1,10 @@
-"use client";
-
-import { useReveal } from "@/shared/components/motion/Reveal";
-import { cn } from "@/utils/cn";
-
 /**
- * Линия-разделитель, которая прочерчивается слева направо, когда доходит до
- * кадра.
+ * Примитивы страницы контактов.
  *
- * Почему не обычный <Reveal> вокруг .rule-ticked: общее появление на сайте —
- * «наводка на резкость» (clip-path + расфокус), и на линии высотой в один
- * пиксель оно не читается вовсе. Здесь нужен другой вход, поэтому берётся
- * только наблюдатель из useReveal, а состояние переключается собственным
- * атрибутом data-drawn (стили — .rule-draw в app/(frontend)/contacts.css).
- *
- * Компонент декоративен: содержания в нём нет, поэтому aria-hidden.
+ * DrawnRule здесь больше не объявляется: приём понадобился третьей странице
+ * (товару), и по правилу, записанному в шапке app/(frontend)/contacts.css,
+ * переехал в общий слой — shared/components/motion/DrawnRule.tsx вместе со
+ * стилями .rule-draw в home.css. Реэкспорт оставлен, чтобы разметка контактов
+ * продолжала брать примитивы из одного места.
  */
-export function DrawnRule({
-	className,
-	plain = false,
-	delay = 0,
-}: {
-	className?: string;
-	/** Без засечек-шкалы — для разделителей внутри списка. */
-	plain?: boolean;
-	delay?: number;
-}) {
-	const { ref, revealed } = useReveal<HTMLDivElement>("block");
-
-	return (
-		<div
-			ref={ref}
-			data-drawn={revealed}
-			aria-hidden="true"
-			className={cn("rule-draw", plain && "rule-draw--plain", className)}
-			style={
-				delay
-					? ({ "--reveal-delay": `${delay}ms` } as React.CSSProperties)
-					: undefined
-			}
-		/>
-	);
-}
+export { DrawnRule } from "@/shared/components/motion/DrawnRule";

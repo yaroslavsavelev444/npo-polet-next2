@@ -1,66 +1,44 @@
-import type { Category } from "@/payload-types";
-import { cn } from "@/utils/cn";
-import CategoryCard from "./CategoryCard";
-
-export type GridColumns = 2 | 3 | 4;
+import type { CategoryCardData } from "../types/filters";
+import { CategoryCard } from "./CategoryCard";
+import styles from "./CategoryCatalog.module.css";
 
 interface CategoryGridProps {
-	categories: Category[];
-	loading?: boolean;
-	columns?: GridColumns;
-	className?: string;
+	categories: CategoryCardData[];
+	/** Каскад появления — только при первой сборке выдачи, см. CategoryCard. */
+	stagger?: boolean;
 }
 
-const GRID_COLUMNS: Record<GridColumns, string> = {
-	2: "lg:grid-cols-2",
-	3: "lg:grid-cols-3",
-	4: "lg:grid-cols-4",
-};
-
-function CategoryCardSkeleton() {
-	return (
-		<article
-			aria-hidden="true"
-			className="flex flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] animate-pulse"
-		>
-			<div className="aspect-square w-full bg-[var(--surface-secondary)]" />
-			{/* !p-4: коллизия с .p-4 из @once-ui-system/core, см. CategoryCard.tsx */}
-			<div className="flex flex-col gap-2.5 !p-4">
-				<div className="h-4 w-3/4 rounded bg-[var(--surface-secondary)]" />
-				<div className="h-3 w-full rounded bg-[var(--surface-secondary)]" />
-				<div className="h-3 w-2/3 rounded bg-[var(--surface-secondary)]" />
-			</div>
-		</article>
-	);
-}
-
-export default function CategoryGrid({
+/**
+ * Сетка разделов.
+ *
+ * Число колонок задаётся контейнерными запросами (класс .grid в
+ * CategoryCatalog.module.css), поэтому класс @container обязан висеть на
+ * ОБЁРТКЕ: элемент не может быть собственным query-контейнером, и при
+ * совмещении ролей запросы молча перестают срабатывать — сетка остаётся
+ * двухколоночной на любой ширине. Тот же порядок, что и в сетке товаров.
+ *
+ * <ul>, а не <div>: это перечень разделов, и скринридер обязан объявить его
+ * длину до того, как пользователь начнёт его обходить.
+ */
+export function CategoryGrid({
 	categories,
-	loading = false,
-	columns = 4,
-	className,
+	stagger = true,
 }: CategoryGridProps) {
-	const skeletonCount = columns * 2;
-
 	return (
-		<section
-			className={cn(
-				"grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3",
-				GRID_COLUMNS[columns],
-				className,
-			)}
-		>
-			{loading
-				? Array.from({ length: skeletonCount }).map((_, index) => (
-						<CategoryCardSkeleton key={index} />
-					))
-				: categories.map((category, index) => (
-						<CategoryCard
-							key={category.id}
-							category={category}
-							priority={index < 8}
-						/>
-					))}
-		</section>
+		<div className="@container">
+			<ul className={styles.grid}>
+				{categories.map((category, index) => (
+					<CategoryCard
+						key={category.id}
+						category={category}
+						index={index}
+						priority={index < 4}
+						stagger={stagger}
+					/>
+				))}
+			</ul>
+		</div>
 	);
 }
+
+export default CategoryGrid;

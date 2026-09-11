@@ -11,7 +11,7 @@ export function ReviewCard({ review }: ReviewCardProps) {
 	const initial = review.authorName.charAt(0).toUpperCase() || "?";
 
 	return (
-		<article className="flex flex-col gap-3 border-b border-[var(--border)] py-5 first:pt-0 last:border-0">
+		<article className="flex flex-col gap-3 border-b border-[var(--hairline)] py-5 first:pt-0 last:border-0">
 			<header className="flex items-start justify-between gap-3">
 				<div className="flex items-center gap-3">
 					<span

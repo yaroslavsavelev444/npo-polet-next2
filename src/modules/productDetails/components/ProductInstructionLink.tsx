@@ -1,6 +1,7 @@
 import { Download, ExternalLink, FileText } from "lucide-react";
 import { cn } from "@/utils/cn";
 import type { ProductInstructionData } from "../types";
+import styles from "./ProductPage.module.css";
 
 interface Props {
 	instruction: ProductInstructionData;
@@ -13,11 +14,11 @@ interface Props {
  *    расширение файла;
  *  - «link» — внешняя ссылка: открываем в новой вкладке, показываем домен.
  *
- * Раньше это была карточка со своей рамкой и радиусом внутри блока покупки,
- * у которого уже есть и рамка, и радиус, — вложенная карточка. Теперь это
- * строка той же таблицы, что и условия поставки: собственной рамки нет,
+ * Это строка той же таблицы, что и условия поставки: собственной рамки нет,
  * отделяет её волосяная линия сверху. Кликабельна вся строка — крупная зона
- * нажатия удобна и на тач-устройствах.
+ * нажатия удобна и на тач-устройствах. Стрелка действия сдвигается при
+ * наведении: направление жеста подсказывает, что произойдёт (уход из
+ * страницы), и это единственная микроанимация строки.
  */
 export function ProductInstructionLink({ instruction, className }: Props) {
 	const isFile = instruction.type === "file";
@@ -38,22 +39,15 @@ export function ProductInstructionLink({ instruction, className }: Props) {
 			rel="noopener noreferrer"
 			download={isFile || undefined}
 			aria-label={`Инструкция к товару — ${actionLabel.toLowerCase()}`}
-			className={cn(
-				"group flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-[var(--surface-hover)]",
-				className,
-			)}
+			className={cn(styles.instruction, className)}
 		>
-			<span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--primary)]/10 text-[var(--primary)]">
-				<FileText className="h-[18px] w-[18px]" aria-hidden="true" />
-				{badge && (
-					<span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-[var(--primary)] px-1.5 py-px text-[9px] font-bold uppercase leading-none text-white">
-						{badge}
-					</span>
-				)}
+			<span className={styles.instructionMark}>
+				<FileText className="h-4 w-4" aria-hidden="true" />
+				{badge && <span className={styles.instructionBadge}>{badge}</span>}
 			</span>
 
 			<span className="min-w-0 flex-1">
-				<span className="block text-[13px] font-semibold text-[var(--text-primary)]">
+				<span className="block text-[0.8125rem] font-semibold text-[var(--text-primary)]">
 					Инструкция к товару
 				</span>
 				<span className="block truncate text-xs text-[var(--text-muted)]">
@@ -61,7 +55,7 @@ export function ProductInstructionLink({ instruction, className }: Props) {
 				</span>
 			</span>
 
-			<span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--primary)]">
+			<span className={styles.instructionAction}>
 				<ActionIcon className="h-4 w-4" aria-hidden="true" />
 				<span className="hidden sm:inline">{actionLabel}</span>
 			</span>

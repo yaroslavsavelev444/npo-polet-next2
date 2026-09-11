@@ -315,3 +315,55 @@ export const getCachedCategoryPriceBounds = (categoryId: string) => {
 		revalidate: false,
 	})();
 };
+
+/**
+ * Число видимых позиций в каждом разделе каталога: ключ — id категории
+ * строкой, значение — количество товаров.
+ *
+ * Один запрос на весь каталог, а не payload.count на каждую категорию:
+ * разделов два десятка, и поштучный подсчёт превратился бы в два десятка
+ * обращений к базе на каждую отрисовку витрины каталога. Выбирается ровно
+ * одно поле (select) при depth 0 — из базы приезжают пары id-категории, а не
+ * документы товаров.
+ *
+ * Условия те же, что у выдачи раздела (buildProductWhere с isVisible), иначе
+ * подпись на карточке обещала бы позиции, которых на странице раздела нет:
+ * черновики и снятые с продажи в счёт не идут.
+ */
+async function fetchCategoryProductCounts(): Promise<Record<string, number>> {
+	const payload = await getPayloadInstance();
+	const result = await payload.find({
+		collection: "products",
+		where: buildProductWhere({ isVisible: true }),
+		depth: 0,
+		pagination: false,
+		select: { category: true },
+	});
+
+	const counts: Record<string, number> = {};
+	for (const doc of result.docs) {
+		// depth: 0 отдаёт связь числом, но в типах она остаётся объединением —
+		// разбираем оба случая, чтобы смена depth не ломала подсчёт молча.
+		const relation = (doc as { category?: number | { id: number } | null })
+			.category;
+		const id = typeof relation === "object" ? relation?.id : relation;
+		if (id === null || id === undefined) continue;
+		const key = String(id);
+		counts[key] = (counts[key] ?? 0) + 1;
+	}
+	return counts;
+}
+
+export const getCachedCategoryProductCounts = () => {
+	if (env.NODE_ENV === "development") {
+		return fetchCategoryProductCounts();
+	}
+	return unstable_cache(
+		fetchCategoryProductCounts,
+		["category-product-counts"],
+		{
+			tags: ["products"],
+			revalidate: false,
+		},
+	)();
+};

@@ -17,7 +17,7 @@ export function RatingSummary({ breakdown }: RatingSummaryProps) {
 	return (
 		<div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-10">
 			<div className="flex shrink-0 flex-col items-center gap-1 sm:items-start">
-				<span className="text-5xl font-bold leading-none tracking-tight text-[var(--text-primary)]">
+				<span className="text-5xl font-bold leading-none tracking-[-0.03em] tabular-nums text-[var(--text-primary)]">
 					{average.toFixed(1)}
 				</span>
 				<StarRating value={average} size={18} />
@@ -35,7 +35,7 @@ export function RatingSummary({ breakdown }: RatingSummaryProps) {
 							<span className="w-3 shrink-0 tabular-nums text-[var(--text-muted)]">
 								{star}
 							</span>
-							<div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+							<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
 								<div
 									className="h-full rounded-full bg-[var(--warning)] transition-[width] duration-500"
 									style={{ width: `${percent}%` }}

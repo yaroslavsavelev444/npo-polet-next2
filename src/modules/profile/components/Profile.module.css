@@ -1,0 +1,1355 @@
+/* ===========================================================================
+   Личный кабинет
+   ===========================================================================
+   Материалы и движение — общие с уже обновлёнными поверхностями (главная,
+   контакты, каталог, корзина). Своей системы у кабинета нет и быть не должно:
+
+     • первый экран — полоса --void-deep с одним радиальным источником снизу
+       слева, ровно как на контактах и витрине каталога;
+     • липкая панель разделов — тот же класс .rail из
+       productCatalog/components/Catalog.module.css, что держит управление
+       выдачей: кабинет не заводит вторую липкую панель со своим ростом;
+     • служебные подписи — моноширинный верхний регистр с разрядкой (.micro
+       оттуда же);
+     • времена и кривые — --ease-out-expo / --ease-out-quart / --dur-* из
+       app/(frontend)/home.css.
+
+   Чем кабинет ОТЛИЧАЕТСЯ от каталога — и почему. Каталог показывает
+   однородный набор (сетка равнозначных карточек), кабинет — разнородные
+   настройки, у каждой своя цена ошибки. Поэтому здесь не сетка, а
+   разлинованные секции в две колонки: слева объяснение, что это за настройка
+   и чем грозит, справа сам орган управления. Прочитать, прежде чем трогать, —
+   это и есть композиция страницы.
+
+   Модуль, а не глобальный файл: глобальные утилиты @once-ui-system
+   подключаются вне слоёв и перебивают Tailwind на числовых отступах (разбор —
+   в шапке app/(frontend)/globals.css). Хешированные имена классов этот спор
+   обходят стороной.                                                         */
+
+/* ---------------------------------------------------------------------------
+   Личность
+   ---------------------------------------------------------------------------
+   Правая колонка первого экрана. На витрине каталога там стоит пояснение к
+   разделу — здесь стоит ответ на вопрос «под кем я вошёл», и это ровно тот
+   же уровень: то, что нужно знать до того, как что-то делать.
+
+   Монограмма — не аватар. Загружаемой картинки у пользователя в этой системе
+   нет, и рисовать серый силуэт вместо неё значит показывать отсутствие
+   данных там, где данные есть: две буквы имени опознаются мгновенно. Плашка
+   под ними — та же --media-plate, что под кадром товара и раздела.         */
+.identity {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.identityHead {
+	display: flex;
+	align-items: center;
+	gap: 0.875rem;
+	min-width: 0;
+}
+
+.monogram {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 3rem;
+	height: 3rem;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	color: var(--text-secondary);
+	/* Тонкая внутренняя обводка вместо рамки: на --void-deep плашка иначе
+	   сливается с полосой первого экрана. */
+	box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.identityName {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	line-height: 1.3;
+	letter-spacing: var(--tracking-tight);
+	color: var(--text-primary);
+	/* Длинное ФИО обрезается по ширине, а не переносится на три строки: блок
+	   стоит рядом с заголовком и обязан держать высоту. */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.identityEmail {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.identityMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.identityFoot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding-top: 0.875rem;
+	border-top: 1px solid var(--rule);
+}
+
+/* ---------------------------------------------------------------------------
+   Признак состояния
+   ---------------------------------------------------------------------------
+   Роль, подтверждение почты, статус аккаунта. Заливка вместо рамки: три
+   обведённых прямоугольника подряд читаются как группа кнопок, а нажать их
+   нельзя.                                                                   */
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	height: 1.5rem;
+	padding: 0 0.6rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	line-height: 1;
+	text-transform: uppercase;
+	white-space: nowrap;
+	color: var(--text-secondary);
+}
+
+.chipDot {
+	width: 0.375rem;
+	height: 0.375rem;
+	border-radius: 999px;
+	background: currentColor;
+}
+
+.chipOk {
+	background: color-mix(in srgb, var(--success) 14%, transparent);
+	color: color-mix(in srgb, var(--success) 82%, #fff);
+}
+
+.chipWarn {
+	background: color-mix(in srgb, var(--warning) 16%, transparent);
+	color: color-mix(in srgb, var(--warning) 78%, #fff);
+}
+
+.chipDanger {
+	background: color-mix(in srgb, var(--error) 14%, transparent);
+	color: color-mix(in srgb, var(--error) 82%, #fff);
+}
+
+/* ---------------------------------------------------------------------------
+   Навигация по разделам
+   ---------------------------------------------------------------------------
+   Живёт внутри липкой .rail — той же, что на витрине каталога. Разделов три,
+   и они взаимоисключающие, поэтому это сегментированный переключатель, а не
+   список ссылок: промежуток между пунктами соврал бы, что их можно выбрать
+   несколько.
+
+   Подсветка активного — ОДИН элемент, который переезжает между сегментами, а
+   не заливка, которая гаснет в одном месте и зажигается в другом. Переезд
+   показывает, что это одна и та же позиция в одном ряду; одновременное
+   гашение и зажигание читается как два несвязанных события. Геометрию
+   подсветке пишет ProfileNav в переменные --nav-x / --nav-w.
+
+   На узком экране ряд прокручивается горизонтально: при трёх подписях на
+   320px он не помещается, а резать подписи до значков — терять единственное,
+   что объясняет, куда ведёт раздел.                                        */
+.nav {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	min-width: 0;
+	padding: 0.25rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--void) 60%, transparent);
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+	display: none;
+}
+
+/* Подсветка. inset-block вместо height: ряд может подрасти на сенсорных
+   экранах (цель крупнее), и подсветка обязана расти вместе с ним. */
+.navHighlight {
+	position: absolute;
+	top: 0.25rem;
+	bottom: 0.25rem;
+	left: 0;
+	z-index: 0;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+	transform: translate3d(var(--nav-x, 0), 0, 0);
+	width: var(--nav-w, 0);
+	transition:
+		transform 380ms var(--ease-out-expo),
+		width 380ms var(--ease-out-expo);
+	pointer-events: none;
+}
+
+/* До первого замера ширина нулевая — без этого подсветка на первом кадре
+   выезжала бы из левого края. */
+.nav[data-ready="true"] .navHighlight {
+	opacity: 1;
+}
+
+.nav:not([data-ready="true"]) .navHighlight {
+	opacity: 0;
+	transition: none;
+}
+
+.navItem {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	flex: 0 0 auto;
+	height: 2rem;
+	padding: 0 0.85rem;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition: color 200ms var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+	.navItem {
+		height: 2.25rem;
+	}
+}
+
+/* Узкий экран: поля сегмента поджимаются, чтобы все три подписи уместились в
+   ряд без прокрутки.
+
+   Числа не подобраны на глаз. На 375px под ряд остаётся 343px, а при полях
+   0.85rem (и 1rem на сенсорных экранах) три сегмента занимают 378 — ровно на
+   35px больше. Поджатие полей до 0.6rem и отбивок до 0.35/0.2rem снимает
+   ~45px, и ряд встаёт целиком с запасом.
+
+   Цель под палец от этого не страдает: её задаёт высота (2.25rem) и ширина
+   сегмента, которая и при поджатых полях не меньше 80px.
+
+   Прокрутка остаётся включённой как страховка: на 320px ряд всё равно не
+   помещается ни при каких полях, а резать подписи до значков — терять
+   единственное, что объясняет, куда ведёт раздел. */
+@media (max-width: 26rem) {
+	.nav {
+		gap: 0.2rem;
+	}
+
+	.navItem {
+		gap: 0.35rem;
+		padding: 0 0.6rem;
+	}
+}
+
+.navItem:hover {
+	color: var(--text-primary);
+}
+
+.navItem[aria-selected="true"] {
+	color: var(--text-primary);
+}
+
+.navIcon {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	transition: color 200ms var(--ease-out-quart);
+}
+
+.navItem[aria-selected="true"] .navIcon {
+	color: var(--primary);
+}
+
+/* Счётчик у раздела — число устройств. Появляется только когда есть что
+   считать. */
+.navCount {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+}
+
+.navItem[aria-selected="true"] .navCount {
+	color: var(--primary-200);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.navHighlight {
+		transition: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Панель раздела
+   ---------------------------------------------------------------------------
+   Смена раздела — это смена содержимого на одном и том же месте, и она
+   обязана читаться как одно движение: панель проявляется со сдвигом снизу,
+   той же кривой, что и всё остальное появление на сайте. Длительность
+   короткая (280 мс): переключение вкладок — навигация, а не показ.        */
+.panel {
+	animation: profile-panel-in 300ms var(--ease-out-expo) both;
+}
+
+@keyframes profile-panel-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 10px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.panel {
+		animation: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Секция настроек
+   ---------------------------------------------------------------------------
+   Две колонки: слева — что это и зачем, справа — сам орган управления.
+   Порог 62rem, а не 64rem: колонка объяснения фиксирована (17rem), и на
+   1024px правой части остаётся ровно столько, сколько нужно полю с подписью.
+
+   Разлиновка сверху у каждой секции, кроме первой: секции отбиваются линией,
+   как разделы на странице товара, а не рамкой карточки — рамок в этой
+   системе нет.                                                             */
+.section {
+	display: grid;
+	gap: 1.25rem;
+	padding-block: clamp(1.75rem, 3.5vw, 2.75rem);
+	border-top: 1px solid var(--rule);
+}
+
+.section:first-child {
+	border-top: 0;
+	padding-top: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+@media (min-width: 62rem) {
+	.section {
+		grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+		gap: clamp(2rem, 4vw, 4rem);
+	}
+}
+
+.sectionAside {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.sectionTitle {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	line-height: 1.3;
+	letter-spacing: var(--tracking-tight);
+	color: var(--text-primary);
+}
+
+.sectionHint {
+	margin: 0;
+	max-width: 46ch;
+	font-size: 0.8125rem;
+	line-height: 1.6;
+	color: var(--text-muted);
+}
+
+.sectionBody {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+	min-width: 0;
+}
+
+/* Секция, доводящая до необратимого действия. Не залитая красным панель — на
+   тёмной витрине крупное красное пятно кричит раньше, чем его прочитали, — а
+   та же секция, у которой красным помечено только то, что нажимают. */
+.sectionDanger .sectionTitle {
+	color: color-mix(in srgb, var(--error) 80%, #fff);
+}
+
+/* ---------------------------------------------------------------------------
+   Поле формы
+   ---------------------------------------------------------------------------
+   Строка с подчёркиванием, а не обведённая коробка: тот же приём, что в форме
+   обратной связи на контактах (.contact-field в app/(frontend)/contacts.css).
+   Повторён здесь, а не вынесен в общий слой, по правилу проекта: приём
+   переезжает в общее место, когда понадобится ТРЕТЬЕЙ странице. Пока их две,
+   и у кабинета свои поля — с крупной целью под палец и с кнопкой показа
+   пароля в правом углу, чего у формы контактов нет.
+
+   Ошибка — состояние самой строки: линия краснеет в тот момент, когда взгляд
+   ещё не дошёл до текста под полем.                                         */
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	min-width: 0;
+}
+
+.fieldLabel {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	transition: color 200ms var(--ease-out-quart);
+}
+
+.fieldBox {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	border-bottom: 1px solid var(--border);
+	transition: border-color 200ms var(--ease-out-quart);
+}
+
+.fieldBox:hover {
+	border-bottom-color: var(--border-light);
+}
+
+/* Прочерк акцента по фокусу — тот же жест, которым прочерчивается линия под
+   активной строкой на главной и разделитель на контактах. */
+.fieldBox::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	bottom: -1px;
+	height: 1px;
+	background: var(--primary);
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.fieldBox:focus-within::after {
+	transform: scaleX(1);
+}
+
+.field[data-invalid="true"] .fieldBox {
+	border-bottom-color: color-mix(in srgb, var(--error) 55%, transparent);
+}
+
+.field[data-invalid="true"] .fieldBox::after {
+	background: var(--error);
+	transform: scaleX(1);
+}
+
+.field:focus-within .fieldLabel {
+	color: var(--text-primary);
+}
+
+.control {
+	width: 100%;
+	min-width: 0;
+	padding: 0.55rem 0 0.7rem;
+	border: 0;
+	background: transparent;
+	outline: none;
+	/* 1rem, не мельче: Safari на iOS приближает страницу к любому полю с
+	   текстом меньше 16px, и после ввода вёрстка остаётся увеличенной. */
+	font-size: 1rem;
+	font-family: inherit;
+	line-height: 1.4;
+	color: var(--text-primary);
+}
+
+.control::placeholder {
+	color: var(--text-muted);
+}
+
+/* Заблокированное поле (почта) не выглядит сломанным: оно выглядит
+   справочным. Приглушённый текст и замок справа объясняют это лучше, чем
+   стандартное 50% непрозрачности. */
+.control:disabled,
+.control[readonly] {
+	color: var(--text-secondary);
+	cursor: default;
+}
+
+.field[data-locked="true"] .fieldBox {
+	border-bottom-style: dashed;
+	border-bottom-color: var(--hairline);
+}
+
+.field[data-locked="true"] .fieldBox::after {
+	display: none;
+}
+
+.fieldIcon {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+}
+
+/* Показать/скрыть пароль. Цель 2.25rem — по ней бьют пальцем. */
+.fieldToggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 2.25rem;
+	height: 2.25rem;
+	margin-right: -0.4rem;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition:
+		color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart);
+}
+
+.fieldToggle:hover,
+.fieldToggle:focus-visible {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.fieldToggle:active {
+	transform: scale(0.92);
+}
+
+.fieldToggle:disabled {
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+.fieldNote {
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.fieldError {
+	margin: 0;
+	display: flex;
+	align-items: flex-start;
+	gap: 0.35rem;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--error);
+	animation: profile-note-in 220ms var(--ease-out-quart) both;
+}
+
+@keyframes profile-note-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, -3px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.fieldError,
+	.fieldBox::after {
+		animation: none;
+		transition: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Требования к паролю
+   ---------------------------------------------------------------------------
+   Список условий, которые гаснут по мере выполнения, вместо строки «8–16
+   символов: заглавная, строчная, цифра, спецсимвол» под полем. Разница не
+   косметическая: одна строка требований читается один раз и забывается, а
+   при ошибке приходится сверять пароль с ней по памяти. Здесь видно, какое
+   именно условие ещё не выполнено, — и видно ДО отправки.
+
+   Правила те же, что проверяет validatePassword: список не заводит
+   собственных — при расхождении пользователь увидел бы все галочки и всё
+   равно получил ошибку.                                                     */
+.rules {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rule {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+	transition: color 220ms var(--ease-out-quart);
+}
+
+.rule[data-met="true"] {
+	color: color-mix(in srgb, var(--success) 78%, #fff);
+}
+
+.ruleMark {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 0.875rem;
+	height: 0.875rem;
+	flex: 0 0 auto;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	opacity: 0.5;
+	transition: opacity 220ms var(--ease-out-quart);
+}
+
+.rule[data-met="true"] .ruleMark {
+	opacity: 1;
+	border-color: currentColor;
+	background: color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+/* Галочка прочерчивается, а не появляется: выполненное условие — это
+   маленькое достижение, и отрисовка отмечает его без всплывающего
+   уведомления. */
+.ruleCheck {
+	stroke-dasharray: 22;
+	stroke-dashoffset: 22;
+	transition: stroke-dashoffset 300ms var(--ease-out-expo);
+}
+
+.rule[data-met="true"] .ruleCheck {
+	stroke-dashoffset: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ruleCheck {
+		transition: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Кнопки
+   ---------------------------------------------------------------------------
+   Три роли, и больше в кабинете не нужно: основное действие секции,
+   второстепенное и необратимое. Рост 2.75rem — цель под палец без отдельного
+   правила для сенсорных экранов.                                           */
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	height: 2.75rem;
+	padding: 0 1.25rem;
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	font-family: inherit;
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart),
+		opacity 180ms var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart);
+}
+
+/* Отклик на нажатие, а не на отпускание: обратная связь, которая ждёт
+   отпускания, ощущается задержкой. */
+.btn:active:not(:disabled) {
+	transform: scale(0.985);
+}
+
+.btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+
+.btnPrimary {
+	background: var(--primary);
+	color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+	background: var(--primary-600);
+}
+
+.btnQuiet {
+	border-color: var(--border);
+	background: transparent;
+	color: var(--text-primary);
+	font-weight: 500;
+}
+
+.btnQuiet:hover:not(:disabled) {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.btnDanger {
+	border-color: color-mix(in srgb, var(--error) 45%, transparent);
+	background: color-mix(in srgb, var(--error) 10%, transparent);
+	color: color-mix(in srgb, var(--error) 85%, #fff);
+}
+
+.btnDanger:hover:not(:disabled) {
+	border-color: var(--error);
+	background: var(--error);
+	color: #fff;
+}
+
+/* Компактная кнопка — «Обновить» в шапке списка устройств, «Выйти» в блоке
+   личности. Тот же материал, что у органов управления каталога. */
+.btnSmall {
+	height: 2.25rem;
+	padding: 0 0.85rem;
+	border-radius: 999px;
+	font-size: 0.8125rem;
+	font-weight: 500;
+}
+
+@media (pointer: coarse) {
+	.btnSmall {
+		height: 2.5rem;
+		padding: 0 1rem;
+	}
+}
+
+.spin {
+	animation: profile-spin 700ms linear infinite;
+}
+
+@keyframes profile-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.btn:active:not(:disabled) {
+		transform: none;
+	}
+	.spin {
+		animation-duration: 1800ms;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Подтверждение действия
+   ---------------------------------------------------------------------------
+   Ответ на «сохранилось или нет» остаётся НА ЭКРАНЕ, рядом с кнопкой, а не
+   уезжает всплывающим уведомлением через три секунды: вопрос возникает
+   позже, чем тост исчезает. Тот же вывод, что и у формы обратной связи на
+   контактах.                                                                */
+.notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	padding: 0.75rem 0.9rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-sm);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+	animation: profile-note-in 260ms var(--ease-out-quart) both;
+}
+
+.noticeOk {
+	border-color: color-mix(in srgb, var(--success) 35%, transparent);
+	background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+.noticeOkIcon {
+	color: var(--success);
+}
+
+.noticeError {
+	border-color: color-mix(in srgb, var(--error) 35%, transparent);
+	background: color-mix(in srgb, var(--error) 8%, transparent);
+	color: var(--text-primary);
+}
+
+.noticeErrorIcon {
+	color: var(--error);
+}
+
+.noticeWarn {
+	border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+	background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
+.noticeWarnIcon {
+	color: var(--warning);
+}
+
+.noticeIcon {
+	flex: 0 0 auto;
+	margin-top: 0.1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.notice {
+		animation: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Разлинованный список
+   ---------------------------------------------------------------------------
+   Устройства и переходы в другие разделы кабинета набраны одинаково —
+   строками одной таблицы, а не карточками. Причина та же, что у карточки
+   товара: десяток обведённых прямоугольников читается решёткой, а здесь ещё
+   и врёт про важность — активная сессия и ссылка на заказы не равнозначны
+   рамке вокруг них.
+
+   Границу строки задаёт волосяная линия сверху; у первой её нет, потому что
+   секция уже отбита собственной.                                            */
+.rows {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.row {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.875rem;
+	padding: 0.9rem 0;
+	border-top: 1px solid var(--hairline);
+}
+
+.rows > li:first-child .row,
+.rows > .row:first-child {
+	border-top: 0;
+	padding-top: 0.25rem;
+}
+
+/* Значок устройства/раздела на той же плашке, что и монограмма. */
+.rowIcon {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+	color: var(--text-secondary);
+	transition: color 200ms var(--ease-out-quart);
+}
+
+.rowMain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.rowTitle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	line-height: 1.3;
+	color: var(--text-primary);
+	transition: color 200ms var(--ease-out-quart);
+}
+
+.rowTitleText {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rowMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.75rem;
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.rowMetaItem {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	margin: 0;
+	min-width: 0;
+}
+
+.rowAction {
+	flex: 0 0 auto;
+}
+
+/* Текущая сессия помечена вертикальной чертой акцента слева — тем же
+   способом, которым отмечен выбранный пункт в меню сортировки каталога:
+   глаз находит её по левому краю, где начинается чтение. */
+.rowCurrent::before {
+	content: "";
+	position: absolute;
+	left: -0.75rem;
+	top: 50%;
+	width: 2px;
+	height: 1.5rem;
+	transform: translateY(-50%);
+	border-radius: 1px;
+	background: var(--primary);
+}
+
+.rowCurrent .rowIcon {
+	color: var(--primary-200);
+	box-shadow: inset 0 0 0 1px
+		color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+/* Строка-ссылка: весь ряд — цель перехода. */
+.rowLink {
+	text-decoration: none;
+	color: inherit;
+	border-radius: var(--radius-sm);
+	outline-offset: 4px;
+}
+
+.rowLink:hover .rowTitle,
+.rowLink:focus-visible .rowTitle {
+	color: var(--primary);
+}
+
+.rowLink:hover .rowIcon,
+.rowLink:focus-visible .rowIcon {
+	color: var(--primary);
+}
+
+.rowArrow {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	transition:
+		color 200ms var(--ease-out-quart),
+		transform 320ms var(--ease-out-expo);
+}
+
+.rowLink:hover .rowArrow,
+.rowLink:focus-visible .rowArrow {
+	color: var(--primary);
+	transform: translate3d(3px, 0, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.rowArrow {
+		transition: color 200ms linear;
+	}
+	.rowLink:hover .rowArrow,
+	.rowLink:focus-visible .rowArrow {
+		transform: none;
+	}
+}
+
+/* Уходящая строка: сессия исчезает не мгновенно, иначе непонятно, что именно
+   произошло и с какой из них. */
+.rowLeaving {
+	opacity: 0.45;
+	pointer-events: none;
+}
+
+/* Каскадное появление строк списка. Порядковый номер приходит инлайн через
+   --i, шаг 45 мс — тот же, что у карточек каталога: меньше 40 мс каскад
+   перестаёт читаться и превращается в общий сдвиг, больше 60 мс последняя
+   строка заметно опаздывает.
+
+   Анимация срабатывает на монтировании, то есть один раз на строку: отзыв
+   чужой сессии не заставляет остальные появляться заново. */
+.rowEnter {
+	animation: profile-row-in 420ms var(--ease-out-expo) both;
+	animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes profile-row-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 8px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.rowEnter {
+		animation: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Шапка списка
+   --------------------------------------------------------------------------- */
+.listHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding-bottom: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Пусто / загрузка
+   ---------------------------------------------------------------------------
+   Тем же голосом, что и пустая выдача каталога: знак, заголовок, объяснение.
+   Без крупной иллюстрации — на странице, где всё держится на разлиновке, она
+   читается заглушкой из другого проекта.                                    */
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 2.75rem 1rem;
+	border-top: 1px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+	text-align: center;
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.emptyText {
+	margin: 0;
+	max-width: 40ch;
+	font-size: 0.8125rem;
+	line-height: 1.6;
+	color: var(--text-muted);
+}
+
+.skeletonRow {
+	display: flex;
+	align-items: center;
+	gap: 0.875rem;
+	padding: 0.9rem 0;
+	border-top: 1px solid var(--hairline);
+}
+
+.skeletonPlate {
+	width: 2.5rem;
+	height: 2.5rem;
+	flex: 0 0 auto;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+}
+
+.skeletonLine {
+	height: 0.6rem;
+	border-radius: 999px;
+	background: var(--surface-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Модальное подтверждение
+   ---------------------------------------------------------------------------
+   Поверхность общая со всем всплывающим на сайте: --void, то есть ТЕМНЕЕ
+   витрины, и одно тёплое пятно у верхнего края — как у панели корзины,
+   мобильного меню и нижнего листа каталога. Слой над страницей не может быть
+   светлее страницы.                                                         */
+.dialog {
+	position: relative;
+	border-color: var(--rule);
+	background: var(--void);
+	overflow: hidden;
+}
+
+.dialog::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 auto 0;
+	height: 60%;
+	pointer-events: none;
+	background: radial-gradient(
+		120% 100% at 50% 0%,
+		color-mix(in srgb, var(--primary) 8%, transparent) 0%,
+		transparent 72%
+	);
+}
+
+.dialogBody {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.dialogText {
+	margin: 0;
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.dialogActions {
+	display: flex;
+	gap: 0.75rem;
+	width: 100%;
+}
+
+.dialogActions > * {
+	flex: 1 1 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Хвост страницы
+   ---------------------------------------------------------------------------
+   Служебная подпись под разделами — та же линия с текстом по центру, которой
+   отмечен конец выдачи каталога. Здесь она несёт справку: когда был вход и
+   под каким номером аккаунт, — то, что спрашивает поддержка.               */
+.tail {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-top: 2.5rem;
+}
+
+.tailRule {
+	flex: 1 1 auto;
+	height: 1px;
+	background: var(--rule);
+}
+
+/* ---------------------------------------------------------------------------
+   Флажок согласия
+   ---------------------------------------------------------------------------
+   Тот же приём, что у согласия на обработку данных в форме контактов:
+   нативный input спрятан, но остаётся на месте и фокусируемым (display: none
+   выкинул бы его из обхода клавиатурой), а видимую метку рисует квадрат с
+   прочерчивающейся галочкой.
+
+   Нужен он здесь ровно один раз — перед необратимым действием, — и потому
+   выглядит весомее обычного: это последняя остановка перед удалением
+   аккаунта.                                                                 */
+.check {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+	padding: 0.9rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart);
+}
+
+.check:hover {
+	border-color: var(--border-light);
+}
+
+.checkInput {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.checkBox {
+	position: relative;
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 1.25rem;
+	height: 1.25rem;
+	margin-top: 0.1rem;
+	border: 1px solid var(--border-light);
+	border-radius: 4px;
+	background: transparent;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart);
+}
+
+.checkMark {
+	stroke-dasharray: 22;
+	stroke-dashoffset: 22;
+	transition: stroke-dashoffset var(--dur-base) var(--ease-out-expo);
+}
+
+.checkInput:checked ~ .checkBox {
+	border-color: var(--error);
+	background: var(--error);
+}
+
+.checkInput:checked ~ .checkBox .checkMark {
+	stroke-dashoffset: 0;
+}
+
+.checkInput:focus-visible ~ .checkBox {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+.checkText {
+	font-size: 0.875rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.check:has(.checkInput:checked) {
+	border-color: color-mix(in srgb, var(--error) 45%, transparent);
+	background: color-mix(in srgb, var(--error) 7%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.checkMark {
+		transition: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Обратный отсчёт до исполнения заявки
+   ---------------------------------------------------------------------------
+   Крупная величина и шкала под ней. Шкала здесь не декоративная: срок в «13
+   дней 4 часа» сам по себе не говорит, много это или мало от периода
+   ожидания, а заполненная на четверть полоса — говорит сразу.
+
+   Цифры моноширинные: значение обновляется раз в минуту, и при пропорциональных
+   цифрах соседний текст дёргался бы на каждом обновлении.                   */
+.countdown {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+	padding: 1.1rem;
+	border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--warning) 7%, transparent);
+}
+
+.countdownValue {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+	line-height: 1;
+	color: var(--text-primary);
+}
+
+.countdownUnit {
+	font-family: var(--font-body);
+	font-size: 0.8125rem;
+	font-weight: 400;
+	letter-spacing: 0;
+	color: var(--text-secondary);
+}
+
+.progress {
+	height: 3px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+
+.progressBar {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--warning);
+	transition: width var(--dur-slow) var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.progressBar {
+		transition: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Перечень последствий
+   ---------------------------------------------------------------------------
+   Не залитая красным панель: крупное красное пятно на тёмной витрине кричит
+   раньше, чем его успевают прочитать, а прочитать здесь обязательно. Красным
+   помечены только значки — ровно столько, чтобы список опознавался как
+   предупреждение.                                                           */
+.riskList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.riskItem {
+	display: flex;
+	gap: 0.7rem;
+	font-size: 0.875rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.riskIcon {
+	flex: 0 0 auto;
+	margin-top: 0.2rem;
+	color: color-mix(in srgb, var(--error) 80%, #fff);
+}

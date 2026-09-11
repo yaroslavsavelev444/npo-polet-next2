@@ -1,123 +1,123 @@
-import { ArrowRight, Package } from "lucide-react";
+"use client";
+
+import { ArrowUpRight, Layers } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-
-import type { Category, Media } from "@/payload-types";
+import catalog from "@/modules/productCatalog/components/Catalog.module.css";
+import { pluralizeProducts } from "@/modules/productCatalog/lib/catalogOptions";
+import { useReveal } from "@/shared/components/motion/Reveal";
+import type { CategoryCardData } from "../types/filters";
+import styles from "./CategoryCatalog.module.css";
 
 interface CategoryCardProps {
-	category: Category;
+	category: CategoryCardData;
+	/** Порядковый номер в выдаче — по нему считается сдвиг каскада. */
+	index: number;
+	/** Первые кадры грузятся приоритетно: это вероятный LCP. */
 	priority?: boolean;
+	/**
+	 * Каскад при появлении. Отключается после первого же уточнения поиска:
+	 * при вводе карточка обязана появляться сразу, иначе задержка читается
+	 * как тормоза интерфейса, а не как приём.
+	 */
+	stagger?: boolean;
 }
 
-interface ImageData {
-	url: string;
-	alt: string;
-}
-
-export function getImageData(image: Category["image"]): ImageData | null {
-	if (!image || typeof image !== "object") {
-		return null;
-	}
-
-	const media = image as Media;
-
-	if (!media.url) {
-		return null;
-	}
-
-	return {
-		url: media.url,
-		alt: media.alt ?? "",
-	};
-}
-
-export default function CategoryCard({
+/**
+ * Карточка раздела каталога.
+ *
+ * Устроена как карточка товара — кадр на плашке, слот названия, нижняя
+ * строка сводки, — и это сделано намеренно: два яруса каталога обязаны
+ * читаться как один интерфейс, где верхний просто крупнее. Отличий ровно
+ * два, и оба продиктованы содержимым:
+ *
+ *   • вместо цены в нижней строке стоит число позиций — единственная
+ *     величина, по которой раздел можно сравнить с соседним;
+ *   • вместо кнопки «в корзину» — стрелка перехода: у раздела одно действие.
+ *
+ * Появление — общий для сайта «захват» (см. [data-reveal] в home.css),
+ * вариант soft: без среза по краю, потому что срез по границе кадра читается
+ * как обрезка снимка, а не как приём.
+ *
+ * Сам <li> и есть наблюдаемый элемент: обёртка вокруг него сломала бы сетку
+ * (grid-элементом стала бы она, а не карточка).
+ */
+export function CategoryCard({
 	category,
+	index,
 	priority = false,
+	stagger = true,
 }: CategoryCardProps) {
-	const image = getImageData(category.image);
+	const { ref, props } = useReveal<HTMLLIElement>("soft", {
+		// Потолок на десятой позиции: дальше каскад всё равно не виден целиком
+		// (карточки ниже кадра), а задержка в секунду на двадцатой карточке
+		// означала бы, что она проявляется уже после того, как до неё
+		// докрутили.
+		delay: stagger ? Math.min(index, 9) * 45 : 0,
+	});
+
+	const { image, productCount } = category;
+	const hasProducts = productCount > 0;
 
 	return (
-		<Link
-			href={`/category/${category.slug}`}
-			aria-label={`Открыть категорию «${category.name}»`}
-			className="
-				group
-				relative
-				flex
-				h-full
-				flex-col
-				overflow-hidden
-				rounded-[var(--radius-lg)]
-				border
-				border-[var(--border)]
-				bg-[var(--surface)]
-				transition-all
-				duration-300
-				ease-out
-				hover:-translate-y-1
-				hover:border-[var(--primary)]/40
-				hover:shadow-[0_16px_40px_var(--shadow-color)]
-				focus-visible:outline-none
-				focus-visible:ring-2
-				focus-visible:ring-[var(--primary)]
-				focus-visible:ring-offset-2
-				focus-visible:ring-offset-[var(--background)]
-				active:scale-[0.98]
-			"
-		>
-			{/* Изображение: фиксированная геометрия, object-contain — не деформирует
-			    и не обрезает PNG с прозрачным фоном при любых пропорциях исходника. */}
-			<div className="relative aspect-square w-full shrink-0 overflow-hidden bg-[var(--surface-secondary)]">
-				{image ? (
-					<Image
-						src={image.url}
-						alt={image.alt || category.name}
-						fill
-						priority={priority}
-						loading={priority ? "eager" : "lazy"}
-						sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
-						className="object-contain p-7 transition-transform duration-500 ease-out group-hover:scale-[1.06]"
-					/>
-				) : (
-					<div className="flex h-full w-full items-center justify-center">
-						<Package
-							size={40}
-							strokeWidth={1.5}
-							className="text-[var(--text-muted)]"
-							aria-hidden
+		<li ref={ref} {...props}>
+			<Link
+				href={category.href}
+				aria-label={`Открыть раздел «${category.name}»`}
+				className={styles.card}
+			>
+				<div className={styles.frame}>
+					{image ? (
+						<Image
+							src={image.url}
+							alt={image.alt || category.name}
+							fill
+							priority={priority}
+							loading={priority ? "eager" : "lazy"}
+							sizes="(max-width: 44rem) 50vw, (max-width: 66rem) 33vw, 320px"
+							className={styles.image}
 						/>
-					</div>
-				)}
-			</div>
-
-			{/* Контент: фиксированная высота заголовка/подзаголовка через
-			    line-clamp + reserved min-height — геометрия карточки не зависит
-			    от длины текста. !p-4/!pt-2 ниже: @once-ui-system/core грузится
-			    раньше Tailwind (см. layout.tsx) и его collision-классы .p-4/.pt-2
-			    перебивают padding без !important — как в NavbarClientIsland.tsx. */}
-			<div className="flex flex-1 flex-col gap-1.5 !p-4">
-				<h3 className="line-clamp-2 min-h-[2.5rem] text-base font-semibold leading-tight text-[var(--text-primary)] transition-colors duration-200 group-hover:text-[var(--primary)]">
-					{category.name}
-				</h3>
-
-				<div className="min-h-[2.25rem]">
-					{category.subtitle && (
-						<p className="line-clamp-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-							{category.subtitle}
-						</p>
+					) : (
+						<div className={styles.imageEmpty}>
+							<Layers size={36} strokeWidth={1.25} aria-hidden />
+						</div>
 					)}
 				</div>
 
-				<div className="mt-auto flex items-center gap-1 !pt-2 text-xs font-medium text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--primary)]">
-					Смотреть категорию
-					<ArrowRight
-						size={13}
-						className="transition-transform duration-200 ease-out group-hover:translate-x-0.5"
-						aria-hidden
-					/>
+				<div className={styles.body}>
+					{/* title — на случай, когда длинное название обрезано: наведение
+					    показывает его целиком. Скринридеру оно и так читается
+					    полностью из aria-label ссылки. */}
+					<h3 className={styles.name} title={category.name}>
+						{category.name}
+					</h3>
+
+					{category.subtitle && (
+						<p className={styles.subtitle}>{category.subtitle}</p>
+					)}
+
+					<div className={styles.foot}>
+						<span
+							className={`${catalog.micro} ${styles.count} ${
+								hasProducts ? "" : styles.countEmpty
+							}`}
+						>
+							{hasProducts
+								? `${productCount} ${pluralizeProducts(productCount)}`
+								: "Скоро"}
+						</span>
+
+						<ArrowUpRight
+							size={16}
+							strokeWidth={1.75}
+							aria-hidden
+							className={styles.go}
+						/>
+					</div>
 				</div>
-			</div>
-		</Link>
+			</Link>
+		</li>
 	);
 }
+
+export default CategoryCard;

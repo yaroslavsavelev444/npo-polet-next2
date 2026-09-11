@@ -62,14 +62,15 @@ export function ProductCatalogLayout({
 				breadcrumbs={breadcrumbs}
 			/>
 
-			<div className="mt-[2rem] sm:mt-[3rem]">
-				<CatalogToolbar
-					totalDocs={initialPage.totalDocs}
-					priceBounds={priceBounds}
-					onOpenFilters={() => setMobileFiltersOpen(true)}
-					onOpenSort={() => setMobileSortOpen(true)}
-				/>
-			</div>
+			{/* Панель — прямой потомок колонки, без обёртки: её собственный
+			    отступ задан в .rail, а любая обёртка ростом с панель отняла бы у
+			    position: sticky ход (разбор — там же, в Catalog.module.css). */}
+			<CatalogToolbar
+				totalDocs={initialPage.totalDocs}
+				priceBounds={priceBounds}
+				onOpenFilters={() => setMobileFiltersOpen(true)}
+				onOpenSort={() => setMobileSortOpen(true)}
+			/>
 
 			<div className="mt-[2rem] sm:mt-[2.5rem]">
 				<CatalogProductGrid

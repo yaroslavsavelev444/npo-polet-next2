@@ -1,11 +1,12 @@
 import { PackageCheck, ShieldCheck, Truck } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ProductCardData } from "@/modules/productCard";
-import { ProductPrice } from "@/modules/productCard/components/ProductPrice";
+import { formatPrice } from "@/modules/productCard";
 import { ProductQuantitySelector } from "@/modules/productCard/components/ProductQuantitySelector";
 import { WishlistButton } from "@/modules/wishlist/components/WishlistButton";
 import type { ProductDetailData } from "../types";
 import { ProductInstructionLink } from "./ProductInstructionLink";
+import styles from "./ProductPage.module.css";
 
 interface ProductBuyPanelProps {
 	product: ProductDetailData;
@@ -15,15 +16,16 @@ interface ProductBuyPanelProps {
 /**
  * Блок покупки: цена → действие → условия поставки → инструкция.
  *
- * Раньше сюда же входили название товара и рейтинг, а вся колонка была
- * шириной 380 px: длинное техническое название разваливалось на восемь строк
- * крупного полужирного текста и занимало весь первый экран, оттесняя кнопку
- * вниз. Название и рейтинг переехали в шапку страницы во всю ширину, а панели
- * осталось ровно то, ради чего в неё смотрят.
+ * Панель набрана плашкой --void на витрине --background, то есть ТЕМНЕЕ
+ * страницы. Это не мелочь оформления: слой светлее страницы читается как
+ * наклеенная сверху карточка, слой темнее — как утопленная в страницу панель.
+ * Тот же материал держит панель корзины и всплывающие окна каталога, и
+ * благодаря ему панели не нужна ни тень, ни толстая рамка — хватает
+ * волосяной черты по контуру.
  *
- * Панель — один контейнер с одной рамкой; вложенных карточек внутри нет.
- * Условия поставки и инструкция разделены волосяными линиями: это строки
- * одной таблицы, а не отдельные блоки, каждый со своей рамкой и тенью.
+ * Внутри панели вложенных карточек нет. Условия поставки и инструкция —
+ * строки одной таблицы, разделённые волосяными линиями: у каждой ровно одно
+ * содержание, и собственная рамка ей не нужна.
  */
 export function ProductBuyPanel({ product, cardData }: ProductBuyPanelProps) {
 	const { brand } = product;
@@ -51,17 +53,32 @@ export function ProductBuyPanel({ product, cardData }: ProductBuyPanelProps) {
 	}
 
 	return (
-		<div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface)]">
-			<div className="flex flex-col gap-4 p-5">
-				<ProductPrice
-					size="detail"
-					finalPrice={product.finalPrice}
-					originalPrice={product.priceForIndividual}
-					hasDiscount={product.hasDiscount}
-					discountPercentage={product.discountPercentage}
-				/>
+		<div className={styles.buyPanel}>
+			<div className={styles.buyMain}>
+				{/* Цена набрана здесь, а не общим ProductPrice: у карточки каталога
+				    цена одной строкой без старой цены (в узкую колонку она не
+				    помещалась), а здесь места хватает на всю тройку — итог,
+				    зачёркнутый старый и размер скидки. */}
+				<p className={styles.priceRow}>
+					<span className={styles.priceValue}>
+						{formatPrice(product.finalPrice)}
+					</span>
 
-				<div className="flex items-stretch gap-2">
+					{product.hasDiscount && (
+						<>
+							<span className={styles.priceOld}>
+								{formatPrice(product.priceForIndividual)}
+							</span>
+							{product.discountPercentage != null && (
+								<span className={styles.priceDiscount}>
+									−{product.discountPercentage}%
+								</span>
+							)}
+						</>
+					)}
+				</p>
+
+				<div className={styles.buyActions}>
 					<div className="min-w-0 flex-1">
 						<ProductQuantitySelector
 							product={cardData}
@@ -71,36 +88,32 @@ export function ProductBuyPanel({ product, cardData }: ProductBuyPanelProps) {
 					</div>
 					<WishlistButton
 						product={cardData}
-						className="h-10 w-10 shrink-0 rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-transparent shadow-none hover:bg-[var(--surface-hover)]"
+						tone="glass"
+						className="h-10 w-10 rounded-[var(--radius-sm)]"
 					/>
 				</div>
 
 				{hasMinBatch && (
-					<p className="text-xs text-[var(--text-muted)]">
+					<p className={styles.buyNote}>
 						Минимальный заказ —{" "}
-						<span className="tabular-nums text-[var(--text-secondary)]">
+						<span className={styles.buyNoteValue}>
 							{product.minOrderQuantity} шт.
 						</span>
 					</p>
 				)}
 			</div>
 
-			<ul className="flex flex-col border-t border-[var(--hairline)]">
+			<ul className={styles.terms}>
 				{terms.map((row) => (
-					<li
-						key={row.text}
-						className="flex items-center gap-3 px-5 py-3 text-[13px] text-[var(--text-secondary)] not-first:border-t not-first:border-[var(--hairline)]"
-					>
-						<span className="shrink-0 text-[var(--primary)]">{row.icon}</span>
+					<li key={row.text} className={styles.termRow}>
+						<span className={styles.termIcon}>{row.icon}</span>
 						{row.text}
 					</li>
 				))}
 			</ul>
 
 			{product.instruction && (
-				<div className="border-t border-[var(--hairline)]">
-					<ProductInstructionLink instruction={product.instruction} />
-				</div>
+				<ProductInstructionLink instruction={product.instruction} />
 			)}
 		</div>
 	);

@@ -1,51 +1,98 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ProductCardData } from "@/modules/productCard";
 import { formatPrice } from "@/modules/productCard";
 import { ProductQuantitySelector } from "@/modules/productCard/components/ProductQuantitySelector";
+import { PageContainer } from "@/shared/components/PageContainer";
 import type { ProductDetailData } from "../types";
+import styles from "./ProductPage.module.css";
 
 interface Props {
 	product: ProductDetailData;
 	cardData: ProductCardData;
+	/**
+	 * Элемент, за которым панель следит: пока он виден, панели нет. На
+	 * странице это сам блок покупки.
+	 */
+	watchId: string;
 }
 
 /**
- * Липкая панель покупки для мобильных. Держит цену и кнопку «в корзину» в
- * пределах досягаемости большого пальца при любой длине страницы — ключевой
- * mobile-паттерн e-commerce. На десктопе скрыта: там действия видны в липком
- * блоке покупки.
+ * Липкая панель покупки.
  *
- * Степпера здесь нет намеренно. На 390 px в строку не помещались цена в шесть
- * разрядов, степпер и кнопка разом: цена обрезалась на середине, а кнопка
- * сжималась. Панель — короткий путь «добавить», точное количество задаётся
- * степпером в блоке покупки выше и в корзине. Оба экземпляра используют один
- * стор корзины и остаются синхронными.
+ * Раньше она жила только на телефоне: на десктопе блок покупки был липким и
+ * ехал вдоль всей страницы. Теперь разделы страницы идут во всю ширину (см.
+ * ProductInformation), липкая колонка справа заканчивается вместе с первым
+ * экраном — и без этой панели покупателю, дочитавшему характеристики,
+ * пришлось бы прокручивать назад. Поэтому панель работает на всех ширинах.
+ *
+ * Появляется она не «после N пикселей прокрутки», а ровно тогда, когда
+ * настоящий блок покупки ушёл из кадра: два одинаковых действия на экране
+ * одновременно — это дубль, из-за которого непонятно, какое из них
+ * настоящее. Следит за этим IntersectionObserver по элементу блока, а не
+ * слушатель прокрутки: наблюдатель не будит страницу на каждом кадре.
+ *
+ * Степпера в панели нет намеренно. На 390px в строку не помещаются цена в
+ * шесть разрядов, степпер и кнопка разом: цена обрезалась на середине, а
+ * кнопка сжималась. Панель — короткий путь «добавить»; точное количество
+ * задаётся степпером в блоке покупки выше и в корзине. Оба экземпляра
+ * работают через один стор корзины и остаются синхронными.
  */
-export function ProductStickyBar({ product, cardData }: Props) {
+export function ProductStickyBar({ product, cardData, watchId }: Props) {
+	const [shown, setShown] = useState(false);
+
+	useEffect(() => {
+		const target = document.getElementById(watchId);
+		if (!target) {
+			// Блока покупки на странице нет — показывать альтернативу ему нечему
+			// противопоставить, поэтому панель просто остаётся видимой.
+			setShown(true);
+			return;
+		}
+
+		const observer = new IntersectionObserver(
+			([entry]) => setShown(!entry.isIntersecting),
+			// Нижний отступ равен высоте самой панели: пока блок покупки виден
+			// хотя бы краем НАД панелью, дублировать его незачем.
+			{ rootMargin: "0px 0px -80px 0px" },
+		);
+		observer.observe(target);
+		return () => observer.disconnect();
+	}, [watchId]);
+
 	return (
-		<div className="fixed inset-x-0 bottom-0 z-[51] border-t border-[var(--hairline)] bg-[var(--surface)]/95 px-[1rem] pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-md lg:hidden">
-			<div className="flex items-center gap-4">
-				<div className="flex min-w-0 shrink flex-col leading-tight">
-					<span className="truncate text-[17px] font-bold tabular-nums text-[var(--text-primary)]">
+		<div
+			data-shown={shown || undefined}
+			// Панель остаётся в разметке скрытой, иначе оборвётся анимация ухода.
+			// Но «присутствует» и «доступна» — разные вещи: inert убирает её из
+			// обхода табом и из дерева доступности, пока она не показана.
+			inert={!shown}
+			className={styles.stickyBar}
+		>
+			<PageContainer className={styles.stickyInner}>
+				<span className={styles.stickyTitle}>{product.title}</span>
+
+				<span className={styles.stickyPrice}>
+					<span className={styles.stickyPriceValue}>
 						{formatPrice(product.finalPrice)}
 					</span>
 					{product.hasDiscount && (
-						<span className="truncate text-xs tabular-nums text-[var(--text-muted)] line-through">
+						<span className={styles.stickyPriceOld}>
 							{formatPrice(product.priceForIndividual)}
 						</span>
 					)}
-				</div>
+				</span>
 
-				<div className="min-w-0 flex-1">
+				<span className={styles.stickyAction}>
 					<ProductQuantitySelector
 						variant="card"
 						product={cardData}
 						minOrderQuantity={product.minOrderQuantity}
 						maxOrderQuantity={product.maxOrderQuantity}
 					/>
-				</div>
-			</div>
+				</span>
+			</PageContainer>
 		</div>
 	);
 }

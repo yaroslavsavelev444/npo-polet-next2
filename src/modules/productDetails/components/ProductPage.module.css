@@ -1,0 +1,1050 @@
+/* ===========================================================================
+   Страница товара
+   ===========================================================================
+   Продолжение того же визуального языка, что каталог, корзина и мобильное
+   меню, а не отдельный мир:
+
+     • страница живёт на --background, как и каталог. Полноширинных тёмных
+       полос здесь нет намеренно: ими набрана главная и контакты — страницы
+       рассказа. Страница товара — витрина, её соседи по смыслу это каталог и
+       корзина, и материал у неё должен быть тот же;
+     • структуру держит разлиновка (--rule / --hairline), а не рамки вокруг
+       блоков. Единственная поверхность страницы — плашка --media-plate под
+       снимком и плашка --void под блоком покупки. --void ТЕМНЕЕ витрины,
+       поэтому блок покупки читается как утопленная в страницу панель, а не
+       как наклеенная сверху карточка;
+     • микроподписи — моноширинный верхний регистр с разрядкой (тот же голос,
+       что в панели каталога и в корзине);
+     • названия разделов набраны акцидентной PaluiSP2. Это единственное место
+       на странице, где она появляется: название товара ей набрать нельзя —
+       технические имена здесь доходят до 140 знаков, а у PaluiSP2 знак
+       занимает ~1.2em против ~0.5em у Manrope. Зато «ОПИСАНИЕ» и
+       «ХАРАКТЕРИСТИКИ» — короткие слова в верхнем регистре, то есть ровно то,
+       на что эта гарнитура рассчитана. Получается разделение: Manrope
+       называет ТОВАР, PaluiSP2 — ЧАСТИ СТРАНИЦЫ;
+     • времена и кривые — --dur-* / --ease-out-expo / --ease-out-quart из
+       home.css. Движение на сайте одно.
+
+   Модуль, а не утилиты Tailwind: здесь нужны правила по типу указателя,
+   состояния родителя, влияющие на потомков, и ключевые кадры — всё это в
+   утилитах превращается в цепочку важностей, воюющую с глобальными стилями
+   @once-ui-system (см. шапку app/(frontend)/globals.css).                   */
+
+/* ---------------------------------------------------------------------------
+   Общее
+   --------------------------------------------------------------------------- */
+
+/* Микроподпись: категория, единицы, счётчик кадров, имена групп характеристик.
+   Моноширинный здесь работает по прямому назначению — держит одинаковую
+   ширину знака в колонке подписей и в счётчиках, которые меняются. */
+.micro {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Шапка
+   --------------------------------------------------------------------------- */
+
+/* Название товара.
+   Кегль намеренно ниже «плакатного»: имена в этом каталоге доходят до 140
+   знаков, и на 40px такое название занимает восемь строк и съедает первый
+   экран целиком. Мера строки 24ch удерживает и короткое имя от растекания в
+   одну длинную строку через весь экран. */
+.title {
+	max-width: 24ch;
+	margin: 0;
+	font-size: clamp(1.5rem, 1.05rem + 1.9vw, 2.75rem);
+	font-weight: 700;
+	line-height: 1.1;
+	letter-spacing: -0.025em;
+	text-wrap: balance;
+	color: var(--text-primary);
+}
+
+/* Полка фактов под названием: наличие, рейтинг, производитель, гарантия.
+   Разлинована сверху и снизу — это та самая линия, на которой стоят обе
+   колонки первого экрана, и она же связывает шапку с содержимым. */
+.factBar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem 1.25rem;
+	padding: 0.85rem 0;
+	border-top: 1px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+}
+
+.fact {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.8125rem;
+	line-height: 1;
+	color: var(--text-secondary);
+}
+
+.factDot {
+	width: 0.4375rem;
+	height: 0.4375rem;
+	flex: 0 0 auto;
+	border-radius: 999px;
+}
+
+/* Разделитель между фактами — волосяная черта, а не точка: та же разлиновка,
+   что держит страницу. Прячется, когда строка переносится (см. ниже). */
+.factDivider {
+	width: 1px;
+	height: 0.875rem;
+	flex: 0 0 auto;
+	background: var(--rule);
+}
+
+@media (max-width: 40rem) {
+	.factDivider {
+		display: none;
+	}
+
+	.factBar {
+		gap: 0.65rem 1rem;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Галерея
+   --------------------------------------------------------------------------- */
+/* Вход галереи. По характеру тот же, что общее появление сайта (сдвиг снизу
+   плюс расфокус, уходящий в ноль), но БЕЗ clip-path: у общего появления в
+   показанном состоянии остаётся inset(0), то есть обрезка ровно по краю
+   блока, — а подсветка за кадром выходит за его границы и была бы срезана.
+   Наблюдатель при этом общий (useReveal), состояние приходит атрибутом. */
+.galleryEnter {
+	opacity: 0;
+	transform: translate3d(0, 28px, 0);
+	filter: blur(10px);
+	transition:
+		opacity var(--dur-base) var(--ease-out-expo),
+		transform var(--dur-slow) var(--ease-out-expo),
+		filter var(--dur-base) var(--ease-out-expo);
+	transition-delay: var(--reveal-delay, 240ms);
+	will-change: opacity, transform, filter;
+}
+
+.galleryEnter[data-shown="true"] {
+	opacity: 1;
+	transform: translate3d(0, 0, 0);
+	filter: blur(0);
+	will-change: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.galleryEnter {
+		opacity: 1;
+		transform: none;
+		filter: none;
+		transition: none;
+	}
+}
+
+
+/* Кадр — единственная светлая поверхность первого экрана. Рамки у него нет:
+   плашка --media-plate сама себя отделяет от витрины, а рамка поверх неё
+   была бы вторым способом сказать то же самое.
+
+   Тёплое пятно под кадром — та же единственная декорация, что у панели
+   корзины и мобильного меню. Оно не под самим снимком, а ЗА ним (z-index -1
+   на псевдоэлементе обёртки), поэтому не осветляет плашку и не мешает читать
+   товар: свет виден только по краям, как отсвет на столе. */
+/* Предел ширины стоит на СЦЕНЕ, а не на самой галерее.
+
+   Кадр квадратный, то есть его высота равна ширине. Без предела в левой
+   колонке широкого экрана (~780px за вычетом рейки миниатюр) он вырастал в
+   квадрат почти в 700px — товар на пол-экрана и кнопка покупки, уехавшая под
+   сгиб. Ограничивать при этом всю галерею было бы нельзя: товар с одним
+   снимком (рейки нет) получил бы кадр на ширину рейки больше, чем товар с
+   пятью, и один и тот же экран выглядел бы по-разному от товара к товару.
+
+   Предел здесь же держит и подсветку: она позиционируется от сцены, и без
+   общего предела свет уезжал бы вправо от кадра. */
+.galleryStage {
+	position: relative;
+	isolation: isolate;
+	width: 100%;
+	/* Предел двойной, и вторая его половина — по ВЫСОТЕ окна. Кадр квадратный,
+	   поэтому ограничение ширины это ограничение высоты: на ноутбуке с экраном
+	   в 800px кадр в 38rem занял бы вместе с шапкой и полкой фактов весь первый
+	   экран, и блок покупки уехал бы под сгиб. 62vh оставляет под кадром запас
+	   на строку миниатюр и начало следующего раздела при любой высоте окна. */
+	max-width: min(38rem, 62vh);
+	min-width: 0;
+}
+
+.galleryFrame {
+	position: relative;
+	aspect-ratio: 1;
+	width: 100%;
+	overflow: hidden;
+	border-radius: var(--radius-md);
+	background: var(--media-plate);
+}
+
+/* Свет виден только по краям кадра — плашка непрозрачна и закрывает середину,
+   — поэтому пятно намеренно шире кадра и опущено ниже его центра: получается
+   отсвет «на столе» под предметом, а не подсветка предмета. Насыщенность
+   низкая: выше 10% свет начинает спорить с ярлыком скидки и с оранжевой
+   кнопкой в соседней колонке. */
+.galleryGlow {
+	position: absolute;
+	inset: -6% -14% -14%;
+	z-index: -1;
+	pointer-events: none;
+	background: radial-gradient(
+		52% 44% at 50% 74%,
+		color-mix(in srgb, var(--primary) 10%, transparent) 0%,
+		transparent 72%
+	);
+	/* Свет слегка ведёт за прокруткой — тот же приём, что держит глубину на
+	   главной (.p-parallax). Двигается только подсветка, не сам кадр: кадр
+	   интерактивный (нажатие открывает полноэкранный просмотр, свайп листает),
+	   и уводить его из-под пальца нельзя. */
+	transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * 4rem), 0);
+	will-change: transform;
+}
+
+/* На узком экране свет не выходит за края кадра по горизонтали: там до края
+   окна остаётся 1rem, и пятно упиралось бы в него, создавая переполнение по
+   ширине (его гасит overflow-x: clip на body, но полагаться на обрезку там,
+   где можно просто не вылезать, незачем). */
+@media (max-width: 40rem) {
+	.galleryGlow {
+		inset: -4% 0 -12%;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.galleryGlow {
+		transform: none;
+	}
+}
+
+/* Снимок появляется при переключении кадра, а не подменяется рывком: смена
+   src на одном и том же узле иначе читается как подёргивание. */
+.galleryImage {
+	object-fit: contain;
+	padding: 7%;
+	animation: product-image-in 420ms var(--ease-out-expo) both;
+}
+
+@keyframes product-image-in {
+	from {
+		opacity: 0;
+		transform: scale(1.015);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.galleryImage {
+		animation: none;
+	}
+}
+
+/* Уголковые метки кадра — тот же приём, что отмечает активную карточку в
+   каталоге и активный кадр на главной (.reticle). Здесь они отмечают, что
+   кадр интерактивен: по нему кликают, чтобы развернуть. */
+.galleryFrame::before,
+.galleryFrame::after {
+	content: "";
+	position: absolute;
+	z-index: 2;
+	width: 16px;
+	height: 16px;
+	pointer-events: none;
+	opacity: 0;
+	transition:
+		inset 420ms var(--ease-out-quart),
+		opacity 260ms var(--ease-out-quart);
+}
+
+.galleryFrame::before {
+	top: 14px;
+	left: 14px;
+	border-top: 1px solid var(--primary);
+	border-left: 1px solid var(--primary);
+}
+
+.galleryFrame::after {
+	right: 14px;
+	bottom: 14px;
+	border-right: 1px solid var(--primary);
+	border-bottom: 1px solid var(--primary);
+}
+
+.galleryFrame:hover::before,
+.galleryFrame:focus-within::before {
+	top: 0;
+	left: 0;
+	opacity: 1;
+}
+
+.galleryFrame:hover::after,
+.galleryFrame:focus-within::after {
+	right: 0;
+	bottom: 0;
+	opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.galleryFrame::before,
+	.galleryFrame::after {
+		display: none;
+	}
+}
+
+.galleryEmpty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem;
+	color: var(--text-muted);
+}
+
+/* Служебные элементы поверх кадра — стекло по разлиновке, тот же материал,
+   что у кнопок над карточкой товара и у кнопки закрытия в корзине. Белые
+   «таблетки» с тенью, стоявшие здесь раньше, принадлежали светлой теме. */
+.galleryChip {
+	position: absolute;
+	z-index: 3;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.35rem 0.6rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--void-deep) 82%, transparent);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	color: var(--text-secondary);
+	pointer-events: none;
+}
+
+.galleryCounter {
+	right: 0.75rem;
+	bottom: 0.75rem;
+}
+
+.galleryZoom {
+	left: 0.75rem;
+	bottom: 0.75rem;
+	opacity: 0;
+	transition: opacity 200ms var(--ease-out-quart);
+}
+
+.galleryFrame:hover .galleryZoom,
+.galleryFrame:focus-within .galleryZoom {
+	opacity: 1;
+}
+
+/* На сенсорном экране наведения нет — подсказка про разворот там не нужна
+   вовсе: снимок и так открывается нажатием, а постоянная плашка закрывает
+   товар. */
+@media (hover: none) {
+	.galleryZoom {
+		display: none;
+	}
+}
+
+.galleryArrow {
+	position: absolute;
+	z-index: 3;
+	top: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	transform: translateY(-50%);
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--void-deep) 82%, transparent);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	color: var(--text-primary);
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity 200ms var(--ease-out-quart),
+		color 200ms var(--ease-out-quart),
+		border-color 200ms var(--ease-out-quart),
+		transform 200ms var(--ease-out-quart);
+}
+
+.galleryArrowPrev {
+	left: 0.75rem;
+}
+
+.galleryArrowNext {
+	right: 0.75rem;
+}
+
+.galleryFrame:hover .galleryArrow,
+.galleryArrow:focus-visible {
+	opacity: 1;
+}
+
+.galleryArrow:hover {
+	color: var(--text-primary);
+	border-color: var(--border-light);
+}
+
+.galleryArrowPrev:active {
+	transform: translateY(-50%) translateX(-2px);
+}
+
+.galleryArrowNext:active {
+	transform: translateY(-50%) translateX(2px);
+}
+
+/* На сенсорном экране стрелок нет вовсе. Наведения там не существует, значит
+   они висели бы поверх снимка постоянно — двумя серыми кругами ровно посреди
+   товара. Листать при этом есть чем: свайп по кадру и рейка миниатюр прямо под
+   ним, где видны все кадры сразу, — а счётчик в углу сообщает, что кадр не
+   один. */
+@media (hover: none) {
+	.galleryArrow {
+		display: none;
+	}
+}
+
+/* --- Миниатюры ------------------------------------------------------------
+   Рейка под кадром на узком экране и колонка справа на широком. Активная
+   отмечена не рамкой по периметру, а чертой акцента снизу: рамка вокруг
+   квадрата 64px спорит с самим снимком, а черта читается как указатель.   */
+.thumbRail {
+	display: flex;
+	gap: 0.5rem;
+	overflow-x: auto;
+	padding-bottom: 0.25rem;
+	scrollbar-width: thin;
+	overscroll-behavior-x: contain;
+}
+
+.thumb {
+	position: relative;
+	flex: 0 0 auto;
+	width: 4rem;
+	height: 4rem;
+	overflow: hidden;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+	cursor: pointer;
+	opacity: 0.55;
+	transition: opacity 200ms var(--ease-out-quart);
+}
+
+.thumb:hover {
+	opacity: 0.85;
+}
+
+.thumb[aria-current="true"] {
+	opacity: 1;
+}
+
+.thumb::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	bottom: 0;
+	height: 2px;
+	background: var(--primary);
+	transform: scaleX(0);
+	transform-origin: center;
+	transition: transform 320ms var(--ease-out-expo);
+}
+
+.thumb[aria-current="true"]::after {
+	transform: scaleX(1);
+}
+
+.thumbImage {
+	object-fit: contain;
+	padding: 0.4rem;
+}
+
+@media (min-width: 64rem) {
+	.thumbRail {
+		flex-direction: column;
+		max-height: 34rem;
+		overflow-x: visible;
+		overflow-y: auto;
+		padding-right: 0.25rem;
+		padding-bottom: 0;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Блок покупки
+   ---------------------------------------------------------------------------
+   Плашка --void на витрине --background: слой ТЕМНЕЕ страницы читается как
+   утопленная панель, а не как наклеенная сверху карточка. Тот же материал,
+   что у панели корзины и всплывающих окон каталога, минус тень — панель
+   лежит в потоке, а не парит над ним.                                     */
+.buyPanel {
+	overflow: hidden;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-md);
+	background: var(--void);
+}
+
+.buyMain {
+	display: flex;
+	flex-direction: column;
+	gap: 1.15rem;
+	padding: 1.25rem;
+}
+
+.priceRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.35rem 0.85rem;
+}
+
+.priceValue {
+	font-size: clamp(1.75rem, 1.4rem + 1.1vw, 2.25rem);
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: -0.03em;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+.priceOld {
+	font-size: 0.9375rem;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+	text-decoration: line-through;
+}
+
+.priceDiscount {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.25rem 0.4rem;
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--primary) 16%, transparent);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 700;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+	color: var(--primary-200);
+}
+
+.buyActions {
+	display: flex;
+	align-items: stretch;
+	gap: 0.5rem;
+}
+
+.buyNote {
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.buyNoteValue {
+	font-variant-numeric: tabular-nums;
+	color: var(--text-secondary);
+}
+
+/* Условия поставки — строки одной таблицы, а не набор карточек: у каждой
+   ровно одно содержание, и собственная рамка ей не нужна. */
+.terms {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-top: 1px solid var(--hairline);
+}
+
+.termRow {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.7rem 1.25rem;
+	font-size: 0.8125rem;
+	line-height: 1.35;
+	color: var(--text-secondary);
+}
+
+.termRow + .termRow {
+	border-top: 1px solid var(--hairline);
+}
+
+.termIcon {
+	flex: 0 0 auto;
+	color: var(--primary);
+}
+
+/* --- Инструкция ----------------------------------------------------------- */
+.instruction {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.85rem 1.25rem;
+	border-top: 1px solid var(--hairline);
+	text-decoration: none;
+	transition: background-color 200ms var(--ease-out-quart);
+}
+
+.instruction:hover,
+.instruction:focus-visible {
+	background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.instructionMark {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	color: var(--primary);
+}
+
+.instructionBadge {
+	position: absolute;
+	left: 50%;
+	bottom: -0.3rem;
+	transform: translateX(-50%);
+	padding: 0.1rem 0.3rem;
+	border-radius: 999px;
+	background: var(--primary);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.5rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	line-height: 1;
+	color: #fff;
+}
+
+.instructionAction {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	flex: 0 0 auto;
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--primary);
+	transition: transform 240ms var(--ease-out-expo);
+}
+
+.instruction:hover .instructionAction,
+.instruction:focus-visible .instructionAction {
+	transform: translate3d(0.15rem, 0, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Разделы страницы
+   ---------------------------------------------------------------------------
+   Один ритм на все разделы: линия, которая прочерчивается при попадании в
+   кадр (.rule-draw), под ней название раздела акцидентной гарнитурой, дальше
+   содержимое. Вертикальный отступ принадлежит самому разделу, поэтому товар
+   без описания или без характеристик не оставляет ни лишней пустоты, ни
+   висящей линии.                                                           */
+.section {
+	scroll-margin-top: calc(var(--sticky-header-height) + 2rem);
+}
+
+.sectionHead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.5rem 1.5rem;
+	margin-top: 1.15rem;
+}
+
+/* Название раздела — единственное место страницы с акцидентной гарнитурой.
+   Верхняя граница кегля выведена из ширины знака: «ХАРАКТЕРИСТИКИ» это 14
+   знаков, у PaluiSP2 знак ~1.2em, то есть слово тянет ~16.8em и при 1.875rem
+   занимает 504px — половину колонки на широком экране и вся ширина минус
+   поля на 375px. */
+.sectionTitle {
+	margin: 0;
+	font-size: clamp(1rem, 0.78rem + 1.1vw, 1.875rem);
+	color: var(--text-primary);
+}
+
+.sectionNote {
+	font-variant-numeric: tabular-nums;
+}
+
+/* --- Описание ------------------------------------------------------------- */
+.lede {
+	max-width: 68ch;
+	margin: 0;
+	white-space: pre-line;
+	font-size: clamp(0.9375rem, 0.9rem + 0.2vw, 1.0625rem);
+	line-height: 1.75;
+	color: var(--text-secondary);
+}
+
+/* --- Характеристики ------------------------------------------------------- */
+.specGroupName {
+	margin: 0 0 0.35rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.specList {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0 3rem;
+	margin: 0;
+}
+
+@media (min-width: 64rem) {
+	.specList {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+/* Пара «название — значение» сама себе сетка с фиксированной колонкой
+   названия: значение начинается на одной вертикали во всех строках, и
+   расстояние между ними не зависит от ширины экрана. Прежняя раскладка
+   разгоняла пару по краям колонки, и между названием и значением оставалось
+   до полуметра пустоты, через которую глаз не дотягивался. */
+.specRow {
+	display: grid;
+	grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+	align-items: baseline;
+	gap: 0 1.25rem;
+	padding: 0.6rem 0;
+	border-bottom: 1px solid var(--hairline);
+	transition: background-color 180ms var(--ease-out-quart);
+}
+
+@media (min-width: 40rem) {
+	.specRow {
+		grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
+		gap: 0 1.5rem;
+	}
+}
+
+/* Наведение подсвечивает строку целиком и на ширину поля вокруг неё:
+   в длинной таблице это единственный способ не потерять строку глазами при
+   переходе от названия к значению. */
+.specRow:hover {
+	background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+	box-shadow:
+		-0.5rem 0 0 color-mix(in srgb, var(--text-primary) 4%, transparent),
+		0.5rem 0 0 color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.specName {
+	font-size: 0.8125rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.specValue {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1.4;
+	color: var(--text-primary);
+}
+
+.specNumber {
+	font-variant-numeric: tabular-nums;
+}
+
+.specUnit {
+	margin-left: 0.35rem;
+	font-weight: 400;
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Липкая панель покупки
+   ---------------------------------------------------------------------------
+   Появляется тогда и только тогда, когда настоящий блок покупки уехал за
+   пределы экрана. На телефоне это единственный способ держать цену и кнопку
+   в пределах большого пальца; на широком экране — единственный способ не
+   заставлять прокручивать назад из характеристик и отзывов, потому что
+   разделы теперь идут во всю ширину и липкая колонка справа закончилась
+   вместе с первым экраном.
+
+   Панель поднимается снизу, а не проявляется на месте: она приходит с того
+   края, к которому и прижата, и уходит туда же (симметричный путь).       */
+.stickyBar {
+	position: fixed;
+	inset-inline: 0;
+	bottom: 0;
+	z-index: 51;
+	border-top: 1px solid var(--rule);
+	background: color-mix(in srgb, var(--void) 92%, transparent);
+	backdrop-filter: blur(18px) saturate(160%);
+	-webkit-backdrop-filter: blur(18px) saturate(160%);
+
+	transform: translate3d(0, 100%, 0);
+	opacity: 0;
+	pointer-events: none;
+	transition:
+		transform 320ms var(--ease-out-quart),
+		opacity 200ms var(--ease-out-quart);
+	will-change: transform;
+}
+
+.stickyBar[data-shown="true"] {
+	transform: translate3d(0, 0, 0);
+	opacity: 1;
+	pointer-events: auto;
+	transition-duration: 420ms, 260ms;
+	transition-timing-function: var(--ease-out-expo), var(--ease-out-quart);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	.stickyBar {
+		background: var(--void);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.stickyBar {
+		transform: none;
+		transition: opacity 160ms linear;
+	}
+
+	.stickyBar[data-shown="true"] {
+		transform: none;
+	}
+}
+
+/* Только вертикальные поля и НЕ сокращённой записью padding: горизонтальные
+   приходят от PageContainer (px-[1rem] / sm:px-6), а правило из CSS-модуля
+   перебивает утилиты Tailwind — модуль не завёрнут в слой (см. шапку
+   app/(frontend)/globals.css). Сокращённая запись обнуляла боковые поля, и на
+   экране уже 1280px цена с кнопкой упирались в края окна. */
+.stickyInner {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding-top: 0.7rem;
+	padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
+}
+
+.stickyTitle {
+	display: none;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-primary);
+}
+
+/* Название товара в панели появляется только там, где для него есть место.
+   На телефоне в строку помещаются цена и кнопка — и всё; название там и не
+   нужно, экран товара никуда не делся. */
+@media (min-width: 48rem) {
+	.stickyTitle {
+		display: block;
+	}
+}
+
+.stickyPrice {
+	display: flex;
+	flex-direction: column;
+	flex: 0 0 auto;
+	gap: 0.15rem;
+	line-height: 1.1;
+}
+
+.stickyPriceValue {
+	font-size: 1.0625rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+.stickyPriceOld {
+	font-size: 0.6875rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+	text-decoration: line-through;
+}
+
+.stickyAction {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+@media (min-width: 48rem) {
+	.stickyAction {
+		flex: 0 0 auto;
+		width: 18rem;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Полноэкранный просмотр
+   ---------------------------------------------------------------------------
+   Тот же материал, что у остальных слоёв над страницей: --void-deep вместо
+   чёрного, разлиновка --rule, моноширинный счётчик. Чистый чёрный на этой
+   витрине читается как провал, а не как слой.                             */
+.lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: flex;
+	flex-direction: column;
+	background: color-mix(in srgb, var(--void-deep) 94%, transparent);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	animation: product-lightbox-in 260ms var(--ease-out-quart) both;
+}
+
+@keyframes product-lightbox-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+.lightboxHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex: 0 0 auto;
+	padding: max(0.9rem, env(safe-area-inset-top)) 1rem 0.9rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+.lightboxStage {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 1rem;
+}
+
+@media (min-width: 40rem) {
+	.lightboxStage {
+		padding: 1.5rem 4.5rem;
+	}
+}
+
+.lightboxImage {
+	object-fit: contain;
+	animation: product-image-in 320ms var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lightbox,
+	.lightboxImage {
+		animation: none;
+	}
+}
+
+.lightboxButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	flex: 0 0 auto;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart);
+}
+
+.lightboxButton:hover,
+.lightboxButton:focus-visible {
+	color: var(--text-primary);
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.lightboxButton:active {
+	transform: scale(0.94);
+}
+
+.lightboxArrow {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 2.75rem;
+	height: 2.75rem;
+}
+
+.lightboxArrow:active {
+	transform: translateY(-50%) scale(0.94);
+}
+
+.lightboxArrowPrev {
+	left: 0.5rem;
+}
+
+.lightboxArrowNext {
+	right: 0.5rem;
+}
+
+@media (min-width: 40rem) {
+	.lightboxArrowPrev {
+		left: 1rem;
+	}
+
+	.lightboxArrowNext {
+		right: 1rem;
+	}
+}
+
+.lightboxRail {
+	display: flex;
+	justify-content: center;
+	gap: 0.5rem;
+	flex: 0 0 auto;
+	overflow-x: auto;
+	padding: 0.9rem 1rem calc(0.9rem + env(safe-area-inset-bottom));
+	border-top: 1px solid var(--rule);
+	scrollbar-width: thin;
+}

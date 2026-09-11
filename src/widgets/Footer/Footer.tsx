@@ -1,233 +1,360 @@
-// components/layout/Footer.tsx
-
+import { ArrowUpRight, Mail, Phone } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import type { CSSProperties } from "react";
+import { SOCIAL_PLATFORM_LABELS } from "@/modules/contact/content/contacts-content";
+import { telHref } from "@/modules/contact/lib/format";
+import { socialConfig } from "@/modules/contact/lib/social-config";
+import { getCachedCategories } from "@/payload/services/categories.service";
 import { getCachedConsents } from "@/payload/services/consents.service";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import type { Consent } from "@/payload-types";
+import { DrawnRule } from "@/shared/components/motion/DrawnRule";
+import { cn } from "@/utils/cn";
 import {
-  getCompanyName,
-  getLegalAddress,
-  getLogoUrl,
-  getPrimaryEmail,
-  getPrimaryPhone,
-  getSocialLinks,
+	getCompanyName,
+	getLegalAddress,
+	getLogoUrl,
+	getPrimaryEmail,
+	getPrimaryPhone,
+	getSocialLinks,
+	getWorkingHours,
 } from "@/utils/settings-helpers";
+import { BackToTop } from "./BackToTop";
+import styles from "./Footer.module.css";
+import { FooterReveal } from "./FooterReveal";
+import {
+	ACCOUNT_LINKS,
+	COMPANY_LINKS,
+	type FooterGroup,
+	MAX_FOOTER_CATEGORIES,
+} from "./footer-nav";
 
-export interface FooterColumn {
-  title: string;
-  links: { label: string; path: string; external?: boolean }[];
-}
+/**
+ * Подвал витрины.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ЧТО ЗДЕСЬ ПРОИСХОДИТ И ПОЧЕМУ ИМЕННО ТАК
+ * ────────────────────────────────────────────────────────────────────────────
+ * Подвал — единственный блок, который посетитель видит на каждой странице
+ * сайта, поэтому он обязан отвечать на четыре вопроса и ни на один больше:
+ * чей это сайт, как связаться, куда ещё пойти, на каких условиях всё это
+ * работает. Отсюда четыре зоны сверху вниз: знак с подписью, полка каналов
+ * связи, колонки разделов, строка реквизитов.
+ *
+ * ЦЕЛЕВЫХ КНОПОК ЗДЕСЬ НЕТ НАМЕРЕННО. На главной подвал идёт сразу за
+ * финальным призывом, у которого ровно те же два действия («Смотреть
+ * продукцию» → /category, «Написать менеджеру» → /contacts). Третья пара
+ * кнопок через 80 пикселей после второй — это не усиление, а шум. Их роль
+ * играет полка каналов: телефон и почта набраны крупно, вся строка целиком
+ * является ссылкой и по площади нажатия больше любой кнопки.
+ *
+ * СОСТАВ ДАННЫХ. Настройки, соглашения и категории тянутся параллельно и все
+ * три закэшированы. Категории запрашиваются С ТЕМИ ЖЕ параметрами, что и в
+ * Navbar ({ isActive: true, sort: "order" }), чтобы попасть в уже прогретую
+ * запись кэша, а не завести вторую с тем же содержимым.
+ *
+ * ЧЕГО ЗДЕСЬ НЕТ. Пользователь не запрашивается: ради подсветки личных
+ * разделов подвал в корневом макете добавил бы обращение к сессии на каждой
+ * странице сайта. Личные ссылки показываются всем — страницы сами уводят на
+ * вход.
+ */
+
+/** Строка бренда — та же, что в мобильном меню и в первом экране главной. */
+const STRAPLINE = "Перехват, а не поражение";
 
 export interface FooterProps {
-  columns?: FooterColumn[];
-  showBackToTop?: boolean;
-  className?: string;
+	className?: string;
 }
 
-const DEFAULT_COLUMNS: FooterColumn[] = [
-  {
-    title: "Товары",
-    links: [
-      { label: "Категории", path: "/category" },
-      { label: "Все товары", path: "/category/all" },
-    ],
-  },
-  {
-    title: "Ресурсы",
-    links: [{ label: "База знаний", path: "/knowledge" }],
-  },
-  {
-    title: "О проекте",
-    links: [
-      { label: "Контакты", path: "/contacts" },
-      { label: "Соглашения", path: "/consents" },
-    ],
-  },
-  {
-    title: "Личный кабинет",
-    links: [
-      { label: "Профиль", path: "/profile" },
-      { label: "Мои отзывы", path: "/my-reviews" },
-      { label: "Избранное", path: "/wishlist" },
-    ],
-  },
-];
+export default async function Footer({ className }: FooterProps = {}) {
+	const [settings, consentsResult, categoriesResult] = await Promise.all([
+		getCachedSettings(),
+		getCachedConsents({ isActive: true, sort: "title" }),
+		getCachedCategories({ isActive: true, sort: "order" }),
+	]);
 
-export default async function Footer({
-  columns = DEFAULT_COLUMNS,
-  showBackToTop = true,
-  className = "",
-}: FooterProps) {
-  // Получаем настройки и соглашения параллельно
-  const [settings, consentsResult] = await Promise.all([
-    getCachedSettings(),
-    getCachedConsents({ isActive: true, sort: "title" }),
-  ]);
+	const companyName = getCompanyName(settings) || "НПО «Полёт»";
+	const logoUrl = getLogoUrl(settings);
+	const phone = getPrimaryPhone(settings);
+	const email = getPrimaryEmail(settings);
+	const workingHours = getWorkingHours(settings);
+	const legalAddress = getLegalAddress(settings);
+	const socialLinks = getSocialLinks(settings);
 
-  const companyName = getCompanyName(settings);
-  const logoUrl = getLogoUrl(settings);
-  const phone = getPrimaryPhone(settings);
-  const email = getPrimaryEmail(settings);
-  const socialLinks = getSocialLinks(settings);
-  const legalAddress = getLegalAddress(settings);
+	const categories = (categoriesResult?.docs || []).slice(
+		0,
+		MAX_FOOTER_CATEGORIES,
+	);
 
-  // Строим ссылки на соглашения для нижней части
-  const consentLinks = (consentsResult?.docs || []).map((consent: Consent) => ({
-    label: consent.title,
-    path: `/consents/${consent.slug}`,
-  }));
+	// Соглашения приходят из админки. Запасной список нужен на случай пустой
+	// коллекции: юридические ссылки в подвале — требование, а не украшение, и
+	// подвал без них выглядит недоделанным ровно до первой проверки.
+	const consentLinks = (consentsResult?.docs || []).map((consent: Consent) => ({
+		label: consent.title,
+		path: `/consents/${consent.slug}`,
+	}));
+	const legalLinks =
+		consentLinks.length > 0
+			? consentLinks
+			: [
+					{ label: "Политика конфиденциальности", path: "/consents/privacy" },
+					{ label: "Правила продажи товаров", path: "/consents/terms" },
+					{
+						label: "Пользовательское соглашение",
+						path: "/consents/user-agreement",
+					},
+					{ label: "Публичная оферта", path: "/consents/offer" },
+					{ label: "Файлы куки", path: "/consents/cookie" },
+					{
+						label: "Согласие на обработку данных",
+						path: "/consents/personal-data",
+					},
+				];
 
-  // Если соглашений нет, используем запасные ссылки (как в старом проекте)
-  const bottomLinks =
-    consentLinks.length > 0
-      ? consentLinks
-      : [
-          { label: "Политика конфиденциальности", path: "/consents/privacy" },
-          { label: "Правила продажи товаров", path: "/consents/terms" },
-          {
-            label: "Пользовательское соглашение",
-            path: "/consents/user-agreement",
-          },
-          { label: "Публичная оферта", path: "/consents/offer" },
-          { label: "Файлы куки", path: "/consents/cookie" },
-          {
-            label: "Согласие на обработку данных",
-            path: "/consents/personal-data",
-          },
-        ];
+	const groups: FooterGroup[] = [
+		{
+			title: "Каталог",
+			links: [
+				...categories.map((category) => ({
+					label: category.name,
+					href: `/category/${category.slug}`,
+					title: category.name,
+				})),
+				{ label: "Все категории", href: "/category" },
+			],
+		},
+		{ title: "Компания", links: COMPANY_LINKS },
+		{ title: "Кабинет", links: ACCOUNT_LINKS },
+	];
 
-  return (
-    <footer className={`w-full bg-black text-gray-300  ${className}`}>
-      <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
-        {/* Верхняя часть: логотип и контакты по центру */}
-        <div className="flex flex-col items-center text-center">
-          {logoUrl ? (
-            <Image
-              src={logoUrl}
-              alt={companyName || "Логотип"}
-              width={180}
-              height={48}
-              className="h-12 w-auto"
-              priority
-            />
-          ) : (
-            <span className="text-2xl font-bold text-white">
-              {companyName || "Название компании"}
-            </span>
-          )}
+	if (socialLinks.length > 0) {
+		groups.push({
+			title: "Мы в сети",
+			links: socialLinks.map((link) => ({
+				label: link.title || SOCIAL_PLATFORM_LABELS[link.platform] || "Перейти",
+				href: link.url,
+				external: true,
+				platform: link.platform,
+			})),
+		});
+	}
 
-          <div className="mt-4 space-x-4 text-sm">
-            {phone && (
-              <a
-                href={`tel:${phone}`}
-                className="hover:text-primary transition"
-              >
-                {phone}
-              </a>
-            )}
-            {email && (
-              <>
-                <span className="text-gray-500">•</span>
-                <a
-                  href={`mailto:${email}`}
-                  className="hover:text-primary transition"
-                >
-                  {email}
-                </a>
-              </>
-            )}
-          </div>
+	// Ячейки полки каналов считаются заранее: число колонок уезжает в CSS
+	// переменной, потому что их бывает две или три, и repeat(auto-fit)
+	// растянул бы две на всю ширину, оставив значения посреди пустоты.
+	const channelCount = [phone, email, workingHours].filter(Boolean).length;
 
-          {/* Социальные сети (если есть) — в старом проекте не было, но оставим на случай */}
-          {socialLinks.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-4 justify-center">
-              {socialLinks.map((link, idx) => (
-                <a
-                  key={idx}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-primary transition text-sm"
-                >
-                  {link.platform}
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
+	// Порядковый номер блока в каскаде появления. Считается сквозным, а не с
+	// нуля в каждой зоне: иначе нижняя строка проявлялась бы одновременно с
+	// первой колонкой.
+	let order = 0;
 
-        {/* Сетка колонок */}
-        <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {columns.map((col, idx) => (
-            <div key={idx}>
-              <h3 className="text-white font-semibold text-lg mb-4">
-                {col.title}
-              </h3>
-              <ul className="space-y-2">
-                {col.links.map((link, i) => (
-                  <li key={i}>
-                    <Link
-                      href={link.path}
-                      className="text-gray-400 hover:text-primary transition text-sm"
-                      target={link.external ? "_blank" : undefined}
-                      rel={link.external ? "noopener noreferrer" : undefined}
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+	return (
+		<footer className={cn(styles.footer, className)}>
+			<div className={cn("rule-ticked", styles.seam)} aria-hidden="true" />
+			<div className={styles.glow} aria-hidden="true" />
 
-        {/* Разделитель */}
-        <hr className="my-12 border-border/30" />
+			<FooterReveal>
+				<div
+					className={cn(styles.head, styles.item)}
+					style={{ "--i": order++ } as CSSProperties}
+				>
+					<Link href="/" className={styles.mark} aria-label="На главную">
+						{logoUrl ? (
+							<Image
+								src={logoUrl}
+								alt={companyName}
+								width={280}
+								height={80}
+								className={styles.logo}
+							/>
+						) : (
+							<span className={cn("u-display", styles.wordmark)}>
+								{companyName}
+							</span>
+						)}
+					</Link>
 
-        {/* Нижняя часть: юр.информация слева, соглашения и наверх справа */}
-        <div className="flex flex-col md:flex-row justify-between items-start gap-4 text-sm">
-          <div className="space-y-1 text-gray-500">
-            {companyName && <p className="text-gray-400">{companyName}</p>}
-            {legalAddress && <p>{legalAddress}</p>}
-            {/* При желании можно добавить ИНН/ОГРН из настроек, если они будут добавлены в модель */}
-          </div>
+					<p className={cn("u-display", styles.strap)}>{STRAPLINE}</p>
+				</div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {bottomLinks.map((link, idx) => (
-              <Link
-                key={idx}
-                href={link.path}
-                className="text-gray-500 hover:text-primary transition text-xs sm:text-sm whitespace-nowrap"
-              >
-                {link.label}
-              </Link>
-            ))}
-            {showBackToTop && (
-              <a
-                href="#top"
-                className="inline-flex items-center gap-1 text-gray-500 hover:text-primary transition ml-2"
-              >
-                <span>Наверх</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
+				{channelCount > 0 ? (
+					<div
+						className={cn(styles.channels, styles.item)}
+						style={
+							{
+								"--i": order++,
+								"--channel-cols": channelCount,
+							} as CSSProperties
+						}
+					>
+						{phone ? (
+							<a href={telHref(phone)} className={styles.channel}>
+								<span className={styles.channelBody}>
+									<span className={styles.channelLabel}>Телефон</span>
+									<span className={styles.channelValue}>{phone}</span>
+								</span>
+								<Phone className={styles.channelIcon} aria-hidden="true" />
+							</a>
+						) : null}
+
+						{email ? (
+							<a href={`mailto:${email}`} className={styles.channel}>
+								<span className={styles.channelBody}>
+									<span className={styles.channelLabel}>Почта</span>
+									<span className={styles.channelValue}>{email}</span>
+								</span>
+								<Mail className={styles.channelIcon} aria-hidden="true" />
+							</a>
+						) : null}
+
+						{workingHours ? (
+							<div className={styles.channel}>
+								<span className={styles.channelBody}>
+									<span className={styles.channelLabel}>График</span>
+									<span className={cn(styles.channelValue, styles.channelNote)}>
+										{workingHours}
+									</span>
+								</span>
+							</div>
+						) : null}
+					</div>
+				) : null}
+
+				<nav
+					className={styles.nav}
+					aria-label="Разделы сайта"
+					style={{ "--nav-cols": groups.length } as CSSProperties}
+				>
+					{groups.map((group) => (
+						<div
+							key={group.title}
+							className={cn(styles.group, styles.item)}
+							style={{ "--i": order++ } as CSSProperties}
+						>
+							<h2 className={styles.groupTitle}>{group.title}</h2>
+							<ul className={styles.list}>
+								{group.links.map((link) => {
+									// «Все категории» отбивается чертой только когда над ней
+									// действительно есть категории — иначе линия висит
+									// над единственным пунктом.
+									const isAll =
+										link.href === "/category" && categories.length > 0;
+									const config = link.platform
+										? (socialConfig[link.platform] ?? socialConfig.other)
+										: undefined;
+									const Icon = config?.icon;
+
+									// Подпись обрезается на второй строке во ВСЕХ колонках, а не
+									// только у категорий: названия приходят из админки, и
+									// правило, работающее лишь для сегодняшних данных, — это
+									// отложенная поломка ряда.
+									const body = (
+										<span className={cn(styles.linkText, styles.linkClamp)}>
+											{link.label}
+										</span>
+									);
+
+									return (
+										<li key={link.href} className={cn(isAll && styles.itemAll)}>
+											{link.external ? (
+												<a
+													href={link.href}
+													target="_blank"
+													rel="noopener noreferrer"
+													title={link.title}
+													className={styles.link}
+													style={
+														config
+															? ({
+																	"--net-tint": config.color,
+																} as CSSProperties)
+															: undefined
+													}
+												>
+													{Icon ? (
+														<Icon
+															className={styles.linkIcon}
+															aria-hidden="true"
+														/>
+													) : null}
+													{body}
+													<ArrowUpRight
+														className={styles.linkArrow}
+														aria-hidden="true"
+													/>
+												</a>
+											) : (
+												<Link
+													href={link.href}
+													title={link.title}
+													className={styles.link}
+												>
+													{body}
+												</Link>
+											)}
+										</li>
+									);
+								})}
+							</ul>
+						</div>
+					))}
+				</nav>
+
+				<DrawnRule className={styles.rule} />
+
+				<div
+					className={cn(styles.legal, styles.item)}
+					style={{ "--i": order++ } as CSSProperties}
+				>
+					<p className={styles.legalMeta}>
+						{/* Год берётся в момент рендера. Все маршруты витрины серверные и
+						    динамические (см. вывод сборки), поэтому он не «застывает» на
+						    дате сборки, как это было бы у статически предгенерированной
+						    страницы. */}
+						<span className={styles.legalName}>
+							© {new Date().getFullYear()} {companyName}
+						</span>
+						{legalAddress ? <span>{legalAddress}</span> : null}
+					</p>
+
+					<div className={styles.legalSide}>
+						<ul className={styles.legalLinks}>
+							{legalLinks.map((link) => (
+								<li key={link.path}>
+									<Link
+										href={link.path}
+										className={cn(styles.link, styles.legalLink)}
+									>
+										<span className={styles.linkText}>{link.label}</span>
+									</Link>
+								</li>
+							))}
+						</ul>
+
+						<BackToTop />
+					</div>
+				</div>
+			</FooterReveal>
+
+			<FooterNoScriptStyles />
+		</footer>
+	);
+}
+
+/**
+ * Показывает подвал целиком, когда JavaScript отключён.
+ *
+ * Базовое состояние блоков — скрытое (см. .item в Footer.module.css), и без
+ * этого правила посетитель без JS получил бы пустую тёмную полосу вместо
+ * контактов и юридических ссылок. Приём и его место — те же, что у
+ * FaqNoScriptStyles: правило живёт рядом с тем, что оно спасает.
+ */
+function FooterNoScriptStyles() {
+	return (
+		<noscript>
+			<style>{`.${styles.item}{opacity:1!important;transform:none!important;filter:none!important}`}</style>
+		</noscript>
+	);
 }

@@ -12,99 +12,155 @@ export const revalidate = 0;
 //   • /category/<чужая>/products/<slug> отдавала 200 + <meta http-equiv
 //     ="refresh"> вместо честного 308 — то есть дубль оставался
 //     индексируемым (см. permanentRedirect.md, раздел про streaming).
-// Скелетон ниже живёт внутри самой страницы (Suspense вокруг CategoryToolbar) —
-// так он не влияет на статус ответа.
+// Скелетон ниже живёт ВНУТРИ самой страницы (Suspense вокруг выдачи), а сама
+// страница ни notFound(), ни редиректов не вызывает — на статус ответа он не
+// влияет.
 
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
-import CategoryGrid from "@/modules/category/components/CategoryGrid";
-import { CategoryToolbar } from "@/modules/category/components/CategoryToolbar";
-import { applyCategoryFilters } from "@/modules/category/lib/applyCategoryFilters";
+import { CategoryCatalogHero } from "@/modules/category/components/CategoryCatalogHero";
+import { CategoryCatalogSkeleton } from "@/modules/category/components/CategoryCatalogSkeleton";
+import { CategoryCatalogView } from "@/modules/category/components/CategoryCatalogView";
+import { mapCategoryToCardData } from "@/modules/category/lib/adapter";
 import { parseCategorySearchParams } from "@/modules/category/lib/parseFilters";
+import type { CategoryFilters } from "@/modules/category/types/filters";
 import { getCachedCategories } from "@/payload/services/categories.service";
+import { getCachedCategoryProductCounts } from "@/payload/services/products.service";
+import { baseURL } from "@/resources/content";
 import { JsonLd } from "@/shared/components/JsonLd";
+import { PageContainer } from "@/shared/components/PageContainer";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
-import { Empty } from "@/UI";
+
+const PAGE_PATH = "/category";
+const PAGE_URL = `${baseURL}${PAGE_PATH}`;
+
+// Заголовок разбит на строки вручную — почему именно так, см. комментарий в
+// CategoryCatalogHero. Меняя его, там же придётся пересчитать границы кегля.
+const HERO_TITLE_LINES = ["Каталог", "продукции"];
+const HERO_LEAD =
+	"Средства противодействия беспилотникам: стационарные комплексы, носимые и ручные изделия, антидроновая защита периметра. Выберите раздел или найдите нужное по названию.";
+
+const PAGE_DESCRIPTION =
+	"Разделы каталога НПО «Полёт»: комплексы радиоэлектронного подавления, ручные и стационарные средства противодействия БПЛА.";
 
 export const metadata: Metadata = {
-	title: "Каталог категорий",
-	description: "Все категории товаров нашего магазина",
+	title: "Каталог продукции",
+	description: PAGE_DESCRIPTION,
+	alternates: { canonical: PAGE_URL },
+	openGraph: {
+		title: "Каталог продукции",
+		description: PAGE_DESCRIPTION,
+		url: PAGE_URL,
+		type: "website",
+	},
 };
+
+const BREADCRUMB_ITEMS = [
+	{ title: "Главная", href: "/" },
+	{ title: "Каталог", href: PAGE_PATH },
+];
 
 interface CategoriesPageProps {
 	searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+/**
+ * Витрина каталога — верхний ярус того же интерфейса, что и выдача товаров
+ * внутри раздела.
+ *
+ * Три яруса сверху вниз, чем ниже — тем конкретнее:
+ *
+ *   1. первый экран — что это за каталог;
+ *   2. липкая панель — сколько здесь разделов и как их отобрать;
+ *   3. сетка — сами разделы.
+ *
+ * Порядок и материалы совпадают со страницей раздела намеренно: переход
+ * «каталог → раздел» не должен читаться как переход на другой сайт.
+ *
+ * Первый экран не ждёт базу: он полностью статичен и уходит в ответ сразу, а
+ * выдача подставляется по готовности (Suspense вокруг CategoryCatalogContent).
+ * Разница видна на холодном кэше — вместо пустого экрана посетитель сразу
+ * получает заголовок и ориентир.
+ */
 export default async function CategoriesPage({
 	searchParams,
 }: CategoriesPageProps) {
 	const rawSearchParams = await searchParams;
 	const filters = parseCategorySearchParams(rawSearchParams);
 
-	const { docs: allCategories } = await getCachedCategories({
-		isActive: true,
-		sort: "order",
-		limit: 200,
-		depth: 1,
-	});
-
-	const filteredCategories = applyCategoryFilters(allCategories, filters);
-
-	const breadcrumbItems = [
-		{ title: "Главная", href: "/" },
-		{ title: "Категории", href: "/category" },
-	];
-
 	return (
-		<main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
-			<div className="flex flex-col gap-6">
-				<Breadcrumbs items={breadcrumbItems} />
-				<JsonLd data={buildBreadcrumbSchema(breadcrumbItems)} />
+		// Общий layout витрины кладёт страницу в центрированную колонку с
+		// отступом padding="l". Первому экрану он мешает: полоса обязана идти
+		// во всю ширину окна и заезжать под шапку. .full-bleed возвращает
+		// полную ширину, отрицательные поля снимают вертикальный отступ —
+		// иначе над первым экраном остаётся полоса фона. Тот же приём, что на
+		// главной и на контактах.
+		<main
+			className="full-bleed min-h-screen"
+			style={{
+				marginTop: "calc(-1 * var(--responsive-space-l))",
+				marginBottom: "calc(-1 * var(--responsive-space-l))",
+			}}
+		>
+			<JsonLd data={buildBreadcrumbSchema(BREADCRUMB_ITEMS)} />
 
-				<header className="flex flex-col gap-2">
-					<h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-						Каталог категорий
-					</h1>
-					<p className="max-w-2xl text-base text-[var(--text-secondary)]">
-						Выберите категорию, чтобы посмотреть товары
-					</p>
-				</header>
-			</div>
+			<CategoryCatalogHero
+				titleLines={HERO_TITLE_LINES}
+				lead={HERO_LEAD}
+				breadcrumbs={BREADCRUMB_ITEMS}
+			/>
 
-			<Suspense fallback={<ToolbarSkeleton />}>
-				<CategoryToolbar
-					totalCount={allCategories.length}
-					filteredCount={filteredCategories.length}
-				/>
-			</Suspense>
-
-			{filteredCategories.length > 0 ? (
-				<CategoryGrid categories={filteredCategories} columns={4} />
-			) : (
-				<Empty
-					message="Категории не найдены"
-					description={
-						filters.q
-							? "Попробуйте изменить поисковый запрос или очистить фильтры."
-							: "Пока ещё нет доступных категорий."
-					}
-					size="lg"
-					className="!py-20"
-				/>
-			)}
+			<PageContainer className="pb-[5rem]">
+				<Suspense fallback={<CategoryCatalogSkeleton />}>
+					<CategoryCatalogContent filters={filters} />
+				</Suspense>
+			</PageContainer>
 		</main>
 	);
 }
 
-function ToolbarSkeleton() {
+/**
+ * Данные витрины.
+ *
+ * Два независимых запроса идут одним Promise.all — зависимости между ними
+ * нет, а последовательно они складывались бы в сумму задержек. Оба
+ * кэшируются с тегами и сбрасываются хуками Payload.
+ *
+ * Отбор и сортировка применяются уже в клиентском компоненте — в том числе
+ * при серверной отрисовке, поэтому в HTML попадает готовая выдача (для
+ * поисковика и для случая, когда JS не выполнился), а дальше уточнение
+ * запроса идёт мгновенно и без обращения к серверу. Разбор — в
+ * useCategoryFilters.
+ */
+async function CategoryCatalogContent({
+	filters,
+}: {
+	filters: CategoryFilters;
+}) {
+	const [{ docs: allCategories }, productCounts] = await Promise.all([
+		getCachedCategories({
+			isActive: true,
+			sort: "order",
+			limit: 200,
+			depth: 1,
+		}),
+		getCachedCategoryProductCounts(),
+	]);
+
+	const categories = allCategories.map((category) =>
+		mapCategoryToCardData(category, productCounts[String(category.id)] ?? 0),
+	);
+
+	const totalProducts = categories.reduce(
+		(sum, category) => sum + category.productCount,
+		0,
+	);
+
 	return (
-		<div aria-hidden className="flex flex-col gap-3">
-			<div className="flex flex-col gap-3 sm:flex-row">
-				<div className="h-10 animate-pulse rounded-md border border-[var(--border)] bg-[var(--surface)] sm:flex-1" />
-				<div className="h-10 w-full animate-pulse rounded-md border border-[var(--border)] bg-[var(--surface)] sm:w-44" />
-			</div>
-			<div className="h-5 w-32 animate-pulse rounded bg-[var(--surface)]" />
-		</div>
+		<CategoryCatalogView
+			categories={categories}
+			initialFilters={filters}
+			totalProducts={totalProducts}
+		/>
 	);
 }

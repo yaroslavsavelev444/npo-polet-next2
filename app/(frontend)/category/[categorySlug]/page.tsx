@@ -4,7 +4,7 @@ export const revalidate = 0;
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getImageData } from "@/modules/category/components/CategoryCard";
+import { getImageData } from "@/modules/category/lib/media";
 import type { ProductQuery } from "@/modules/productCard/types/query";
 import { ProductCatalogLayout } from "@/modules/productCatalog/components/ProductCatalogLayout";
 import { parseCatalogSearchParams } from "@/modules/productCatalog/lib/parseFilters";
@@ -75,7 +75,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
 	const breadcrumbItems = [
 		{ title: "Главная", href: "/" },
-		{ title: "Категории", href: "/category" },
+		{ title: "Каталог", href: "/category" },
 		{ title: category.name, href: `/category/${categorySlug}` },
 	];
 
