@@ -18,22 +18,29 @@ function isPopulated<T>(value: number | T | null | undefined): value is T {
 	return typeof value === "object" && value !== null;
 }
 
+/** Сколько позиций показывать в свёрнутой строке до «и ещё N». */
+const PREVIEW_LIMIT = 3;
+
 export function mapOrderToListItem(order: Order): OrderListItemView {
-	const totalItems = (order.items ?? []).reduce(
-		(sum, item) => sum + item.quantity,
-		0,
-	);
+	const items = order.items ?? [];
+	const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
 	return {
 		id: String(order.id),
 		orderNumber: order.orderNumber,
 		status: order.status,
 		createdAt: order.createdAt,
-		itemsCount: order.items?.length ?? 0,
+		itemsCount: items.length,
 		totalItems,
 		total: order.pricing.total,
 		currency: order.pricing.currency ?? "RUB",
 		deliveryMethod: order.delivery.method,
+		paymentMethod: order.payment.method,
+		// Снимок имён из самого заказа: ни одного лишнего обращения к базе.
+		itemsPreview: items.slice(0, PREVIEW_LIMIT).map((item) => ({
+			name: item.name,
+			quantity: item.quantity,
+		})),
 		canCancel: isOrderCancellable(order.status),
 	};
 }

@@ -16,10 +16,10 @@ export default function robots(): MetadataRoute.Robots {
 					"/cart",
 					"/checkout",
 					"/profile",
+					"/profile/*",
 					"/orders",
 					"/orders/*",
 					"/wishlist",
-					"/reviews",
 					"/*?*group=",
 					// Отфильтрованная выдача базы знаний: то же содержимое в другой
 					// нарезке. Сами материалы при этом полностью открыты — робот

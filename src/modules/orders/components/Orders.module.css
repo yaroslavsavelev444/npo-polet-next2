@@ -1,0 +1,1471 @@
+/* ===========================================================================
+   Мои заказы
+   ===========================================================================
+   Продолжение личного кабинета: первый экран --void-deep, липкая .rail из
+   productCatalog/components/Catalog.module.css, служебные подписи
+   моноширинным капслоком, времена и кривые из app/(frontend)/home.css.
+   Своей системы страница не заводит.
+
+   ────────────────────────────────────────────────────────────────────────────
+   ГЛАВНОЕ РЕШЕНИЕ: РАЗЛИНОВАННЫЙ СПИСОК С РАСКРЫТИЕМ, А НЕ КАРТОЧКИ + МОДАЛКА
+   ────────────────────────────────────────────────────────────────────────────
+   Было: узкая карточка с четырьмя фактами (номер, дата, статус, сумма), всё
+   остальное — за модальным окном. То есть чтобы узнать, ЧТО в заказе, куда он
+   едет и почему столько стоит, приходилось открывать окно поверх страницы,
+   терять место в списке и закрывать его, чтобы посмотреть следующий заказ.
+   Сравнить два заказа было нельзя в принципе.
+
+   Стало: строка списка отвечает на вопросы «мой ли это заказ, что с ним и
+   сколько он стоит» БЕЗ единого нажатия — состав перечислен именами позиций,
+   статус подписан словом со значком, у активного заказа показан этап пути.
+   Нажатие раскрывает подробности на месте, список остаётся на экране, соседний
+   заказ раскрывается рядом.
+
+   Рамок у строк нет — по тем же основаниям, что у карточки товара и карточки
+   раздела каталога: десяток обведённых прямоугольников читается решёткой.
+   Строку от строки отбивает разлиновка, а раскрытая получает подложку и
+   акцентную черту слева: видно, что читаешь именно её.                      */
+
+/* ---------------------------------------------------------------------------
+   Список
+   --------------------------------------------------------------------------- */
+.list {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.order {
+	position: relative;
+	border-top: 1px solid var(--rule);
+	transition: background-color 260ms var(--ease-out-quart);
+}
+
+.list > .order:first-child {
+	border-top: 0;
+}
+
+/* Раскрытый заказ — единица чтения: подложка темнее витрины (как у всего
+   всплывающего в этой системе) и акцентная черта слева, на том же месте, где
+   в кабинете отмечено текущее устройство, а в меню сортировки каталога —
+   выбранный пункт. */
+.order[data-open="true"] {
+	background: color-mix(in srgb, var(--void) 55%, transparent);
+}
+
+.order[data-open="true"]::before {
+	content: "";
+	position: absolute;
+	left: calc(-1 * var(--order-accent-offset, 0.75rem));
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	border-radius: 1px;
+	background: var(--primary);
+	animation: order-accent-in 320ms var(--ease-out-expo) both;
+}
+
+@keyframes order-accent-in {
+	from {
+		transform: scaleY(0);
+		opacity: 0;
+	}
+	to {
+		transform: scaleY(1);
+		opacity: 1;
+	}
+}
+
+/* Каскад появления строк. Шаг 45 мс — тот же, что у карточек каталога и
+   строк кабинета: меньше 40 мс каскад перестаёт читаться, больше 60 мс
+   последняя строка заметно опаздывает. */
+.orderEnter {
+	animation: order-row-in 420ms var(--ease-out-expo) both;
+	animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes order-row-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 10px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.orderEnter,
+	.order[data-open="true"]::before {
+		animation: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Свёрнутая строка
+   ---------------------------------------------------------------------------
+   Вся шапка — одна кнопка: нажатие в любом месте строки раскрывает заказ.
+   Отдельная маленькая цель «раскрыть» справа заставляла бы целиться, а на
+   сенсорном экране ещё и промахиваться.
+
+   Раскладка сеткой с именованными областями: на узком экране номер и стрелка
+   идут строкой, под ними — статус слева и деньги справа; с 48rem всё
+   собирается в один ряд. Именованные области описывают оба состояния целиком
+   и читаются как картинка — в отличие от перестановки порядка у flex.       */
+.head {
+	display: grid;
+	width: 100%;
+	gap: 0.85rem 1.25rem;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-areas:
+		"main   toggle"
+		"status money";
+	align-items: start;
+	padding: 1.15rem 0;
+	border: 0;
+	background: transparent;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+	border-radius: var(--radius-sm);
+	outline-offset: 4px;
+}
+
+@media (min-width: 48rem) {
+	.head {
+		grid-template-columns: minmax(0, 1fr) auto auto auto;
+		grid-template-areas: "main status money toggle";
+		align-items: center;
+		gap: 1.5rem;
+		padding: 1.35rem 0;
+	}
+}
+
+.headMain {
+	grid-area: main;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	min-width: 0;
+}
+
+.headStatus {
+	grid-area: status;
+	display: flex;
+	flex-direction: column;
+	/* По ширине содержимого, а не колонки: растянутый на 12.5rem бейдж
+	   превращается в полосу и перестаёт читаться как метка. */
+	align-items: flex-start;
+	gap: 0.45rem;
+	min-width: 0;
+	max-width: 100%;
+}
+
+@media (min-width: 48rem) {
+	.headStatus {
+		/* Ширина под самую длинную подпись («Ожидает подтверждения») и под
+		   шкалу этапов: без неё колонка дышала бы от строки к строке, и
+		   бейджи соседних заказов переставали стоять в столбик. */
+		width: 12.5rem;
+		flex: 0 0 auto;
+	}
+}
+
+.headMoney {
+	grid-area: money;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.2rem;
+	flex: 0 0 auto;
+}
+
+.headToggle {
+	grid-area: toggle;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 999px;
+	color: var(--text-muted);
+	transition:
+		color 200ms var(--ease-out-quart),
+		background-color 200ms var(--ease-out-quart),
+		transform 320ms var(--ease-out-expo);
+}
+
+.head:hover .headToggle,
+.head:focus-visible .headToggle {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.order[data-open="true"] .headToggle {
+	transform: rotate(180deg);
+	color: var(--primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.headToggle {
+		transition: color 200ms linear;
+	}
+}
+
+/* Номер заказа — моноширинный: это код, его диктуют менеджеру и ищут глазами
+   среди других кодов, а пропорциональные цифры в столбик не встают. */
+.orderNumber {
+	display: flex;
+	align-items: baseline;
+	gap: 0.45rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.01em;
+	line-height: 1.2;
+	color: var(--text-primary);
+	transition: color 200ms var(--ease-out-quart);
+}
+
+.orderNumberPrefix {
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.head:hover .orderNumber,
+.head:focus-visible .orderNumber {
+	color: var(--primary);
+}
+
+/* Дата и способ получения — служебная строка. */
+.orderMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.3rem 0.6rem;
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.4;
+	color: var(--text-secondary);
+}
+
+.orderMetaDot {
+	width: 2px;
+	height: 2px;
+	border-radius: 999px;
+	background: var(--border-light);
+}
+
+/* На узком экране дата и способ получения не помещаются в одну строку, а
+   перенос по flex-wrap оставляет точку-разделитель висеть в конце первой
+   строки сиротой. Поэтому здесь они честно ставятся друг под друга, а
+   разделитель убирается: его работу делает перенос. */
+@media (max-width: 30rem) {
+	.orderMeta {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.15rem;
+	}
+
+	.orderMetaDot {
+		display: none;
+	}
+}
+
+/* Состав заказа в свёрнутом виде: имена позиций.
+   Именно имена, а не «3 товара»: число ничего не говорит о том, ТОТ ли это
+   заказ, а «Сеткомёт Паук ×2, Кабель ВЧ ×1» отвечает на вопрос сразу. */
+.orderItems {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+}
+
+.orderItemsRest {
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Статус
+   ---------------------------------------------------------------------------
+   Значок + подпись словом. Цвет только усиливает: силуэт значка различает
+   состояния при дальтонизме, на плохом экране и в распечатке, а подпись
+   работает всегда.                                                          */
+.status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	max-width: 100%;
+	padding: 0.3rem 0.65rem 0.3rem 0.5rem;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.statusIcon {
+	flex: 0 0 auto;
+}
+
+.statusWait {
+	border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+	background: color-mix(in srgb, var(--warning) 12%, transparent);
+	color: color-mix(in srgb, var(--warning) 80%, #fff);
+}
+
+.statusProgress {
+	border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+	color: var(--accent-light);
+}
+
+/* Единственное состояние, где ход за покупателем, помечено фирменным
+   акцентом — самым громким цветом системы. Три «заказ едет» его не получают:
+   там делать нечего. */
+.statusAction {
+	border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+	color: var(--primary-200);
+}
+
+.statusDone {
+	border-color: color-mix(in srgb, var(--success) 32%, transparent);
+	background: color-mix(in srgb, var(--success) 12%, transparent);
+	color: color-mix(in srgb, var(--success) 80%, #fff);
+}
+
+.statusStopped {
+	border-color: color-mix(in srgb, var(--error) 32%, transparent);
+	background: color-mix(in srgb, var(--error) 10%, transparent);
+	color: color-mix(in srgb, var(--error) 82%, #fff);
+}
+
+/* ---------------------------------------------------------------------------
+   Этап пути
+   ---------------------------------------------------------------------------
+   «Этап 3 из 6» словами и та же доля полосой. Полоса помечена aria-hidden:
+   значение уже сказано текстом, и второй раз его проговаривать не нужно.
+
+   Показывается только у незакрытых заказов: у доставленного и отменённого
+   шкала «6 из 6» сообщала бы движение там, где его больше нет.             */
+.progress {
+	display: flex;
+	align-items: center;
+	/* Шкала, наоборот, занимает всю колонку: её длина и есть значение. */
+	align-self: stretch;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.progressTrack {
+	flex: 1 1 auto;
+	min-width: 2.5rem;
+	height: 3px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+	overflow: hidden;
+}
+
+.progressBar {
+	/* display: block обязателен: заполнение — <span> внутри <span> (вся шапка
+	   строки заказа это <button>, где <div> недопустим), а строчный бокс
+	   игнорирует ширину и высоту — полоса рисовалась нулевого размера.
+	   Дорожка выше блочная сама собой: она flex-элемент. */
+	display: block;
+	height: 100%;
+	border-radius: 999px;
+	background: var(--accent);
+	transform-origin: left center;
+	transition: width var(--dur-slow) var(--ease-out-expo);
+}
+
+.progressBarAction {
+	background: var(--primary);
+}
+
+.progressLabel {
+	flex: 0 0 auto;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.progressBar {
+		transition: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Деньги в свёрнутой строке
+   ---------------------------------------------------------------------------
+   Итог — единственная величина строки, которую читают, а не проглядывают,
+   поэтому он крупнее всего остального и набран табличными цифрами: суммы
+   соседних заказов обязаны стоять в столбик.                                */
+.total {
+	font-size: 1.0625rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+	line-height: 1.1;
+	white-space: nowrap;
+	color: var(--text-primary);
+}
+
+.totalNote {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	white-space: nowrap;
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Раскрытие
+   ---------------------------------------------------------------------------
+   Высота анимируется через grid-template-rows: 0fr → 1fr — единственный
+   способ плавно раскрыть блок НЕИЗВЕСТНОЙ высоты без измерения в JS и без
+   max-height «на глаз». Тот же приём держит аккордеон FAQ на главной.
+
+   Содержимое догоняет раскрытие: панель уже поехала, содержимое проявляется
+   следом — так раскрытие читается одним движением, а не рывком.            */
+.panel {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows var(--dur-base) var(--ease-out-expo);
+}
+
+.order[data-open="true"] .panel {
+	grid-template-rows: 1fr;
+}
+
+.panelInner {
+	overflow: hidden;
+	opacity: 0;
+	transform: translate3d(0, -6px, 0);
+	transition:
+		opacity var(--dur-base) var(--ease-out-quart),
+		transform var(--dur-base) var(--ease-out-quart);
+}
+
+.order[data-open="true"] .panelInner {
+	opacity: 1;
+	transform: none;
+	transition-delay: 90ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.panel,
+	.panelInner {
+		transition: none;
+	}
+}
+
+.panelBody {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+	padding-bottom: 1.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Блок внутри раскрытия
+   ---------------------------------------------------------------------------
+   Не карточка с рамкой, а раздел, отбитый волосяной линией и подписью —
+   как разделы на странице товара и секции кабинета. Рамок в этой системе
+   нет.                                                                      */
+.block {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+	min-width: 0;
+}
+
+.blockHead {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding-bottom: 0.6rem;
+	border-bottom: 1px solid var(--hairline);
+}
+
+.blockTitle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.blockNote {
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+/* Две колонки для доставки и данных: на широком экране их читают рядом, как
+   разворот. */
+.columns {
+	display: grid;
+	gap: 1.5rem;
+}
+
+@media (min-width: 62rem) {
+	.columns {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 2rem;
+		align-items: start;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Поле «подпись → значение»
+   ---------------------------------------------------------------------------
+   Значок слева, подпись сверху, значение под ней. Значок на плашке
+   --media-plate — той же, что под кадром товара и монограммой в кабинете:
+   одна поверхность на весь сайт.                                            */
+.fields {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+	margin: 0;
+}
+
+.field {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.7rem;
+	min-width: 0;
+}
+
+.fieldIcon {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 2rem;
+	height: 2rem;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+	color: var(--text-muted);
+}
+
+.fieldBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.fieldLabel {
+	margin: 0;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	line-height: 1.2;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.fieldValue {
+	margin: 0;
+	font-size: 0.875rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+	overflow-wrap: anywhere;
+}
+
+.fieldLink {
+	color: var(--accent);
+	text-decoration: none;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+.fieldLink:hover,
+.fieldLink:focus-visible {
+	color: var(--accent-hover);
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+/* Значение, которое диктуют или копируют: трек-номер, ИНН. */
+.fieldCode {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------------------------------
+   Путь заказа
+   ---------------------------------------------------------------------------
+   Горизонтальная шкала на широком экране и вертикальная лента на узком.
+   Причина не в моде: у горизонтали шаг занимает колонку шириной с подпись, и
+   на телефоне шесть колонок либо превращаются в нечитаемые огрызки, либо
+   уезжают за край. Вертикаль на телефоне читается сверху вниз, как и всё
+   остальное.                                                                */
+.timeline {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.step {
+	position: relative;
+	display: grid;
+	grid-template-columns: 1.5rem minmax(0, 1fr);
+	gap: 0.75rem;
+	padding-bottom: 1.1rem;
+}
+
+.step:last-child {
+	padding-bottom: 0;
+}
+
+/* Ось: соединитель идёт от точки вниз до следующей. Рисуется псевдоэлементом
+   на самом шаге — отдельный узел на каждый шаг был бы лишним DOM. */
+.step:not(:last-child)::before {
+	content: "";
+	position: absolute;
+	left: 0.6875rem;
+	top: 1.5rem;
+	bottom: 0.35rem;
+	width: 1px;
+	background: var(--rule);
+}
+
+.step[data-state="done"]:not(:last-child)::before {
+	background: color-mix(in srgb, var(--success) 40%, transparent);
+}
+
+.stepDot {
+	display: grid;
+	place-items: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--background);
+	color: var(--text-muted);
+	transition:
+		border-color 260ms var(--ease-out-quart),
+		color 260ms var(--ease-out-quart);
+}
+
+.step[data-state="done"] .stepDot {
+	border-color: color-mix(in srgb, var(--success) 55%, transparent);
+	background: color-mix(in srgb, var(--success) 14%, transparent);
+	color: color-mix(in srgb, var(--success) 80%, #fff);
+}
+
+.step[data-state="current"] .stepDot {
+	border-color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 16%, transparent);
+	color: var(--accent-light);
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.step[data-state="cancelled"] .stepDot {
+	border-color: color-mix(in srgb, var(--error) 55%, transparent);
+	background: color-mix(in srgb, var(--error) 14%, transparent);
+	color: color-mix(in srgb, var(--error) 82%, #fff);
+}
+
+.stepBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	min-width: 0;
+	padding-top: 0.15rem;
+}
+
+.stepHead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.25rem 0.6rem;
+}
+
+.stepLabel {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--text-secondary);
+}
+
+.step[data-state="done"] .stepLabel,
+.step[data-state="current"] .stepLabel {
+	color: var(--text-primary);
+}
+
+.step[data-state="cancelled"] .stepLabel {
+	color: color-mix(in srgb, var(--error) 82%, #fff);
+}
+
+.stepNow {
+	padding: 0.1rem 0.4rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--accent) 16%, transparent);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.5625rem;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	line-height: 1.4;
+	text-transform: uppercase;
+	color: var(--accent-light);
+}
+
+.stepAt {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+}
+
+.stepText {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Позиции заказа
+   ---------------------------------------------------------------------------
+   Строки, а не карточки. Кадр товара — на плашке --media-plate с
+   object-contain и полем в процентах, как в каталоге: снимок на прозрачном
+   фоне и снимок, залитый белым, садятся на одну поверхность.               */
+.items {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.item {
+	position: relative;
+	display: grid;
+	grid-template-columns: 3.25rem minmax(0, 1fr);
+	grid-template-areas:
+		"frame body"
+		"frame money";
+	gap: 0.25rem 0.85rem;
+	padding: 0.85rem 0;
+	border-top: 1px solid var(--hairline);
+}
+
+.items > .item:first-child {
+	border-top: 0;
+	padding-top: 0.25rem;
+}
+
+@media (min-width: 40rem) {
+	.item {
+		grid-template-columns: 3.75rem minmax(0, 1fr) auto;
+		grid-template-areas: "frame body money";
+		align-items: center;
+		gap: 1rem;
+	}
+}
+
+.itemFrame {
+	grid-area: frame;
+	position: relative;
+	aspect-ratio: 1;
+	width: 100%;
+	overflow: hidden;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+}
+
+.itemImage {
+	object-fit: contain;
+	padding: 10%;
+	transition: transform 500ms var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.item:hover .itemImage {
+		transform: scale(1.06);
+	}
+}
+
+.itemImageArchived {
+	opacity: 0.4;
+	filter: grayscale(1);
+}
+
+.itemImageEmpty {
+	display: grid;
+	place-items: center;
+	height: 100%;
+	color: var(--border-light);
+}
+
+.itemBody {
+	grid-area: body;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	min-width: 0;
+}
+
+.itemName {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1.35;
+	color: var(--text-primary);
+	transition: color 200ms var(--ease-out-quart);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+}
+
+.itemLink {
+	color: inherit;
+	text-decoration: none;
+	outline-offset: 3px;
+}
+
+/* Ссылка растягивается на всю строку: целиться в название не нужно. */
+.itemLink::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+}
+
+.item:hover .itemLink .itemName,
+.itemLink:focus-visible .itemName {
+	color: var(--primary);
+}
+
+.itemMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.3rem 0.5rem;
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+.itemStrike {
+	text-decoration: line-through;
+}
+
+.itemSale {
+	padding: 0.1rem 0.3rem;
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--success) 16%, transparent);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 700;
+	line-height: 1.3;
+	color: color-mix(in srgb, var(--success) 80%, #fff);
+}
+
+.itemArchived {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.itemMoney {
+	grid-area: money;
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+	.itemMoney {
+		align-items: flex-end;
+		text-align: right;
+	}
+}
+
+.itemLineTotal {
+	font-size: 0.9375rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.itemLineOld {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	text-decoration: line-through;
+}
+
+/* ---------------------------------------------------------------------------
+   Стоимость
+   ---------------------------------------------------------------------------
+   Строки расчёта одного веса, итог — заметно крупнее и отбит линией: это
+   единственная величина, ради которой блок открывают. Суммы табличными
+   цифрами и прижаты вправо, поэтому читаются столбиком.                     */
+.sum {
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+	margin: 0;
+}
+
+.sumRow {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	font-size: 0.875rem;
+}
+
+.sumLabel {
+	margin: 0;
+	color: var(--text-secondary);
+}
+
+.sumValue {
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	color: var(--text-primary);
+}
+
+.sumDiscount .sumLabel,
+.sumDiscount .sumValue {
+	color: color-mix(in srgb, var(--success) 80%, #fff);
+}
+
+.sumCode {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.8125rem;
+	letter-spacing: 0.06em;
+}
+
+.sumTotal {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-top: 0.35rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--rule);
+}
+
+.sumTotalLabel {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.sumTotalValue {
+	margin: 0;
+	font-size: 1.375rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.015em;
+	white-space: nowrap;
+	color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Вложения (счёт и документы)
+   --------------------------------------------------------------------------- */
+.files {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.file {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+	padding: 0.75rem 0;
+	border-top: 1px solid var(--hairline);
+}
+
+.files > .file:first-child {
+	border-top: 0;
+	padding-top: 0.25rem;
+}
+
+.filePlate {
+	position: relative;
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 2.75rem;
+	height: 2.75rem;
+	overflow: hidden;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+	color: var(--text-muted);
+}
+
+.fileBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.fileLabel {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1.3;
+	color: var(--text-primary);
+}
+
+.fileMeta {
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fileActions {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Кнопки
+   ---------------------------------------------------------------------------
+   Те же три роли, что в кабинете: основное действие, второстепенное и
+   необратимое. Рост 2.5rem — цель под палец.                                */
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	height: 2.5rem;
+	padding: 0 1rem;
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	font-family: inherit;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart),
+		opacity 180ms var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+	.btn {
+		height: 2.75rem;
+	}
+}
+
+.btn:active:not(:disabled) {
+	transform: scale(0.985);
+}
+
+.btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+
+.btnPrimary {
+	background: var(--primary);
+	color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+	background: var(--primary-600);
+}
+
+.btnQuiet {
+	border-color: var(--border);
+	background: transparent;
+	color: var(--text-primary);
+	font-weight: 500;
+}
+
+.btnQuiet:hover:not(:disabled) {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.btnDanger {
+	border-color: color-mix(in srgb, var(--error) 45%, transparent);
+	background: color-mix(in srgb, var(--error) 10%, transparent);
+	color: color-mix(in srgb, var(--error) 85%, #fff);
+}
+
+.btnDanger:hover:not(:disabled) {
+	border-color: var(--error);
+	background: var(--error);
+	color: #fff;
+}
+
+.btnIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+	.btnIcon {
+		width: 2.5rem;
+		height: 2.5rem;
+	}
+}
+
+.btnIcon:hover,
+.btnIcon:focus-visible {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+	color: var(--text-primary);
+}
+
+.spin {
+	animation: orders-spin 700ms linear infinite;
+}
+
+@keyframes orders-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.btn:active:not(:disabled) {
+		transform: none;
+	}
+	.spin {
+		animation-duration: 1800ms;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Сообщения
+   --------------------------------------------------------------------------- */
+.notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	margin: 0;
+	padding: 0.75rem 0.9rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-sm);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.noticeIcon {
+	flex: 0 0 auto;
+	margin-top: 0.1rem;
+}
+
+.noticeError {
+	border-color: color-mix(in srgb, var(--error) 35%, transparent);
+	background: color-mix(in srgb, var(--error) 8%, transparent);
+	color: var(--text-primary);
+}
+
+.noticeErrorIcon {
+	color: var(--error);
+}
+
+.noticeWarn {
+	border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+	background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
+.noticeWarnIcon {
+	color: var(--warning);
+}
+
+.noticeAction {
+	border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+	background: color-mix(in srgb, var(--primary) 9%, transparent);
+	color: var(--text-primary);
+}
+
+.noticeActionIcon {
+	color: var(--primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Отмена заказа
+   ---------------------------------------------------------------------------
+   Необратимое действие спрятано за подтверждением с обязательной причиной —
+   так было и раньше, и это правильно. Изменилось то, что форма раскрывается
+   на месте кнопки, а не подменяет её рывком.                                */
+.cancelForm {
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+	animation: orders-fade-in 260ms var(--ease-out-quart) both;
+}
+
+@keyframes orders-fade-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, -4px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cancelForm {
+		animation: none;
+	}
+}
+
+.textareaField {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.textareaLabel {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.textarea {
+	width: 100%;
+	min-height: 5.5rem;
+	max-height: 16rem;
+	padding: 0.7rem 0.85rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--void-deep) 55%, transparent);
+	font-family: inherit;
+	/* 1rem, не мельче: Safari на iOS приближает страницу к любому полю с
+	   текстом меньше 16px, и после ввода вёрстка остаётся увеличенной. */
+	font-size: 1rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+	resize: vertical;
+	outline: none;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		box-shadow 180ms var(--ease-out-quart);
+}
+
+.textarea::placeholder {
+	color: var(--text-muted);
+}
+
+.textarea:hover {
+	border-color: var(--border-light);
+}
+
+.textarea:focus {
+	border-color: color-mix(in srgb, var(--primary) 70%, transparent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.textarea[aria-invalid="true"] {
+	border-color: color-mix(in srgb, var(--error) 60%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Пусто, загрузка, ошибка
+   --------------------------------------------------------------------------- */
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1rem;
+	padding: 4rem 1rem;
+	border-top: 1px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+	text-align: center;
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.emptyText {
+	margin: 0;
+	max-width: 44ch;
+	font-size: 0.875rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.skeletonRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.85rem 1.25rem;
+	padding: 1.35rem 0;
+	border-top: 1px solid var(--rule);
+}
+
+.skeletonLine {
+	height: 0.7rem;
+	border-radius: 999px;
+	background: var(--surface-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Хвост и постраничная навигация
+   --------------------------------------------------------------------------- */
+.tail {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-top: 2.5rem;
+}
+
+.tailRule {
+	flex: 1 1 auto;
+	height: 1px;
+	background: var(--rule);
+}
+
+.pager {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-top: 2rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid var(--rule);
+}
+
+.pagerLabel {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Сводка первого экрана
+   ---------------------------------------------------------------------------
+   Числа, которые хочется знать до того, как начал читать список: сколько
+   заказов всего и сколько из них в работе. Набраны крупно моноширинным —
+   тем же голосом, что сводка выдачи каталога.                               */
+.summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.5rem 2.5rem;
+}
+
+.summaryItem {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.summaryValue {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 1.75rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+	line-height: 1;
+	color: var(--text-primary);
+}
+
+.summaryValueAccent {
+	color: var(--primary-200);
+}

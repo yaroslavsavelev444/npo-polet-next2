@@ -12,8 +12,8 @@ import { formatAddress } from "@/modules/checkout/lib/address";
 import { formatOrderDate } from "../lib/format-date";
 import { DELIVERY_METHOD_LABELS } from "../lib/labels";
 import type { OrderDetailView } from "../types";
-import { OrderField, OrderFieldGroup } from "./OrderField";
-import { ORDER_CARD_CLASS } from "./orderCard.styles";
+import { OrderField } from "./OrderField";
+import styles from "./Orders.module.css";
 
 type Delivery = OrderDetailView["delivery"];
 
@@ -23,7 +23,7 @@ interface OrderDeliveryPanelProps {
 
 const METHOD_ICON: Record<
 	Delivery["method"],
-	ComponentType<{ size?: number; className?: string }>
+	ComponentType<{ size?: number; "aria-hidden"?: boolean }>
 > = {
 	door_to_door: Truck,
 	pickup_point: Package,
@@ -31,24 +31,35 @@ const METHOD_ICON: Record<
 };
 
 /**
- * Детали доставки с учётом способа получения. Показываются только заполненные
- * поля: у самовывоза — пункт выдачи, у курьера — адрес и перевозчик, у ПВЗ —
- * перевозчик и трек-номер.
+ * Получение заказа: способ, куда и когда.
+ *
+ * Показываются только заполненные поля — у самовывоза нет перевозчика, у
+ * курьера нет пункта выдачи, и пустые строки «—» на их месте были бы шумом.
+ *
+ * Трек-номер набран моноширинным: его переписывают в поле на сайте
+ * перевозчика, и пропорциональные цифры при этом читаются с ошибками.
  */
 export function OrderDeliveryPanel({ delivery }: OrderDeliveryPanelProps) {
 	const MethodIcon = METHOD_ICON[delivery.method];
 	// Одна функция форматирования на весь проект (см. checkout/lib/address):
 	// она поддерживает все три поколения адресов — строку целиком в `street`,
 	// разбитые поля и канонический `fullAddress` из подсказок. Квартира,
-	// подъезд и этаж выводятся отдельными сегментами и только для курьера:
-	// в ПВЗ и самовывозе их не существует.
+	// подъезд и этаж выводятся только для курьера: в ПВЗ и самовывозе их не
+	// существует.
 	const addressText = formatAddress(delivery.address, {
 		withUnitDetails: delivery.method === "door_to_door",
 	});
 
 	return (
-		<section className={`flex flex-col gap-6 p-4 sm:p-5 ${ORDER_CARD_CLASS}`}>
-			<OrderFieldGroup title="Получение">
+		<section className={styles.block}>
+			<div className={styles.blockHead}>
+				<h3 className={styles.blockTitle}>
+					<MapPin size={13} aria-hidden />
+					Получение
+				</h3>
+			</div>
+
+			<dl className={styles.fields}>
 				<OrderField
 					icon={MethodIcon}
 					label="Способ"
@@ -57,7 +68,7 @@ export function OrderDeliveryPanel({ delivery }: OrderDeliveryPanelProps) {
 
 				{delivery.method === "self_pickup" && delivery.pickupPointName && (
 					<OrderField
-						icon={MapPin}
+						icon={Store}
 						label="Пункт самовывоза"
 						value={
 							delivery.pickupPointAddress
@@ -93,6 +104,7 @@ export function OrderDeliveryPanel({ delivery }: OrderDeliveryPanelProps) {
 						icon={Package}
 						label="Трек-номер"
 						value={delivery.trackingNumber}
+						code
 					/>
 				)}
 
@@ -111,7 +123,9 @@ export function OrderDeliveryPanel({ delivery }: OrderDeliveryPanelProps) {
 						value={delivery.notes}
 					/>
 				)}
-			</OrderFieldGroup>
+			</dl>
 		</section>
 	);
 }
+
+export default OrderDeliveryPanel;

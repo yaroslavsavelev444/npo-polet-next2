@@ -1,7 +1,8 @@
 import { Headset } from "lucide-react";
+import { formatOrderDateTime } from "../../lib/format-date";
 import type { OrderStatus } from "../../types";
 import { OrderStatusBadge } from "../OrderStatusBadge";
-import { ORDER_CARD_CLASS } from "../orderCard.styles";
+import styles from "../Orders.module.css";
 import { OrderConfetti } from "./OrderConfetti";
 import { SuccessCheckmark } from "./SuccessCheckmark";
 
@@ -15,20 +16,19 @@ interface OrderSuccessHeroProps {
 	createdAt: string;
 }
 
-function formatDate(iso: string): string {
-	return new Date(iso).toLocaleString("ru-RU", {
-		day: "2-digit",
-		month: "long",
-		year: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
-}
-
 /**
- * Ключевой блок страницы: анимированная галочка, конфетти, сообщение об успехе,
- * номер/статус заказа и уведомление о звонке менеджера. Единственное «громкое»
- * место страницы — остальное намеренно спокойное.
+ * Первый экран страницы заказа: подтверждение, номер, статус и обещание
+ * звонка.
+ *
+ * Единственное «громкое» место страницы — остальное намеренно спокойное.
+ * Громкость создают анимированная галочка и конфетти, а не заливка: полоса
+ * стоит на общем фоне витрины и отбита сверху и снизу той же разлиновкой,
+ * которой отбиты секции везде на сайте. Прежняя версия рисовала карточку на
+ * --surface с рамкой — материал прежней версии витрины, из-за которого
+ * страница заказа выглядела чужой рядом со списком заказов.
+ *
+ * Номер заказа набран моноширинным и увеличен: это то, что диктуют менеджеру,
+ * и то, ради чего на страницу возвращаются.
  */
 export function OrderSuccessHero({
 	orderNumber,
@@ -38,61 +38,69 @@ export function OrderSuccessHero({
 	createdAt,
 }: OrderSuccessHeroProps) {
 	return (
-		<section className={`relative overflow-hidden ${ORDER_CARD_CLASS}`}>
+		<section className="relative isolate overflow-hidden border-y border-[var(--rule)]">
 			<OrderConfetti />
 
-			{/* Мягкое свечение сверху */}
+			{/* Один источник света снизу, как на остальных первых экранах сайта.
+			    Здесь он зелёный: событие — успех, а не переход в раздел. */}
 			<div
 				aria-hidden
-				className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,var(--success)/12,transparent_70%)]"
+				className="pointer-events-none absolute inset-0 -z-10"
+				style={{
+					background:
+						"radial-gradient(90% 80% at 50% 0%, color-mix(in srgb, var(--success) 10%, transparent) 0%, transparent 62%)",
+				}}
 			/>
 
-			<div className="relative z-10 flex flex-col items-center px-5 py-10 text-center sm:px-8 sm:py-14">
+			<div className="relative z-10 flex flex-col items-center px-[1rem] py-[clamp(2.5rem,6vw,4rem)] text-center">
 				<SuccessCheckmark />
 
-				<h1 className="mt-6 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-					Заказ успешно оформлен
+				<h1 className="mt-6 text-[clamp(1.375rem,1rem+1.6vw,2rem)] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
+					Заказ оформлен
 				</h1>
-				<p className="mt-2 max-w-md text-sm text-[var(--text-secondary)] sm:text-base">
-					Спасибо за заказ! Мы уже начали его обработку.
+
+				<p className={`${styles.orderNumber} mt-3 !text-[1.25rem]`}>
+					<span className={styles.orderNumberPrefix}>Заказ №</span>
+					{orderNumber}
 				</p>
 
-				<div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-					<span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-[var(--surface-secondary)] px-4 py-1.5 text-sm">
-						<span className="text-[var(--text-secondary)]">Заказ</span>
-						<span className="font-semibold tabular-nums text-[var(--text-primary)]">
-							№ {orderNumber}
-						</span>
-					</span>
+				<div className="mt-4 flex flex-wrap items-center justify-center gap-3">
 					<OrderStatusBadge status={status} />
+					<time dateTime={createdAt} className={styles.totalNote}>
+						от {formatOrderDateTime(createdAt)}
+					</time>
 				</div>
 
-				<p className="mt-3 text-xs text-[var(--text-muted)]">
-					от {formatDate(createdAt)}
-				</p>
-
-				{/* Уведомление о звонке менеджера */}
-				<div className="mt-8 flex w-full max-w-lg items-start gap-3 rounded-[var(--radius-md)] border border-[var(--accent)]/25 bg-[var(--accent)]/8 p-4 text-left">
-					<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[var(--accent-light)]">
-						<Headset size={17} aria-hidden />
-					</span>
-					{/* Номер здесь — тот самый, который покупатель выбрал в форме.
-					    Формулировка меняется вместе с выбором: обещать «свяжется с
-					    вами», когда звонок уйдёт получателю, значит снова спутать
-					    два разных человека. */}
-					<p className="text-sm leading-relaxed text-[var(--text-primary)]">
+				{/* Номер здесь — тот самый, который покупатель выбрал в форме.
+				    Формулировка меняется вместе с выбором: обещать «свяжется с
+				    вами», когда звонок уйдёт получателю, значит спутать двух
+				    разных людей. */}
+				<p
+					className={`${styles.notice} mt-8 max-w-[34rem] text-left`}
+					style={{
+						borderColor: "color-mix(in srgb, var(--accent) 32%, transparent)",
+						background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+					}}
+				>
+					<Headset
+						size={16}
+						aria-hidden
+						className={styles.noticeIcon}
+						style={{ color: "var(--accent-light)" }}
+					/>
+					<span>
 						{callsRecipient
 							? "В ближайшее время менеджер позвонит получателю по номеру "
 							: "В ближайшее время менеджер свяжется с вами по номеру "}
 						<a
 							href={`tel:${phone.replace(/[^\d+]/g, "")}`}
-							className="font-semibold text-[var(--accent-light)] underline-offset-2 hover:underline"
+							className={styles.fieldLink}
 						>
 							{phone}
 						</a>
 						, чтобы уточнить детали и подтвердить заказ.
-					</p>
-				</div>
+					</span>
+				</p>
 			</div>
 		</section>
 	);

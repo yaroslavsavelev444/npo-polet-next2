@@ -56,7 +56,7 @@ const CABINET_LINKS: CabinetLink[] = [
 		icon: <Heart size={18} aria-hidden />,
 	},
 	{
-		href: "/reviews",
+		href: "/profile/reviews",
 		title: "Мои отзывы",
 		hint: "Оставленные оценки и комментарии",
 		icon: <MessageSquareText size={18} aria-hidden />,

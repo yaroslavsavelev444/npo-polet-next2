@@ -1,6 +1,7 @@
-import { formatPrice } from "@/modules/productCard";
-import { formatOrderDateTime } from "../lib/format-date";
+import { ArrowUpRight, Route } from "lucide-react";
+import Link from "next/link";
 import { buildOrderTimeline } from "../lib/status-flow";
+import { ORDER_STATUS_VIEW } from "../lib/status-view";
 import type { OrderDetailView, OrderStatus } from "../types";
 import { CancelOrderSection } from "./CancelOrderSection";
 import { OrderAttachments } from "./OrderAttachments";
@@ -8,10 +9,8 @@ import { OrderDeliveryPanel } from "./OrderDeliveryPanel";
 import { OrderInfoPanel } from "./OrderInfoPanel";
 import { OrderPriceSummary } from "./OrderPriceSummary";
 import { OrderProductList } from "./OrderProductList";
-import { OrderReveal } from "./OrderReveal";
-import { OrderStatusBadge } from "./OrderStatusBadge";
+import styles from "./Orders.module.css";
 import { OrderTimeline } from "./OrderTimeline";
-import { ORDER_CARD_CLASS } from "./orderCard.styles";
 
 interface OrderDetailContentProps {
 	detail: OrderDetailView;
@@ -19,9 +18,27 @@ interface OrderDetailContentProps {
 }
 
 /**
- * Bento-содержимое просмотра заказа: краткая шапка, timeline, товары, доставка,
- * данные, вложения, стоимость и отмена. Отделено от контейнера (модалка/шит),
- * поэтому переиспользуемо в других местах (напр. отдельная страница заказа).
+ * Подробности заказа — содержимое раскрытой строки списка.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ПОРЯДОК БЛОКОВ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Он отвечает на вопросы в том порядке, в каком они возникают у человека,
+ * который только что открыл заказ:
+ *
+ *   1. что сейчас происходит и что дальше — путь заказа;
+ *   2. что я заказал — состав;
+ *   3. куда это едет и на кого оформлено — получение и данные;
+ *   4. чем подтверждается — документы;
+ *   5. сколько это стоит — расчёт;
+ *   6. что я могу сделать — действия.
+ *
+ * Стоимость стоит НИЖЕ состава, а не рядом с ним: проверить расчёт можно
+ * только после того, как увидел позиции, а итог всё равно уже назван в
+ * свёрнутой строке — здесь он нужен разложенным, а не громким.
+ *
+ * Отделено от контейнера, поэтому переиспользуемо: сегодня это раскрытие в
+ * списке, завтра — отдельная страница заказа.
  */
 export function OrderDetailContent({
 	detail,
@@ -34,84 +51,79 @@ export function OrderDetailContent({
 		statusHistory: detail.statusHistory,
 	});
 
+	const hint = ORDER_STATUS_VIEW[detail.status].hint;
+	const needsAction = ORDER_STATUS_VIEW[detail.status].tone === "action";
+
 	return (
-		<div className="flex flex-col gap-3 sm:gap-4">
-			{/* Шапка: статус, дата, итог */}
-			<OrderReveal delay={0}>
-				<div
-					className={`flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5 ${ORDER_CARD_CLASS}`}
-				>
-					<div className="flex flex-col gap-1.5">
-						<OrderStatusBadge status={detail.status} />
-						<span className="text-xs text-[var(--text-muted)]">
-							от {formatOrderDateTime(detail.createdAt)}
-						</span>
-					</div>
-					<div className="text-right">
-						<p className="text-xs text-[var(--text-secondary)]">Сумма заказа</p>
-						<p className="text-lg font-bold tabular-nums text-[var(--text-primary)]">
-							{formatPrice(detail.total)}
-						</p>
-					</div>
-				</div>
-			</OrderReveal>
-
-			{/* Timeline статусов */}
-			<OrderReveal delay={70}>
-				<OrderTimeline steps={timeline} />
-			</OrderReveal>
-
-			{/* Товары */}
-			{detail.items.length > 0 && (
-				<OrderReveal delay={140}>
-					<OrderProductList items={detail.items} />
-				</OrderReveal>
+		<div className={styles.panelBody}>
+			{/* Что делать прямо сейчас — до всего остального. Показывается только
+			    когда ход за покупателем: подсказка «заказ собирают» под каждым
+			    заказом превратилась бы в шум, который перестают читать. */}
+			{needsAction && (
+				<p className={`${styles.notice} ${styles.noticeAction}`}>
+					<Route
+						size={15}
+						aria-hidden
+						className={`${styles.noticeIcon} ${styles.noticeActionIcon}`}
+					/>
+					{hint}
+				</p>
 			)}
 
-			{/* Доставка + данные пользователя */}
-			<div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:items-start">
-				<OrderReveal delay={210}>
-					<OrderDeliveryPanel delivery={detail.delivery} />
-				</OrderReveal>
-				<OrderReveal delay={260}>
-					<OrderInfoPanel
-						contact={detail.contact}
-						recipient={detail.recipient}
-						payment={detail.payment}
-						company={detail.companyInfo}
-						notes={detail.notes}
-					/>
-				</OrderReveal>
+			<section className={styles.block}>
+				<div className={styles.blockHead}>
+					<h3 className={styles.blockTitle}>
+						<Route size={13} aria-hidden />
+						Путь заказа
+					</h3>
+				</div>
+				<OrderTimeline steps={timeline} />
+			</section>
+
+			{detail.items.length > 0 && <OrderProductList items={detail.items} />}
+
+			<div className={styles.columns}>
+				<OrderDeliveryPanel delivery={detail.delivery} />
+				<OrderInfoPanel
+					contact={detail.contact}
+					recipient={detail.recipient}
+					payment={detail.payment}
+					company={detail.companyInfo}
+					notes={detail.notes}
+				/>
 			</div>
 
-			{/* Вложения от администратора (счёт, документы) */}
 			{detail.attachments.length > 0 && (
-				<OrderReveal delay={320}>
-					<OrderAttachments attachments={detail.attachments} />
-				</OrderReveal>
+				<OrderAttachments attachments={detail.attachments} />
 			)}
 
-			{/* Стоимость */}
-			<OrderReveal delay={370}>
-				<OrderPriceSummary
-					subtotal={detail.pricing.subtotal}
-					discount={detail.pricing.discount}
-					total={detail.pricing.total}
-					shippingCost={detail.pricing.shippingCost}
-					promo={detail.promo}
-					paymentStatus={detail.payment.status}
-				/>
-			</OrderReveal>
+			<OrderPriceSummary
+				subtotal={detail.pricing.subtotal}
+				discount={detail.pricing.discount}
+				total={detail.pricing.total}
+				shippingCost={detail.pricing.shippingCost}
+				promo={detail.promo}
+				paymentStatus={detail.payment.status}
+			/>
 
-			{detail.canCancel && (
-				<OrderReveal delay={420}>
-					<CancelOrderSection
-						orderId={detail.id}
-						canCancel={detail.canCancel}
-						onCancelled={onCancelled}
-					/>
-				</OrderReveal>
-			)}
+			<div className={styles.actions}>
+				<Link
+					href={`/orders/${detail.orderNumber}`}
+					className={`${styles.btn} ${styles.btnQuiet}`}
+				>
+					Открыть страницу заказа
+					<ArrowUpRight size={15} aria-hidden />
+				</Link>
+			</div>
+
+			<CancelOrderSection
+				orderId={detail.id}
+				orderNumber={detail.orderNumber}
+				canCancel={detail.canCancel}
+				onCancelled={onCancelled}
+			/>
 		</div>
 	);
 }
+
+export default OrderDetailContent;

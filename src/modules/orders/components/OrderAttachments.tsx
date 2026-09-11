@@ -1,7 +1,7 @@
 import { Download, ExternalLink, FileText, Paperclip } from "lucide-react";
 import Image from "next/image";
 import type { OrderAttachment } from "../types";
-import { ORDER_CARD_CLASS } from "./orderCard.styles";
+import styles from "./Orders.module.css";
 
 interface OrderAttachmentsProps {
 	attachments: OrderAttachment[];
@@ -9,7 +9,7 @@ interface OrderAttachmentsProps {
 
 const KIND_LABEL: Record<OrderAttachment["kind"], string> = {
 	image: "Изображение",
-	pdf: "PDF-документ",
+	pdf: "PDF",
 	document: "Документ",
 };
 
@@ -20,91 +20,81 @@ function formatFileSize(bytes: number | null): string | null {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
-function AttachmentActions({ attachment }: { attachment: OrderAttachment }) {
-	return (
-		<div className="flex shrink-0 items-center gap-1.5">
-			<a
-				href={attachment.url}
-				target="_blank"
-				rel="noopener noreferrer"
-				aria-label={`Открыть: ${attachment.filename}`}
-				className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-light)] text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-light)]"
-			>
-				<ExternalLink size={15} aria-hidden />
-			</a>
-			<a
-				href={attachment.url}
-				download={attachment.filename}
-				aria-label={`Скачать: ${attachment.filename}`}
-				className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-light)] text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-light)]"
-			>
-				<Download size={15} aria-hidden />
-			</a>
-		</div>
-	);
-}
-
-function AttachmentRow({ attachment }: { attachment: OrderAttachment }) {
-	const size = formatFileSize(attachment.filesize);
-	const typeLabel = KIND_LABEL[attachment.kind];
-
-	return (
-		<div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-light)] bg-[var(--surface-secondary)]/40 p-2.5 sm:p-3">
-			{/* Превью изображения или иконка типа файла */}
-			<div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-secondary)]">
-				{attachment.kind === "image" && attachment.previewUrl ? (
-					<Image
-						src={attachment.previewUrl}
-						alt={attachment.label}
-						fill
-						sizes="56px"
-						className="object-cover"
-					/>
-				) : (
-					<FileText
-						size={22}
-						className="text-[var(--text-secondary)]"
-						aria-hidden
-					/>
-				)}
-			</div>
-
-			<div className="min-w-0 flex-1">
-				<p className="text-sm font-medium text-[var(--text-primary)]">
-					{attachment.label}
-				</p>
-				<p className="truncate text-xs text-[var(--text-secondary)]">
-					{attachment.filename}
-				</p>
-				<p className="mt-0.5 text-xs text-[var(--text-muted)]">
-					{[typeLabel, size].filter(Boolean).join(" · ")}
-				</p>
-			</div>
-
-			<AttachmentActions attachment={attachment} />
-		</div>
-	);
-}
-
 /**
- * Вложения, прикреплённые администратором (счёт, изображения, документы).
- * Изображения показываются с превью, документы — с иконкой типа. У каждого
- * вложения — открыть и скачать. Блок не рендерится, если вложений нет.
+ * Документы по заказу, приложенные менеджером: счёт на оплату и всё, что
+ * появится позже.
+ *
+ * Два действия на файл, а не одно: открыть в новой вкладке (посмотреть, тот ли
+ * это счёт) и скачать (отнести в бухгалтерию). Подписи у обеих кнопок
+ * содержат имя файла — десять одинаковых значков подряд иначе неразличимы
+ * для скринридера.
  */
 export function OrderAttachments({ attachments }: OrderAttachmentsProps) {
-	if (attachments.length === 0) return null;
-
 	return (
-		<section className={`p-4 sm:p-5 ${ORDER_CARD_CLASS}`}>
-			<h3 className="mb-3.5 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
-				<Paperclip size={13} aria-hidden />
-				Вложения
-			</h3>
-			<div className="flex flex-col gap-2.5">
-				{attachments.map((attachment) => (
-					<AttachmentRow key={attachment.id} attachment={attachment} />
-				))}
+		<section className={styles.block}>
+			<div className={styles.blockHead}>
+				<h3 className={styles.blockTitle}>
+					<Paperclip size={13} aria-hidden />
+					Документы
+				</h3>
+				<p className={styles.blockNote}>{attachments.length}</p>
 			</div>
+
+			<ul className={styles.files}>
+				{attachments.map((attachment) => {
+					const size = formatFileSize(attachment.filesize);
+					const meta = [KIND_LABEL[attachment.kind], size]
+						.filter(Boolean)
+						.join(" · ");
+
+					return (
+						<li key={attachment.id} className={styles.file}>
+							<span className={styles.filePlate}>
+								{attachment.kind === "image" && attachment.previewUrl ? (
+									<Image
+										src={attachment.previewUrl}
+										alt=""
+										fill
+										sizes="44px"
+										className="object-cover"
+									/>
+								) : (
+									<FileText size={18} aria-hidden />
+								)}
+							</span>
+
+							<div className={styles.fileBody}>
+								<p className={styles.fileLabel}>{attachment.label}</p>
+								<p className={styles.fileMeta} title={attachment.filename}>
+									{attachment.filename} · {meta}
+								</p>
+							</div>
+
+							<div className={styles.fileActions}>
+								<a
+									href={attachment.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									aria-label={`Открыть «${attachment.label}» в новой вкладке`}
+									className={styles.btnIcon}
+								>
+									<ExternalLink size={15} aria-hidden />
+								</a>
+								<a
+									href={attachment.url}
+									download={attachment.filename}
+									aria-label={`Скачать «${attachment.label}»`}
+									className={styles.btnIcon}
+								>
+									<Download size={15} aria-hidden />
+								</a>
+							</div>
+						</li>
+					);
+				})}
+			</ul>
 		</section>
 	);
 }
+
+export default OrderAttachments;

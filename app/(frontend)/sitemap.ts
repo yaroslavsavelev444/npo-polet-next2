@@ -21,6 +21,8 @@ const STATIC_ROUTES: Array<{
   // FAQ меняется реже каталога, но это посадочная страница под
   // информационные запросы — приоритет выше служебных страниц.
   { path: "/faq", changeFrequency: "monthly", priority: 0.7 },
+  // Публичная лента отзывов: содержимое обновляется по мере модерации.
+  { path: "/reviews", changeFrequency: "weekly", priority: 0.6 },
   { path: "/contacts", changeFrequency: "monthly", priority: 0.5 },
   { path: "/consents", changeFrequency: "yearly", priority: 0.3 },
 ];

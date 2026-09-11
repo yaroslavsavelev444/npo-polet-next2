@@ -2,7 +2,8 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/UI";
+import { useTransition } from "react";
+import styles from "./Orders.module.css";
 
 interface Props {
 	page: number;
@@ -11,6 +12,18 @@ interface Props {
 	hasPrevPage: boolean;
 }
 
+/**
+ * Постраничная навигация.
+ *
+ * Две кнопки по краям и положение посередине: номеров страниц здесь нет
+ * намеренно — заказы отсортированы по дате, и «страница 7» ничего не говорит
+ * о том, что на ней. Ходят по такому списку подряд, а не прыжками.
+ *
+ * Прокрутка при переходе не сбрасывается (scroll: false), но список заведомо
+ * меняется целиком, поэтому фокус уводится наверх списка средствами самой
+ * навигации: следующая страница начинается с первой строки, а не с того
+ * места, где стояла предыдущая.
+ */
 export function OrdersPagination({
 	page,
 	totalPages,
@@ -20,43 +33,51 @@ export function OrdersPagination({
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
+	const [isPending, startTransition] = useTransition();
 
 	if (totalPages <= 1) return null;
 
 	function goToPage(nextPage: number) {
 		const params = new URLSearchParams(searchParams.toString());
-		if (nextPage <= 1) {
-			params.delete("page");
-		} else {
-			params.set("page", String(nextPage));
-		}
+		if (nextPage <= 1) params.delete("page");
+		else params.set("page", String(nextPage));
+
 		const query = params.toString();
-		router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+		startTransition(() => {
+			router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+			if (typeof window !== "undefined") {
+				window.scrollTo({ top: 0, behavior: "smooth" });
+			}
+		});
 	}
 
 	return (
-		<div className="mt-6 flex items-center justify-center gap-3">
-			<Button
-				variant="outline"
-				size="sm"
-				disabled={!hasPrevPage}
+		<nav className={styles.pager} aria-label="Страницы заказов">
+			<button
+				type="button"
+				disabled={!hasPrevPage || isPending}
 				onClick={() => goToPage(page - 1)}
-				leftIcon={<ChevronLeft className="h-4 w-4" />}
+				className={`${styles.btn} ${styles.btnQuiet}`}
 			>
+				<ChevronLeft size={15} aria-hidden />
 				Назад
-			</Button>
-			<span className="text-sm text-[var(--text-secondary)]">
-				Страница {page} из {totalPages}
-			</span>
-			<Button
-				variant="outline"
-				size="sm"
-				disabled={!hasNextPage}
+			</button>
+
+			<p className={styles.pagerLabel} aria-live="polite">
+				{page} / {totalPages}
+			</p>
+
+			<button
+				type="button"
+				disabled={!hasNextPage || isPending}
 				onClick={() => goToPage(page + 1)}
-				rightIcon={<ChevronRight className="h-4 w-4" />}
+				className={`${styles.btn} ${styles.btnQuiet}`}
 			>
 				Вперёд
-			</Button>
-		</div>
+				<ChevronRight size={15} aria-hidden />
+			</button>
+		</nav>
 	);
 }
+
+export default OrdersPagination;

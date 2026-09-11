@@ -1,53 +1,79 @@
 import { pluralizeReviews } from "../lib/format";
 import type { RatingBreakdown } from "../types";
+import styles from "./Reviews.module.css";
 import { StarRating } from "./StarRating";
 
 interface RatingSummaryProps {
 	breakdown: RatingBreakdown;
+	/**
+	 * `stacked` — колонкой (первый экран публичной страницы, где на сводку
+	 * отведена узкая колонка рядом с заголовком);
+	 * `inline` — средняя оценка слева, распределение справа (страница товара,
+	 * где сводка лежит поперёк всей ширины блока).
+	 */
+	variant?: "stacked" | "inline";
 }
 
 /**
- * Сводка рейтинга: крупная средняя оценка слева и распределение по звёздам
- * справа (полоски 5→1). Стандартный, мгновенно считываемый паттерн из
- * современных маркетплейсов.
+ * Сводка рейтинга: средняя оценка, число отзывов и распределение по звёздам.
+ *
+ * Один компонент на страницу товара и на публичную ленту отзывов — сводка
+ * должна выглядеть одинаково там и там, различается только раскладка.
+ *
+ * Распределение — не украшение: оно отвечает на вопрос, из чего сложилась
+ * средняя. «4,6» при двадцати пятёрках и одной единице и «4,6» при равномерном
+ * разбросе — разные вещи, и полосы показывают разницу сразу.
+ *
+ * Числа рядом с полосами продублированы текстом намеренно: полосы помечены
+ * aria-hidden, а значение читается из подписи — рейтинг не должен
+ * передаваться одной картинкой.
  */
-export function RatingSummary({ breakdown }: RatingSummaryProps) {
+export function RatingSummary({
+	breakdown,
+	variant = "inline",
+}: RatingSummaryProps) {
 	const { average, count, distribution } = breakdown;
 
 	return (
-		<div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-10">
-			<div className="flex shrink-0 flex-col items-center gap-1 sm:items-start">
-				<span className="text-5xl font-bold leading-none tracking-[-0.03em] tabular-nums text-[var(--text-primary)]">
-					{average.toFixed(1)}
+		<div
+			className={
+				variant === "stacked"
+					? styles.summary
+					: `${styles.summary} sm:flex-row sm:items-center sm:gap-[2.5rem]`
+			}
+		>
+			<div className={styles.summaryHead}>
+				<span className={styles.summaryValue}>
+					{average.toFixed(1).replace(".", ",")}
 				</span>
-				<StarRating value={average} size={18} />
-				<span className="text-sm text-[var(--text-muted)]">
-					{count} {pluralizeReviews(count)}
+				<span className={styles.summaryAside}>
+					<StarRating value={average} size={16} />
+					<span className="text-[0.8125rem] text-[var(--text-muted)]">
+						{count} {pluralizeReviews(count)}
+					</span>
 				</span>
 			</div>
 
-			<div className="flex flex-1 flex-col gap-1.5">
+			<dl className={`${styles.bars} flex-1`}>
 				{([5, 4, 3, 2, 1] as const).map((star) => {
 					const value = distribution[star];
 					const percent = count > 0 ? (value / count) * 100 : 0;
 					return (
-						<div key={star} className="flex items-center gap-3 text-xs">
-							<span className="w-3 shrink-0 tabular-nums text-[var(--text-muted)]">
-								{star}
-							</span>
-							<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--rule)]">
-								<div
-									className="h-full rounded-full bg-[var(--warning)] transition-[width] duration-500"
+						<div key={star} className={styles.bar}>
+							<dt>{star} ★</dt>
+							<span className={styles.barTrack} aria-hidden>
+								<span
+									className={styles.barFill}
 									style={{ width: `${percent}%` }}
 								/>
-							</div>
-							<span className="w-8 shrink-0 text-right tabular-nums text-[var(--text-muted)]">
-								{value}
 							</span>
+							<dd className={`${styles.barCount} m-0`}>{value}</dd>
 						</div>
 					);
 				})}
-			</div>
+			</dl>
 		</div>
 	);
 }
+
+export default RatingSummary;

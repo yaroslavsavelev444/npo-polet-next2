@@ -63,7 +63,7 @@ export function getSecondaryLinks(isAuthenticated: boolean): MobileNavLink[] {
 
 	return [
 		{ label: "Избранное", href: "/wishlist" },
-		{ label: "Мои отзывы", href: "/reviews" },
+		{ label: "Мои отзывы", href: "/profile/reviews" },
 		{ label: "Соглашения", href: "/consents" },
 	];
 }

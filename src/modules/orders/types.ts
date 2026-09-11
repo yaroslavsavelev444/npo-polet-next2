@@ -32,16 +32,40 @@ export type OrderFilterGroup =
 	| "cancelled"
 	| "past";
 
+/** Позиция заказа в свёрнутой строке списка — только для опознания. */
+export interface OrderItemPreview {
+	name: string;
+	quantity: number;
+}
+
 export interface OrderListItemView {
 	id: string;
 	orderNumber: string;
 	status: OrderStatus;
 	createdAt: string;
+	/** Число разных позиций. */
 	itemsCount: number;
+	/** Суммарное количество единиц по всем позициям. */
 	totalItems: number;
 	total: number;
 	currency: string;
 	deliveryMethod: Order["delivery"]["method"];
+	/**
+	 * Способ оплаты. Нужен свёрнутой строке, чтобы посчитать этап заказа: у
+	 * оплаты по счёту в сценарии появляется дополнительный шаг ожидания счёта
+	 * (см. lib/status-flow), и без него «этап 3 из 6» врал бы на единицу.
+	 */
+	paymentMethod: Order["payment"]["method"];
+	/**
+	 * Первые позиции заказа — снимок имён на момент покупки.
+	 *
+	 * Именно имена, а не изображения: снимок лежит в самом заказе и не требует
+	 * ни одного дополнительного обращения к базе, тогда как картинки товаров
+	 * при depth: 1 не подтянуты и потребовали бы поднять глубину выборки всего
+	 * списка. Опознать свой заказ по «Сеткомёт Паук ×2» проще, чем по
+	 * миниатюре, а стоит это ноль.
+	 */
+	itemsPreview: OrderItemPreview[];
 	canCancel: boolean;
 }
 

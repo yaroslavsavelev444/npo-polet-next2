@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
+import styles from "./Orders.module.css";
 
-type IconType = ComponentType<{ size?: number; className?: string }>;
+type IconType = ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
 
 interface OrderFieldProps {
 	icon: IconType;
@@ -8,52 +9,45 @@ interface OrderFieldProps {
 	value: ReactNode;
 	/** Делает значение ссылкой (tel:/mailto:/http). */
 	href?: string;
+	/** Значение, которое диктуют или копируют: трек-номер, ИНН. */
+	code?: boolean;
 }
 
-/** Строка «иконка + подпись + значение» — общий примитив блоков заказа. */
+/**
+ * Строка «значок → подпись → значение» — общий примитив блоков заказа.
+ *
+ * Подпись набрана мелким капслоком над значением, а не слева от него: слева
+ * она отнимала бы у значения половину ширины, а значения здесь длинные —
+ * адрес, юридическое наименование, комментарий. Значок стоит на плашке
+ * --media-plate, той же, что под кадром товара и монограммой кабинета.
+ *
+ * <dl> с парами dt/dd — семантика списка определений: это ровно он, и
+ * скринридер объявляет его как набор пар.
+ */
 export function OrderField({
 	icon: Icon,
 	label,
 	value,
 	href,
+	code,
 }: OrderFieldProps) {
 	return (
-		<div className="flex items-start gap-3">
-			<span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
-				<Icon size={15} aria-hidden />
+		<div className={styles.field}>
+			<span className={styles.fieldIcon} aria-hidden>
+				<Icon size={15} />
 			</span>
-			<div className="min-w-0 flex-1">
-				<dt className="text-xs text-[var(--text-secondary)]">{label}</dt>
-				{href ? (
-					<a
-						href={href}
-						className="block break-words text-sm font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--accent-light)]"
-					>
-						{value}
-					</a>
-				) : (
-					<dd className="break-words text-sm font-medium text-[var(--text-primary)]">
-						{value}
-					</dd>
-				)}
+			<div className={styles.fieldBody}>
+				<dt className={styles.fieldLabel}>{label}</dt>
+				<dd className={`${styles.fieldValue} ${code ? styles.fieldCode : ""}`}>
+					{href ? (
+						<a href={href} className={styles.fieldLink}>
+							{value}
+						</a>
+					) : (
+						value
+					)}
+				</dd>
 			</div>
-		</div>
-	);
-}
-
-interface OrderFieldGroupProps {
-	title: string;
-	children: ReactNode;
-}
-
-/** Группа полей с заголовком-подписью. */
-export function OrderFieldGroup({ title, children }: OrderFieldGroupProps) {
-	return (
-		<div className="flex flex-col gap-3.5">
-			<h3 className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
-				{title}
-			</h3>
-			<dl className="flex flex-col gap-3.5">{children}</dl>
 		</div>
 	);
 }

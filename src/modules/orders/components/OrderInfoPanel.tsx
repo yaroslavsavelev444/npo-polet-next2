@@ -11,8 +11,8 @@ import {
 import type { Order } from "@/payload-types";
 import { PAYMENT_METHOD_LABELS } from "../lib/labels";
 import type { OrderContactPreference } from "../lib/order-contact";
-import { OrderField, OrderFieldGroup } from "./OrderField";
-import { ORDER_CARD_CLASS } from "./orderCard.styles";
+import { OrderField } from "./OrderField";
+import styles from "./Orders.module.css";
 
 interface OrderInfoPanelProps {
 	/**
@@ -42,20 +42,19 @@ interface OrderInfoPanelProps {
 	notes?: string | null;
 }
 
-function Divider() {
-	return <div className="h-px bg-[var(--border)]" />;
-}
-
-/**
- * Данные, введённые пользователем при оформлении: получатель, способ оплаты,
- * реквизиты организации и комментарий. Пустые поля не отображаются.
- * Переиспользуется на странице успеха и в модалке просмотра заказа.
- */
 /** Телефон в виде, пригодном для tel:. */
 function telHref(phone: string): string {
 	return `tel:${phone.replace(/[^\d+]/g, "")}`;
 }
 
+/**
+ * Данные, введённые при оформлении: связь по заказу, получатель, оплата,
+ * реквизиты организации и комментарий. Пустые поля не показываются.
+ *
+ * Номер получателя выводится отдельно только если он НЕ тот же, что номер для
+ * связи: иначе панель дважды повторяла бы одно число, и главное различие —
+ * «звонят не получателю» — перестало бы читаться.
+ */
 export function OrderInfoPanel({
 	contact,
 	recipient,
@@ -64,35 +63,34 @@ export function OrderInfoPanel({
 	notes,
 }: OrderInfoPanelProps) {
 	const hasCompany = Boolean(company?.name);
-	// Номер получателя показывается отдельно, только если он не тот же, что и
-	// номер для связи: иначе панель дважды повторяла бы одно число, и главное
-	// различие («звонят не получателю») перестало бы читаться.
 	const showRecipientPhone =
 		recipient.phone !== "" && recipient.phone !== contact.phone;
 
 	return (
-		<section className={`flex flex-col gap-6 p-4 sm:p-5 ${ORDER_CARD_CLASS}`}>
-			{contact.phone && (
-				<>
-					<OrderFieldGroup title="Связь по заказу">
-						<OrderField
-							icon={PhoneCall}
-							label={
-								contact.owner === "recipient"
-									? "Менеджер звонит получателю"
-									: "Менеджер звонит вам"
-							}
-							value={contact.phone}
-							href={telHref(contact.phone)}
-						/>
-					</OrderFieldGroup>
+		<section className={styles.block}>
+			<div className={styles.blockHead}>
+				<h3 className={styles.blockTitle}>
+					<User size={13} aria-hidden />
+					Данные заказа
+				</h3>
+			</div>
 
-					<Divider />
-				</>
-			)}
+			<dl className={styles.fields}>
+				{contact.phone && (
+					<OrderField
+						icon={PhoneCall}
+						label={
+							contact.owner === "recipient"
+								? "Менеджер звонит получателю"
+								: "Менеджер звонит вам"
+						}
+						value={contact.phone}
+						href={telHref(contact.phone)}
+					/>
+				)}
 
-			<OrderFieldGroup title="Получатель">
-				<OrderField icon={User} label="ФИО" value={recipient.fullName} />
+				<OrderField icon={User} label="Получатель" value={recipient.fullName} />
+
 				{showRecipientPhone && (
 					<OrderField
 						icon={Phone}
@@ -101,12 +99,14 @@ export function OrderInfoPanel({
 						href={telHref(recipient.phone)}
 					/>
 				)}
+
 				<OrderField
 					icon={Mail}
-					label="Email"
+					label="Почта"
 					value={recipient.email}
 					href={`mailto:${recipient.email}`}
 				/>
+
 				{recipient.contactPerson && (
 					<OrderField
 						icon={UserRound}
@@ -114,26 +114,19 @@ export function OrderInfoPanel({
 						value={recipient.contactPerson}
 					/>
 				)}
-			</OrderFieldGroup>
 
-			<Divider />
-
-			<OrderFieldGroup title="Оплата">
 				<OrderField
 					icon={CreditCard}
-					label="Способ оплаты"
+					label="Оплата"
 					value={PAYMENT_METHOD_LABELS[payment.method]}
 				/>
-			</OrderFieldGroup>
 
-			{hasCompany && company && (
-				<>
-					<Divider />
-					<OrderFieldGroup title="Организация">
+				{hasCompany && company && (
+					<>
 						{company.name && (
 							<OrderField
 								icon={Building2}
-								label="Название"
+								label="Организация"
 								value={company.name}
 							/>
 						)}
@@ -142,6 +135,7 @@ export function OrderInfoPanel({
 								icon={Building2}
 								label="ИНН"
 								value={company.taxNumber}
+								code
 							/>
 						)}
 						{company.legalAddress && (
@@ -154,26 +148,23 @@ export function OrderInfoPanel({
 						{company.contactPerson && (
 							<OrderField
 								icon={UserRound}
-								label="Контактное лицо"
+								label="Контактное лицо организации"
 								value={company.contactPerson}
 							/>
 						)}
-					</OrderFieldGroup>
-				</>
-			)}
+					</>
+				)}
 
-			{notes && (
-				<>
-					<Divider />
-					<OrderFieldGroup title="Комментарий">
-						<OrderField
-							icon={MessageSquareText}
-							label="К заказу"
-							value={notes}
-						/>
-					</OrderFieldGroup>
-				</>
-			)}
+				{notes && (
+					<OrderField
+						icon={MessageSquareText}
+						label="Комментарий к заказу"
+						value={notes}
+					/>
+				)}
+			</dl>
 		</section>
 	);
 }
+
+export default OrderInfoPanel;

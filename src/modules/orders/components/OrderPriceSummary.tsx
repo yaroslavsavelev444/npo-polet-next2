@@ -1,7 +1,8 @@
+import { Receipt } from "lucide-react";
 import { formatPrice } from "@/modules/productCard";
 import { PAYMENT_STATUS_LABELS } from "../lib/labels";
 import type { OrderDetailView } from "../types";
-import { ORDER_CARD_CLASS } from "./orderCard.styles";
+import styles from "./Orders.module.css";
 
 type PaymentStatus = OrderDetailView["payment"]["status"];
 
@@ -17,27 +18,37 @@ interface OrderPriceSummaryProps {
 	 * посчитана в итоге дважды.
 	 */
 	promo?: { code: string; amount: number } | null;
-	/** Статус оплаты — бейдж рядом с итогом (только в просмотре заказа). */
+	/** Статус оплаты — подпись рядом с итогом. */
 	paymentStatus?: PaymentStatus;
 }
 
-const PAYMENT_STATUS_STYLES: Record<PaymentStatus, string> = {
-	pending: "bg-[var(--warning)]/15 text-[var(--warning)]",
-	paid: "bg-[var(--success)]/15 text-[var(--success)]",
-	failed: "bg-[var(--error)]/15 text-[var(--error)]",
-	refunded: "bg-[var(--error)]/15 text-[var(--error)]",
+const PAYMENT_STATUS_CLASS: Record<PaymentStatus, string> = {
+	pending: styles.statusWait,
+	paid: styles.statusDone,
+	failed: styles.statusStopped,
+	refunded: styles.statusStopped,
 };
 
 /**
- * Итоговая стоимость заказа.
+ * Стоимость заказа.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ЧТО ЗДЕСЬ ВАЖНО И ПОЧЕМУ ИМЕННО ТАК
+ * ────────────────────────────────────────────────────────────────────────────
+ * Блок отвечает на один вопрос: откуда взялась итоговая сумма. Поэтому все
+ * слагаемые набраны одним кеглем и одним весом — ни одно из них не важнее
+ * другого, — а итог отбит линией и вдвое крупнее: он единственный, ради чего
+ * блок открывают.
  *
  * Скидка по промокоду выделена отдельной строкой с самим кодом: покупатель,
- * применивший код, должен видеть в заказе подтверждение, что он сработал, а
- * не безымянную «Скидку», по которой это не проверить. Прочие скидки
- * (товарные и корзинная) остаются одной строкой — они не результат действия
- * покупателя и разбивать их не на что.
+ * применивший код, должен видеть подтверждение, что код сработал, а не
+ * безымянную «Скидку», по которой это не проверить. Прочие скидки (товарные и
+ * корзинная) остаются одной строкой — они не результат его действия, и
+ * разбивать их не на что.
  *
- * Строки доставки и статуса оплаты опциональны — используются в просмотре заказа.
+ * Расчёт здесь не производится: все величины приходят снимком из заказа.
+ * Единственная арифметика — вычитание промокода из общей скидки, чтобы одна и
+ * та же уступка не была показана дважды.
  */
 export function OrderPriceSummary({
 	subtotal,
@@ -52,69 +63,61 @@ export function OrderPriceSummary({
 	// исторического заказа, где снимок цен по какой-то причине не сходится:
 	// отрицательная «Скидка» была бы заведомой ерундой на глазах покупателя.
 	const otherDiscount = Math.max(0, discount - promoAmount);
-	const hasDiscount = otherDiscount > 0;
-	const hasShipping = shippingCost > 0;
 
 	return (
-		<section className={`p-4 sm:p-5 ${ORDER_CARD_CLASS}`}>
-			<h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
-				Стоимость
-			</h3>
+		<section className={styles.block}>
+			<div className={styles.blockHead}>
+				<h3 className={styles.blockTitle}>
+					<Receipt size={13} aria-hidden />
+					Стоимость
+				</h3>
+			</div>
 
-			<dl className="flex flex-col gap-2.5 text-sm">
-				<div className="flex items-baseline justify-between gap-3">
-					<dt className="text-[var(--text-secondary)]">Сумма товаров</dt>
-					<dd className="tabular-nums text-[var(--text-primary)]">
-						{formatPrice(subtotal)}
-					</dd>
+			<dl className={styles.sum}>
+				<div className={styles.sumRow}>
+					<dt className={styles.sumLabel}>Товары</dt>
+					<dd className={styles.sumValue}>{formatPrice(subtotal)}</dd>
 				</div>
 
-				{hasDiscount && (
-					<div className="flex items-baseline justify-between gap-3">
-						<dt className="text-[var(--success)]">Скидка</dt>
-						<dd className="tabular-nums text-[var(--success)]">
-							−{formatPrice(discount)}
-						</dd>
+				{otherDiscount > 0 && (
+					<div className={`${styles.sumRow} ${styles.sumDiscount}`}>
+						<dt className={styles.sumLabel}>Скидка</dt>
+						<dd className={styles.sumValue}>−{formatPrice(otherDiscount)}</dd>
 					</div>
 				)}
 
 				{promoAmount > 0 && promo && (
-					<div className="flex items-baseline justify-between gap-3">
-						<dt className="text-[var(--success)]">
-							Промокод{" "}
-							<span className="font-mono tracking-wide">{promo.code}</span>
+					<div className={`${styles.sumRow} ${styles.sumDiscount}`}>
+						<dt className={styles.sumLabel}>
+							Промокод <span className={styles.sumCode}>{promo.code}</span>
 						</dt>
-						<dd className="tabular-nums text-[var(--success)]">
-							−{formatPrice(promoAmount)}
-						</dd>
+						<dd className={styles.sumValue}>−{formatPrice(promoAmount)}</dd>
 					</div>
 				)}
 
-				{hasShipping && (
-					<div className="flex items-baseline justify-between gap-3">
-						<dt className="text-[var(--text-secondary)]">Доставка</dt>
-						<dd className="tabular-nums text-[var(--text-primary)]">
-							{formatPrice(shippingCost)}
-						</dd>
+				{shippingCost > 0 && (
+					<div className={styles.sumRow}>
+						<dt className={styles.sumLabel}>Доставка</dt>
+						<dd className={styles.sumValue}>{formatPrice(shippingCost)}</dd>
 					</div>
 				)}
 
-				<div className="mt-1.5 flex items-baseline justify-between gap-3 border-t border-[var(--border-light)] pt-3.5">
-					<dt className="flex flex-wrap items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
+				<div className={styles.sumTotal}>
+					<dt className={styles.sumTotalLabel}>
 						К оплате
 						{paymentStatus && (
 							<span
-								className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${PAYMENT_STATUS_STYLES[paymentStatus]}`}
+								className={`${styles.status} ${PAYMENT_STATUS_CLASS[paymentStatus]}`}
 							>
 								{PAYMENT_STATUS_LABELS[paymentStatus]}
 							</span>
 						)}
 					</dt>
-					<dd className="text-xl font-bold tabular-nums text-[var(--text-primary)]">
-						{formatPrice(total)}
-					</dd>
+					<dd className={styles.sumTotalValue}>{formatPrice(total)}</dd>
 				</div>
 			</dl>
 		</section>
 	);
 }
+
+export default OrderPriceSummary;

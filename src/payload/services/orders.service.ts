@@ -84,6 +84,37 @@ export async function getOrdersByUserId(
 	};
 }
 
+/**
+ * Статусы ВСЕХ заказов покупателя — по одному полю на заказ.
+ *
+ * Нужны, чтобы посчитать, сколько заказов в каждой вкладке отбора и сколько
+ * из них в работе. Считать это пятью отдельными count-запросами было бы пять
+ * обращений к базе на каждую отрисовку страницы; здесь — одно, и из базы
+ * приезжает один столбец (select), без единого документа заказа.
+ *
+ * pagination: false осознанно: даже у самого активного покупателя это сотни
+ * коротких строк, а половинчатая выборка дала бы неверные счётчики — хуже,
+ * чем никаких.
+ */
+export async function getOrderStatusesForUser(
+	userId: string,
+): Promise<Order["status"][]> {
+	const payload = await getPayloadInstance();
+
+	const result = await payload.find({
+		collection: "orders",
+		where: { user: { equals: userId } },
+		depth: 0,
+		pagination: false,
+		select: { status: true },
+		overrideAccess: true,
+	});
+
+	return (result.docs as unknown as Pick<Order, "status">[]).map(
+		(doc) => doc.status,
+	);
+}
+
 export async function getOrderByIdForUser(
 	orderId: string,
 	userId: string,

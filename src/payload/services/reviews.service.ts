@@ -1,6 +1,12 @@
 import { sql } from "@payloadcms/db-postgres";
 import { unstable_cache } from "next/cache";
-import type { ProductReview, User } from "../../../payload-types";
+import type { Where } from "payload";
+import type {
+	Media,
+	Product,
+	ProductReview,
+	User,
+} from "../../../payload-types";
 import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
 
@@ -348,4 +354,292 @@ export async function getReviewEligibility(
 	}
 
 	return { canReview: true, reason: "eligible", existingReviewStatus: null };
+}
+
+/* ===========================================================================
+   Отзывы вне карточки товара
+   ===========================================================================
+   Две выборки: публичная лента «Наши отзывы» (все одобренные отзывы каталога)
+   и личный список «Мои отзывы» (отзывы одного пользователя в любом статусе).
+
+   Обе отдают отзыв ВМЕСТЕ с товаром: вне страницы товара отзыв без указания,
+   о чём он, бесполезен. Глубина 2 — товар (уровень 1) и его категория с
+   изображениями (уровень 2): из категории строится ссылка, из первого
+   изображения — миниатюра.                                                  */
+
+/** Товар, о котором отзыв, — ровно то, что нужно для опознания. */
+export interface ReviewProductRef {
+	id: string;
+	title: string;
+	href: string | null;
+	imageUrl: string | null;
+	imageAlt: string;
+}
+
+export interface PublicReviewView extends ReviewView {
+	product: ReviewProductRef | null;
+}
+
+export interface PublicReviewsFeed {
+	reviews: PublicReviewView[];
+	totalDocs: number;
+	page: number;
+	totalPages: number;
+	hasNextPage: boolean;
+}
+
+function mapProductRef(
+	product: Product | number | null | undefined,
+): ReviewProductRef | null {
+	if (!product || typeof product !== "object") return null;
+
+	const category =
+		typeof product.category === "object" && product.category !== null
+			? product.category
+			: null;
+
+	const firstImage = product.images?.find(
+		(image): image is Media => typeof image === "object" && image !== null,
+	);
+
+	return {
+		id: String(product.id),
+		title: product.title,
+		href:
+			product.slug && category?.slug
+				? `/category/${category.slug}/products/${product.slug}`
+				: null,
+		imageUrl: firstImage?.url ?? null,
+		imageAlt: firstImage?.alt || product.title,
+	};
+}
+
+/**
+ * Сводный рейтинг по ВСЕМУ каталогу — средняя оценка, число отзывов и
+ * распределение по звёздам.
+ *
+ * Считается тем же прямым SQL по индексу product_reviews_status_idx, что и
+ * рейтинг одного товара: выбирать тысячи документов ради пяти чисел нельзя.
+ *
+ * Считаются ВСЕ одобренные отзывы, включая те немногие, что могли остаться
+ * без текста, — ровно так же, как на карточке товара. Иначе средняя оценка на
+ * публичной странице отличалась бы от средней на странице товара, и это
+ * читалось бы как ошибка.
+ */
+async function fetchGlobalRatingBreakdown(): Promise<RatingBreakdown> {
+	const payload = await getPayloadInstance();
+	const result = (await payload.db.drizzle.execute(sql`
+		SELECT
+			COALESCE(AVG(rating), 0)::float AS average,
+			COUNT(*)::int AS count,
+			COUNT(*) FILTER (WHERE rating = 5)::int AS r5,
+			COUNT(*) FILTER (WHERE rating = 4)::int AS r4,
+			COUNT(*) FILTER (WHERE rating = 3)::int AS r3,
+			COUNT(*) FILTER (WHERE rating = 2)::int AS r2,
+			COUNT(*) FILTER (WHERE rating = 1)::int AS r1
+		FROM product_reviews
+		WHERE status = ${APPROVED}
+	`)) as DrizzleRows;
+
+	const row = result.rows?.[0] ?? {};
+	return {
+		average: toNumber(row.average),
+		count: toNumber(row.count),
+		distribution: {
+			5: toNumber(row.r5),
+			4: toNumber(row.r4),
+			3: toNumber(row.r3),
+			2: toNumber(row.r2),
+			1: toNumber(row.r1),
+		},
+	};
+}
+
+export const getGlobalRatingBreakdown = () => {
+	if (env.NODE_ENV === "development") {
+		return fetchGlobalRatingBreakdown();
+	}
+	return unstable_cache(
+		fetchGlobalRatingBreakdown,
+		["global-rating-breakdown"],
+		{
+			tags: ["reviews"],
+			revalidate: false,
+		},
+	)();
+};
+
+/**
+ * Лента одобренных отзывов по всему каталогу.
+ *
+ * Только `approved` — тот же фильтр, что у отзывов на странице товара и что
+ * записан в access коллекции. Ни `pending`, ни `rejected` сюда попасть не
+ * могут: статус проверяется здесь, а не полагается на права запроса.
+ *
+ * Отзывы без текста отсеиваются: поле comment у коллекции обязательное, но
+ * исторические записи бывают пустыми, а пустая карточка в публичной ленте
+ * выглядит поломкой.
+ */
+export async function getApprovedReviewsFeed(
+	options: { page?: number; limit?: number; rating?: number | null } = {},
+): Promise<PublicReviewsFeed> {
+	const payload = await getPayloadInstance();
+	const { page = 1, limit = 12, rating = null } = options;
+
+	const conditions: Where[] = [
+		{ status: { equals: APPROVED } },
+		{ comment: { not_equals: "" } },
+	];
+	if (rating && rating >= 1 && rating <= 5) {
+		conditions.push({ rating: { equals: rating } });
+	}
+
+	const result = await payload.find({
+		collection: "product-reviews",
+		where: { and: conditions },
+		sort: "-createdAt",
+		page,
+		limit,
+		depth: 2,
+		overrideAccess: true,
+	});
+
+	return {
+		reviews: (result.docs as unknown as ProductReview[]).map((doc) => ({
+			...mapReview(doc),
+			product: mapProductRef(doc.product),
+		})),
+		totalDocs: result.totalDocs,
+		page: result.page ?? page,
+		totalPages: result.totalPages,
+		hasNextPage: result.hasNextPage,
+	};
+}
+
+/* ---------------------------------------------------------------------------
+   Мои отзывы
+   ---------------------------------------------------------------------------
+   Автор видит свои отзывы в ЛЮБОМ статусе — иначе он не может убедиться, что
+   отзыв принят на модерацию, и не узнает причину отклонения. Это же правило
+   записано в access коллекции (Reviews.ts).
+
+   Здесь, в отличие от публичной выборки, имя автора не сокращается и не
+   показывается вовсе: пользователь читает собственные отзывы.              */
+
+export type ReviewStatus = NonNullable<ProductReview["status"]>;
+
+export interface MyReviewView {
+	id: string;
+	rating: number;
+	title: string | null;
+	comment: string;
+	pros: string[];
+	cons: string[];
+	status: ReviewStatus;
+	/** Заполняется модератором при отклонении — объясняет, что не так. */
+	rejectionReason: string | null;
+	isVerifiedPurchase: boolean;
+	createdAt: string;
+	product: ReviewProductRef | null;
+}
+
+export interface MyReviewsPage {
+	reviews: MyReviewView[];
+	totalDocs: number;
+	page: number;
+	totalPages: number;
+	hasNextPage: boolean;
+}
+
+function mapArrayField(
+	items: { value?: string | null }[] | null | undefined,
+): string[] {
+	return (items ?? [])
+		.map((item) => item.value?.trim())
+		.filter((value): value is string => Boolean(value));
+}
+
+function mapMyReview(doc: ProductReview): MyReviewView {
+	return {
+		id: String(doc.id),
+		rating: toNumber(doc.rating),
+		title: doc.title?.trim() || null,
+		comment: doc.comment,
+		pros: mapArrayField(doc.pros),
+		cons: mapArrayField(doc.cons),
+		status: doc.status ?? "pending",
+		rejectionReason: doc.rejectionReason?.trim() || null,
+		isVerifiedPurchase: Boolean(doc.isVerifiedPurchase),
+		createdAt: doc.createdAt,
+		product: mapProductRef(doc.product),
+	};
+}
+
+export async function getUserReviews(
+	userId: string | number,
+	options: { page?: number; limit?: number; status?: ReviewStatus | null } = {},
+): Promise<MyReviewsPage> {
+	const payload = await getPayloadInstance();
+	const { page = 1, limit = 10, status = null } = options;
+
+	const conditions: Where[] = [{ user: { equals: Number(userId) } }];
+	if (status) conditions.push({ status: { equals: status } });
+
+	const result = await payload.find({
+		collection: "product-reviews",
+		where: { and: conditions },
+		sort: "-createdAt",
+		page,
+		limit,
+		depth: 2,
+		overrideAccess: true,
+	});
+
+	return {
+		reviews: (result.docs as unknown as ProductReview[]).map(mapMyReview),
+		totalDocs: result.totalDocs,
+		page: result.page ?? page,
+		totalPages: result.totalPages,
+		hasNextPage: result.hasNextPage,
+	};
+}
+
+export interface UserReviewStats {
+	total: number;
+	byStatus: Record<ReviewStatus, number>;
+	/** Средняя оценка, которую поставил сам пользователь. */
+	averageGiven: number;
+}
+
+/**
+ * Счётчики по статусам для панели отбора и сводки первого экрана.
+ *
+ * Один SQL вместо четырёх payload.count: четыре обращения к базе ради
+ * четырёх чисел — не та цена, которую стоит платить за страницу кабинета.
+ */
+export async function getUserReviewStats(
+	userId: string | number,
+): Promise<UserReviewStats> {
+	const payload = await getPayloadInstance();
+	const result = (await payload.db.drizzle.execute(sql`
+		SELECT
+			COUNT(*)::int AS total,
+			COUNT(*) FILTER (WHERE status = 'approved')::int AS approved,
+			COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+			COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
+			COALESCE(AVG(rating), 0)::float AS average
+		FROM product_reviews
+		WHERE user_id = ${Number(userId)}
+	`)) as DrizzleRows;
+
+	const row = result.rows?.[0] ?? {};
+	return {
+		total: toNumber(row.total),
+		byStatus: {
+			approved: toNumber(row.approved),
+			pending: toNumber(row.pending),
+			rejected: toNumber(row.rejected),
+		},
+		averageGiven: toNumber(row.average),
+	};
 }

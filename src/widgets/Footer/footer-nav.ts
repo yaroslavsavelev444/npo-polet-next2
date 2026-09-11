@@ -52,6 +52,7 @@ export const MAX_FOOTER_CATEGORIES = 4;
 export const COMPANY_LINKS: FooterLink[] = [
 	{ label: "Контакты", href: "/contacts" },
 	{ label: "База знаний", href: "/knowledge" },
+	{ label: "Отзывы", href: "/reviews" },
 	{ label: "Вопросы и ответы", href: "/faq" },
 	{ label: "Соглашения", href: "/consents" },
 ];
@@ -68,6 +69,6 @@ export const ACCOUNT_LINKS: FooterLink[] = [
 	{ label: "Профиль", href: "/profile" },
 	{ label: "Заказы", href: "/orders" },
 	{ label: "Избранное", href: "/wishlist" },
-	{ label: "Мои отзывы", href: "/reviews" },
+	{ label: "Мои отзывы", href: "/profile/reviews" },
 	{ label: "Корзина", href: "/cart" },
 ];

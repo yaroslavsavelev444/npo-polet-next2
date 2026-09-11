@@ -1,26 +1,21 @@
 import { ArrowLeft, PackageSearch } from "lucide-react";
 import Link from "next/link";
-import { buttonStyles } from "@/UI/Button/Button.styles";
+import styles from "../Orders.module.css";
 
 /**
- * Основные действия после оформления: перейти к своим заказам или вернуться в
- * каталог. Ссылки стилизованы как кнопки (buttonStyles), т.к. семантически это
- * переходы, а не действия-кнопки. На мобильных — в столбец на всю ширину.
+ * Куда идти дальше после оформления: к своим заказам или обратно в каталог.
+ *
+ * Ссылки, а не кнопки: семантически это переходы. Вид у них общий с кнопками
+ * страницы заказов — тот же рост, то же скругление, те же два тона.
  */
 export function OrderActions() {
 	return (
-		<div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-			<Link
-				href="/orders"
-				className={buttonStyles("primary", "lg", false, "sm:min-w-52")}
-			>
-				<PackageSearch size={18} aria-hidden />К заказам
+		<div className={`${styles.actions} justify-center`}>
+			<Link href="/orders" className={`${styles.btn} ${styles.btnPrimary}`}>
+				<PackageSearch size={16} aria-hidden />К заказам
 			</Link>
-			<Link
-				href="/category"
-				className={buttonStyles("outline", "lg", false, "sm:min-w-52")}
-			>
-				<ArrowLeft size={18} aria-hidden />
+			<Link href="/category" className={`${styles.btn} ${styles.btnQuiet}`}>
+				<ArrowLeft size={16} aria-hidden />
 				Назад к покупкам
 			</Link>
 		</div>

@@ -1,0 +1,902 @@
+/* ===========================================================================
+   Отзывы: публичная лента и личный список
+   ===========================================================================
+   Две страницы, одна сущность — и потому один файл. «Наши отзывы» и «Мои
+   отзывы» обязаны выглядеть роднёй: одинаковые звёзды, одинаковая подача
+   товара, одинаковая типографика текста отзыва, одинаковое раскрытие длинного
+   комментария. Разъедься они по двум модулям — разойдутся и на первой же
+   правке.
+
+   Различает страницы КОМПОЗИЦИЯ, а не материал:
+
+     • публичная — сетка панелей: витрина, по которой ходят глазами, выбирая,
+       что прочитать. Отдельная панель нужна потому, что каждый отзыв —
+       высказывание отдельного человека, и в многоколоночной раскладке
+       отделить их друг от друга одним воздухом не выходит;
+     • личная — разлинованный список: свои отзывы читают подряд, сравнивать их
+       между собой не нужно, зато у каждого есть статус, который важнее
+       оформления.
+
+   Материалы общие с остальным сайтом: панель — --void (темнее витрины, как
+   сводка рейтинга на странице товара), разлиновка --rule, служебные подписи
+   моноширинным капслоком, времена и кривые из app/(frontend)/home.css.     */
+
+/* ---------------------------------------------------------------------------
+   Сводка первого экрана
+   ---------------------------------------------------------------------------
+   Крупная средняя оценка со звёздами и распределением. На публичной странице
+   это главный сигнал доверия, и он обязан читаться до того, как посетитель
+   начал читать сами отзывы.                                                 */
+.summary {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+}
+
+.summaryHead {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.summaryValue {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 3rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.03em;
+	line-height: 0.9;
+	color: var(--text-primary);
+}
+
+.summaryAside {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	min-width: 0;
+}
+
+/* Распределение по звёздам. Полосы помечены aria-hidden: числа рядом с ними
+   уже сказаны текстом, и объявлять одно значение дважды не нужно. */
+.bars {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	margin: 0;
+}
+
+.bar {
+	display: grid;
+	grid-template-columns: 1.5rem minmax(0, 1fr) 2.25rem;
+	align-items: center;
+	gap: 0.6rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	border: 0;
+	background: transparent;
+	padding: 0.1rem 0;
+	text-align: left;
+	font-family: inherit;
+}
+
+.barTrack {
+	height: 3px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+
+.barFill {
+	/* display: block обязателен: заполнение — <span> внутри <span>, а строчный
+	   бокс игнорирует и ширину, и высоту, и полоса рисовалась нулевого
+	   размера. Дорожка выше блочная «сама собой» — она grid-элемент строки. */
+	display: block;
+	height: 100%;
+	border-radius: 999px;
+	background: var(--warning);
+	transform-origin: left center;
+	animation: reviews-bar-in var(--dur-slow) var(--ease-out-expo) both;
+}
+
+@keyframes reviews-bar-in {
+	from {
+		transform: scaleX(0);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+
+.barCount {
+	text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.barFill {
+		animation: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Сетка публичной ленты
+   ---------------------------------------------------------------------------
+   Колонки считаются от ширины САМОЙ сетки (@container на обёртке), как в
+   каталоге: важна ширина колонки с текстом, а не ширина окна.
+
+   Потолок — три колонки. Четвёртая на 1280px даёт колонку ~290px, где строка
+   отзыва становится короче 40 знаков и текст рассыпается на обрывки. Мера
+   строки важнее плотности: страницу открывают читать.                      */
+.grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+@container (min-width: 34rem) {
+	.grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1.25rem;
+	}
+}
+
+@container (min-width: 62rem) {
+	.grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+/* Панель отзыва. --void — тот же материал, что у сводки рейтинга на странице
+   товара: слой, утопленный в страницу, а не наклейка поверх неё. */
+.card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+	height: 100%;
+	padding: 1.15rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-md);
+	background: var(--void);
+	transition:
+		border-color 260ms var(--ease-out-quart),
+		transform 320ms var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.card:hover,
+	.card:focus-within {
+		border-color: var(--border);
+		transform: translate3d(0, -2px, 0);
+	}
+}
+
+/* Каскад появления — шаг 45 мс, тот же, что у карточек каталога и строк
+   заказов. */
+.enter {
+	animation: reviews-in 460ms var(--ease-out-expo) both;
+	animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes reviews-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 12px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.enter {
+		animation: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Товар в отзыве
+   ---------------------------------------------------------------------------
+   Вне страницы товара отзыв без указания, о чём он, бесполезен — поэтому
+   товар стоит ПЕРВЫМ и является ссылкой целиком. Кадр на плашке
+   --media-plate: та же поверхность, что под снимком в каталоге и в заказах.  */
+.product {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	min-width: 0;
+	padding-bottom: 0.85rem;
+	border-bottom: 1px solid var(--hairline);
+	text-decoration: none;
+	color: inherit;
+	border-radius: var(--radius-sm);
+	outline-offset: 4px;
+}
+
+.productFrame {
+	position: relative;
+	flex: 0 0 auto;
+	width: 2.75rem;
+	height: 2.75rem;
+	overflow: hidden;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+}
+
+.productImage {
+	object-fit: contain;
+	padding: 8%;
+	transition: transform 500ms var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.product:hover .productImage {
+		transform: scale(1.07);
+	}
+}
+
+.productEmpty {
+	display: grid;
+	place-items: center;
+	height: 100%;
+	color: var(--border-light);
+}
+
+.productBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.productLabel {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.5625rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.productName {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1.3;
+	color: var(--text-primary);
+	transition: color 200ms var(--ease-out-quart);
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+}
+
+.product:hover .productName,
+.product:focus-visible .productName {
+	color: var(--primary);
+}
+
+.productArrow {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	transition:
+		color 200ms var(--ease-out-quart),
+		transform 320ms var(--ease-out-expo);
+}
+
+.product:hover .productArrow,
+.product:focus-visible .productArrow {
+	color: var(--primary);
+	transform: translate3d(2px, -2px, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.productArrow,
+	.productImage,
+	.card {
+		transition: color 200ms linear;
+	}
+	.product:hover .productArrow {
+		transform: none;
+	}
+}
+
+/* Товар, которого больше нет в каталоге: ссылки нет, но отзыв остаётся
+   осмысленным — название сохранено снимком в самом отзыве. */
+.productPlain {
+	cursor: default;
+}
+
+/* ---------------------------------------------------------------------------
+   Оценка
+   ---------------------------------------------------------------------------
+   Звёзды и число рядом. Число — не дубль: при дробном среднем звёзды
+   заполняются частично, и «4,3» читается точнее любой картинки. В самих
+   отзывах оценка целая, и число подтверждает её словом для тех, кто звёзды не
+   различает.                                                                */
+.rating {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.ratingValue {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.75rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.04em;
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Текст отзыва
+   ---------------------------------------------------------------------------
+   Центр внимания страницы. Мера строки ограничена: в широкой колонке строка
+   уходит за 90 знаков, и глаз теряет начало следующей.
+
+   Длинный отзыв свёрнут до шести строк и раскрывается по кнопке. Затухание
+   внизу — единственный честный сигнал, что текст продолжается: обрыв на
+   полуслове без него читается как сбой вёрстки.                            */
+.body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.title {
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1.35;
+	letter-spacing: var(--tracking-tight);
+	color: var(--text-primary);
+}
+
+.comment {
+	position: relative;
+	margin: 0;
+	max-width: 70ch;
+	font-size: 0.875rem;
+	line-height: 1.65;
+	color: var(--text-secondary);
+	white-space: pre-line;
+	overflow-wrap: anywhere;
+}
+
+.comment[data-clamped="true"] {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 6;
+	line-clamp: 6;
+	overflow: hidden;
+	mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+
+.more {
+	align-self: flex-start;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	font-family: inherit;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	color: var(--accent);
+	cursor: pointer;
+	text-underline-offset: 0.25em;
+	transition: color 150ms var(--ease-out-quart);
+	border-radius: 2px;
+}
+
+.more:hover,
+.more:focus-visible {
+	color: var(--accent-hover);
+	text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   Достоинства и недостатки
+   ---------------------------------------------------------------------------
+   Поля есть в модели, и заполненные они — самая полезная часть отзыва:
+   короткие тезисы читаются быстрее абзаца. Показываются только если не
+   пустые.                                                                   */
+.prosCons {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin: 0;
+}
+
+.prosConsGroup {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.35rem 0.5rem;
+	margin: 0;
+}
+
+.prosConsLabel {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.5625rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	line-height: 1.4;
+	text-transform: uppercase;
+}
+
+.prosLabel {
+	color: color-mix(in srgb, var(--success) 78%, #fff);
+}
+
+.consLabel {
+	color: color-mix(in srgb, var(--warning) 78%, #fff);
+}
+
+.prosConsValue {
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Подпись отзыва
+   --------------------------------------------------------------------------- */
+.foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin-top: auto;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--hairline);
+}
+
+.author {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.avatar {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 999px;
+	background: var(--media-plate);
+	box-shadow: inset 0 0 0 1px var(--rule);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+}
+
+.authorName {
+	font-size: 0.8125rem;
+	font-weight: 500;
+	color: var(--text-primary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.date {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	white-space: nowrap;
+	color: var(--text-muted);
+}
+
+/* Подтверждённая покупка — главный признак доверия на публичной странице, и
+   он подписан словом, а не только значком. */
+.verified {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	padding: 0.2rem 0.5rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--success) 12%, transparent);
+	font-size: 0.625rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	line-height: 1.3;
+	text-transform: uppercase;
+	white-space: nowrap;
+	color: color-mix(in srgb, var(--success) 80%, #fff);
+}
+
+.footSpacer {
+	flex: 1 1 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Статус отзыва (только «Мои отзывы»)
+   ---------------------------------------------------------------------------
+   Три состояния, и все три нужно уметь объяснить, а не просто назвать:
+   опубликован, ждёт модерации, отклонён. Значок различает их силуэтом — цвет
+   только усиливает.                                                        */
+.status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.3rem 0.65rem 0.3rem 0.5rem;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+
+.statusApproved {
+	border-color: color-mix(in srgb, var(--success) 32%, transparent);
+	background: color-mix(in srgb, var(--success) 12%, transparent);
+	color: color-mix(in srgb, var(--success) 80%, #fff);
+}
+
+.statusPending {
+	border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+	background: color-mix(in srgb, var(--warning) 12%, transparent);
+	color: color-mix(in srgb, var(--warning) 80%, #fff);
+}
+
+.statusRejected {
+	border-color: color-mix(in srgb, var(--error) 32%, transparent);
+	background: color-mix(in srgb, var(--error) 10%, transparent);
+	color: color-mix(in srgb, var(--error) 82%, #fff);
+}
+
+/* ---------------------------------------------------------------------------
+   Строка личного списка
+   ---------------------------------------------------------------------------
+   Разлинованный список, а не сетка панелей: свои отзывы читают подряд,
+   сравнивать их не нужно, и рамка вокруг каждого добавила бы решётку там, где
+   хватает волосяной линии. Тот же приём, что в списке заказов и в кабинете. */
+.rows {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.row {
+	display: grid;
+	grid-template-columns: 3.5rem minmax(0, 1fr);
+	grid-template-areas:
+		"frame head"
+		"body  body";
+	gap: 0.75rem 1rem;
+	padding: 1.35rem 0;
+	border-top: 1px solid var(--rule);
+}
+
+.rows > .row:first-child {
+	border-top: 0;
+}
+
+@media (min-width: 48rem) {
+	.row {
+		grid-template-columns: 4rem minmax(0, 1fr);
+		grid-template-areas:
+			"frame head"
+			"frame body";
+		gap: 0.6rem 1.25rem;
+	}
+}
+
+.rowFrame {
+	grid-area: frame;
+	position: relative;
+	aspect-ratio: 1;
+	width: 100%;
+	overflow: hidden;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+}
+
+.rowHead {
+	grid-area: head;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.5rem 1rem;
+	min-width: 0;
+}
+
+.rowBody {
+	grid-area: body;
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	min-width: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Пояснение к статусу
+   ---------------------------------------------------------------------------
+   Статус без объяснения бесполезен: «Отклонён» без причины — это тупик.
+   Причина приходит из поля rejectionReason, которое заполняет модератор.    */
+.note {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	margin: 0;
+	padding: 0.7rem 0.85rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-sm);
+	font-size: 0.8125rem;
+	line-height: 1.55;
+	color: var(--text-secondary);
+}
+
+.noteIcon {
+	flex: 0 0 auto;
+	margin-top: 0.1rem;
+}
+
+.notePending {
+	border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+	background: color-mix(in srgb, var(--warning) 7%, transparent);
+}
+
+.notePendingIcon {
+	color: var(--warning);
+}
+
+.noteRejected {
+	border-color: color-mix(in srgb, var(--error) 30%, transparent);
+	background: color-mix(in srgb, var(--error) 7%, transparent);
+	color: var(--text-primary);
+}
+
+.noteRejectedIcon {
+	color: var(--error);
+}
+
+/* ---------------------------------------------------------------------------
+   Кнопки
+   --------------------------------------------------------------------------- */
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem;
+	margin-top: 2rem;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	height: 2.75rem;
+	padding: 0 1.25rem;
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	font-family: inherit;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart),
+		opacity 180ms var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart);
+}
+
+.btn:active:not(:disabled) {
+	transform: scale(0.985);
+}
+
+.btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+.btnPrimary {
+	background: var(--primary);
+	color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+	background: var(--primary-600);
+}
+
+.btnQuiet {
+	border-color: var(--border);
+	background: transparent;
+	color: var(--text-primary);
+	font-weight: 500;
+}
+
+.btnQuiet:hover:not(:disabled) {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.spin {
+	animation: reviews-spin 700ms linear infinite;
+}
+
+@keyframes reviews-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.btn:active:not(:disabled) {
+		transform: none;
+	}
+	.spin {
+		animation-duration: 1800ms;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Пусто, загрузка, ошибка
+   --------------------------------------------------------------------------- */
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1rem;
+	padding: 4rem 1rem;
+	border-top: 1px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+	text-align: center;
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.emptyText {
+	margin: 0;
+	max-width: 46ch;
+	font-size: 0.875rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.errorBox {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	margin: 1.5rem 0 0;
+	padding: 0.75rem 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--error) 8%, transparent);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+}
+
+/* Заглушка карточки: та же геометрия, что у настоящей, — при подстановке
+   данных сетка не перестраивается. */
+.skeletonCard {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+	padding: 1.15rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-md);
+	background: var(--void);
+}
+
+.skeletonLine {
+	height: 0.7rem;
+	border-radius: 999px;
+	background: var(--surface-secondary);
+}
+
+.skeletonPlate {
+	width: 2.75rem;
+	height: 2.75rem;
+	flex: 0 0 auto;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+}
+
+/* ---------------------------------------------------------------------------
+   Хвост
+   --------------------------------------------------------------------------- */
+.tail {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-top: 2.5rem;
+}
+
+.tailRule {
+	flex: 1 1 auto;
+	height: 1px;
+	background: var(--rule);
+}
+
+/* Название товара в строке личного списка. Кадр у строки свой (grid-область
+   frame), поэтому здесь только текстовая часть ссылки. */
+.rowProductLink {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	text-decoration: none;
+	color: inherit;
+	border-radius: 2px;
+	outline-offset: 3px;
+}
+
+.rowProductLink:hover .productName,
+.rowProductLink:focus-visible .productName {
+	color: var(--primary);
+}
+
+.rowProductName {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.35rem;
+	min-width: 0;
+}
+
+.rowProductArrow {
+	flex: 0 0 auto;
+	align-self: center;
+	color: var(--text-muted);
+	transition:
+		color 200ms var(--ease-out-quart),
+		transform 320ms var(--ease-out-expo);
+}
+
+.rowProductLink:hover .rowProductArrow,
+.rowProductLink:focus-visible .rowProductArrow {
+	color: var(--primary);
+	transform: translate3d(2px, -2px, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.rowProductArrow {
+		transition: color 200ms linear;
+	}
+	.rowProductLink:hover .rowProductArrow {
+		transform: none;
+	}
+}
+
+.rowMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem 0.75rem;
+	margin-top: 0.4rem;
+}

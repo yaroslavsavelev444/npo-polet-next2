@@ -132,7 +132,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
 	const breadcrumbItems = [
 		{ title: "Главная", href: "/" },
-		{ title: "Категории", href: "/category" },
+		{ title: "Каталог", href: "/category" },
 		...(detailData.category
 			? [
 					{
