@@ -31,6 +31,7 @@ export type NotificationScenario =
   | "order_cancelled"
   | "review_approved"
   | "review_rejected"
+  | "review_invitation"
   | "welcome";
 
 interface ScenarioDataMap {
@@ -50,6 +51,7 @@ interface ScenarioDataMap {
     productUrl: string;
     reason?: string | null;
   };
+  review_invitation: { orderNumber: string; productCount: number };
   welcome: Record<string, never>;
 }
 
@@ -169,6 +171,36 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
       link: productUrl,
     }),
   },
+  /**
+   * Приглашение оценить полученные товары.
+   *
+   * Отдельный сценарий, а не приписка к order_status_changed, и это
+   * принципиально: то уведомление отвечает на вопрос «где мой заказ», это —
+   * просьба об услуге. Смешав их, мы получили бы либо просьбу, которую никто
+   * не заметит в строке про статус, либо строку про статус, в которой
+   * зачем-то торгуют.
+   *
+   * Ведёт сразу в раздел «Можно оценить», а не на общую страницу отзывов:
+   * приглашение обязано открывать список, ради которого его и отправили.
+   *
+   * Создаётся ТОЛЬКО когда есть что оценивать — проверку делает вызывающий
+   * (см. inviteToReviewDeliveredOrder), потому что только он знает состав
+   * заказа. Каталог формулировок за наличие повода не отвечает.
+   *
+   * Канал только внутрисайтовый. Письмо с тем же содержанием документы на
+   * /consents прямо запрещают — разбор в шапке inviteToReviewDeliveredOrder.
+   */
+  review_invitation: {
+    type: "review",
+    build: ({ orderNumber, productCount }) => ({
+      title: "Расскажите о покупке",
+      body:
+        productCount === 1
+          ? `Заказ №${orderNumber} доставлен — можно оценить товар из него. Отзывы покупателей помогают тем, кто только выбирает.`
+          : `Заказ №${orderNumber} доставлен — можно оценить ${productCount} ${pluralizeProducts(productCount)} из него. Отзывы покупателей помогают тем, кто только выбирает.`,
+      link: "/profile/reviews?status=to-review",
+    }),
+  },
   welcome: {
     type: "system",
     build: () => ({
@@ -178,6 +210,22 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
     }),
   },
 };
+
+/**
+ * «оценить 2 товара» — винительный падеж.
+ *
+ * Отдельно от pluralizeItems ниже, и это не дублирование: та форма стоит
+ * после предлога «из» и потому родительная («заказ из 2 товаров»). Одна
+ * функция на оба места давала бы «оценить 2 товаров».
+ */
+function pluralizeProducts(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 14) return "товаров";
+  if (mod10 === 1) return "товар";
+  if (mod10 >= 2 && mod10 <= 4) return "товара";
+  return "товаров";
+}
 
 function pluralizeItems(count: number): string {
   const mod10 = count % 10;

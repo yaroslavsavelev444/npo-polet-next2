@@ -11,10 +11,16 @@ const serverSchema = z.object({
   // База данных
   DATABASE_URI: z.string().url(),
 
-  // Redis (для BullMQ)
+  // Redis (для BullMQ, pending-auth челленджей и rate limit'ов)
   REDIS_URL: z.string().url().optional(),
   REDIS_HOST: z.string().optional(),
   REDIS_PORT: z.string().optional(),
+  // Отдельная переменная, а не пароль внутри REDIS_URL: в URL его пришлось бы
+  // percent-кодировать, и любой спецсимвол в сгенерированном пароле тихо
+  // ломал бы разбор (`new URL` отрезал бы часть, а соединение падало бы с
+  // NOAUTH уже в проде). Та же самая переменная передаётся серверу Redis как
+  // --requirepass в docker-compose.prod.yml — один источник правды.
+  REDIS_PASSWORD: z.string().optional(),
 
   // Node env
   NODE_ENV: z
@@ -85,6 +91,7 @@ function buildEnv() {
     REDIS_URL: process.env.REDIS_URL,
     REDIS_HOST: process.env.REDIS_HOST,
     REDIS_PORT: process.env.REDIS_PORT,
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD,
     NODE_ENV: process.env.NODE_ENV,
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
     ADMIN_HOSTNAME: process.env.ADMIN_HOSTNAME,

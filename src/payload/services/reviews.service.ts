@@ -643,3 +643,272 @@ export async function getUserReviewStats(
 		averageGiven: toNumber(row.average),
 	};
 }
+
+/* ===========================================================================
+   Предложения оставить отзыв
+   ===========================================================================
+   «Можно оценить» в кабинете: товары, которые пользователь купил и о которых
+   ещё не высказался.
+
+   ────────────────────────────────────────────────────────────────────────────
+   ПОЧЕМУ ПРЕДЛОЖЕНИЕ НЕ ХРАНИТСЯ, А ВЫЧИСЛЯЕТСЯ
+   ────────────────────────────────────────────────────────────────────────────
+   Предложение — это не факт, а следствие трёх изменчивых фактов: заказ
+   завершён, товар всё ещё продаётся, отзыва ещё нет. Хранимая таблица
+   предложений начала бы расходиться с каждым из них: товар сняли с продажи —
+   предложение осталось; пользователь оставил отзыв на странице товара —
+   предложение осталось. Пришлось бы держать инвалидацию в трёх хуках сразу
+   (products, product-reviews, orders) и всё равно иметь окно рассинхрона.
+
+   Проекция такой цены не стоит: выборка идёт по уже существующим индексам
+   (orders_user_idx + orders_status_idx → orders_items_parent_id_idx →
+   products_pkey → product_reviews_user_idx) и ограничена заказами ОДНОГО
+   пользователя, а не таблицей заказов целиком.
+
+   ────────────────────────────────────────────────────────────────────────────
+   ПОЧЕМУ ДВА ЗАПРОСА, А НЕ ОДИН
+   ────────────────────────────────────────────────────────────────────────────
+   SQL отбирает только идентификаторы: заголовок товара лежит в
+   products_locales, изображения — в таблице связей, категория — в третьей.
+   Собирать это руками значило бы продублировать в SQL то, что Payload уже
+   умеет (локали, depth, populate), и разойтись с ним на первой же правке.
+   Поэтому тяжёлая часть — дедупликация и три условия отбора — остаётся в SQL,
+   а документы забираются одним payload.find по готовому списку id.           */
+
+/** Товар, о котором пользователь ещё может высказаться. */
+export interface ReviewInvitation {
+	/** Тот же вид товара, что у карточек отзывов, — списки должны совпадать. */
+	product: ReviewProductRef;
+	/** Дата САМОЙ СВЕЖЕЙ покупки: по ней предложения и сортируются. */
+	lastPurchasedAt: string;
+	/** В скольких завершённых заказах встретился товар (не число единиц). */
+	ordersCount: number;
+}
+
+export interface ReviewInvitationsPage {
+	invitations: ReviewInvitation[];
+	page: number;
+	hasNextPage: boolean;
+}
+
+/**
+ * Условия, при которых покупка превращается в предложение.
+ *
+ * `delivered` — тот же финальный статус, что даёт право оставить отзыв
+ * (hasUserPurchasedProduct, группа «Завершённые» в status.groups.ts). Другой
+ * статус здесь означал бы, что кабинет зовёт оценить товар, а форма откажет.
+ *
+ * Доступность товара — ровно то же определение, по которому он виден в
+ * каталоге (buildProductWhere: `_status = published` + `inventory.isVisible`)
+ * и не считается архивным в заказах (isProductArchived: `discontinued`).
+ * Параллельной системы статусов здесь не заводится: разошедшись, она начала
+ * бы предлагать оценить то, чего в продаже нет.
+ *
+ * `IS DISTINCT FROM` вместо `<>` — обязателен: у перенесённых товаров статус
+ * бывает не проставлен, а `NULL <> 'discontinued'` — это NULL, то есть строка
+ * молча выпала бы из выдачи. Видимость, наоборот, сравнивается строгим
+ * `= TRUE`, как её сравнивает каталог: невыставленный флаг там прячет товар,
+ * и предложение обязано вести себя так же.
+ */
+/**
+ * «Товар всё ещё продаётся» — ОДНО определение на весь проект.
+ *
+ * Вынесено отдельным фрагментом не ради краткости, а чтобы у правила не
+ * появилось второй редакции. Его спрашивают три разных места: список
+ * предложений в кабинете, счётчик на панели и факт `pendingReviews`, по
+ * которому решает показываться баннер (modules/banners/server/facts.ts).
+ * Разойдясь, они дают ровно ту поломку, от которой предостерегает шапка
+ * facts.ts: баннер зовёт оценить товары, а раздел под ним пуст.
+ *
+ * Ожидает товар под алиасом `p`.
+ */
+const PRODUCT_STILL_ON_SALE = sql`
+	p._status = 'published'
+	AND p.inventory_is_visible = TRUE
+	AND p.inventory_status IS DISTINCT FROM 'discontinued'
+`;
+
+/** «Пользователь ещё не высказался об этом товаре» — в любом статусе отзыва. */
+function noReviewYet(userId: number, productColumn: ReturnType<typeof sql>) {
+	return sql`
+		NOT EXISTS (
+			SELECT 1 FROM product_reviews r
+			WHERE r.user_id = ${userId} AND r.product_id = ${productColumn}
+		)
+	`;
+}
+
+/**
+ * Источник предложений: завершённые покупки пользователя, из которых ещё
+ * можно сделать предложение оценить товар.
+ *
+ * Экспортируется ради модуля баннеров: факт `pendingReviews` обязан считаться
+ * ЭТИМ запросом, а не своей копией условий.
+ */
+export function reviewInvitationSource(userId: number) {
+	return sql`
+		FROM orders o
+		JOIN orders_items oi ON oi._parent_id = o.id
+		JOIN products p ON p.id = oi.product_id
+		WHERE o.user_id = ${userId}
+			AND o.status = ${DELIVERED_STATUS}
+			AND ${PRODUCT_STILL_ON_SALE}
+			AND ${noReviewYet(userId, sql`oi.product_id`)}
+	`;
+}
+
+/**
+ * Какие из перечисленных товаров пользователь МОЖЕТ оценить прямо сейчас.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ПОЧЕМУ СПИСОК ТОВАРОВ, А НЕ ИДЕНТИФИКАТОР ЗАКАЗА
+ * ────────────────────────────────────────────────────────────────────────────
+ * Единственный вызывающий — хук заказа в момент перехода в «доставлен», и
+ * спрашивать у базы статус этого же заказа там нельзя: хук выполняется внутри
+ * транзакции Payload, а прямой SQL идёт мимо неё и увидит ещё старый статус.
+ * Поэтому факт покупки берётся из документа, который хук и так держит в
+ * руках, а у базы спрашивается только то, что этой транзакцией не менялось, —
+ * состояние товаров и наличие отзывов.
+ *
+ * Проверки доступности и отсутствия отзыва — те же самые фрагменты, что и в
+ * списке предложений. Предложение и приглашение не могут разойтись по
+ * определению.
+ */
+export async function filterReviewableProducts(
+	userId: string | number,
+	productIds: (string | number)[],
+): Promise<number[]> {
+	const id = Number(userId);
+	const ids = [...new Set(productIds.map(Number))].filter((n) =>
+		Number.isFinite(n),
+	);
+	if (!Number.isFinite(id) || ids.length === 0) return [];
+
+	const payload = await getPayloadInstance();
+	// Явный список биндов вместо массива: drizzle разворачивает JS-массив в
+	// кортеж параметров, из-за чего `= ANY(${ids}::int[])` собирается в
+	// невалидный SQL (тот же разбор — у getRatingAggregatesForProducts).
+	const idList = sql.join(
+		ids.map((value) => sql`${value}`),
+		sql`, `,
+	);
+
+	const result = (await payload.db.drizzle.execute(sql`
+		SELECT p.id AS product_id
+		FROM products p
+		WHERE p.id IN (${idList})
+			AND ${PRODUCT_STILL_ON_SALE}
+			AND ${noReviewYet(id, sql`p.id`)}
+	`)) as DrizzleRows;
+
+	return (result.rows ?? []).map((row) => toNumber(row.product_id));
+}
+
+/**
+ * Сколько товаров ждут оценки. Нужно панели отбора, которая показывает число
+ * рядом с подписью ещё до того, как раздел открыт.
+ *
+ * Считается тем же источником, что и сама выдача: два разных условия дали бы
+ * счётчик, не сходящийся со списком под ним.
+ */
+export async function countReviewInvitations(
+	userId: string | number,
+): Promise<number> {
+	const id = Number(userId);
+	if (!Number.isFinite(id)) return 0;
+
+	const payload = await getPayloadInstance();
+	const result = (await payload.db.drizzle.execute(sql`
+		SELECT COUNT(DISTINCT oi.product_id)::int AS count
+		${reviewInvitationSource(id)}
+	`)) as DrizzleRows;
+
+	return toNumber(result.rows?.[0]?.count);
+}
+
+/**
+ * Страница предложений оставить отзыв.
+ *
+ * Товар встречается РОВНО ОДИН РАЗ, сколько бы заказов и единиц за ним ни
+ * стояло: группировка идёт по product_id, а количество единиц в выдачу не
+ * входит вовсе. Три покупки одного товара — одно предложение.
+ *
+ * Порядок — от свежей покупки к давней: впечатление ещё живо, и оценить
+ * последнее купленное естественнее, чем то, что взяли два года назад.
+ * Вторичная сортировка по id обязательна — без неё две покупки, пришедшие
+ * одной секундой (перенос исторических заказов кладёт их пачкой), могли бы
+ * менять порядок между страницами, и товар либо задвоился бы, либо пропал.
+ */
+export async function getReviewInvitations(
+	userId: string | number,
+	options: { page?: number; limit?: number } = {},
+): Promise<ReviewInvitationsPage> {
+	const id = Number(userId);
+	const { page = 1, limit = 12 } = options;
+	const empty: ReviewInvitationsPage = {
+		invitations: [],
+		page,
+		hasNextPage: false,
+	};
+	if (!Number.isFinite(id)) return empty;
+
+	const payload = await getPayloadInstance();
+
+	// Берём на одну строку больше запрошенного: наличие следующей страницы
+	// выясняется без второго COUNT по тому же соединению.
+	const result = (await payload.db.drizzle.execute(sql`
+		SELECT
+			oi.product_id AS product_id,
+			MAX(o.created_at) AS last_purchased_at,
+			COUNT(DISTINCT o.id)::int AS orders_count
+		${reviewInvitationSource(id)}
+		GROUP BY oi.product_id
+		ORDER BY last_purchased_at DESC, oi.product_id DESC
+		LIMIT ${limit + 1} OFFSET ${(page - 1) * limit}
+	`)) as DrizzleRows;
+
+	const rows = result.rows ?? [];
+	const hasNextPage = rows.length > limit;
+	const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
+	if (pageRows.length === 0) return { ...empty, page };
+
+	const ids = pageRows.map((row) => toNumber(row.product_id));
+
+	// depth 2 — как у остальных выборок отзывов: товар (уровень 1) и его
+	// категория с изображениями (уровень 2). Из категории строится ссылка, из
+	// первого изображения — миниатюра.
+	const products = await payload.find({
+		collection: "products",
+		where: { id: { in: ids } },
+		limit: ids.length,
+		depth: 2,
+		overrideAccess: true,
+	});
+
+	const byId = new Map<number, Product>();
+	for (const doc of products.docs as unknown as Product[]) {
+		byId.set(Number(doc.id), doc);
+	}
+
+	// Порядок задаёт SQL, а не payload.find: тот сортирует по-своему, и без
+	// восстановления порядка выдача перестала бы быть «от свежей покупки».
+	const invitations = pageRows.flatMap<ReviewInvitation>((row) => {
+		const product = byId.get(toNumber(row.product_id));
+		const ref = mapProductRef(product);
+		if (!ref) return [];
+
+		const purchasedAt = row.last_purchased_at;
+		return [
+			{
+				product: ref,
+				lastPurchasedAt:
+					purchasedAt instanceof Date
+						? purchasedAt.toISOString()
+						: String(purchasedAt),
+				ordersCount: Math.max(1, toNumber(row.orders_count)),
+			},
+		];
+	});
+
+	return { invitations, page, hasNextPage };
+}

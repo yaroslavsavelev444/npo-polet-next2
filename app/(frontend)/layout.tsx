@@ -9,6 +9,7 @@ import { Column, Flex, Meta } from "@once-ui-system/core";
 import type { Viewport } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import localFont from "next/font/local";
+import { BannerGate } from "@/modules/banners/components/BannerGate";
 import { AnalyticsGate } from "@/modules/cookie-consent/components/AnalyticsGate";
 import { CookieConsentBanner } from "@/modules/cookie-consent/components/CookieConsentBanner";
 import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
@@ -151,6 +152,13 @@ export default async function RootLayout({
 					<Footer />
 
 					<CookieConsentBanner />
+
+					{/* Модальные баннеры для авторизованных покупателей. Здесь, а не
+					    в шапке, по двум причинам: модалка не принадлежит ни одному
+					    разделу (она приходит поверх любой страницы), а сам компонент
+					    для неавторизованного не рендерит вообще ничего — см.
+					    BannerGate. */}
+					<BannerGate />
 				</Column>
 			</Flex>
 		</Providers>

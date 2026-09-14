@@ -26,7 +26,7 @@ interface MyReviewsViewProps {
 const EMPTY_COPY: Record<MyReviewsFilter, { title: string; text: string }> = {
 	all: {
 		title: "Отзывов пока нет",
-		text: "Оценить можно товар из завершённого заказа — форма отзыва открывается на странице товара.",
+		text: "Товары из завершённых заказов, о которых можно высказаться, собраны в разделе «Можно оценить».",
 	},
 	approved: {
 		title: "Опубликованных отзывов нет",
@@ -50,9 +50,9 @@ const EMPTY_COPY: Record<MyReviewsFilter, { title: string; text: string }> = {
  * его отзыв принят на модерацию, и узнать причину, если он отклонён.
  *
  * Пустое состояние объясняет не «здесь пусто», а что сделать: отзыв нельзя
- * оставить откуда угодно — только на странице товара из завершённого заказа
- * (см. getReviewEligibility). Поэтому переход ведёт в заказы, а не в каталог:
- * из каталога отзыв оставить всё равно не выйдет.
+ * оставить откуда угодно — право на него даёт только завершённая покупка
+ * (см. getReviewEligibility). Поэтому переход ведёт в раздел «Можно оценить»,
+ * а не в каталог: из каталога отзыв оставить всё равно не выйдет.
  */
 export function MyReviewsView({
 	initialReviews,
@@ -100,11 +100,16 @@ export function MyReviewsView({
 				<p className={styles.emptyTitle}>{copy.title}</p>
 				<p className={styles.emptyText}>{copy.text}</p>
 				{filter === "all" ? (
+					/* Раньше отсюда вели в заказы: оставить отзыв можно было только
+					   со страницы товара, и найти её получалось лишь через заказ.
+					   Теперь есть раздел, который сам показывает, что доступно для
+					   оценки, — путь через список заказов стал длиннее без причины. */
 					<Link
-						href="/orders?status=completed"
+						href="/profile/reviews?status=to-review"
 						className={`${styles.btn} ${styles.btnPrimary}`}
 					>
-						<PackageCheck size={15} aria-hidden />К завершённым заказам
+						<PackageCheck size={15} aria-hidden />
+						Что можно оценить
 					</Link>
 				) : (
 					<Link

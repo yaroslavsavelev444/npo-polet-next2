@@ -900,3 +900,71 @@
 	gap: 0.4rem 0.75rem;
 	margin-top: 0.4rem;
 }
+
+/* ---------------------------------------------------------------------------
+   Предложение оставить отзыв («Можно оценить»)
+   ---------------------------------------------------------------------------
+   Карточка стоит на общих .card/.grid/.product — это тот же объект той же
+   сетки, что и карточка отзыва, и расходиться им нельзя: разделы
+   переключаются на месте, и разная геометрия читалась бы как подмена
+   страницы.
+
+   Ниже — только то, чего у карточки отзыва нет: строка покупки и подвал с
+   оценкой. */
+
+.inviteMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+/* Подвал прижат к низу: карточки в ряду разной высоты (названия товаров
+   разной длины), и без этого звёзды вставали бы на разных уровнях — ряд
+   рассыпался бы на отдельные карточки вместо строки. */
+.inviteFoot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-top: auto;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--hairline);
+}
+
+/* Кнопка — запасной путь к той же форме, что открывают звёзды, и звучать
+   громче их она не должна. */
+.inviteBtn {
+	flex: 0 0 auto;
+	padding-inline: 0.75rem;
+	font-size: 0.75rem;
+}
+
+/* Карточка — собственный контейнер запросов. Считать раскладку её подвала от
+   ширины СЕТКИ нельзя: на широком экране сетка идёт в три колонки, каждая
+   узкая, а запрос к сетке видел бы её полную ширину и оставил бы звёзды с
+   кнопкой в одной строке шириной в пару сантиметров. */
+.inviteCard {
+	container-type: inline-size;
+}
+
+/* Тесная карточка: кнопка во всю ширину. Рядом со звёздами ей остаётся
+   полоска, в которую не попасть пальцем. */
+@container (max-width: 20rem) {
+	.inviteFoot {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.inviteBtn {
+		justify-content: center;
+	}
+}

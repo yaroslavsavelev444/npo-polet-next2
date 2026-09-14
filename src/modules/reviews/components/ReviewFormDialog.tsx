@@ -8,6 +8,8 @@ interface ReviewFormDialogProps {
 	onClose: () => void;
 	productId: string;
 	productTitle: string;
+	/** Оценка, выбранная до открытия формы (звёзды на карточке «Можно оценить»). */
+	initialRating?: number;
 	onSuccess?: () => void;
 }
 
@@ -16,6 +18,7 @@ export function ReviewFormDialog({
 	onClose,
 	productId,
 	productTitle,
+	initialRating,
 	onSuccess,
 }: ReviewFormDialogProps) {
 	return (
@@ -23,6 +26,7 @@ export function ReviewFormDialog({
 			<ReviewForm
 				productId={productId}
 				productTitle={productTitle}
+				initialRating={initialRating}
 				onSuccess={() => {
 					onSuccess?.();
 					onClose();

@@ -18,6 +18,7 @@ import * as migration_20260904_153241_promo_codes from "./20260904_153241_promo_
 import * as migration_20260907_120000_faq_richtext_and_anchors from "./20260907_120000_faq_richtext_and_anchors.ts";
 import * as migration_20260907_160000_contact_requests from "./20260907_160000_contact_requests.ts";
 import * as migration_20260909_120000_cart_onboarding_seen from "./20260909_120000_cart_onboarding_seen.ts";
+import * as migration_20260911_120000_banners_module from "./20260911_120000_banners_module.ts";
 
 export const migrations = [
 	{
@@ -119,5 +120,10 @@ export const migrations = [
 		up: migration_20260909_120000_cart_onboarding_seen.up,
 		down: migration_20260909_120000_cart_onboarding_seen.down,
 		name: "20260909_120000_cart_onboarding_seen",
+	},
+	{
+		up: migration_20260911_120000_banners_module.up,
+		down: migration_20260911_120000_banners_module.down,
+		name: "20260911_120000_banners_module",
 	},
 ];

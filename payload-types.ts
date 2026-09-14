@@ -79,6 +79,8 @@ export interface Config {
     feedbacks: Feedback;
     'contact-requests': ContactRequest;
     banners: Banner;
+    'banner-states': BannerState;
+    'banner-events': BannerEvent;
     'pickup-points': PickupPoint;
     'transport-companies': TransportCompany;
     discounts: Discount;
@@ -116,6 +118,8 @@ export interface Config {
     feedbacks: FeedbacksSelect<false> | FeedbacksSelect<true>;
     'contact-requests': ContactRequestsSelect<false> | ContactRequestsSelect<true>;
     banners: BannersSelect<false> | BannersSelect<true>;
+    'banner-states': BannerStatesSelect<false> | BannerStatesSelect<true>;
+    'banner-events': BannerEventsSelect<false> | BannerEventsSelect<true>;
     'pickup-points': PickupPointsSelect<false> | PickupPointsSelect<true>;
     'transport-companies': TransportCompaniesSelect<false> | TransportCompaniesSelect<true>;
     discounts: DiscountsSelect<false> | DiscountsSelect<true>;
@@ -912,40 +916,320 @@ export interface ContactRequest {
   createdAt: string;
 }
 /**
- * Промо-баннеры и системные уведомления
+ * Модальные окна для авторизованных покупателей. Новый баннер становится виден не раньше чем через 15 минут после публикации — это время на проверку текста и ссылок.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "banners".
  */
 export interface Banner {
   id: number;
-  title: string;
-  subtitle?: string | null;
-  description?: string | null;
-  media?: (number | Media)[] | null;
-  action?: ('none' | 'link' | 'modal' | 'redirect') | null;
   /**
-   * URL для Link/Redirect, ID модалки для Modal
+   * Не показывается пользователю. Заголовок модалки — в разделе «Содержимое».
    */
-  actionPayload?: string | null;
+  name: string;
+  /**
+   * «На публикацию» запускает отсчёт проверки. Баннер становится виден сам, когда отсчёт закончится.
+   */
+  status: 'draft' | 'scheduled' | 'paused' | 'archived';
+  /**
+   * Раньше этого момента баннер не увидит никто. Считается автоматически: 15 минут от последней правки содержимого.
+   */
+  publishAt?: string | null;
+  visibility?: string | null;
+  /**
+   * Пусто — с момента окончания проверки.
+   */
   startAt?: string | null;
   /**
-   * Оставьте пустым для бессрочного показа
+   * Пусто — бессрочно.
    */
   endAt?: string | null;
-  repeatable?: boolean | null;
-  priority?: number | null;
-  status?: ('draft' | 'active' | 'scheduled' | 'archived') | null;
-  isSystem?: boolean | null;
-  targeting?: {
+  content: {
     /**
-     * Оставьте пустым — баннер виден всем
+     * До 90 символов. Длинный заголовок в модалке переносится, но перестаёт читаться с первого взгляда.
      */
-    roles?: ('user' | 'lawyer' | 'admin' | 'moderator')[] | null;
+    title: string;
+    /**
+     * До 400 символов. Модалка — не статья: если нужного не сказать в трёх предложениях, ведите ссылкой на страницу.
+     */
+    body?: string | null;
+    /**
+     * Необязательно.
+     */
+    image?: (number | null) | Media;
+    /**
+     * «Пост» — картинка блоком над текстом. «Фон» — на всю модалку, текст поверх; проверьте читаемость на светлых снимках.
+     */
+    imageMode?: ('background' | 'post') | null;
   };
+  cta?: {
+    enabled?: boolean | null;
+    /**
+     * Коротко и глаголом: «Перейти в корзину», а не «Подробнее».
+     */
+    label?: string | null;
+    kind?: ('internal' | 'external') | null;
+    /**
+     * Внутренняя — путь от корня: /cart. Внешняя — полный адрес с https://.
+     */
+    href?: string | null;
+  };
+  /**
+   * Необязательна и не заменяет кнопку: кнопка — главное действие, ссылка — второстепенное («Условия доставки»).
+   */
+  link?: {
+    enabled?: boolean | null;
+    /**
+     * Коротко и глаголом: «Перейти в корзину», а не «Подробнее».
+     */
+    label?: string | null;
+    kind?: ('internal' | 'external') | null;
+    /**
+     * Внутренняя — путь от корня: /cart. Внешняя — полный адрес с https://.
+     */
+    href?: string | null;
+  };
+  conditionMatch: 'all' | 'any';
+  /**
+   * Пусто — баннер доступен всем авторизованным покупателям. Неавторизованные не получают баннеры никогда, независимо от условий.
+   */
+  conditions?:
+    | (
+        | {
+            /**
+             * Включительно. Пусто — без нижней границы.
+             */
+            minDays?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxDays?: number | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'account-age';
+          }
+        | {
+            /**
+             * Снятая галочка — условие «почта не подтверждена». Подтверждение делается кодом из письма при регистрации и в профиле.
+             */
+            verified?: boolean | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'email-verified';
+          }
+        | {
+            scope: 'any' | 'delivered' | 'active';
+            /**
+             * Включительно. Пусто — без нижней границы.
+             */
+            minCount?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxCount?: number | null;
+            /**
+             * Пусто — не спрашивать. Например, «от 90» — покупатель не заказывал три месяца.
+             */
+            minDaysSinceLast?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxDaysSinceLast?: number | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'order-count';
+          }
+        | {
+            state: 'filled' | 'empty';
+            /**
+             * Включительно. Пусто — без нижней границы.
+             */
+            minItems?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxItems?: number | null;
+            /**
+             * Включительно. Пусто — без нижней границы.
+             */
+            minTotal?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxTotal?: number | null;
+            /**
+             * Сколько времени в корзину ничего не клали. «От 24» — забытая корзина.
+             */
+            minIdleHours?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxIdleHours?: number | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'cart';
+          }
+        | {
+            /**
+             * Включительно. Пусто — без нижней границы.
+             */
+            minItems?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxItems?: number | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'wishlist';
+          }
+        | {
+            /**
+             * Считается по тому же правилу, что и право оставить отзыв: товар из доставленного заказа, на который отзыва ещё нет.
+             */
+            minCount?: number | null;
+            /**
+             * Включительно. Пусто — без верхней границы.
+             */
+            maxCount?: number | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'pending-reviews';
+          }
+        | {
+            action: 'order_placed' | 'order_delivered' | 'review_left' | 'promo_code_used' | 'wishlist_item_added';
+            /**
+             * Снятая галочка — «никогда не совершал».
+             */
+            performed?: boolean | null;
+            /**
+             * Пусто — когда угодно.
+             */
+            withinDays?: number | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'action';
+          }
+        | {
+            /**
+             * Например /cart или /category. Совпадение по префиксу: раздел покрывает свои вложенные страницы. Это единственное условие, которое проверяется в браузере, — оно выбирает момент показа, а не право видеть баннер.
+             */
+            paths: string[];
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'page';
+          }
+      )[]
+    | null;
+  /**
+   * Важный проходит очередь раньше обычных и может повторяться после быстрого закрытия. Внешне не отличается.
+   */
+  importance: 'normal' | 'important';
+  /**
+   * Больше — раньше. Сравнивается только внутри своей важности.
+   */
+  priority?: number | null;
+  /**
+   * Экранное время после того, как баннер получен вкладкой. Отсчитывается, только пока вкладка открыта и видима.
+   */
+  delaySeconds?: number | null;
+  policy: {
+    kind: 'once' | 'limited' | 'interval' | 'until_outcome';
+    /**
+     * Пусто — сутки.
+     */
+    repeatAfterHours?: number | null;
+    /**
+     * Для «до результата» пусто означает пять — потолок против бесконечного повторения.
+     */
+    maxImpressions?: number | null;
+    /**
+     * Результат закрывает баннер навсегда при любой политике, не только при «до результата».
+     */
+    outcome: 'cta' | 'dwell' | 'cta_or_dwell';
+    dwellSeconds?: number | null;
+  };
+  /**
+   * Создан кодом (seed), а не редактором.
+   */
+  isSystem?: boolean | null;
+  /**
+   * Ключ стартового сценария. По нему seed узнаёт свой баннер и не создаёт второй.
+   */
+  seedKey?: string | null;
+  createdBy?: (number | null) | Admin;
+  updatedBy?: (number | null) | Admin;
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
+}
+/**
+ * Служебный журнал только для чтения: сколько раз баннер показан конкретному пользователю и когда его можно показать снова.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "banner-states".
+ */
+export interface BannerState {
+  id: number;
+  banner: number | Banner;
+  user: number | User;
+  status: 'active' | 'satisfied' | 'exhausted';
+  /**
+   * Сколько раз модалка действительно открывалась.
+   */
+  impressions: number;
+  /**
+   * Сколько раз баннер уходил клиенту — включая недошедшие до показа.
+   */
+  deliveries: number;
+  ctaClicks: number;
+  totalDwellMs: number;
+  firstShownAt?: string | null;
+  lastShownAt?: string | null;
+  /**
+   * Пусто — можно сейчас.
+   */
+  nextEligibleAt?: string | null;
+  /**
+   * Пусто — не достигнута.
+   */
+  outcomeReachedAt?: string | null;
+  /**
+   * Событие приходит с идентификатором показа, и сверять его надо с тем, что сервер выдал последним, а не с «каким-нибудь из прошлых».
+   */
+  lastImpressionId?: string | null;
+  /**
+   * Пока заполнено, следующий баннер этому пользователю не выдаётся. Сбрасывается закрытием модалки и по истечении получаса.
+   */
+  inFlightSince?: string | null;
+  lastCloseMethod?: ('close-button' | 'overlay' | 'escape' | 'cta' | 'link' | 'navigation') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Журнал только для чтения: воронка показов баннеров и способы их закрытия.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "banner-events".
+ */
+export interface BannerEvent {
+  id: number;
+  banner: number | Banner;
+  user: number | User;
+  impressionId: string;
+  kind: 'delivered' | 'impression' | 'view' | 'cta' | 'link' | 'dismiss' | 'outcome';
+  at: string;
+  sequence: number;
+  /**
+   * Только у «прочитан», «закрыт» и «цель достигнута».
+   */
+  dwellMs?: number | null;
+  closeMethod?: ('close-button' | 'overlay' | 'escape' | 'cta' | 'link' | 'navigation') | null;
+  path?: string | null;
+  /**
+   * Только у «нажата кнопка» и «переход по ссылке».
+   */
+  href?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * Журнал только для чтения. Записи создаются при оформлении заказа и погашаются при его отмене.
@@ -1547,6 +1831,14 @@ export interface PayloadLockedDocument {
         value: number | Banner;
       } | null)
     | ({
+        relationTo: 'banner-states';
+        value: number | BannerState;
+      } | null)
+    | ({
+        relationTo: 'banner-events';
+        value: number | BannerEvent;
+      } | null)
+    | ({
         relationTo: 'pickup-points';
         value: number | PickupPoint;
       } | null)
@@ -1710,10 +2002,10 @@ export interface UsersSelect<T extends boolean = true> {
   twoFAVerified?: T;
   twoFAVerifiedAt?: T;
   emailVerified?: T;
+  cartOnboardingSeenAt?: T;
   lastLoginAt?: T;
   legacyPasswordHash?: T;
   legacyPasswordMigrated?: T;
-  cartOnboardingSeenAt?: T;
   legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2131,26 +2423,170 @@ export interface ContactRequestsSelect<T extends boolean = true> {
  * via the `definition` "banners_select".
  */
 export interface BannersSelect<T extends boolean = true> {
-  title?: T;
-  subtitle?: T;
-  description?: T;
-  media?: T;
-  action?: T;
-  actionPayload?: T;
+  name?: T;
+  status?: T;
+  publishAt?: T;
+  visibility?: T;
   startAt?: T;
   endAt?: T;
-  repeatable?: T;
-  priority?: T;
-  status?: T;
-  isSystem?: T;
-  targeting?:
+  content?:
     | T
     | {
-        roles?: T;
+        title?: T;
+        body?: T;
+        image?: T;
+        imageMode?: T;
       };
+  cta?:
+    | T
+    | {
+        enabled?: T;
+        label?: T;
+        kind?: T;
+        href?: T;
+      };
+  link?:
+    | T
+    | {
+        enabled?: T;
+        label?: T;
+        kind?: T;
+        href?: T;
+      };
+  conditionMatch?: T;
+  conditions?:
+    | T
+    | {
+        'account-age'?:
+          | T
+          | {
+              minDays?: T;
+              maxDays?: T;
+              id?: T;
+              blockName?: T;
+            };
+        'email-verified'?:
+          | T
+          | {
+              verified?: T;
+              id?: T;
+              blockName?: T;
+            };
+        'order-count'?:
+          | T
+          | {
+              scope?: T;
+              minCount?: T;
+              maxCount?: T;
+              minDaysSinceLast?: T;
+              maxDaysSinceLast?: T;
+              id?: T;
+              blockName?: T;
+            };
+        cart?:
+          | T
+          | {
+              state?: T;
+              minItems?: T;
+              maxItems?: T;
+              minTotal?: T;
+              maxTotal?: T;
+              minIdleHours?: T;
+              maxIdleHours?: T;
+              id?: T;
+              blockName?: T;
+            };
+        wishlist?:
+          | T
+          | {
+              minItems?: T;
+              maxItems?: T;
+              id?: T;
+              blockName?: T;
+            };
+        'pending-reviews'?:
+          | T
+          | {
+              minCount?: T;
+              maxCount?: T;
+              id?: T;
+              blockName?: T;
+            };
+        action?:
+          | T
+          | {
+              action?: T;
+              performed?: T;
+              withinDays?: T;
+              id?: T;
+              blockName?: T;
+            };
+        page?:
+          | T
+          | {
+              paths?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
+  importance?: T;
+  priority?: T;
+  delaySeconds?: T;
+  policy?:
+    | T
+    | {
+        kind?: T;
+        repeatAfterHours?: T;
+        maxImpressions?: T;
+        outcome?: T;
+        dwellSeconds?: T;
+      };
+  isSystem?: T;
+  seedKey?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
-  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "banner-states_select".
+ */
+export interface BannerStatesSelect<T extends boolean = true> {
+  banner?: T;
+  user?: T;
+  status?: T;
+  impressions?: T;
+  deliveries?: T;
+  ctaClicks?: T;
+  totalDwellMs?: T;
+  firstShownAt?: T;
+  lastShownAt?: T;
+  nextEligibleAt?: T;
+  outcomeReachedAt?: T;
+  lastImpressionId?: T;
+  inFlightSince?: T;
+  lastCloseMethod?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "banner-events_select".
+ */
+export interface BannerEventsSelect<T extends boolean = true> {
+  banner?: T;
+  user?: T;
+  impressionId?: T;
+  kind?: T;
+  at?: T;
+  sequence?: T;
+  dwellMs?: T;
+  closeMethod?: T;
+  path?: T;
+  href?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

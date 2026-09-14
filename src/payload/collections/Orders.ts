@@ -18,6 +18,7 @@ import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { revokeRedemptionsForOrder } from "../services/promo-redemptions.db.ts";
+import { inviteToReviewDeliveredOrder } from "../services/review-invitation.notify.ts";
 
 /** Заказы после удаления аккаунта обезличиваются (user становится пустым) — для них in-app уведомление создавать некому. */
 function getOrderUserId(doc: { user?: unknown }): number | null {
@@ -395,6 +396,19 @@ export const Orders: CollectionConfig = {
 						orderNumber: doc.orderNumber,
 						status: doc.status,
 					});
+				}
+
+				// Доставлен — единственный момент, когда у покупателя появляется
+				// право высказаться о товарах этого заказа (см.
+				// hasUserPurchasedProduct: финальный статус и есть основание).
+				// Приглашение внутрисайтовое, письма здесь нет и быть не может —
+				// разбор в шапке inviteToReviewDeliveredOrder.
+				//
+				// void, а не await: приглашение не должно ни задерживать
+				// сохранение заказа, ни тем более его ронять — ровно как письма и
+				// уведомления выше.
+				if (doc.status === OrderStatus.DELIVERED) {
+					void inviteToReviewDeliveredOrder(req.payload, doc);
 				}
 				return doc;
 			},

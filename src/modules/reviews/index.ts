@@ -7,6 +7,8 @@ export { ReviewCard } from "./components/ReviewCard";
 export { ReviewComment } from "./components/ReviewComment";
 export { ReviewForm } from "./components/ReviewForm";
 export { ReviewFormDialog } from "./components/ReviewFormDialog";
+export { ReviewInvitationCard } from "./components/ReviewInvitationCard";
+export { ReviewInvitationsView } from "./components/ReviewInvitationsView";
 export { ReviewProductLink } from "./components/ReviewProductLink";
 export { ReviewProsCons } from "./components/ReviewProsCons";
 export { ReviewStatusBadge } from "./components/ReviewStatusBadge";
@@ -26,11 +28,13 @@ export {
 	reviewInitials,
 } from "./lib/format";
 export {
-	isValidMyReviewsFilter,
+	isValidMyReviewsSection,
 	type MyReviewsFilter,
-	REVIEW_STATUS_FILTERS,
+	type MyReviewsSection,
+	REVIEW_SECTIONS,
 	REVIEW_STATUS_VIEW,
 	type ReviewStatusView,
+	sectionToFilter,
 } from "./lib/status-view";
 
 // ВНИМАНИЕ: серверный сборщик данных (getReviewsSectionData) тянет за собой

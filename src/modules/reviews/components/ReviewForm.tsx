@@ -16,6 +16,13 @@ import { StarRatingInput } from "./StarRatingInput";
 interface ReviewFormProps {
 	productId: string;
 	productTitle: string;
+	/**
+	 * Оценка, выбранная ещё до открытия формы. Нужна разделу «Можно оценить»:
+	 * там звёзды стоят прямо на карточке товара и нажатие на них одновременно
+	 * открывает форму и отвечает на её первый вопрос. Переспрашивать то, что
+	 * человек только что выбрал, — терять сделанный им шаг.
+	 */
+	initialRating?: number;
 	/** Вызывается после успешной отправки — закрывает модальное окно. */
 	onSuccess?: () => void;
 }
@@ -23,6 +30,7 @@ interface ReviewFormProps {
 export function ReviewForm({
 	productId,
 	productTitle,
+	initialRating,
 	onSuccess,
 }: ReviewFormProps) {
 	const {
@@ -34,7 +42,17 @@ export function ReviewForm({
 	} = useForm<ReviewFormData>({
 		resolver: zodResolver(reviewFormSchema),
 		mode: "onTouched",
-		defaultValues: { rating: 0, comment: "" },
+		// Оценка вне диапазона (чужой вызов компонента) не должна доезжать до
+		// формы предвыбранной: 0 просто означает «ещё не выбрано».
+		defaultValues: {
+			rating:
+				typeof initialRating === "number" &&
+				initialRating >= 1 &&
+				initialRating <= 5
+					? Math.trunc(initialRating)
+					: 0,
+			comment: "",
+		},
 	});
 
 	const rating = watch("rating");

@@ -1,7 +1,7 @@
 // src/UI/Modal/Modal.tsx
 'use client'
 
-import { useEffect, useRef, useCallback, useState, type ReactNode } from 'react'
+import { useEffect, useCallback, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { RemoveScroll } from 'react-remove-scroll' // <-- новый импорт
@@ -33,7 +33,18 @@ export function Modal({
   afterClose,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false)
-  const dialogRef = useRef<HTMLDialogElement>(null)
+  /**
+   * Элемент <dialog> держится в СОСТОЯНИИ, а не в ref.
+   *
+   * До первого эффекта компонент возвращает null (портала ещё нет), поэтому
+   * ref в эффекте синхронизации оказывался пустым, а повторно эффект не
+   * запускался: его зависимости к тому моменту уже не менялись. Модалка,
+   * СМОНТИРОВАННАЯ СРАЗУ ОТКРЫТОЙ — `{active && <Modal open …/>}`, — из-за
+   * этого не открывалась никогда: <dialog> висел в DOM с display:none, а
+   * showModal() не вызывался. Состояние делает появление элемента событием,
+   * на которое эффект обязан отреагировать.
+   */
+  const [dialogEl, setDialogEl] = useState<HTMLDialogElement | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -41,34 +52,35 @@ export function Modal({
 
   // Синхронизация open/close
   useEffect(() => {
-    const el = dialogRef.current
-    if (!el) return
+    if (!dialogEl) return
     if (open) {
-      if (!el.open) el.showModal()
-    } else {
-      if (el.open) el.close()
+      if (!dialogEl.open) dialogEl.showModal()
+    } else if (dialogEl.open) {
+      dialogEl.close()
+      // afterClose вызывается только после НАСТОЯЩЕГО закрытия. Вне этой
+      // ветки он срабатывал бы и на первом рендере закрытой модалки — то
+      // есть сообщал бы о событии, которого не было.
       afterClose?.()
     }
-  }, [open, afterClose])
+  }, [open, afterClose, dialogEl])
 
   // Перехват Escape
   useEffect(() => {
-    const el = dialogRef.current
-    if (!el) return
+    if (!dialogEl) return
     const handle = (e: Event) => {
       e.preventDefault()
       if (closeOnEscape) onClose()
     }
-    el.addEventListener('cancel', handle)
-    return () => el.removeEventListener('cancel', handle)
-  }, [closeOnEscape, onClose])
+    dialogEl.addEventListener('cancel', handle)
+    return () => dialogEl.removeEventListener('cancel', handle)
+  }, [closeOnEscape, onClose, dialogEl])
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent<HTMLDialogElement>) => {
       if (!closeOnOverlay) return
-      if (e.target === dialogRef.current) onClose()
+      if (e.target === dialogEl) onClose()
     },
-    [closeOnOverlay, onClose],
+    [closeOnOverlay, onClose, dialogEl],
   )
 
   const widthStyle = typeof width === 'number' ? `${width}px` : width
@@ -78,7 +90,7 @@ export function Modal({
   return createPortal(
     <RemoveScroll enabled={open}> {/* Обёртка для блокировки скролла */}
       <dialog
-        ref={dialogRef}
+        ref={setDialogEl}
         onClick={handleBackdropClick}
         className={cn(
           'm-auto max-h-[90vh] overflow-hidden p-0 bg-transparent border-none outline-none',

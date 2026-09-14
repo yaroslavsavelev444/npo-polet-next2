@@ -10,6 +10,18 @@ interface StarRatingInputProps {
 	/** Размер звезды в пикселях. */
 	size?: number;
 	disabled?: boolean;
+	/**
+	 * Имя группы для скринридера. Обязательно переопределять там, где таких
+	 * групп на странице несколько: дюжина одинаковых «Оценка товара» подряд не
+	 * даёт понять, какой товар оценивается.
+	 */
+	label?: string;
+	/**
+	 * Подпись под звёздами («Выберите оценку» / «Отлично»). В форме она ведёт
+	 * по шагам, на тесной карточке — занимает строку, ничего не добавляя:
+	 * выбор там сразу открывает форму, где та же подпись и появится.
+	 */
+	showHint?: boolean;
 }
 
 const LABELS = ["Ужасно", "Плохо", "Нормально", "Хорошо", "Отлично"] as const;
@@ -24,6 +36,8 @@ export function StarRatingInput({
 	onChange,
 	size = 32,
 	disabled = false,
+	label = "Оценка товара",
+	showHint = true,
 }: StarRatingInputProps) {
 	const [hover, setHover] = useState(0);
 	const shown = hover || value;
@@ -43,7 +57,7 @@ export function StarRatingInput({
 		<div className="flex flex-col gap-1.5">
 			<div
 				role="radiogroup"
-				aria-label="Оценка товара"
+				aria-label={label}
 				className="flex items-center gap-1"
 				onKeyDown={handleKeyDown}
 			>
@@ -85,12 +99,14 @@ export function StarRatingInput({
 					);
 				})}
 			</div>
-			<span
-				className="text-sm font-medium text-[var(--text-secondary)] min-h-[1.25rem]"
-				aria-live="polite"
-			>
-				{shown ? LABELS[shown - 1] : "Выберите оценку"}
-			</span>
+			{showHint && (
+				<span
+					className="text-sm font-medium text-[var(--text-secondary)] min-h-[1.25rem]"
+					aria-live="polite"
+				>
+					{shown ? LABELS[shown - 1] : "Выберите оценку"}
+				</span>
+			)}
 		</div>
 	);
 }

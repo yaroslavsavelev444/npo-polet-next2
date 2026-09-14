@@ -53,8 +53,28 @@ export function Input(props: AdvancedInputProps) {
 	// ref владельца поля объединяется с внутренним, а не подменяет его:
 	// внутренний нужен кнопке «показать пароль» (поиск родительской формы),
 	// внешний — управлению фокусом снаружи.
-	const forwardedRef = (rest as { ref?: React.Ref<HTMLInputElement> }).ref;
+	//
+	// Внешний ref обязан доходить и до <textarea>. Раньше он прокидывался
+	// только в ветку <input>, а из rest удалялся всегда — то есть в режиме
+	// multiline терялся молча. Ценой этого был не фокус, а работа формы:
+	// react-hook-form регистрирует поле именно через ref, и без него
+	// {...register("comment")} не регистрировал ничего. Значение поля
+	// оставалось undefined сколько бы в него ни печатали, и отправка отзыва
+	// падала на валидации «expected string, received undefined» — то есть
+	// отзыв нельзя было оставить вообще ниоткуда.
+	const forwardedRef = (
+		rest as { ref?: React.Ref<HTMLInputElement | HTMLTextAreaElement> }
+	).ref;
 	if ("ref" in rest) delete (rest as { ref?: unknown }).ref;
+
+	/** Кладёт узел во внутренний ref и передаёт владельцу поля. */
+	const attachRef = (node: HTMLInputElement | HTMLTextAreaElement | null) => {
+		// Внутренний ref служит кнопке «показать пароль», которой у textarea
+		// нет, — поэтому туда попадает только <input>.
+		inputRef.current = node instanceof HTMLInputElement ? node : null;
+		if (typeof forwardedRef === "function") forwardedRef(node);
+		else if (forwardedRef) forwardedRef.current = node;
+	};
 
 	const handleAutoResize = useCallback(
 		(e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -168,6 +188,7 @@ export function Input(props: AdvancedInputProps) {
 					<textarea
 						{...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
 						{...a11yProps}
+						ref={attachRef}
 						rows={(rest as { rows?: number }).rows ?? 3}
 						className={cn(inputClass, "h-auto py-2.5 resize-none")}
 						onChange={
@@ -181,11 +202,7 @@ export function Input(props: AdvancedInputProps) {
 					<input
 						{...(rest as React.InputHTMLAttributes<HTMLInputElement>)}
 						{...a11yProps}
-						ref={(node) => {
-							inputRef.current = node;
-							if (typeof forwardedRef === "function") forwardedRef(node);
-							else if (forwardedRef) forwardedRef.current = node;
-						}}
+						ref={attachRef}
 						type={resolvedType}
 						className={inputClass}
 					/>

@@ -7,7 +7,9 @@ import { env } from "./src/env.ts";
 import { migrations } from "./src/migrations/index.ts";
 import { AccountDeletionRequests } from "./src/payload/collections/AccountDeletionRequests.ts";
 import { Admins } from "./src/payload/collections/Admins.ts";
+import { BannerEvents } from "./src/payload/collections/BannerEvents.ts";
 import { Banners } from "./src/payload/collections/Banners.ts";
+import { BannerStates } from "./src/payload/collections/BannerStates.ts";
 import { Carts } from "./src/payload/collections/Carts.ts";
 import { Categories } from "./src/payload/collections/Categories.ts";
 import { CheckoutPreferences } from "./src/payload/collections/CheckoutPreferences.ts";
@@ -86,6 +88,12 @@ export default buildConfig({
 		Feedbacks,
 		ContactRequests,
 		Banners,
+		// Состояния и журнал показов — служебные спутники Banners: определение
+		// баннера живёт в коллекции выше, а «сколько раз его видел вот этот
+		// покупатель» и «что он с ним сделал» обязаны лежать отдельно (см.
+		// шапки самих коллекций). В меню админки скрыты.
+		BannerStates,
+		BannerEvents,
 		PickupPoints,
 		TransportCompanies,
 		Discounts,

@@ -4,9 +4,11 @@ import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import {
 	getApprovedReviewsFeed,
 	getApprovedReviewsForProduct,
+	getReviewInvitations,
 	getUserReviews,
 	type MyReviewView,
 	type PublicReviewView,
+	type ReviewInvitation,
 } from "@/payload/services/reviews.service";
 import type { ReviewView } from "../types";
 
@@ -130,6 +132,42 @@ export async function loadMoreMyReviewsAction(
 
 	return {
 		reviews: result.reviews,
+		hasMore: result.hasNextPage,
+		page: result.page,
+	};
+}
+
+export interface LoadMoreInvitationsResult {
+	invitations: ReviewInvitation[];
+	hasMore: boolean;
+	page: number;
+}
+
+/** Размер страницы раздела «Можно оценить»: карточки идут сеткой по три. */
+const INVITATIONS_PAGE_SIZE = 12;
+
+/**
+ * Следующая страница предложений оставить отзыв.
+ *
+ * Пользователь берётся с сервера (getCurrentUser) и НЕ принимается
+ * параметром — ровно по той же причине, что и в личном списке отзывов: иначе
+ * подстановка чужого id раскрыла бы историю чужих покупок, то есть какие
+ * товары человек покупал. Отбор товаров целиком в getReviewInvitations:
+ * клиент не может ни ослабить его, ни подменить.
+ */
+export async function loadMoreReviewInvitationsAction(
+	page: number,
+): Promise<LoadMoreInvitationsResult> {
+	const user = await getCurrentUser();
+	if (!user) return { invitations: [], hasMore: false, page: 1 };
+
+	const result = await getReviewInvitations(String(user.id), {
+		page: safePageNumber(page),
+		limit: INVITATIONS_PAGE_SIZE,
+	});
+
+	return {
+		invitations: result.invitations,
 		hasMore: result.hasNextPage,
 		page: result.page,
 	};
