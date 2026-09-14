@@ -28,10 +28,8 @@ import { after, before, test } from "node:test";
 import { getPayload } from "payload";
 import config from "../../payload.config.ts";
 import { collectAudienceFacts } from "../../src/modules/banners/server/facts.ts";
-import {
-	countReviewInvitations,
-	filterReviewableProducts,
-} from "../../src/payload/services/reviews.service.ts";
+import { filterReviewableProducts } from "../../src/payload/services/review-eligibility.ts";
+import { countReviewInvitations } from "../../src/payload/services/reviews.service.ts";
 
 const TAG = "delivered-invitation-test";
 /**
@@ -258,7 +256,7 @@ test("filterReviewableProducts пропускает только то, что р
 	});
 	created.reviews.push(Number(review.id));
 
-	const allowed = await filterReviewableProducts(userId, [
+	const allowed = await filterReviewableProducts(payload, userId, [
 		alive,
 		gone,
 		reviewed,
@@ -268,8 +266,8 @@ test("filterReviewableProducts пропускает только то, что р
 });
 
 test("пустой список товаров не идёт в базу и возвращает пусто", async () => {
-	assert.deepEqual(await filterReviewableProducts(userId, []), []);
-	assert.deepEqual(await filterReviewableProducts("не-число", [1]), []);
+	assert.deepEqual(await filterReviewableProducts(payload, userId, []), []);
+	assert.deepEqual(await filterReviewableProducts(payload, "не-число", [1]), []);
 });
 
 /* ----------------------------------------------------------- переход --- */

@@ -9,6 +9,10 @@ import type {
 } from "../../../payload-types";
 import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
+import {
+	noReviewYet,
+	PRODUCT_STILL_ON_SALE,
+} from "./review-eligibility";
 
 /**
  * Сервис отзывов о товарах.
@@ -698,45 +702,12 @@ export interface ReviewInvitationsPage {
  * (hasUserPurchasedProduct, группа «Завершённые» в status.groups.ts). Другой
  * статус здесь означал бы, что кабинет зовёт оценить товар, а форма откажет.
  *
- * Доступность товара — ровно то же определение, по которому он виден в
- * каталоге (buildProductWhere: `_status = published` + `inventory.isVisible`)
- * и не считается архивным в заказах (isProductArchived: `discontinued`).
- * Параллельной системы статусов здесь не заводится: разошедшись, она начала
- * бы предлагать оценить то, чего в продаже нет.
- *
- * `IS DISTINCT FROM` вместо `<>` — обязателен: у перенесённых товаров статус
- * бывает не проставлен, а `NULL <> 'discontinued'` — это NULL, то есть строка
- * молча выпала бы из выдачи. Видимость, наоборот, сравнивается строгим
- * `= TRUE`, как её сравнивает каталог: невыставленный флаг там прячет товар,
- * и предложение обязано вести себя так же.
+ * Условия «товар всё ещё продаётся» и «отзыва ещё нет» живут в
+ * review-eligibility.ts и импортируются оттуда — своей редакции этот файл не
+ * заводит. Причина переезда не стилистическая: их использует и хук заказа,
+ * который тянет их в граф импортов payload.config.ts, а этот файл в тот граф
+ * попадать не должен (см. шапку review-eligibility.ts).
  */
-/**
- * «Товар всё ещё продаётся» — ОДНО определение на весь проект.
- *
- * Вынесено отдельным фрагментом не ради краткости, а чтобы у правила не
- * появилось второй редакции. Его спрашивают три разных места: список
- * предложений в кабинете, счётчик на панели и факт `pendingReviews`, по
- * которому решает показываться баннер (modules/banners/server/facts.ts).
- * Разойдясь, они дают ровно ту поломку, от которой предостерегает шапка
- * facts.ts: баннер зовёт оценить товары, а раздел под ним пуст.
- *
- * Ожидает товар под алиасом `p`.
- */
-const PRODUCT_STILL_ON_SALE = sql`
-	p._status = 'published'
-	AND p.inventory_is_visible = TRUE
-	AND p.inventory_status IS DISTINCT FROM 'discontinued'
-`;
-
-/** «Пользователь ещё не высказался об этом товаре» — в любом статусе отзыва. */
-function noReviewYet(userId: number, productColumn: ReturnType<typeof sql>) {
-	return sql`
-		NOT EXISTS (
-			SELECT 1 FROM product_reviews r
-			WHERE r.user_id = ${userId} AND r.product_id = ${productColumn}
-		)
-	`;
-}
 
 /**
  * Источник предложений: завершённые покупки пользователя, из которых ещё
@@ -755,53 +726,6 @@ export function reviewInvitationSource(userId: number) {
 			AND ${PRODUCT_STILL_ON_SALE}
 			AND ${noReviewYet(userId, sql`oi.product_id`)}
 	`;
-}
-
-/**
- * Какие из перечисленных товаров пользователь МОЖЕТ оценить прямо сейчас.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * ПОЧЕМУ СПИСОК ТОВАРОВ, А НЕ ИДЕНТИФИКАТОР ЗАКАЗА
- * ────────────────────────────────────────────────────────────────────────────
- * Единственный вызывающий — хук заказа в момент перехода в «доставлен», и
- * спрашивать у базы статус этого же заказа там нельзя: хук выполняется внутри
- * транзакции Payload, а прямой SQL идёт мимо неё и увидит ещё старый статус.
- * Поэтому факт покупки берётся из документа, который хук и так держит в
- * руках, а у базы спрашивается только то, что этой транзакцией не менялось, —
- * состояние товаров и наличие отзывов.
- *
- * Проверки доступности и отсутствия отзыва — те же самые фрагменты, что и в
- * списке предложений. Предложение и приглашение не могут разойтись по
- * определению.
- */
-export async function filterReviewableProducts(
-	userId: string | number,
-	productIds: (string | number)[],
-): Promise<number[]> {
-	const id = Number(userId);
-	const ids = [...new Set(productIds.map(Number))].filter((n) =>
-		Number.isFinite(n),
-	);
-	if (!Number.isFinite(id) || ids.length === 0) return [];
-
-	const payload = await getPayloadInstance();
-	// Явный список биндов вместо массива: drizzle разворачивает JS-массив в
-	// кортеж параметров, из-за чего `= ANY(${ids}::int[])` собирается в
-	// невалидный SQL (тот же разбор — у getRatingAggregatesForProducts).
-	const idList = sql.join(
-		ids.map((value) => sql`${value}`),
-		sql`, `,
-	);
-
-	const result = (await payload.db.drizzle.execute(sql`
-		SELECT p.id AS product_id
-		FROM products p
-		WHERE p.id IN (${idList})
-			AND ${PRODUCT_STILL_ON_SALE}
-			AND ${noReviewYet(id, sql`p.id`)}
-	`)) as DrizzleRows;
-
-	return (result.rows ?? []).map((row) => toNumber(row.product_id));
 }
 
 /**

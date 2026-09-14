@@ -1,7 +1,7 @@
 import type { BasePayload } from "payload";
-import type { Order } from "../../../payload-types";
-import { notify } from "../../services/notifications/notificationCenter";
-import { filterReviewableProducts } from "./reviews.service";
+import type { Order } from "../../../payload-types.ts";
+import { notify } from "../../services/notifications/notificationCenter.ts";
+import { filterReviewableProducts } from "./review-eligibility.ts";
 
 /**
  * Приглашение оценить товары из доставленного заказа — ВНУТРИ САЙТА.
@@ -125,7 +125,11 @@ export async function inviteToReviewDeliveredOrder(
 		// срабатывает на возврате статуса, ради которого и введена.
 		if (await alreadyInvited(payload, userId, order.orderNumber)) return;
 
-		const reviewable = await filterReviewableProducts(userId, productIds);
+		const reviewable = await filterReviewableProducts(
+			payload,
+			userId,
+			productIds,
+		);
 		if (reviewable.length === 0) return;
 
 		await notify(payload, userId, "review_invitation", {
