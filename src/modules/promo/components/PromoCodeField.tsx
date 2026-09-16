@@ -1,16 +1,16 @@
 "use client";
 
-import { AlertCircle, Check, Tag, X } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { AlertCircle, Check, Info, Loader2, Tag, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { formatPrice } from "@/modules/productCard";
-import { cn } from "@/utils/cn";
 import { applyPromoCodeAction } from "../actions/promo.actions";
 import {
 	normalizePromoCode,
 	PROMO_CODE_INPUT_ID,
 	PROMO_CODE_MAX_LENGTH,
 } from "../lib/promo-code";
-import type { PromoApplyPreview, PromoRejectionReason } from "../types";
+import type { PromoApplyPreview } from "../types";
+import styles from "./Promo.module.css";
 
 interface Props {
 	/** Применённый код. Владелец состояния — форма оформления заказа. */
@@ -18,6 +18,13 @@ interface Props {
 	onAppliedChange: (preview: PromoApplyPreview | null) => void;
 	/** Корзина пуста или невалидна — применять нечего. */
 	disabled?: boolean;
+	/**
+	 * Отпечаток корзины. Меняется вместе с составом и суммой заказа — по нему
+	 * применённый код перепроверяется заново.
+	 */
+	cartKey?: string;
+	/** Идёт перепроверка — колонка денег помечает суммы как пересчитываемые. */
+	onRevalidatingChange?: (busy: boolean) => void;
 }
 
 /**
@@ -37,6 +44,21 @@ interface Props {
  * иначе покупатель успевает изменить код и увидеть результат проверки
  * ПРЕДЫДУЩЕГО.
  *
+ * ── Перепроверка при изменении корзины ────────────────────────────────────
+ * Скидка по коду считается ОТ КОРЗИНЫ: процент от суммы, порог минимального
+ * заказа, список товаров, на которые код распространяется. Стоит покупателю
+ * изменить количество прямо на оформлении — и показанная скидка относится к
+ * корзине, которой больше нет. Поэтому при смене `cartKey` код
+ * перепроверяется тем же действием, что и при нажатии «Применить»: другого
+ * источника правды о скидке в интерфейсе нет и быть не должно.
+ *
+ * Отказ при перепроверке снимает код и объясняет причину словами сервера —
+ * кроме одного случая. Упёршись в лимит попыток, мы НЕ снимаем код: он
+ * по-прежнему верен, проверить его прямо сейчас просто нельзя, а снятие
+ * лишило бы покупателя скидки, на которую он имеет право. Вместо этого
+ * блок честно предупреждает, что итог уточнится при оформлении, — где
+ * сервер пересчитает всё заново (см. checkout.actions.ts).
+ *
  * ── Ошибка ────────────────────────────────────────────────────────────────
  * Ошибка живёт под полем, а не в тосте: она относится к конкретному вводу,
  * и её нужно перечитывать, исправляя код. Сообщение приходит с сервера
@@ -45,35 +67,109 @@ interface Props {
  * Единственное исключение — `min_order_amount`: причина исправимая
  * добавлением товаров, поэтому она оформлена подсказкой, а не отказом.
  */
-export function PromoCodeField({ applied, onAppliedChange, disabled }: Props) {
+export function PromoCodeField({
+	applied,
+	onAppliedChange,
+	disabled,
+	cartKey,
+	onRevalidatingChange,
+}: Props) {
 	// Постоянный id, а не useId: на него ссылается общий список ошибок формы
 	// оформления заказа (CHECKOUT_FIELD_IDS.promoCode), а сгенерированный id
 	// снаружи знать невозможно.
 	const inputId = PROMO_CODE_INPUT_ID;
 	const [code, setCode] = useState("");
-	const [error, setError] = useState<{
-		reason: PromoRejectionReason | "auth_required" | "rate_limited" | "unknown";
-		message: string;
+	const [message, setMessage] = useState<{
+		tone: "error" | "hint";
+		text: string;
 	} | null>(null);
 	const [isPending, startTransition] = useTransition();
+	const [isRevalidating, setIsRevalidating] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
+
+	// ── Перепроверка при изменении корзины ──────────────────────────────────
+	//
+	// Отпечаток корзины на момент последней успешной проверки. Первый эффект
+	// после применения кода не должен идти на сервер второй раз подряд:
+	// проверка только что была, и её результат уже показан.
+	const checkedKeyRef = useRef<string | undefined>(cartKey);
+	const appliedCode = applied?.code ?? null;
+
+	useEffect(() => {
+		onRevalidatingChange?.(isRevalidating);
+	}, [isRevalidating, onRevalidatingChange]);
+
+	useEffect(() => {
+		if (!appliedCode) {
+			checkedKeyRef.current = cartKey;
+			return;
+		}
+		if (cartKey === undefined || cartKey === checkedKeyRef.current) return;
+
+		// Пауза перед запросом: количество меняют нажатиями подряд, и проверять
+		// каждое промежуточное состояние значило бы и тратить попытки лимита, и
+		// показывать результаты проверок, которые пользователь уже отменил
+		// следующим нажатием.
+		let cancelled = false;
+		setIsRevalidating(true);
+
+		const timer = setTimeout(async () => {
+			const result = await applyPromoCodeAction(appliedCode);
+			if (cancelled) return;
+
+			checkedKeyRef.current = cartKey;
+			setIsRevalidating(false);
+
+			if (result.success) {
+				onAppliedChange(result.data);
+				setMessage(null);
+				return;
+			}
+
+			if (result.reason === "rate_limited") {
+				// Код не отменён — его просто не удалось перепроверить сейчас.
+				// Снять его значило бы отобрать законную скидку.
+				setMessage({
+					tone: "hint",
+					text: "Не удалось перепроверить промокод — итоговую сумму уточним при оформлении заказа",
+				});
+				return;
+			}
+
+			onAppliedChange(null);
+			setMessage({
+				tone: "error",
+				text: `Промокод ${appliedCode} больше не применим: ${lowerFirst(result.message)}`,
+			});
+		}, 600);
+
+		return () => {
+			cancelled = true;
+			clearTimeout(timer);
+			setIsRevalidating(false);
+		};
+	}, [appliedCode, cartKey, onAppliedChange]);
 
 	function submit(event: React.FormEvent) {
 		event.preventDefault();
 		const value = normalizePromoCode(code);
 		if (value === "" || isPending || disabled) return;
 
-		setError(null);
+		setMessage(null);
 		startTransition(async () => {
 			const result = await applyPromoCodeAction(value);
 
 			if (result.success) {
+				checkedKeyRef.current = cartKey;
 				onAppliedChange(result.data);
 				setCode("");
 				return;
 			}
 
-			setError({ reason: result.reason, message: result.message });
+			setMessage({
+				tone: result.reason === "min_order_amount" ? "hint" : "error",
+				text: result.message,
+			});
 			// Фокус возвращается в поле: следующее действие покупателя —
 			// исправить код, и искать поле заново он не должен.
 			inputRef.current?.focus();
@@ -82,36 +178,37 @@ export function PromoCodeField({ applied, onAppliedChange, disabled }: Props) {
 
 	function remove() {
 		onAppliedChange(null);
-		setError(null);
+		setMessage(null);
 	}
 
 	if (applied) {
 		return (
-			<section className="rounded-[var(--radius-lg)] border border-(--success)/40 bg-(--success)/8 p-4 motion-safe:animate-[fade-in-up_320ms_cubic-bezier(0.16,1,0.3,1)]">
-				<div className="flex items-start gap-3">
-					<span
-						className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--success) text-white"
-						aria-hidden
-					>
-						<Check className="h-4 w-4" strokeWidth={3} />
+			<section className={styles.root} aria-label="Промокод">
+				<div className={styles.applied}>
+					<span className={styles.appliedMark} aria-hidden>
+						{isRevalidating ? (
+							<Loader2 size={12} className={styles.spin} />
+						) : (
+							<Check size={12} strokeWidth={3} />
+						)}
 					</span>
 
-					<div className="min-w-0 flex-1">
-						<p className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-(--text-primary)">
-							<span className="font-mono tracking-wide">{applied.code}</span>
-							<span className="font-normal text-(--success)">
+					<div className={styles.appliedBody}>
+						<p className={styles.appliedHead}>
+							<span className={styles.appliedCode}>{applied.code}</span>
+							<span className={styles.appliedAmount}>
 								−{formatPrice(applied.discountAmount)}
 							</span>
 						</p>
 						{/* Роль status, а не alert: применённый код — это подтверждение
 						    успеха, и перебивать им то, что читает пользователь, не нужно. */}
-						<p role="status" className="mt-0.5 text-sm text-(--text-secondary)">
-							{applied.message}
+						<p role="status" className={styles.appliedText}>
+							{isRevalidating ? "Пересчитываем скидку…" : applied.message}
 						</p>
 						{applied.centralDiscountSuppressed && (
 							// Молча заменить действующую скидку нельзя: покупатель видел
 							// её в корзине и обязан понимать, почему её больше нет в итоге.
-							<p className="mt-1 text-xs text-(--text-secondary)">
+							<p className={styles.appliedText}>
 								Промокод выгоднее действующей скидки и заменил её
 							</p>
 						)}
@@ -120,30 +217,30 @@ export function PromoCodeField({ applied, onAppliedChange, disabled }: Props) {
 					<button
 						type="button"
 						onClick={remove}
+						disabled={isRevalidating}
 						aria-label={`Убрать промокод ${applied.code}`}
-						className="-m-1.5 shrink-0 rounded-full p-1.5 text-(--text-secondary) transition-[color,background-color,transform] duration-150 ease-out hover:bg-(--surface) hover:text-(--text-primary) active:scale-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)"
+						className={styles.remove}
 					>
-						<X className="h-4 w-4" aria-hidden />
+						<X size={15} aria-hidden />
 					</button>
 				</div>
+
+				{message && <Message tone={message.tone} text={message.text} />}
 			</section>
 		);
 	}
 
-	const isHint = error?.reason === "min_order_amount";
+	const isHint = message?.tone === "hint";
 
 	return (
-		<section className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-4">
+		<section className={styles.root}>
 			<form onSubmit={submit} noValidate>
-				<label
-					htmlFor={inputId}
-					className="mb-2 flex items-center gap-2 text-sm font-medium text-(--text-primary)"
-				>
-					<Tag className="h-4 w-4 text-(--text-secondary)" aria-hidden />
+				<label htmlFor={inputId} className={styles.label}>
+					<Tag size={13} aria-hidden />
 					Промокод
 				</label>
 
-				<div className="flex gap-2">
+				<div className={styles.row} style={{ marginTop: "0.6rem" }}>
 					<input
 						id={inputId}
 						ref={inputRef}
@@ -153,7 +250,7 @@ export function PromoCodeField({ applied, onAppliedChange, disabled }: Props) {
 						// не выглядит другим кодом, чем «SUMMER24».
 						onChange={(e) => {
 							setCode(normalizePromoCode(e.target.value));
-							if (error) setError(null);
+							if (message) setMessage(null);
 						}}
 						maxLength={PROMO_CODE_MAX_LENGTH}
 						disabled={disabled || isPending}
@@ -162,54 +259,66 @@ export function PromoCodeField({ applied, onAppliedChange, disabled }: Props) {
 						spellCheck={false}
 						enterKeyHint="done"
 						placeholder="Введите код"
-						aria-invalid={error !== null && !isHint}
-						aria-describedby={error ? `${inputId}-message` : undefined}
-						className={cn(
-							"min-w-0 flex-1 rounded-[var(--radius-sm)] border bg-transparent px-3 py-2 font-mono text-sm uppercase tracking-wide outline-none",
-							"transition-colors duration-150 ease-out placeholder:font-sans placeholder:normal-case placeholder:tracking-normal",
-							"disabled:opacity-60",
-							error && !isHint
-								? "border-(--error) focus:border-(--error)"
-								: "border-(--border) focus:border-(--primary)",
-						)}
+						aria-invalid={message !== null && !isHint}
+						aria-describedby={message ? `${inputId}-message` : undefined}
+						className={`${styles.input} ${
+							message && !isHint ? styles.inputInvalid : ""
+						}`}
 					/>
 
-					{/* Кнопка отвечает на нажатие мгновенно (active:scale), не дожидаясь
-					    ответа сервера: без этого промежуток до ответа читается как
-					    «нажатие не сработало», и покупатель жмёт ещё раз. */}
 					<button
 						type="submit"
 						disabled={disabled || isPending || normalizePromoCode(code) === ""}
-						className={cn(
-							"shrink-0 rounded-[var(--radius-sm)] border border-(--border) px-4 py-2 text-sm font-medium text-(--text-primary)",
-							"transition-[transform,background-color,border-color,opacity] duration-150 ease-out",
-							"hover:border-(--primary) hover:text-(--primary)",
-							"active:scale-[0.97] motion-reduce:active:scale-100",
-							"disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-(--border) disabled:hover:text-(--text-primary) disabled:active:scale-100",
-							"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--primary)",
-						)}
+						className={styles.apply}
 					>
 						{isPending ? "Проверяем…" : "Применить"}
 					</button>
 				</div>
 
-				{error && (
-					<p
+				{message && (
+					<Message
 						id={`${inputId}-message`}
-						// Отказ читается вслух сразу (alert), подсказка о недоборе суммы —
-						// в порядке очереди (status): она не мешает вводу и не требует
-						// немедленной реакции.
-						role={isHint ? "status" : "alert"}
-						className={cn(
-							"mt-2 flex items-start gap-1.5 text-sm motion-safe:animate-[fade-in-up_240ms_cubic-bezier(0.16,1,0.3,1)]",
-							isHint ? "text-(--text-secondary)" : "text-(--error)",
-						)}
-					>
-						<AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-						{error.message}
-					</p>
+						tone={message.tone}
+						text={message.text}
+					/>
 				)}
 			</form>
 		</section>
 	);
+}
+
+function Message({
+	id,
+	tone,
+	text,
+}: {
+	id?: string;
+	tone: "error" | "hint";
+	text: string;
+}) {
+	const isHint = tone === "hint";
+	return (
+		<p
+			id={id}
+			// Отказ читается вслух сразу (alert), подсказка — в порядке очереди
+			// (status): она не мешает вводу и не требует немедленной реакции.
+			role={isHint ? "status" : "alert"}
+			className={`${styles.message} ${
+				isHint ? styles.messageHint : styles.messageError
+			}`}
+			style={{ marginTop: "0.5rem" }}
+		>
+			{isHint ? (
+				<Info size={13} aria-hidden className={styles.messageIcon} />
+			) : (
+				<AlertCircle size={13} aria-hidden className={styles.messageIcon} />
+			)}
+			{text}
+		</p>
+	);
+}
+
+/** «Промокод истёк» → «промокод истёк»: сообщение встраивается в фразу. */
+function lowerFirst(text: string): string {
+	return text.charAt(0).toLowerCase() + text.slice(1);
 }

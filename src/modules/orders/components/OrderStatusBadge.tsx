@@ -56,7 +56,7 @@ interface OrderStatusBadgeProps {
  * тогда как одна заливка не работает ни в одном из этих случаев.
  *
  * Подпись берётся из ORDER_STATUS_LABELS — того же источника, что у timeline
- * и страницы успеха: два набора подписей для одних и тех же статусов
+ * и страницы заказа: два набора подписей для одних и тех же статусов
  * разошлись бы на первой же правке.
  */
 export function OrderStatusBadge({ status, className }: OrderStatusBadgeProps) {

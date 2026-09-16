@@ -2,8 +2,6 @@
 
 import { AlertCircle, Loader2, MapPin, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Input } from "@/UI";
-import { cn } from "@/utils/cn";
 import {
 	MIN_QUERY_LENGTH,
 	useAddressSuggestions,
@@ -14,6 +12,8 @@ import {
 	createEmptyAddress,
 } from "../lib/address";
 import type { AddressSuggestion } from "../types";
+import styles from "./Checkout.module.css";
+import { TextField } from "./fields";
 
 /**
  * Поле адреса с подсказками — паттерн ARIA 1.2 combobox с listbox.
@@ -263,6 +263,7 @@ export function AddressAutocomplete({
 	const manualToggle = (
 		<button
 			type="button"
+			className={styles.linkButton}
 			onClick={() => {
 				const nextManual = !manualMode;
 				onManualModeChange(nextManual);
@@ -273,7 +274,6 @@ export function AddressAutocomplete({
 					setQuery(composeAddressLine(value) || value.fullAddress);
 				}
 			}}
-			className="self-start rounded-[var(--radius-sm)] text-xs font-medium text-(--accent-light) underline-offset-4 transition-colors hover:text-(--accent) hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accent)"
 		>
 			{manualMode ? "Вернуться к подсказкам адреса" : "Ввести адрес вручную"}
 		</button>
@@ -281,12 +281,13 @@ export function AddressAutocomplete({
 
 	if (manualMode) {
 		return (
-			<div className="flex flex-col gap-4">
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<Input
+			<div className="flex flex-col gap-[1.25rem]">
+				<div className={styles.pair}>
+					<TextField
 						id={manualFieldIds.city}
 						label="Город или населённый пункт"
 						placeholder="Например, Москва"
+						className={styles.spanAll}
 						value={value.city}
 						onChange={(e) =>
 							onChange({
@@ -300,14 +301,14 @@ export function AddressAutocomplete({
 							})
 						}
 						onBlur={() => onFieldBlur?.("city")}
-						errorMessage={fieldErrors?.city}
+						error={fieldErrors?.city}
 						required
-						wrapperClassName="sm:col-span-2"
 					/>
-					<Input
+					<TextField
 						id={manualFieldIds.street}
 						label="Улица"
 						placeholder="Например, Ленина"
+						className={styles.spanAll}
 						value={value.street}
 						onChange={(e) =>
 							onChange({
@@ -321,11 +322,10 @@ export function AddressAutocomplete({
 							})
 						}
 						onBlur={() => onFieldBlur?.("street")}
-						errorMessage={fieldErrors?.street}
+						error={fieldErrors?.street}
 						required
-						wrapperClassName="sm:col-span-2"
 					/>
-					<Input
+					<TextField
 						id={manualFieldIds.house}
 						label="Дом"
 						placeholder="Например, 12"
@@ -342,12 +342,13 @@ export function AddressAutocomplete({
 							})
 						}
 						onBlur={() => onFieldBlur?.("house")}
-						errorMessage={fieldErrors?.house}
+						error={fieldErrors?.house}
 						required
 					/>
-					<Input
+					<TextField
 						label="Корпус / строение"
-						placeholder="Необязательно"
+						placeholder="Например, 2"
+						optionalNote="необязательно"
 						value={value.block}
 						onChange={(e) =>
 							onChange({
@@ -362,12 +363,14 @@ export function AddressAutocomplete({
 						}
 					/>
 					{requirePostalCode && (
-						<Input
+						<TextField
 							id={manualFieldIds.postalCode}
 							label="Почтовый индекс"
 							placeholder="6 цифр"
 							inputMode="numeric"
 							autoComplete="postal-code"
+							numeric
+							className={styles.spanAll}
 							value={value.postalCode}
 							onChange={(e) =>
 								onChange({
@@ -377,9 +380,9 @@ export function AddressAutocomplete({
 								})
 							}
 							onBlur={() => onFieldBlur?.("postalCode")}
-							errorMessage={fieldErrors?.postalCode}
+							error={fieldErrors?.postalCode}
+							hint="Перевозчик считает по нему тариф доставки до двери"
 							required
-							wrapperClassName="sm:col-span-2"
 						/>
 					)}
 				</div>
@@ -389,11 +392,11 @@ export function AddressAutocomplete({
 	}
 
 	return (
-		<div className="flex flex-col gap-2">
-			<div className="relative">
-				<Input
+		<div className="flex flex-col gap-[0.6rem]">
+			<div className={styles.suggestWrap}>
+				<TextField
 					id={inputId}
-					ref={inputRef}
+					inputRef={inputRef}
 					label={label}
 					placeholder={placeholder}
 					value={query}
@@ -402,18 +405,19 @@ export function AddressAutocomplete({
 					// конфликтуют со своим списком подсказок — отключаем оба.
 					autoCorrect="off"
 					spellCheck={false}
-					leftIcon={<Search className="h-4 w-4" aria-hidden />}
-					rightIcon={
+					leftIcon={<Search size={16} aria-hidden />}
+					rightSlot={
 						status === "loading" ? (
-							<Loader2
-								className="h-4 w-4 animate-spin text-(--text-muted)"
-								aria-hidden
-							/>
+							<span className={styles.fieldIcon} aria-hidden>
+								<Loader2 size={16} className={styles.spin} />
+							</span>
 						) : query ? (
 							<button
 								type="button"
 								aria-label="Очистить адрес"
-								className="pointer-events-auto flex h-6 w-6 items-center justify-center rounded-full text-(--text-muted) transition-colors hover:bg-(--surface-secondary) hover:text-(--text-primary)"
+								className={styles.fieldButton}
+								// Очистка не должна проходить через blur поля: иначе
+								// список успевает закрыться, и кнопка «не срабатывает».
 								onMouseDown={(e) => e.preventDefault()}
 								onClick={() => {
 									setQuery("");
@@ -429,12 +433,12 @@ export function AddressAutocomplete({
 									setIsOpen(true);
 								}}
 							>
-								<X className="h-4 w-4" aria-hidden />
+								<X size={16} aria-hidden />
 							</button>
 						) : null
 					}
-					errorMessage={error}
-					helperText={helperText}
+					error={error}
+					hint={helperText}
 					required
 					role="combobox"
 					aria-expanded={showList}
@@ -454,7 +458,7 @@ export function AddressAutocomplete({
 
 				{showList && (
 					<div
-						className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-[var(--radius-md)] border border-(--border-light) bg-(--surface) shadow-[0_12px_32px_-8px_var(--shadow-color)]"
+						className={styles.suggestPanel}
 						onMouseDown={() => {
 							isSelectingRef.current = true;
 						}}
@@ -463,9 +467,11 @@ export function AddressAutocomplete({
 						}}
 					>
 						{status === "loading" && suggestions.length === 0 && (
-							<p className="flex items-center gap-2 px-4 py-3 text-sm text-(--text-secondary)">
-								<Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-								Ищем адрес…
+							<p className={styles.suggestState}>
+								<span className={styles.suggestStateRow}>
+									<Loader2 size={15} className={styles.spin} aria-hidden />
+									Ищем адрес…
+								</span>
 							</p>
 						)}
 
@@ -475,7 +481,7 @@ export function AddressAutocomplete({
 								id={listboxId}
 								role="listbox"
 								aria-label="Варианты адреса"
-								className="max-h-72 overflow-y-auto overscroll-contain py-1"
+								className={styles.suggestList}
 							>
 								{suggestions.map((suggestion, index) => {
 									const isActive = index === activeIndex;
@@ -491,32 +497,24 @@ export function AddressAutocomplete({
 											aria-selected={isActive}
 											onMouseEnter={() => setActiveIndex(index)}
 											onClick={() => applySuggestion(suggestion)}
-											className={cn(
-												// min-h под палец: 44px — минимальная цель касания.
-												"flex min-h-11 cursor-pointer items-start gap-2.5 px-4 py-2.5 text-sm transition-colors",
-												isActive
-													? "bg-(--primary)/12 text-(--text-primary)"
-													: "text-(--text-primary) hover:bg-(--surface-secondary)",
-											)}
+											className={styles.suggestOption}
 										>
 											<MapPin
-												className={cn(
-													"mt-0.5 h-4 w-4 shrink-0",
-													isActive ? "text-(--primary)" : "text-(--text-muted)",
-												)}
+												size={15}
 												aria-hidden
+												className={styles.suggestOptionIcon}
 											/>
-											<span className="flex min-w-0 flex-col gap-0.5">
-												<span className="break-words leading-snug">
+											<span className={styles.suggestOptionBody}>
+												<span className={styles.suggestLabel}>
 													{suggestion.label}
 												</span>
 												{suggestion.hint && (
-													<span className="text-xs text-(--text-secondary)">
+													<span className={styles.suggestHint}>
 														{suggestion.hint}
 													</span>
 												)}
 												{!suggestion.isComplete && (
-													<span className="text-xs text-(--text-muted)">
+													<span className={styles.suggestMuted}>
 														Уточните номер дома
 													</span>
 												)}
@@ -528,17 +526,15 @@ export function AddressAutocomplete({
 						)}
 
 						{isEmpty && (
-							<div className="flex flex-col gap-2 px-4 py-3">
-								<p className="text-sm text-(--text-secondary)">
-									Ничего не нашлось по запросу «{query.trim()}»
-								</p>
+							<div className={styles.suggestState}>
+								<span>Ничего не нашлось по запросу «{query.trim()}»</span>
 								<button
 									type="button"
+									className={styles.linkButton}
 									onClick={() => {
 										onManualModeChange(true);
 										setIsOpen(false);
 									}}
-									className="self-start text-xs font-medium text-(--accent-light) underline-offset-4 hover:underline"
 								>
 									Ввести адрес вручную
 								</button>
@@ -546,36 +542,36 @@ export function AddressAutocomplete({
 						)}
 
 						{status === "degraded" && degradedReason && (
-							<div className="flex flex-col gap-2 px-4 py-3">
-								<p className="flex items-start gap-2 text-sm text-(--warning)">
-									<AlertCircle
-										className="mt-0.5 h-4 w-4 shrink-0"
-										aria-hidden
-									/>
+							<div className={styles.suggestState}>
+								<span
+									className={styles.suggestStateRow}
+									style={{ color: "var(--warning)" }}
+								>
+									<AlertCircle size={15} aria-hidden />
 									{DEGRADED_MESSAGES[degradedReason] ??
 										DEGRADED_MESSAGES.unavailable}
-								</p>
-								<div className="flex gap-3">
+								</span>
+								<span className={styles.suggestActions}>
 									{degradedReason !== "not_configured" && (
 										<button
 											type="button"
 											onClick={retry}
-											className="text-xs font-medium text-(--accent-light) underline-offset-4 hover:underline"
+											className={styles.linkButton}
 										>
 											Попробовать снова
 										</button>
 									)}
 									<button
 										type="button"
+										className={styles.linkButton}
 										onClick={() => {
 											onManualModeChange(true);
 											setIsOpen(false);
 										}}
-										className="text-xs font-medium text-(--accent-light) underline-offset-4 hover:underline"
 									>
 										Ввести адрес вручную
 									</button>
-								</div>
+								</span>
 							</div>
 						)}
 					</div>
@@ -585,10 +581,10 @@ export function AddressAutocomplete({
 			{/* Разбор выбранного адреса: пользователь должен видеть, ЧТО именно
 			    он выбрал, а не только строку, которую сам набрал. */}
 			{value.source === "dadata" && value.house && (
-				<p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-(--text-secondary)">
-					<span className="inline-flex items-center gap-1 text-(--success)">
-						<MapPin className="h-3.5 w-3.5" aria-hidden />
-						Адрес определён
+				<p className={styles.addressResolved}>
+					<span className={styles.addressResolvedMark}>
+						<MapPin size={13} aria-hidden />
+						Адрес определён до дома
 					</span>
 					{value.postalCode && <span>индекс {value.postalCode}</span>}
 				</p>

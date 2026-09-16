@@ -101,8 +101,18 @@ export async function switchToNewCompany(page: Page): Promise<void> {
 	if (await toggle.isVisible()) await toggle.click();
 }
 
+/**
+ * Способ получения заказа.
+ *
+ * Варианты — группа переключателей (role="radio"), а не набор кнопок:
+ * способ ровно один, и скринридер обязан сказать «1 из 3», а не «нажато».
+ * Поиск идёт внутри именованной группы, потому что слово «самовывоз» есть и
+ * в названиях пунктов выдачи — они тоже переключатели.
+ */
 export function deliveryMethodButton(page: Page, label: string): Locator {
-	return page.getByRole("button", { name: new RegExp(label) });
+	return page
+		.getByRole("radiogroup", { name: "Способ получения заказа" })
+		.getByRole("radio", { name: new RegExp(label) });
 }
 
 /**

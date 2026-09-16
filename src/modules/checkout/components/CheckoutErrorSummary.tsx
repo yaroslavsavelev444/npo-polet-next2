@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { CheckoutErrorEntry } from "../lib/checkout-fields";
 import { focusCheckoutField } from "../lib/focus-field";
+import styles from "./Checkout.module.css";
 
 /**
  * Сводка всех незаполненных и некорректных полей формы.
@@ -43,42 +44,36 @@ export function CheckoutErrorSummary({ entries, focusOnAppear }: Props) {
 			// быть озвучено сразу, а не в порядке очереди.
 			role="alert"
 			aria-labelledby="checkout-error-summary-title"
-			className="rounded-[var(--radius-md)] border border-(--error)/40 bg-(--error)/8 p-4"
+			className={styles.errors}
 		>
 			<p
 				id="checkout-error-summary-title"
 				ref={headingRef}
 				tabIndex={-1}
-				className="flex items-center gap-2 text-sm font-semibold text-(--error) outline-none"
+				className={styles.errorsTitle}
 			>
-				<AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+				<AlertTriangle size={15} aria-hidden />
 				{entries.length === 1
 					? "Одно поле требует внимания"
 					: `Полей с ошибками: ${entries.length}`}
 			</p>
 
-			<ul className="mt-3 flex flex-col gap-1.5">
+			<ul className={styles.errorsList}>
 				{entries.map((entry) => (
-					<li key={entry.path} className="text-sm leading-snug">
+					<li key={entry.path} className={styles.errorsItem}>
 						{entry.elementId ? (
 							<button
 								type="button"
 								onClick={() => focusCheckoutField(entry.elementId)}
-								className="text-left text-(--text-primary) underline decoration-(--error)/50 decoration-1 underline-offset-4 transition-colors hover:decoration-(--error) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--error) focus-visible:ring-offset-2 focus-visible:ring-offset-(--surface)"
+								className={styles.errorsLink}
 							>
-								<span className="font-medium">{entry.label}</span>
-								<span className="text-(--text-secondary)">
-									{" "}
-									— {entry.message}
-								</span>
+								<span className={styles.errorsField}>{entry.label}</span>
+								<span className={styles.errorsMessage}> — {entry.message}</span>
 							</button>
 						) : (
-							<span className="text-(--text-primary)">
-								<span className="font-medium">{entry.label}</span>
-								<span className="text-(--text-secondary)">
-									{" "}
-									— {entry.message}
-								</span>
+							<span>
+								<span className={styles.errorsField}>{entry.label}</span>
+								<span className={styles.errorsMessage}> — {entry.message}</span>
 							</span>
 						)}
 					</li>

@@ -42,9 +42,21 @@ test("самовывоз: заказ оформляется и открывае�
 
 	await submitButton(page).click();
 	await expect(page).toHaveURL(/\/orders\/ORD-/, { timeout: 30_000 });
-	await expect(page.getByText(/Заказ №ORD-/)).toBeVisible();
 
 	const orderNumber = page.url().split("/").pop() as string;
+
+	// Номер виден на САМОЙ странице подтверждения, а не только во всплывающем
+	// уведомлении об успехе: уведомление живёт несколько секунд и уходит, а
+	// номер — это то, что покупатель диктует менеджеру.
+	//
+	// exact обязателен: без него совпадает и текст уведомления
+	// («Заказ №… оформлен»), и проверка падает на двух элементах вместо
+	// одного — причём падает независимо от того, всё ли в порядке со
+	// страницей.
+	await expect(
+		page.getByText(`Заказ №${orderNumber}`, { exact: true }),
+	).toBeVisible();
+
 	const order = readOrder(orderNumber);
 
 	expect(order.delivery.method).toBe("self_pickup");

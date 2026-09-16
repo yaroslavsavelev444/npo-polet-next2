@@ -1,0 +1,1859 @@
+/* ===========================================================================
+   Оформление заказа
+   ===========================================================================
+   Продолжение уже обновлённых поверхностей: первый экран --void-deep как у
+   кабинета, каталога и «Моих заказов»; поля-строки с прочерком акцента как в
+   кабинете и на контактах; служебные подписи моноширинным капслоком; времена
+   и кривые из app/(frontend)/home.css. Своей системы страница не заводит.
+
+   Модуль, а не глобальный файл, по той же причине, что у корзины и каталога:
+   утилиты @once-ui подключаются вне слоёв и перебивают Tailwind на числовых
+   отступах (разбор — в шапке app/(frontend)/globals.css). Хешированные имена
+   классов эту войну обходят стороной.
+
+   ────────────────────────────────────────────────────────────────────────────
+   ГЛАВНОЕ РЕШЕНИЕ: ФОРМА СЛЕВА, ДЕНЬГИ СПРАВА — И НИ ОДНОГО ПОВТОРА
+   ────────────────────────────────────────────────────────────────────────────
+   Было: шесть обведённых карточек в две трети ширины и седьмая, липкая,
+   справа. Состав заказа при этом перечислялся дважды — списком товаров сверху
+   и суммой в итоге, — а чем именно набралась скидка, не отвечало ни одно из
+   мест.
+
+   Стало: слева поток решений сверху вниз (что заказываю → как получу → кто
+   получит → от кого заказ → как плачу), справа — липкая колонка денег:
+   промокод, разбор стоимости до последней скидки, короткая сверка «кому,
+   куда, чем» и кнопка. Каждая величина живёт ровно в одном месте: состав — в
+   списке, деньги — в расчёте.
+
+   На телефоне колонка денег встаёт в конец потока, а её итог дублируется
+   тонкой полосой у нижнего края — но полоса НЕ несёт второй кнопки отправки
+   (две кнопки «подтвердить» на одном экране — верный способ оформить заказ
+   дважды). Она показывает сумму и ведёт к настоящей кнопке.                 */
+
+/* ---------------------------------------------------------------------------
+   Раскладка страницы
+   --------------------------------------------------------------------------- */
+.layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 2rem;
+	align-items: start;
+	padding-bottom: 4rem;
+}
+
+/* 64rem (1024px) — планшет в альбомной ориентации и узкий ноутбук. Порог
+   выбран по тому, что остаётся ФОРМЕ: 1024 − 48 (поля страницы) − 304
+   (колонка денег) − 32 (зазор) = 640px, то есть по 304px на поле в паре
+   «телефон + почта». Номер с маской занимает ~180px — запас есть.
+
+   Ниже этого порога колонка денег встаёт в конец потока: сжимать форму до
+   нечитаемых полей ради липкого итога нельзя, а итог на узком экране и так
+   всегда на виду — его показывает полоса у нижнего края. */
+@media (min-width: 64rem) {
+	.layout {
+		grid-template-columns: minmax(0, 1fr) 19rem;
+		gap: 2rem;
+	}
+}
+
+@media (min-width: 80rem) {
+	.layout {
+		grid-template-columns: minmax(0, 1fr) 21rem;
+		gap: 3rem;
+	}
+}
+
+@media (min-width: 90rem) {
+	.layout {
+		grid-template-columns: minmax(0, 1fr) 23rem;
+		gap: 4rem;
+	}
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+/* Колонка денег. Липкая на широком экране: расчёт и кнопка обязаны быть перед
+   глазами, пока человек заполняет форму на три экрана вниз. */
+.aside {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	min-width: 0;
+}
+
+@media (min-width: 64rem) {
+	.aside {
+		position: sticky;
+		/* Шапка + воздух. Значение шапки замерено и живёт в globals.css. */
+		top: calc(var(--sticky-header-height) + 1.5rem);
+		/* Колонка длиннее экрана не липнет, а прокручивается вместе со
+		   страницей — иначе кнопка оказывается за нижним краем окна и до неё
+		   нельзя добраться вовсе. */
+		max-height: calc(100dvh - var(--sticky-header-height) - 3rem);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		/* Полоса прокрутки внутри липкой колонки не должна съедать ширину
+		   содержимого при появлении. */
+		scrollbar-width: thin;
+		padding-right: 0.25rem;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Раздел формы
+   ---------------------------------------------------------------------------
+   Не карточка, а раздел: номер, заголовок, подпись — и волосяная линия
+   сверху. Ровно так же отбиты разделы страницы товара, кабинета и раскрытого
+   заказа. Номер нужен не для красоты: он превращает длинную форму в
+   пронумерованный путь, по которому видно, сколько шагов осталось.          */
+.section {
+	position: relative;
+	padding: 2rem 0;
+	border-top: 1px solid var(--rule);
+}
+
+.section:first-child {
+	border-top: 0;
+	padding-top: 0.5rem;
+}
+
+@media (min-width: 48rem) {
+	.section {
+		padding: 2.5rem 0;
+	}
+}
+
+.sectionHead {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.85rem;
+	margin-bottom: 1.5rem;
+}
+
+/* Номер раздела: моноширинный, в кружке-плашке --media-plate — той же, что
+   под кадром товара и монограммой кабинета. */
+.sectionIndex {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 999px;
+	background: var(--media-plate);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	color: var(--text-muted);
+	transition:
+		background-color var(--dur-fast) var(--ease-out-quart),
+		color var(--dur-fast) var(--ease-out-quart);
+}
+
+/* Раздел заполнен без ошибок — номер зеленеет. Подтверждение прогресса,
+   которого в прежней форме не было вовсе: понять, что «с этим блоком всё»,
+   можно было только нажав «Подтвердить». */
+.section[data-state="done"] .sectionIndex {
+	background: color-mix(in srgb, var(--success) 18%, transparent);
+	color: color-mix(in srgb, var(--success) 85%, #fff);
+}
+
+.section[data-state="error"] .sectionIndex {
+	background: color-mix(in srgb, var(--error) 18%, transparent);
+	color: color-mix(in srgb, var(--error) 88%, #fff);
+}
+
+.sectionHeadBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.sectionTitle {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--text-primary);
+}
+
+@media (min-width: 48rem) {
+	.sectionTitle {
+		font-size: 1.1875rem;
+	}
+}
+
+.sectionHint {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+	max-width: 48ch;
+}
+
+.sectionBody {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+	min-width: 0;
+}
+
+/* Подблок внутри раздела: своя служебная подпись и линия сверху. Ими
+   разделены «кто оформляет» и «получатель» — два разных человека, и путать
+   их поля нельзя. */
+.group {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	min-width: 0;
+}
+
+.groupDivided {
+	padding-top: 1.5rem;
+	border-top: 1px solid var(--hairline);
+}
+
+.groupLabel {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+/* Две колонки для коротких полей. Один брейкпоинт, 34rem: ниже него даже два
+   поля по половине ширины становятся уже, чем номер телефона с маской. */
+.pair {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1rem;
+}
+
+@media (min-width: 34rem) {
+	.pair {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.triple {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1rem;
+}
+
+@media (min-width: 34rem) {
+	.triple {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+.spanAll {
+	grid-column: 1 / -1;
+}
+
+/* ---------------------------------------------------------------------------
+   Поле формы
+   ---------------------------------------------------------------------------
+   Строка с подчёркиванием, а не обведённая коробка. Тот же приём, что в
+   кабинете (.field в Profile.module.css) и в форме контактов. Повторён здесь,
+   а не вынесен в общий слой, по правилу проекта: приём переезжает в общее
+   место, когда понадобится ЧЕТВЁРТОЙ странице, — и у оформления свои
+   особенности, которых нет у кабинета: значки слева, кнопка очистки справа,
+   обязательность, помеченная звёздочкой.
+
+   Ошибка — состояние самой строки: линия краснеет раньше, чем взгляд дошёл до
+   текста под полем.                                                        */
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	min-width: 0;
+}
+
+.fieldLabel {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	line-height: 1.2;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+.fieldLabelText {
+	min-width: 0;
+}
+
+/* Обязательность — не цветом, а знаком с текстовой подписью для скринридера:
+   по одному цвету звёздочки о ней нельзя узнать ни при дальтонизме, ни на
+   слух. */
+.required {
+	margin-left: 0.2em;
+	color: var(--primary);
+}
+
+.optional {
+	flex: 0 0 auto;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+	opacity: 0.75;
+}
+
+.fieldBox {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	border-bottom: 1px solid var(--border);
+	transition: border-color var(--dur-fast) var(--ease-out-quart);
+}
+
+.fieldBox:hover {
+	border-bottom-color: var(--border-light);
+}
+
+/* Прочерк акцента по фокусу — тот же жест, которым прочерчивается линия под
+   активной строкой на главной и разделитель на контактах. */
+.fieldBox::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	bottom: -1px;
+	height: 1px;
+	background: var(--primary);
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.fieldBox:focus-within::after {
+	transform: scaleX(1);
+}
+
+.field[data-invalid="true"] .fieldBox {
+	border-bottom-color: color-mix(in srgb, var(--error) 55%, transparent);
+}
+
+.field[data-invalid="true"] .fieldBox::after {
+	background: var(--error);
+	transform: scaleX(1);
+}
+
+.field:focus-within .fieldLabel {
+	color: var(--text-primary);
+}
+
+.control {
+	width: 100%;
+	min-width: 0;
+	padding: 0.55rem 0 0.7rem;
+	border: 0;
+	background: transparent;
+	outline: none;
+	/* 1rem, не мельче: Safari на iOS приближает страницу к любому полю с
+	   текстом меньше 16px, и после ввода вёрстка остаётся увеличенной. */
+	font-size: 1rem;
+	font-family: inherit;
+	line-height: 1.4;
+	color: var(--text-primary);
+}
+
+.control::placeholder {
+	color: var(--text-muted);
+}
+
+.control:disabled {
+	color: var(--text-secondary);
+	cursor: default;
+}
+
+/* Номера, индексы, ИНН — табличными цифрами: они выравниваются в колонку и не
+   пляшут по ширине при наборе. */
+.controlNumeric {
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.01em;
+}
+
+.fieldIcon {
+	flex: 0 0 auto;
+	display: grid;
+	place-items: center;
+	color: var(--text-muted);
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+.field:focus-within .fieldIcon {
+	color: var(--primary);
+}
+
+.field[data-invalid="true"] .fieldIcon {
+	color: var(--error);
+}
+
+/* Кнопка внутри поля (очистить адрес). Цель 2.25rem — по ней бьют пальцем. */
+.fieldButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 2.25rem;
+	height: 2.25rem;
+	margin-right: -0.4rem;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition:
+		color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart),
+		transform 150ms var(--ease-out-quart);
+}
+
+.fieldButton:hover,
+.fieldButton:focus-visible {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.fieldButton:active {
+	transform: scale(0.92);
+}
+
+.fieldNote {
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.fieldError {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.35rem;
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--error);
+	animation: checkout-note-in 220ms var(--ease-out-quart) both;
+}
+
+.fieldErrorIcon {
+	flex: 0 0 auto;
+	margin-top: 0.15rem;
+}
+
+@keyframes checkout-note-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, -3px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* Текстовое поле в несколько строк. */
+.textarea {
+	min-height: 4.5rem;
+	padding-top: 0.6rem;
+	resize: vertical;
+}
+
+/* Список выбора. Нативный <select> оставлен намеренно: на телефоне он
+   открывает системный барабан, к которому привык палец, а перевозчиков в
+   списке бывает три десятка. Рисуем только стрелку. */
+.selectBox {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
+.select {
+	width: 100%;
+	min-width: 0;
+	padding: 0.55rem 1.75rem 0.7rem 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	outline: none;
+	appearance: none;
+	font-size: 1rem;
+	font-family: inherit;
+	line-height: 1.4;
+	color: var(--text-primary);
+	cursor: pointer;
+}
+
+/* Список раскрывается системным слоем — он рисуется ОС и не наследует фон
+   страницы. Без явного фона на тёмной теме получается белый текст на белом. */
+.select option {
+	background: var(--surface);
+	color: var(--text-primary);
+}
+
+.selectChevron {
+	position: absolute;
+	right: 0;
+	pointer-events: none;
+	color: var(--text-muted);
+	transition: transform var(--dur-fast) var(--ease-out-quart);
+}
+
+.selectBox:focus-within .selectChevron {
+	color: var(--primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Выбор из вариантов: способ получения, пункт выдачи, способ оплаты
+   ---------------------------------------------------------------------------
+   Здесь рамка уместна и необходима — в отличие от разделов страницы. Вариант
+   выбора обязан читаться как отдельная цель, а выбранный — отличаться от
+   остальных не только галочкой: заливкой, рамкой и цветом знака сразу, чтобы
+   состояние было видно и в оттенках серого.                                */
+.options {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+@media (min-width: 40rem) {
+	.optionsRow {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+/* Два варианта в ряд — выбор номера для связи. Отдельный класс, а не .pair
+   поверх .options: у обоих объявлен grid-template-columns одной
+   специфичностью, и побеждал бы тот, что ниже по файлу, а не тот, что нужен. */
+@media (min-width: 34rem) {
+	.optionsPair {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.optionsInvalid {
+	padding: 0.5rem;
+	margin: -0.5rem;
+	border-radius: var(--radius-md);
+	outline: 1px solid color-mix(in srgb, var(--error) 50%, transparent);
+	outline-offset: 0;
+}
+
+.option {
+	position: relative;
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+	width: 100%;
+	min-width: 0;
+	padding: 0.9rem 1rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
+	text-align: left;
+	cursor: pointer;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart);
+}
+
+.option:hover {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.option:active {
+	transform: scale(0.99);
+}
+
+.option[data-selected="true"] {
+	border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+/* Вариант в колонку — для крупного выбора способа получения: знак сверху,
+   подпись под ним. */
+.optionStacked {
+	flex-direction: column;
+	gap: 0.7rem;
+	padding: 1rem;
+}
+
+.optionMark {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 1.125rem;
+	height: 1.125rem;
+	margin-top: 0.15rem;
+	border: 1px solid var(--border-light);
+	border-radius: 999px;
+	transition: border-color 180ms var(--ease-out-quart);
+}
+
+.option[data-selected="true"] .optionMark {
+	border-color: var(--primary);
+}
+
+.optionMark::after {
+	content: "";
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 999px;
+	background: var(--primary);
+	transform: scale(0);
+	transition: transform 180ms var(--ease-out-expo);
+}
+
+.option[data-selected="true"] .optionMark::after {
+	transform: scale(1);
+}
+
+.optionIcon {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+	color: var(--text-secondary);
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart);
+}
+
+.option[data-selected="true"] .optionIcon {
+	background: color-mix(in srgb, var(--primary) 16%, transparent);
+	color: var(--primary-200);
+}
+
+.optionBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.optionTitle {
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--text-primary);
+}
+
+.optionText {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.45;
+	color: var(--text-secondary);
+	overflow-wrap: anywhere;
+}
+
+.optionNote {
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+/* Цена/условие варианта: то, ради чего варианты и сравнивают. */
+.optionCost {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	line-height: 1.3;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.option[data-selected="true"] .optionCost {
+	color: color-mix(in srgb, var(--primary) 70%, #fff);
+}
+
+.optionCheck {
+	position: absolute;
+	top: 0.75rem;
+	right: 0.75rem;
+	color: var(--primary);
+	animation: checkout-pop-in 240ms var(--ease-out-expo) both;
+}
+
+@keyframes checkout-pop-in {
+	from {
+		opacity: 0;
+		transform: scale(0.6);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Переключатель-флажок
+   --------------------------------------------------------------------------- */
+.checkbox {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.7rem;
+	min-width: 0;
+	/* Целиком строка — цель нажатия, минимум 44px по высоте вместе с полями. */
+	padding: 0.35rem 0;
+	cursor: pointer;
+}
+
+.checkboxInput {
+	flex: 0 0 auto;
+	width: 1.125rem;
+	height: 1.125rem;
+	margin-top: 0.1rem;
+	accent-color: var(--primary);
+	cursor: pointer;
+}
+
+.checkboxBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+}
+
+.checkboxLabel {
+	font-size: 0.875rem;
+	line-height: 1.45;
+	color: var(--text-primary);
+}
+
+.checkboxNote {
+	font-size: 0.75rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+/* Раскрывающийся блок: телефон получателя, реквизиты организации.
+   Раскрывается по высоте, а не появляется рывком. */
+.disclosure {
+	display: grid;
+	grid-template-rows: 0fr;
+	opacity: 0;
+	transition:
+		grid-template-rows var(--dur-fast) var(--ease-out-expo),
+		opacity var(--dur-fast) var(--ease-out-quart);
+}
+
+.disclosure[data-open="true"] {
+	grid-template-rows: 1fr;
+	opacity: 1;
+}
+
+.disclosureInner {
+	overflow: hidden;
+	min-height: 0;
+}
+
+/* Содержимое отбивается от переключателя ТОЛЬКО когда раскрыто: отступ внутри
+   схлопывающейся области исчезает вместе с ней и не оставляет пустоты. */
+.disclosure[data-open="true"] .disclosureInner {
+	padding-top: 1rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Состав заказа
+   ---------------------------------------------------------------------------
+   Список, а не витрина: строки разделены волосяной линией, рамок нет. Та же
+   раскладка, что в корзине, — кадр и всё остальное, — чтобы переход
+   «корзина → оформление» не читался как переход на другой сайт.            */
+.items {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.item {
+	display: grid;
+	grid-template-columns: 3.5rem minmax(0, 1fr);
+	gap: 0.85rem;
+	padding: 0.9rem 0;
+	border-top: 1px solid var(--hairline);
+	transition: opacity var(--dur-fast) var(--ease-out-quart);
+}
+
+.items > .item:first-child {
+	border-top: 0;
+	padding-top: 0;
+}
+
+@media (min-width: 40rem) {
+	.item {
+		grid-template-columns: 4rem minmax(0, 1fr);
+		gap: 1rem;
+	}
+}
+
+/* Идёт запись количества — строка приглушена, но остаётся читаемой и не
+   прыгает по высоте. */
+.item[data-busy="true"] {
+	opacity: 0.55;
+}
+
+.itemFrame {
+	position: relative;
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+	width: 3.5rem;
+	height: 3.5rem;
+	border-radius: var(--radius-sm);
+	background: var(--media-plate);
+}
+
+@media (min-width: 40rem) {
+	.itemFrame {
+		width: 4rem;
+		height: 4rem;
+	}
+}
+
+.itemImage {
+	object-fit: contain;
+	padding: 0.25rem;
+}
+
+.itemImageEmpty {
+	color: var(--border-light);
+}
+
+.itemBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	min-width: 0;
+}
+
+.itemHead {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+.itemName {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1.4;
+	color: var(--text-primary);
+	text-decoration: none;
+	/* Длинное название не обрезается многоточием: на оформлении покупатель
+	   сверяет, что именно он заказывает, и «Комплекс радиоэлектронного…» на
+	   этот вопрос не отвечает. Ограничиваем тремя строками. */
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+a.itemName:hover,
+a.itemName:focus-visible {
+	color: var(--primary-200);
+}
+
+.itemRemove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 2rem;
+	height: 2rem;
+	margin: -0.35rem -0.35rem 0 0;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition:
+		color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart),
+		transform 150ms var(--ease-out-quart);
+}
+
+.itemRemove:hover:not(:disabled),
+.itemRemove:focus-visible {
+	color: var(--error);
+	background: color-mix(in srgb, var(--error) 12%, transparent);
+}
+
+.itemRemove:active:not(:disabled) {
+	transform: scale(0.9);
+}
+
+.itemRemove:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.itemMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.75rem;
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.itemMetaWarning {
+	color: var(--warning);
+}
+
+.itemFoot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.6rem;
+}
+
+.itemMoney {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 0;
+	white-space: nowrap;
+}
+
+.itemOld {
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+	text-decoration: line-through;
+	color: var(--text-muted);
+}
+
+.itemTotal {
+	font-size: 0.9375rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+/* Подтверждение пересчёта: сумма строки коротко подсвечивается акцентом в
+   момент, когда количество изменилось. Без него неясно, приняли правку или
+   нет. */
+.itemTotal[data-changed="true"] {
+	animation: checkout-money-flash 620ms var(--ease-out-quart);
+}
+
+@keyframes checkout-money-flash {
+	0% {
+		color: var(--primary);
+	}
+	100% {
+		color: var(--text-primary);
+	}
+}
+
+/* Снятые с продажи позиции. Не исчезают молча: покупатель их выбирал. */
+.gone {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.goneItem {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Колонка денег
+   ---------------------------------------------------------------------------
+   Единственное место страницы, где рамка обводит блок целиком. Основание:
+   это не раздел формы, а самостоятельная панель, которая на широком экране
+   висит рядом с формой, а на телефоне встаёт в поток. Без границы она
+   сливалась бы с последним разделом формы.                                 */
+.summary {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	padding: 1.25rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-lg);
+	background: color-mix(in srgb, var(--void) 55%, transparent);
+}
+
+.summaryTitle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+/* Расчёт. Слагаемые одним кеглем и весом — ни одно не важнее другого; итог
+   отбит линией и вдвое крупнее: он единственный, ради чего в панель смотрят.
+   Так же устроена «Стоимость» в раскрытом заказе (Orders.module.css).      */
+.sum {
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+	margin: 0;
+}
+
+.sumRow {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	font-size: 0.875rem;
+}
+
+.sumLabel {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.35rem;
+	margin: 0;
+	min-width: 0;
+	color: var(--text-secondary);
+}
+
+.sumValue {
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	color: var(--text-primary);
+}
+
+.sumDiscount .sumLabel,
+.sumDiscount .sumValue {
+	color: color-mix(in srgb, var(--success) 80%, #fff);
+}
+
+.sumCode {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.8125rem;
+	letter-spacing: 0.06em;
+}
+
+.sumBadge {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.1rem 0.35rem;
+	border-radius: var(--radius-sm);
+	background: color-mix(in srgb, var(--success) 16%, transparent);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	line-height: 1.4;
+}
+
+/* Строка доставки: вместо суммы — условие. Цифры у доставки в этом магазине
+   нет до расчёта перевозчика, и «0 ₽» было бы обещанием, которого никто не
+   давал. */
+.sumTextValue {
+	margin: 0;
+	font-size: 0.8125rem;
+	text-align: right;
+	color: var(--text-secondary);
+}
+
+.sumNote {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.4rem;
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.sumTotal {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-top: 0.35rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--rule);
+}
+
+.sumTotalLabel {
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.sumTotalValue {
+	margin: 0;
+	font-size: 1.5rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.015em;
+	white-space: nowrap;
+	color: var(--text-primary);
+	transition: opacity var(--dur-fast) var(--ease-out-quart);
+}
+
+/* Итог пересчитывается — показан прежний, и об этом сказано. Молча показывать
+   устаревшую сумму нельзя. */
+.sumStale {
+	opacity: 0.45;
+}
+
+.sumTotalValue[data-changed="true"] {
+	animation: checkout-total-in 520ms var(--ease-out-expo);
+}
+
+@keyframes checkout-total-in {
+	from {
+		opacity: 0.4;
+		transform: translate3d(0, 0.25em, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Сверка перед подтверждением
+   ---------------------------------------------------------------------------
+   Не повтор формы, а ответ на четыре вопроса, ответы на которые лежат в
+   разных её концах: кому звонить, куда везти, чем платить, от кого заказ.  */
+.review {
+	display: flex;
+	flex-direction: column;
+	gap: 0.7rem;
+	margin: 0;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--rule);
+}
+
+/* Значок стоит в колонке слева и держит обе строки — подпись и значение —
+   на одной вертикали. Сетка, а не флексы с обёрткой: между <dt> и <dd>
+   лишний элемент недопустим, иначе браузер и скринридер перестают видеть в
+   них пару. */
+.reviewRow {
+	display: grid;
+	grid-template-columns: 1.1rem minmax(0, 1fr);
+	align-items: baseline;
+	column-gap: 0.55rem;
+	row-gap: 0.1rem;
+	min-width: 0;
+}
+
+.reviewIcon {
+	display: inline-grid;
+	place-items: center;
+	color: var(--text-muted);
+}
+
+/* display: contents у <dt> раскладывает значок и подпись прямо в ячейки
+   сетки строки. Текст подписи обязан лежать в собственном <span>: голый
+   текстовый узел стал бы анонимным элементом сетки и унаследовал бы
+   типографику от контейнера, а не от подписи. */
+.reviewLabel {
+	display: contents;
+}
+
+.reviewLabelText {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	line-height: 1.2;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.reviewValue {
+	grid-column: 2;
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+	overflow-wrap: anywhere;
+}
+
+/* Значение, которого ещё нет: поле не заполнено. Прочерк вместо выдуманного
+   текста, приглушённым цветом — видно, что это пропуск, а не данные. */
+.reviewEmpty {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+/* ---------------------------------------------------------------------------
+   Кнопка подтверждения
+   --------------------------------------------------------------------------- */
+.cta {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	width: 100%;
+	min-height: 3rem;
+	padding: 0 1.25rem;
+	border: 0;
+	border-radius: var(--radius-md);
+	background: var(--primary);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1;
+	color: #fff;
+	cursor: pointer;
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart),
+		box-shadow 180ms var(--ease-out-quart);
+}
+
+.cta:hover:not(:disabled) {
+	background: var(--primary-400);
+	box-shadow: 0 8px 24px -10px
+		color-mix(in srgb, var(--primary) 70%, transparent);
+}
+
+.cta:active:not(:disabled) {
+	transform: scale(0.985);
+}
+
+.cta:disabled {
+	cursor: progress;
+	opacity: 0.75;
+}
+
+.ctaNote {
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.ctaLink {
+	color: var(--accent-light);
+	text-decoration: none;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+.ctaLink:hover,
+.ctaLink:focus-visible {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+.spin {
+	animation: checkout-spin 900ms linear infinite;
+}
+
+@keyframes checkout-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Сообщения
+   ---------------------------------------------------------------------------
+   Три тона: предупреждение (что-то мешает), отказ (операция не прошла),
+   пояснение (так устроено). Значок у каждого свой — сообщение читается и без
+   цвета.                                                                   */
+.notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.55rem;
+	margin: 0;
+	padding: 0.75rem 0.85rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-md);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+	animation: checkout-note-in 240ms var(--ease-out-quart) both;
+}
+
+.noticeIcon {
+	flex: 0 0 auto;
+	margin-top: 0.1rem;
+	color: var(--text-muted);
+}
+
+.noticeWarn {
+	border-color: color-mix(in srgb, var(--warning) 34%, transparent);
+	background: color-mix(in srgb, var(--warning) 8%, transparent);
+	color: var(--text-primary);
+}
+
+.noticeWarn .noticeIcon {
+	color: var(--warning);
+}
+
+.noticeError {
+	border-color: color-mix(in srgb, var(--error) 42%, transparent);
+	background: color-mix(in srgb, var(--error) 8%, transparent);
+	color: var(--text-primary);
+}
+
+.noticeError .noticeIcon {
+	color: var(--error);
+}
+
+.noticeInfo {
+	border-style: dashed;
+	background: transparent;
+}
+
+.noticeAction {
+	margin-top: 0.35rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	font-weight: 600;
+	color: var(--accent-light);
+	text-align: left;
+	cursor: pointer;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+.noticeAction:hover,
+.noticeAction:focus-visible {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+/* ---------------------------------------------------------------------------
+   Сводка ошибок формы
+   --------------------------------------------------------------------------- */
+.errors {
+	padding: 0.9rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--error) 42%, transparent);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--error) 8%, transparent);
+	animation: checkout-note-in 260ms var(--ease-out-quart) both;
+}
+
+.errorsTitle {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--error);
+	outline: none;
+}
+
+.errorsList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	margin: 0.6rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.errorsItem {
+	font-size: 0.8125rem;
+	line-height: 1.5;
+}
+
+.errorsLink {
+	display: block;
+	width: 100%;
+	padding: 0.2rem 0;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	text-align: left;
+	color: var(--text-primary);
+	cursor: pointer;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+.errorsLink:hover .errorsField,
+.errorsLink:focus-visible .errorsField {
+	color: var(--error);
+	text-decoration-color: var(--error);
+}
+
+.errorsField {
+	font-weight: 600;
+	text-decoration: underline;
+	text-decoration-color: color-mix(in srgb, var(--error) 50%, transparent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.25em;
+	transition:
+		color 150ms var(--ease-out-quart),
+		text-decoration-color 150ms var(--ease-out-quart);
+}
+
+.errorsMessage {
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Липкая полоса итога (телефон)
+   ---------------------------------------------------------------------------
+   Кнопки подтверждения здесь НЕТ намеренно. Две кнопки «Подтвердить заказ» на
+   одном экране — это два разных места, где можно оформить заказ, и ни одного
+   способа понять, что они делают одно и то же. Полоса отвечает на другой
+   вопрос — «сколько сейчас выходит» — и ведёт к единственной настоящей
+   кнопке.                                                                  */
+.dock {
+	position: fixed;
+	inset-inline: 0;
+	bottom: 0;
+	z-index: 40;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.7rem 1rem;
+	padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+	border-top: 1px solid var(--rule);
+	background: color-mix(in srgb, var(--background) 92%, transparent);
+	backdrop-filter: blur(20px) saturate(160%);
+	-webkit-backdrop-filter: blur(20px) saturate(160%);
+	animation: checkout-dock-in 320ms var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	.dock {
+		background: var(--background);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+}
+
+@keyframes checkout-dock-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 100%, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (min-width: 64rem) {
+	.dock {
+		display: none;
+	}
+}
+
+.dockMoney {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+}
+
+.dockLabel {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.dockValue {
+	font-size: 1.125rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.015em;
+	color: var(--text-primary);
+}
+
+.dockButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	flex: 0 0 auto;
+	min-height: 2.75rem;
+	padding: 0 1rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart);
+}
+
+.dockButton:active {
+	transform: scale(0.97);
+}
+
+/* Место под липкую полосу, чтобы она не накрывала последний элемент формы. */
+.dockSpacer {
+	height: 5rem;
+}
+
+@media (min-width: 64rem) {
+	.dockSpacer {
+		display: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Тупиковые состояния
+   --------------------------------------------------------------------------- */
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 4rem 1rem;
+	text-align: center;
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.emptyText {
+	margin: 0;
+	max-width: 40ch;
+	font-size: 0.875rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.emptyActions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.75rem;
+	margin-top: 0.75rem;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	min-height: 2.5rem;
+	padding: 0 1rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	background: transparent;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-primary);
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart);
+}
+
+.btn:hover {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.btnPrimary {
+	border-color: transparent;
+	background: var(--primary);
+	color: #fff;
+}
+
+.btnPrimary:hover {
+	border-color: transparent;
+	background: var(--primary-400);
+}
+
+/* Ссылка «изменить» рядом с заголовком раздела. */
+.sectionLink {
+	flex: 0 0 auto;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--accent-light);
+	text-decoration: none;
+	white-space: nowrap;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+.sectionLink:hover,
+.sectionLink:focus-visible {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+/* ---------------------------------------------------------------------------
+   Подсказки адреса
+   ---------------------------------------------------------------------------
+   Всплывающий слой — --void, то есть ТЕМНЕЕ витрины, с разлиновкой --rule.
+   Так же устроены поповеры каталога и лист фильтров: слой над страницей не
+   может быть светлее страницы.                                             */
+.suggestWrap {
+	position: relative;
+}
+
+.suggestPanel {
+	position: absolute;
+	inset-inline: 0;
+	top: calc(100% + 0.4rem);
+	z-index: 30;
+	overflow: hidden;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-md);
+	background: var(--void);
+	box-shadow: var(--shadow-lg);
+	animation: checkout-suggest-in 200ms var(--ease-out-expo) both;
+}
+
+@keyframes checkout-suggest-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, -0.35rem, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.suggestList {
+	max-height: 18rem;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	margin: 0;
+	padding: 0.25rem 0;
+	list-style: none;
+}
+
+.suggestOption {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	/* 2.75rem — минимальная цель касания. */
+	min-height: 2.75rem;
+	padding: 0.6rem 0.9rem;
+	cursor: pointer;
+	transition: background-color 120ms var(--ease-out-quart);
+}
+
+.suggestOption[aria-selected="true"] {
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.suggestOptionIcon {
+	flex: 0 0 auto;
+	margin-top: 0.15rem;
+	color: var(--text-muted);
+}
+
+.suggestOption[aria-selected="true"] .suggestOptionIcon {
+	color: var(--primary);
+}
+
+.suggestOptionBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+}
+
+.suggestLabel {
+	font-size: 0.875rem;
+	line-height: 1.4;
+	color: var(--text-primary);
+	overflow-wrap: anywhere;
+}
+
+.suggestHint {
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-secondary);
+}
+
+.suggestMuted {
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.suggestState {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 0.75rem 0.9rem;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.suggestStateRow {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.suggestActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+}
+
+.linkButton {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--accent-light);
+	text-align: left;
+	cursor: pointer;
+	transition: color 150ms var(--ease-out-quart);
+}
+
+.linkButton:hover,
+.linkButton:focus-visible {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+/* Разбор выбранного адреса — подтверждение, что справочник его узнал. */
+.addressResolved {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.75rem;
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--text-secondary);
+}
+
+.addressResolvedMark {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	color: var(--success);
+}
+
+/* ---------------------------------------------------------------------------
+   Появление разделов
+   ---------------------------------------------------------------------------
+   Каскад по номеру раздела. Только на первом показе и только через opacity и
+   transform — свойства, которые браузер считает на композиторе.             */
+.enter {
+	animation: checkout-section-in var(--dur-base) var(--ease-out-expo) both;
+	animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+@keyframes checkout-section-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 12px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Уменьшенная анимация
+   ---------------------------------------------------------------------------
+   Появление — украшение, а не условие показа: при выключенной анимации всё
+   видно сразу и целиком.                                                   */
+@media (prefers-reduced-motion: reduce) {
+	.enter,
+	.errors,
+	.notice,
+	.fieldError,
+	.optionCheck,
+	.suggestPanel,
+	.dock,
+	.itemTotal,
+	.sumTotalValue,
+	.spin {
+		animation: none;
+	}
+
+	.fieldBox::after,
+	.optionMark::after,
+	.disclosure,
+	.option,
+	.cta,
+	.itemRemove,
+	.fieldButton {
+		transition: none;
+	}
+
+	.cta:active:not(:disabled),
+	.option:active,
+	.dockButton:active {
+		transform: none;
+	}
+}

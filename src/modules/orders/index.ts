@@ -19,9 +19,14 @@ export { OrdersPageClient } from "./components/OrdersPageClient";
 export { OrdersPagination } from "./components/OrdersPagination";
 export { OrdersRail } from "./components/OrdersRail";
 export { OrderTimeline } from "./components/OrderTimeline";
-export { OrderSuccessView } from "./components/success/OrderSuccessView";
+export { OrderPageView } from "./components/order-page/OrderPageView";
 
-export { buildOrderSuccessView } from "./lib/build-order-success-view";
+// markOrderJustCreated ЗДЕСЬ НЕТ намеренно. Эта бочка тянет за собой
+// get-orders-list → orders.service → Payload → nodemailer, то есть серверное
+// дерево целиком. Клиентскому коду (форме оформления заказа) отметка нужна
+// одна, и он импортирует её прямо из lib/celebrate-order — файла, который не
+// импортирует ничего. Через бочку тот же импорт кладёт сборку с ошибкой
+// «Can't resolve 'child_process'».
 export {
 	getOrdersListView,
 	getOrdersSummary,

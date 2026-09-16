@@ -29,7 +29,7 @@ import type { OrderStatus } from "../types";
  *
  * Подписи статусов не дублируются: они остаются в ORDER_STATUS_LABELS —
  * единственном источнике, из которого их берут и список, и timeline, и
- * страница успеха.
+ * страница заказа.
  */
 
 export type OrderStatusTone =
@@ -59,6 +59,22 @@ export interface OrderStatusView {
 	 * «Отправлен — заказ отправлен» не добавляет ничего.
 	 */
 	hint: string;
+	/**
+	 * Заголовок страницы заказа — утверждение о заказе, а не подпись статуса.
+	 *
+	 * Нужен отдельно от ORDER_STATUS_LABELS потому, что это разные жанры:
+	 * подпись отвечает на «в каком состоянии заказ» и живёт значком в списке
+	 * («Ожидает подтверждения»), а заголовок отвечает на «что произошло» и
+	 * набирается крупно («Заказ оформлен»). Поставить подпись в заголовок
+	 * значило бы встретить покупателя, только что нажавшего «Подтвердить
+	 * заказ», словами «ожидает подтверждения» — то есть сомнением вместо
+	 * ответа.
+	 *
+	 * Заголовок набирается акцидентной гарнитурой в верхнем регистре, поэтому
+	 * длина слова имеет значение: самое длинное здесь — «ПОДТВЕРЖДЁН»
+	 * (11 знаков, ~13.2em у PaluiSP2). Кегль на странице подобран под него.
+	 */
+	headline: string;
 }
 
 export const ORDER_STATUS_VIEW: Record<OrderStatus, OrderStatusView> = {
@@ -66,51 +82,61 @@ export const ORDER_STATUS_VIEW: Record<OrderStatus, OrderStatusView> = {
 		tone: "wait",
 		icon: "clock",
 		hint: "Менеджер свяжется с вами для подтверждения",
+		headline: "Заказ оформлен",
 	},
 	awaiting_invoice: {
 		tone: "wait",
 		icon: "invoice",
 		hint: "Счёт готовится — он появится во вложениях к заказу",
+		headline: "Заказ оформлен",
 	},
 	confirmed: {
 		tone: "progress",
 		icon: "check",
 		hint: "Заказ подтверждён и передан на сборку",
+		headline: "Заказ подтверждён",
 	},
 	processing: {
 		tone: "progress",
 		icon: "cog",
 		hint: "Заказ собирают на складе",
+		headline: "Заказ собирают",
 	},
 	packed: {
 		tone: "progress",
 		icon: "box",
 		hint: "Заказ упакован и готов к отправке",
+		headline: "Заказ упакован",
 	},
 	shipped: {
 		tone: "progress",
 		icon: "truck",
 		hint: "Заказ в пути",
+		headline: "Заказ в пути",
 	},
 	ready_for_pickup: {
 		tone: "action",
 		icon: "store",
 		hint: "Заказ ждёт вас — заберите его в пункте выдачи",
+		headline: "Заказ ждёт вас",
 	},
 	delivered: {
 		tone: "done",
 		icon: "done",
 		hint: "Заказ получен",
+		headline: "Заказ получен",
 	},
 	cancelled: {
 		tone: "stopped",
 		icon: "cancel",
 		hint: "Заказ отменён",
+		headline: "Заказ отменён",
 	},
 	refunded: {
 		tone: "stopped",
 		icon: "refund",
 		hint: "По заказу оформлен возврат",
+		headline: "Оформлен возврат",
 	},
 };
 

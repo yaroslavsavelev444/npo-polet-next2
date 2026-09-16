@@ -1,20 +1,32 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import {
+	AlertTriangle,
+	ArrowLeft,
+	PackageSearch,
+	ShoppingBag,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
+import { markOrderJustCreated } from "@/modules/orders/lib/celebrate-order";
 import type { PromoApplyPreview } from "@/modules/promo";
 import { PromoCodeField } from "@/modules/promo";
+import { PageContainer } from "@/shared/components/PageContainer";
 import { appToast } from "@/shared/lib/toast";
-import { Button } from "@/UI";
 import { submitOrderAction } from "../actions/checkout.actions";
 import { useCheckoutValidation } from "../hooks/useCheckoutValidation";
 import { normalizeAddress } from "../lib/address";
 import {
 	buildErrorEntries,
+	CHECKOUT_FIELDS,
+	type CheckoutSectionKey,
 	findFirstErrorTarget,
 	summarizeAddressErrors,
 } from "../lib/checkout-fields";
+import { buildCheckoutTotals } from "../lib/checkout-totals";
 import { focusCheckoutField } from "../lib/focus-field";
 import {
 	getAvailablePaymentMethods,
@@ -30,26 +42,98 @@ import type {
 	CheckoutSubmitInput,
 	CheckoutView,
 } from "../types";
-import { CheckoutErrorSummary } from "./CheckoutErrorSummary";
+import styles from "./Checkout.module.css";
+import { CheckoutDock } from "./CheckoutDock";
+import { CheckoutHero } from "./CheckoutHero";
+import { CheckoutSection, type CheckoutSectionState } from "./CheckoutSection";
 import { CompanySection } from "./CompanySection";
 import { ContactsSection } from "./ContactsSection";
-import { DeliveryMethodSelector } from "./DeliveryMethodSelector";
-import { OrderConfirmationPanel } from "./OrderConfirmationPanel";
-import { OrderItemsSummary } from "./OrderItemsSummary";
-import { PaymentMethodSelector } from "./PaymentMethodSelector";
+import { DeliverySection } from "./DeliverySection";
+import { TextareaField } from "./fields";
+import { OrderItemsPanel } from "./OrderItemsPanel";
+import { OrderSummaryPanel } from "./OrderSummaryPanel";
+import { PaymentSection } from "./PaymentSection";
 
 interface CheckoutPageClientProps {
 	initialView: CheckoutView;
 	user: { name: string; email: string };
+	/** id покупателя — нужен стору корзины, чтобы отличить сессию от гостевой. */
+	userId: string;
+	/** Видел ли покупатель объяснение про корзину (отметка в профиле). */
+	cartOnboardingSeen: boolean;
+	/** Цепочка навигации, отрисованная на сервере. */
+	breadcrumbs: ReactNode;
 }
 
+/**
+ * Оформление заказа.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * ОТКУДА БЕРУТСЯ ДАННЫЕ И КТО ЗДЕСЬ ИСТОЧНИК ПРАВДЫ
+ * ════════════════════════════════════════════════════════════════════════════
+ * Форма (контакты, доставка, оплата) живёт в состоянии этой страницы и нигде
+ * больше — черновик намеренно не сохраняется.
+ *
+ * СОСТАВ ЗАКАЗА живёт в общем сторе корзины, а не в снимке с сервера. Разница
+ * принципиальная: покупатель может изменить количество прямо здесь, поправить
+ * корзину в соседней вкладке или увидеть, что товар сняли с продажи, — и во
+ * всех трёх случаях на экране обязан оказаться актуальный состав, а не тот,
+ * что приехал при открытии страницы. Серверный снимок используется ровно один
+ * раз: им наполняется стор до первой отрисовки, чтобы не мигнуть пустой
+ * корзиной.
+ *
+ * ДЕНЬГИ не считаются здесь вообще. Суммы без промокода приходят витриной
+ * корзины, суммы с промокодом — с сервера тем же расчётом, который создаст
+ * заказ (applyPromoCodeAction → calculateCheckoutPricing). Разложить готовый
+ * итог на строки помогает `buildCheckoutTotals`, и он тоже ничего не считает.
+ * Перед созданием заказа сервер пересчитывает всё заново и по своей корзине:
+ * подделать цену, подменив тело запроса, невозможно — присланного числа там
+ * просто нет.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * ПОЧЕМУ КНОПКА НЕ БЛОКИРУЕТСЯ ПРИ НЕЗАПОЛНЕННОЙ ФОРМЕ
+ * ════════════════════════════════════════════════════════════════════════════
+ * Заблокированная кнопка не объясняет, чего не хватает. Нажатие обязано быть
+ * возможным: оно показывает список проблем и уводит к первому полю. Двойное
+ * нажатие при этом не создаёт второй заказ — синхронный барьер inFlightRef
+ * закрывается до первого await (useTransition обновляет isSubmitting
+ * асинхронно, и одного флага состояния было бы мало).
+ */
 export function CheckoutPageClient({
 	initialView,
 	user,
+	userId,
+	cartOnboardingSeen,
+	breadcrumbs,
 }: CheckoutPageClientProps) {
 	const router = useRouter();
 	const [isSubmitting, startSubmitting] = useTransition();
 
+	// ── Корзина ─────────────────────────────────────────────────────────────
+	const initCart = useCartPanel((state) => state.init);
+	const storeView = useCartPanel((state) => state.view);
+	const cartPending = useCartPanel((state) => state.pending);
+	const isCartMutating = useCartPanel((state) => state.isMutating);
+	const cartError = useCartPanel((state) => state.error);
+	const setCartQuantity = useCartPanel((state) => state.setQuantity);
+	const removeFromCart = useCartPanel((state) => state.remove);
+	const refreshCart = useCartPanel((state) => state.refresh);
+
+	// Серверные данные заезжают в стор синхронно, до первой отрисовки: иначе
+	// на кадр показалась бы пустая корзина, а затем — настоящая.
+	const seeded = useRef(false);
+	if (!seeded.current) {
+		seeded.current = true;
+		initCart({
+			userId,
+			onboardingSeen: cartOnboardingSeen,
+			initialView: initialView.cart,
+		});
+	}
+
+	const cart = storeView ?? initialView.cart;
+
+	// ── Состояние формы ─────────────────────────────────────────────────────
 	const [contacts, setContacts] = useState<CheckoutContactsFormValue>(() => {
 		const saved = initialView.savedRecipient;
 		// Телефоны подставляются ТОЛЬКО из предпочтений, сохранённых уже после
@@ -108,6 +192,7 @@ export function CheckoutPageClient({
 	 * состояние формы физически не может повлиять на цену заказа.
 	 */
 	const [promo, setPromo] = useState<PromoApplyPreview | null>(null);
+	const [isPromoRevalidating, setIsPromoRevalidating] = useState(false);
 	// Ошибка, не привязанная ни к какому полю: сеть, пустая корзина, отказ
 	// бизнес-логики. Живёт отдельно от ошибок полей, потому что исправляется
 	// не правкой формы, а повторной попыткой.
@@ -171,6 +256,80 @@ export function CheckoutPageClient({
 		[delivery.method],
 	);
 
+	// ── Деньги ──────────────────────────────────────────────────────────────
+	const totals = useMemo(() => buildCheckoutTotals(cart, promo), [cart, promo]);
+
+	/**
+	 * Отпечаток корзины для перепроверки промокода.
+	 *
+	 * В него входит и состав, и суммы: скидка по коду считается от корзины, и
+	 * любое изменение любой из этих величин делает показанную скидку скидкой
+	 * от корзины, которой больше нет.
+	 */
+	const cartKey = useMemo(
+		() =>
+			[
+				cart.summary.priceWithoutDiscount,
+				cart.summary.totalPrice,
+				...cart.items.map((item) => `${item.product.id}x${item.quantity}`),
+			].join("|"),
+		[cart],
+	);
+
+	// Суммы пересчитываются — показанные относятся к прошлому состоянию, и
+	// молчать об этом нельзя.
+	const isStale = isCartMutating || isPromoRevalidating;
+
+	// ── Состояние разделов ──────────────────────────────────────────────────
+	//
+	// Считается из тех же ошибок, что показываются у полей и в сводке:
+	// отдельного «прогресса заполнения» здесь нет и быть не должно — он
+	// неизбежно разошёлся бы с валидацией.
+	const sectionStates = useMemo(() => {
+		const count = (errors: Record<string, string>) => {
+			const result: Partial<Record<CheckoutSectionKey, number>> = {};
+			for (const path of Object.keys(errors)) {
+				const section = CHECKOUT_FIELDS[path]?.section;
+				if (!section) continue;
+				result[section] = (result[section] ?? 0) + 1;
+			}
+			return result;
+		};
+
+		const all = count(allErrors);
+		const visible = count(visibleErrors);
+
+		const resolve = (section: CheckoutSectionKey): CheckoutSectionState => {
+			if ((visible[section] ?? 0) > 0) return "error";
+			return (all[section] ?? 0) > 0 ? "idle" : "done";
+		};
+
+		return {
+			delivery: resolve("delivery"),
+			contacts: resolve("contacts"),
+			company: resolve("company"),
+			payment: resolve("payment"),
+		};
+	}, [allErrors, visibleErrors]);
+
+	// ── Действия с корзиной ─────────────────────────────────────────────────
+	const handleQuantityChange = useCallback(
+		(productId: string, quantity: number) => {
+			setFormError(null);
+			void setCartQuantity(productId, quantity);
+		},
+		[setCartQuantity],
+	);
+
+	const handleRemoveItem = useCallback(
+		async (productId: string) => {
+			setFormError(null);
+			const result = await removeFromCart(productId);
+			if (!result.ok && result.message) appToast.warning(result.message);
+		},
+		[removeFromCart],
+	);
+
 	const handleDeliveryChange = useCallback(
 		(next: CheckoutDeliveryInput) => {
 			setDelivery(next);
@@ -182,11 +341,19 @@ export function CheckoutPageClient({
 		[paymentMethod],
 	);
 
+	const handlePromoChange = useCallback((next: PromoApplyPreview | null) => {
+		setPromo(next);
+		setFormError(null);
+	}, []);
+
+	// ── Отправка ────────────────────────────────────────────────────────────
+	//
 	// Повторные нажатия до завершения запроса создавали бы дубли заказов:
 	// useTransition обновляет isSubmitting асинхронно, поэтому одного флага
 	// состояния мало — нужен синхронный барьер.
 	const inFlightRef = useRef(false);
 	const [summaryFocusToken, setSummaryFocusToken] = useState(0);
+	const summaryRef = useRef<HTMLDivElement | null>(null);
 
 	function revealErrors() {
 		validation.revealAll();
@@ -221,6 +388,11 @@ export function CheckoutPageClient({
 
 				if (result.success) {
 					appToast.success(`Заказ №${result.data.orderNumber} оформлен`);
+					// Отметка для страницы заказа: конфетти взлетает только в этот
+					// переход. Она живёт в sessionStorage, а не в адресе, поэтому
+					// перезагрузка страницы заказа и открытие её из списка праздник
+					// не повторяют (см. modules/orders/lib/celebrate-order).
+					markOrderJustCreated(result.data.orderNumber);
 					router.push(`/orders/${result.data.orderNumber}`);
 					// Флаг НЕ снимаем: страница уходит на успех, и повторное нажатие
 					// во время навигации создало бы второй заказ.
@@ -236,9 +408,13 @@ export function CheckoutPageClient({
 				}
 
 				if (result.error === "CART_EMPTY" || result.error === "CART_INVALID") {
+					// Корзину изменили в другой вкладке или товар сняли с продажи,
+					// пока заполнялась форма. Забираем актуальный состав в стор —
+					// страница перерисуется по нему, и на экране окажется то, что
+					// есть на самом деле, а не то, что приехало при открытии.
 					setFormError(result.message);
 					appToast.warning(result.message);
-					router.refresh();
+					void refreshCart({ silent: true });
 					return;
 				}
 
@@ -278,153 +454,249 @@ export function CheckoutPageClient({
 		});
 	}
 
-	const cartIssue = initialView.cart.validation.isValid
+	const handleJumpToSummary = useCallback(() => {
+		const node = summaryRef.current;
+		if (!node) return;
+		const prefersReducedMotion = window.matchMedia?.(
+			"(prefers-reduced-motion: reduce)",
+		).matches;
+		node.scrollIntoView({
+			behavior: prefersReducedMotion ? "auto" : "smooth",
+			block: "end",
+		});
+	}, []);
+
+	const cartIssue = cart.validation.isValid
 		? null
-		: (initialView.cart.validation.issues[0]?.message ??
+		: (cart.validation.issues[0]?.message ??
 			"Проверьте количество товаров в корзине");
 
-	return (
-		<div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-			<h1 className="mb-6 text-2xl font-semibold text-(--text-primary) sm:text-3xl">
-				Оформление заказа
-			</h1>
-
-			<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-				<div className="flex flex-col gap-6 lg:col-span-2">
-					<OrderItemsSummary items={initialView.cart.items} />
-
-					<DeliveryMethodSelector
-						value={delivery}
-						onChange={handleDeliveryChange}
-						pickupPoints={initialView.pickupPoints}
-						transportCompanies={initialView.transportCompanies}
-						errors={visibleErrors}
-						addressSummaryError={addressSummaryError}
-						onFieldBlur={validation.markTouched}
-						suggestionsEnabled={initialView.addressSuggestionsEnabled}
-						addressManualMode={addressManualMode}
-						onAddressManualModeChange={setAddressManualMode}
-					/>
-
-					<ContactsSection
-						value={contacts}
-						onChange={(next) => {
-							setContacts(next);
-							setFormError(null);
-						}}
-						errors={visibleErrors}
-						onFieldBlur={validation.markTouched}
-					/>
-
-					<CompanySection
-						value={company}
-						onChange={setCompany}
-						companies={initialView.companies}
-						errors={visibleErrors}
-						onFieldBlur={validation.markTouched}
-					/>
-
-					<PaymentMethodSelector
-						value={paymentMethod}
-						onChange={setPaymentMethod}
-						available={availablePaymentMethods}
-						error={visibleErrors.paymentMethod}
-					/>
-
-					<div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-6">
-						<label
-							htmlFor="order-notes"
-							className="mb-2 block text-sm font-medium text-(--text-primary)"
-						>
-							Комментарий к заказу
-						</label>
-						<textarea
-							id="order-notes"
-							value={notes}
-							onChange={(e) => setNotes(e.target.value)}
-							rows={3}
-							maxLength={1000}
-							className="w-full rounded-[var(--radius-sm)] border border-(--border) bg-transparent px-3 py-2 text-sm outline-none transition-colors focus:border-(--primary)"
-							placeholder="Необязательно"
+	// ── Тупиковое состояние: заказывать нечего ──────────────────────────────
+	if (cart.items.length === 0) {
+		return (
+			<>
+				<CheckoutHero
+					breadcrumbs={breadcrumbs}
+					positions={0}
+					itemsQuantity={0}
+					total={0}
+					isStale={false}
+				/>
+				<PageContainer>
+					<div className={styles.empty}>
+						<PackageSearch
+							size={28}
+							strokeWidth={1.25}
+							aria-hidden
+							className="text-[var(--border-light)]"
 						/>
+						<p className={styles.emptyTitle}>Заказывать нечего</p>
+						<p className={styles.emptyText}>
+							В корзине не осталось товаров — оформлять пустой заказ не из чего.
+							Загляните в каталог: всё, что вы выберете, вернётся сюда.
+						</p>
+						{/* Причина, по которой корзина опустела (например, её очистили в
+						    другой вкладке уже после открытия формы), не должна пропасть
+						    вместе с формой. */}
+						{formError && (
+							<p
+								role="alert"
+								className={`${styles.notice} ${styles.noticeWarn}`}
+							>
+								<AlertTriangle
+									size={15}
+									aria-hidden
+									className={styles.noticeIcon}
+								/>
+								<span>{formError}</span>
+							</p>
+						)}
+						<div className={styles.emptyActions}>
+							<Link
+								href="/category"
+								className={`${styles.btn} ${styles.btnPrimary}`}
+							>
+								<ShoppingBag size={15} aria-hidden />
+								Перейти в каталог
+							</Link>
+							<Link href="/cart" className={styles.btn}>
+								<ArrowLeft size={15} aria-hidden />
+								Вернуться в корзину
+							</Link>
+						</div>
 					</div>
-				</div>
+				</PageContainer>
+			</>
+		);
+	}
 
-				<div className="lg:col-span-1">
-					<div className="sticky top-24 flex flex-col gap-4">
-						{/* Поле стоит рядом с итогом, а не среди полей доставки:
-						    промокод меняет именно сумму, и результат его применения
-						    должен быть виден в том же взгляде, что и само поле. */}
-						<PromoCodeField
-							applied={promo}
-							onAppliedChange={(next) => {
-								setPromo(next);
-								setFormError(null);
-							}}
-							disabled={
-								initialView.cart.items.length === 0 ||
-								!initialView.cart.validation.isValid
+	return (
+		<>
+			<CheckoutHero
+				breadcrumbs={breadcrumbs}
+				positions={totals.positions}
+				itemsQuantity={totals.itemsQuantity}
+				total={totals.total}
+				isStale={isStale}
+			/>
+
+			<PageContainer>
+				<div className={styles.layout}>
+					<div className={styles.form}>
+						<CheckoutSection
+							index={1}
+							title="Состав заказа"
+							hint="Количество можно поправить здесь — уходить в корзину не нужно"
+							state={cart.validation.isValid ? "done" : "error"}
+							action={
+								<Link href="/cart" className={styles.sectionLink}>
+									В корзину
+								</Link>
 							}
-						/>
+						>
+							<OrderItemsPanel
+								items={cart.items}
+								unavailable={cart.unavailable}
+								validation={cart.validation}
+								pending={cartPending}
+								onQuantityChange={handleQuantityChange}
+								onRemove={handleRemoveItem}
+							/>
 
-						<OrderConfirmationPanel
-							cart={initialView.cart}
+							{cartError && (
+								<p
+									role="alert"
+									className={`${styles.notice} ${styles.noticeError}`}
+								>
+									<span>{cartError}</span>
+								</p>
+							)}
+						</CheckoutSection>
+
+						<CheckoutSection
+							index={2}
+							title="Способ получения"
+							hint="От него зависят и набор данных, и доступные способы оплаты"
+							state={sectionStates.delivery}
+						>
+							<DeliverySection
+								value={delivery}
+								onChange={handleDeliveryChange}
+								pickupPoints={initialView.pickupPoints}
+								transportCompanies={initialView.transportCompanies}
+								errors={visibleErrors}
+								addressSummaryError={addressSummaryError}
+								onFieldBlur={validation.markTouched}
+								suggestionsEnabled={initialView.addressSuggestionsEnabled}
+								addressManualMode={addressManualMode}
+								onAddressManualModeChange={setAddressManualMode}
+							/>
+						</CheckoutSection>
+
+						<CheckoutSection
+							index={3}
+							title="Контактные данные"
+							hint="Кто оформляет заказ, кто его получит и по какому номеру звонить"
+							state={sectionStates.contacts}
+						>
+							<ContactsSection
+								value={contacts}
+								onChange={(next) => {
+									setContacts(next);
+									setFormError(null);
+								}}
+								errors={visibleErrors}
+								onFieldBlur={validation.markTouched}
+							/>
+						</CheckoutSection>
+
+						<CheckoutSection
+							index={4}
+							title="Плательщик"
+							hint="Обычному заказу ничего заполнять не нужно"
+							state={sectionStates.company}
+						>
+							<CompanySection
+								value={company}
+								onChange={setCompany}
+								companies={initialView.companies}
+								errors={visibleErrors}
+								onFieldBlur={validation.markTouched}
+							/>
+						</CheckoutSection>
+
+						<CheckoutSection
+							index={5}
+							title="Оплата"
+							hint="Деньги не списываются при оформлении"
+							state={sectionStates.payment}
+						>
+							<PaymentSection
+								value={paymentMethod}
+								onChange={setPaymentMethod}
+								available={availablePaymentMethods}
+								error={visibleErrors.paymentMethod}
+								total={totals.total}
+								limitedByDelivery={availablePaymentMethods.length === 1}
+							/>
+						</CheckoutSection>
+
+						<CheckoutSection
+							index={6}
+							title="Комментарий к заказу"
+							hint="Всё, что важно знать менеджеру"
+						>
+							<TextareaField
+								label="Комментарий"
+								optionalNote={`${notes.length} / 1000`}
+								rows={3}
+								maxLength={1000}
+								value={notes}
+								onChange={(event) => setNotes(event.target.value)}
+								placeholder="Например: нужен счёт с НДС"
+							/>
+						</CheckoutSection>
+					</div>
+
+					<aside className={styles.aside} aria-label="Стоимость заказа">
+						<OrderSummaryPanel
+							totals={totals}
 							contacts={contacts}
 							delivery={delivery}
 							company={company}
 							paymentMethod={paymentMethod}
-							notes={notes}
 							pickupPoints={initialView.pickupPoints}
 							transportCompanies={initialView.transportCompanies}
-							promo={promo}
-						/>
-
-						{cartIssue && (
-							<p className="flex items-start gap-2 rounded-[var(--radius-md)] border border-(--warning)/40 bg-(--warning)/8 p-3 text-sm text-(--warning)">
-								<AlertTriangle
-									className="mt-0.5 h-4 w-4 shrink-0"
-									aria-hidden
+							promoField={
+								<PromoCodeField
+									applied={promo}
+									onAppliedChange={handlePromoChange}
+									cartKey={cartKey}
+									onRevalidatingChange={setIsPromoRevalidating}
+									disabled={!cart.validation.isValid || isCartMutating}
 								/>
-								{cartIssue}
-							</p>
-						)}
-
-						<CheckoutErrorSummary
-							entries={errorEntries}
-							focusOnAppear={summaryFocusToken > 0}
-							key={summaryFocusToken}
+							}
+							isStale={isStale}
+							isSubmitting={isSubmitting}
+							onSubmit={handleSubmit}
+							errorEntries={errorEntries}
+							formError={formError}
+							cartIssue={cartIssue}
+							summaryFocusToken={summaryFocusToken}
+							panelRef={summaryRef}
 						/>
-
-						{formError && (
-							<p
-								role="alert"
-								className="flex items-start gap-2 rounded-[var(--radius-md)] border border-(--error)/40 bg-(--error)/8 p-3 text-sm text-(--error)"
-							>
-								<AlertTriangle
-									className="mt-0.5 h-4 w-4 shrink-0"
-									aria-hidden
-								/>
-								{formError}
-							</p>
-						)}
-
-						<Button
-							variant="primary"
-							size="lg"
-							fullWidth
-							// Кнопка НЕ блокируется при невалидной форме: заблокированная
-							// кнопка не объясняет, чего не хватает, и пользователь остаётся
-							// без обратной связи. Вместо этого нажатие показывает список
-							// ошибок и уводит к первому полю.
-							disabled={isSubmitting}
-							loading={isSubmitting}
-							onClick={handleSubmit}
-						>
-							Подтвердить заказ
-						</Button>
-					</div>
+					</aside>
 				</div>
-			</div>
-		</div>
+
+				<div className={styles.dockSpacer} aria-hidden />
+			</PageContainer>
+
+			<CheckoutDock
+				total={totals.total}
+				isStale={isStale}
+				panelRef={summaryRef}
+				onJump={handleJumpToSummary}
+			/>
+		</>
 	);
 }

@@ -1469,3 +1469,417 @@
 .summaryValueAccent {
 	color: var(--primary-200);
 }
+
+/* ===========================================================================
+   Страница одного заказа (/orders/[orderNumber])
+   ===========================================================================
+   Тот же адрес открывается и сразу после оформления, и через месяц из списка.
+   Поэтому страница построена вокруг СОСТОЯНИЯ заказа, а не вокруг факта его
+   создания: тон первого экрана задаёт статус, а праздник добавляется только
+   тому переходу, который пришёл прямо с оформления.
+
+   Материалы — общие с остальной витриной: полоса --void-deep во всю ширину,
+   один радиальный источник света, волосяной шов по нижнему краю, служебные
+   подписи моноширинным капслоком. Блоки ниже первого экрана — буквально те
+   же .block/.fields/.items/.sum, что в раскрытом заказе списка: один заказ,
+   показанный в двух местах, обязан выглядеть одним заказом.               */
+
+/* ---------------------------------------------------------------------------
+   Первый экран
+   --------------------------------------------------------------------------- */
+.pageHero {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	background: var(--void-deep);
+}
+
+/* Источник света окрашен тоном статуса: зелёный у оформленного и полученного,
+   синий у движущегося, оранжевый у ждущего действия, красный у остановленного.
+   Цвет здесь ничего не сообщает в одиночку — он усиливает знак, подпись и
+   заголовок, которые говорят то же самое словами. */
+.pageHeroGlow {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background: radial-gradient(
+		100% 78% at 50% 0%,
+		color-mix(in srgb, var(--hero-tone, var(--success)) 13%, transparent) 0%,
+		transparent 62%
+	);
+}
+
+.pageHero[data-tone="wait"],
+.pageHero[data-tone="done"] {
+	--hero-tone: var(--success);
+}
+
+.pageHero[data-tone="progress"] {
+	--hero-tone: var(--accent);
+}
+
+.pageHero[data-tone="action"] {
+	--hero-tone: var(--primary);
+}
+
+.pageHero[data-tone="stopped"] {
+	--hero-tone: var(--error);
+}
+
+.pageHeroSeam {
+	position: absolute;
+	inset-inline: 0;
+	bottom: 0;
+	height: 1px;
+	pointer-events: none;
+	background: var(--rule);
+}
+
+.pageHeroInner {
+	display: flex;
+	flex-direction: column;
+	padding-top: clamp(1.25rem, 2.5vw, 2rem);
+	padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+/* Содержимое по центру: это единственный экран сайта, где центр оправдан —
+   на нём одно утверждение и один код под ним, а не колонка текста. */
+.heroBody {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	padding-top: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+/* Кегль подобран по самому длинному возможному заголовку — «ПОДТВЕРЖДЁН»,
+   11 знаков, ~13.2em у PaluiSP2: при нижней границе 1.5rem это 317px на
+   экране 375px, где доступно 343. На 320px слово уходит в словарный перенос —
+   там это неизбежно при любом читаемом кегле. */
+.heroTitle {
+	margin: clamp(1.25rem, 2.5vw, 1.75rem) 0 0;
+	font-size: clamp(1.5rem, 0.95rem + 2.4vw, 3rem);
+	line-height: 0.96;
+	color: var(--text-primary);
+}
+
+/* Номер — моноширинный и крупнее строки списка: это код, который диктуют
+   менеджеру, и главная причина вернуться на страницу. */
+.heroNumber {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: center;
+	gap: 0.5rem;
+	margin: clamp(0.75rem, 1.5vw, 1rem) 0 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: clamp(1rem, 0.85rem + 0.7vw, 1.3125rem);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.02em;
+	line-height: 1.2;
+	color: var(--text-primary);
+	/* Очень длинный номер не должен распирать экран. */
+	overflow-wrap: anywhere;
+}
+
+.heroNumberPrefix {
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.heroMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem;
+	margin-top: 1rem;
+}
+
+/* Сумма — вторая по важности величина экрана после самого факта заказа.
+   Подпись сверху, значение крупно: так же собран итог в колонке денег на
+   оформлении. */
+.heroTotal {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.35rem;
+	margin: clamp(1.5rem, 3vw, 2rem) 0 0;
+}
+
+.heroTotalValue {
+	font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.02em;
+	line-height: 1;
+	white-space: nowrap;
+	color: var(--text-primary);
+}
+
+/* Обещание звонка: единственный абзац текста на экране, поэтому он по левому
+   краю и с ограниченной мерой — центрированный многострочный текст читается
+   хуже ровно настолько, насколько он длиннее одной строки. */
+.heroPromise {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	max-width: 34rem;
+	margin: clamp(1.5rem, 3vw, 2rem) 0 0;
+	padding: 0.8rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--accent) 8%, transparent);
+	font-size: 0.875rem;
+	line-height: 1.55;
+	text-align: left;
+	color: var(--text-primary);
+}
+
+.heroPromiseIcon {
+	flex: 0 0 auto;
+	margin-top: 0.15rem;
+	color: var(--accent-light);
+}
+
+/* ---------------------------------------------------------------------------
+   Три факта под первым экраном
+   ---------------------------------------------------------------------------
+   Оглавление заказа, а не повтор блоков ниже: одной строкой вместо трёх
+   разделов. Отвечает на «что именно я заказал» без прокрутки.             */
+.heroFacts {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1rem;
+	margin: clamp(1.75rem, 3.5vw, 2.5rem) 0 0;
+	padding-top: clamp(1.25rem, 2.5vw, 1.75rem);
+	border-top: 1px solid var(--rule);
+}
+
+@media (min-width: 40rem) {
+	.heroFacts {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 1.5rem;
+	}
+}
+
+.heroFact {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	min-width: 0;
+}
+
+.heroFactValue {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	line-height: 1.4;
+	color: var(--text-primary);
+	overflow-wrap: anywhere;
+}
+
+/* Уточнение рядом со значением: «5 шт.» к числу позиций, «Ожидает оплаты» к
+   способу. Тише значения, но не служебная подпись — это часть ответа. */
+.heroFactMuted {
+	font-size: 0.8125rem;
+	font-weight: 400;
+	color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Знак состояния
+   ---------------------------------------------------------------------------
+   Окружность с символом внутри. Цвет и символ приходят из тона статуса
+   (см. OrderStatusMark) — зелёная галочка над отменённым заказом означала бы
+   ровно противоположное правде.                                           */
+.mark {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: clamp(4.5rem, 4rem + 2.5vw, 6rem);
+	aspect-ratio: 1;
+}
+
+.markEcho {
+	position: absolute;
+	inset: 0;
+	border: 1px solid var(--mark-color, var(--success));
+	border-radius: 999px;
+}
+
+.markGlow {
+	position: absolute;
+	inset: 0;
+	border-radius: 999px;
+	background: color-mix(
+		in srgb,
+		var(--mark-color, var(--success)) 14%,
+		transparent
+	);
+	filter: blur(18px);
+}
+
+.markPlate {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 84%;
+	height: 84%;
+	border-radius: 999px;
+	background: color-mix(
+		in srgb,
+		var(--mark-color, var(--success)) 10%,
+		transparent
+	);
+}
+
+.markSvg {
+	width: 100%;
+	height: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   Раскладка страницы
+   ---------------------------------------------------------------------------
+   Слева поток ответов «что дальше → что заказал → куда едет → чем
+   подтверждается», справа липкая колонка «сколько стоит и что я могу
+   сделать». На узком экране всё складывается в один поток в том же порядке:
+   расчёт после состава, действия последними.                              */
+.pageBody {
+	padding-top: clamp(1.75rem, 3.5vw, 2.75rem);
+	padding-bottom: clamp(3rem, 6vw, 4.5rem);
+}
+
+.pageLayout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: clamp(1.75rem, 3.5vw, 2.5rem);
+	align-items: start;
+}
+
+/* 64rem (1024px) — планшет в альбомной ориентации и узкий ноутбук. Порог
+   выбран по тому, что остаётся ОСНОВНОЙ колонке: 1024 − 48 (поля страницы)
+   − 304 (колонка расчёта) − 40 (зазор) = 632px, то есть две подколонки
+   «Получение» и «Данные» по 296px — ровно столько, сколько нужно адресу и
+   юридическому наименованию, чтобы не ломаться на каждом слове. */
+@media (min-width: 64rem) {
+	.pageLayout {
+		grid-template-columns: minmax(0, 1fr) 19rem;
+		gap: 2.5rem;
+	}
+}
+
+@media (min-width: 80rem) {
+	.pageLayout {
+		grid-template-columns: minmax(0, 1fr) 21rem;
+		gap: 3rem;
+	}
+}
+
+.pageMain {
+	display: flex;
+	flex-direction: column;
+	gap: clamp(1.75rem, 3.5vw, 2.5rem);
+	min-width: 0;
+}
+
+.pageRail {
+	min-width: 0;
+}
+
+@media (min-width: 64rem) {
+	.pageRail {
+		position: sticky;
+		/* Шапка + воздух. Высота шапки замерена и живёт в globals.css. */
+		top: calc(var(--sticky-header-height) + 1.5rem);
+		/* Колонка длиннее экрана не липнет, а прокручивается вместе со
+		   страницей — иначе форма отмены оказывается за нижним краем окна и до
+		   неё нельзя добраться вовсе. */
+		max-height: calc(100dvh - var(--sticky-header-height) - 3rem);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-width: thin;
+		padding-right: 0.25rem;
+	}
+}
+
+.pageRailInner {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+	padding: 1.25rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-lg);
+	background: color-mix(in srgb, var(--void) 55%, transparent);
+}
+
+/* Одно выделенное действие и одна тихая ссылка рядом. На узком экране обе
+   растягиваются во всю ширину: половинки кнопок под палец не попадают. */
+.pageActions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+}
+
+.pageActions .btn {
+	width: 100%;
+}
+
+/* Своего правила для prefers-reduced-motion здесь НЕТ намеренно: кольца
+   несут класс .order-ring-echo, а его globals.css при уменьшенной анимации
+   прячет целиком (display: none) и заодно дочерчивает символ
+   (stroke-dashoffset: 0). Второе правило о том же самом рядом — это два
+   места, которые обязаны совпадать, и однажды разойдутся. */
+
+/* ---------------------------------------------------------------------------
+   Заглушка страницы заказа
+   ---------------------------------------------------------------------------
+   Показывается, пока сервер готовит страницу (loading.tsx). Повторяет её
+   геометрию, а не рисует «спиннер посреди пустоты»: когда данные приедут,
+   содержимое встанет на уже занятые места и страница не дёрнется.
+
+   Пульсация общая с остальными заглушками витрины — та же
+   .skeletonPulse, что у корзины и списка заказов.                          */
+.pageSkeletonMark {
+	width: clamp(4.5rem, 4rem + 2.5vw, 6rem);
+	aspect-ratio: 1;
+	border-radius: 999px;
+	background: var(--surface-secondary);
+}
+
+.pageSkeletonBlock {
+	border-radius: var(--radius-sm);
+	background: var(--surface-secondary);
+}
+
+.skeletonPulse {
+	animation: orders-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes orders-skeleton-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.45;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.skeletonPulse {
+		animation: none;
+		opacity: 0.7;
+	}
+}

@@ -100,7 +100,9 @@ test("серверная ошибка поля показывается в св�
 	await fillValidSelfPickup(page);
 
 	await page.getByLabel("Заказ от юридического лица").check();
-	await page.getByRole("button", { name: /E2E Организация/ }).click();
+	// Сохранённые организации — группа переключателей: выбрать можно ровно
+	// одну, и роль обязана об этом сообщать.
+	await page.getByRole("radio", { name: /E2E Организация/ }).click();
 	await expect(errorSummary(page)).toBeHidden();
 
 	// Организацию удалили, пока пользователь заполнял форму.

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
 	FIELD,
 	openCheckout,
@@ -31,6 +31,19 @@ test.beforeEach(() => {
 	resetCart();
 });
 
+/**
+ * Раскрытые подробности заказа в списке.
+ *
+ * Раньше здесь искали `role="dialog"`: подробности открывались модальным
+ * окном. После редизайна «Моих заказов» заказ раскрывается НА МЕСТЕ — это
+ * штатный disclosure: кнопка с aria-expanded и область role="region",
+ * подписанная номером заказа. Проверяемое поведение то же самое, изменилось
+ * только то, где оно живёт.
+ */
+function orderPanel(page: Page, orderNumber: string): Locator {
+	return page.getByRole("region", { name: new RegExp(orderNumber) });
+}
+
 test.describe("витрина покупателя", () => {
 	test("исторические заказы отображаются в списке", async ({ page }) => {
 		await page.goto("/orders");
@@ -45,12 +58,12 @@ test.describe("витрина покупателя", () => {
 		await page.goto("/orders");
 		await page.getByText(`Заказ №${LEGACY_SINGLE_LINE}`).click();
 
-		const dialog = page.getByRole("dialog");
-		await expect(dialog).toBeVisible();
+		const panel = orderPanel(page, LEGACY_SINGLE_LINE);
+		await expect(panel).toBeVisible();
 		// Ровно то, что лежит в street: дописывать «д.»/«кв.» здесь не к чему.
-		await expect(dialog).toContainText("г. Тула, ул. Старая, д. 7, кв. 3");
+		await expect(panel).toContainText("г. Тула, ул. Старая, д. 7, кв. 3");
 		// Пустых сегментов «, , ,» из незаполненных полей быть не должно.
-		await expect(dialog).not.toContainText(", , ");
+		await expect(panel).not.toContainText(", , ");
 	});
 
 	test("разбитый адрес без новых полей собирается корректно", async ({
@@ -59,12 +72,13 @@ test.describe("витрина покупателя", () => {
 		await page.goto("/orders");
 		await page.getByText(`Заказ №${LEGACY_SPLIT_FIELDS}`).click();
 
-		const dialog = page.getByRole("dialog");
-		await expect(dialog).toContainText("248000");
-		await expect(dialog).toContainText("Калуга");
-		await expect(dialog).toContainText("ул. Новая");
-		await expect(dialog).toContainText("д. 12");
-		await expect(dialog).toContainText("кв./офис 45");
+		const panel = orderPanel(page, LEGACY_SPLIT_FIELDS);
+		await expect(panel).toBeVisible();
+		await expect(panel).toContainText("248000");
+		await expect(panel).toContainText("Калуга");
+		await expect(panel).toContainText("ул. Новая");
+		await expect(panel).toContainText("д. 12");
+		await expect(panel).toContainText("кв./офис 45");
 	});
 
 	test("у заказа без новых полей номер для связи всё равно виден", async ({
@@ -76,9 +90,10 @@ test.describe("витрина покупателя", () => {
 		await page.goto("/orders");
 		await page.getByText(`Заказ №${LEGACY_SINGLE_LINE}`).click();
 
-		const dialog = page.getByRole("dialog");
-		await expect(dialog).toContainText("+79990001122");
-		await expect(dialog).toContainText(/менеджер звонит/i);
+		const panel = orderPanel(page, LEGACY_SINGLE_LINE);
+		await expect(panel).toBeVisible();
+		await expect(panel).toContainText("+79990001122");
+		await expect(panel).toContainText(/менеджер звонит/i);
 	});
 
 	test("отсутствие новых полей не роняет страницу", async ({ page }) => {
@@ -89,7 +104,7 @@ test.describe("витрина покупателя", () => {
 
 		await page.goto("/orders");
 		await page.getByText(`Заказ №${LEGACY_SINGLE_LINE}`).click();
-		await expect(page.getByRole("dialog")).toBeVisible();
+		await expect(orderPanel(page, LEGACY_SINGLE_LINE)).toBeVisible();
 
 		expect(errors).toEqual([]);
 	});

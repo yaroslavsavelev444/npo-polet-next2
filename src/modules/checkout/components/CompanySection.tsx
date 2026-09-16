@@ -1,13 +1,13 @@
 "use client";
 
+import { Building2, Check } from "lucide-react";
 import { useState } from "react";
 import type { Company } from "@/payload-types";
-import { Input } from "@/UI";
-import { cn } from "@/utils/cn";
 import { CHECKOUT_FIELD_IDS } from "../lib/checkout-fields";
 import type { CheckoutFieldErrors } from "../lib/checkout-schema";
 import type { CheckoutCompanyInput } from "../types";
-import { CompanyCard } from "./CompanyCard";
+import styles from "./Checkout.module.css";
+import { CheckboxRow, Disclosure, TextField } from "./fields";
 
 interface Props {
 	value: CheckoutCompanyInput;
@@ -17,6 +17,19 @@ interface Props {
 	onFieldBlur: (path: string) => void;
 }
 
+/**
+ * Плательщик: частное лицо или организация.
+ *
+ * Весь раздел — один переключатель и то, что он раскрывает. Реквизиты нужны
+ * меньшинству заказов, и держать их развёрнутыми для всех значило бы удлинять
+ * форму ради тех, кто их не заполняет.
+ *
+ * Сохранённые организации показываются первыми: у постоянного покупателя
+ * заказ от юрлица — это одно нажатие, а не двенадцать полей заново.
+ * Принадлежность выбранной организации проверяет СЕРВЕР (см.
+ * checkout.actions.ts): id приходит из формы, то есть полностью управляется
+ * клиентом, и без проверки заказ можно было бы привязать к чужой организации.
+ */
 export function CompanySection({
 	value,
 	onChange,
@@ -43,117 +56,168 @@ export function CompanySection({
 	const existingCompanyError = errors["company.existingCompanyId"];
 
 	return (
-		<div className="rounded-[var(--radius-lg)] border border-(--border) bg-(--surface) p-6">
-			<label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-(--text-primary)">
-				<input
-					type="checkbox"
-					checked={value.isCompany}
-					onChange={(e) => onChange({ ...value, isCompany: e.target.checked })}
-					className="h-4 w-4 shrink-0 accent-(--primary)"
-				/>
+		<>
+			<CheckboxRow
+				checked={value.isCompany}
+				onChange={(checked) => onChange({ ...value, isCompany: checked })}
+				note="Понадобятся ИНН и юридический адрес — они попадут в счёт"
+			>
 				Заказ от юридического лица
-			</label>
+			</CheckboxRow>
 
-			{value.isCompany && (
-				<div className="mt-5 flex flex-col gap-4">
+			<Disclosure open={value.isCompany}>
+				<div className={styles.group}>
 					{companies.length > 0 && (
-						<div className="flex gap-2 text-sm">
+						<div
+							className={`${styles.options} ${styles.optionsPair}`}
+							role="group"
+							aria-label="Откуда взять реквизиты"
+						>
 							<button
 								type="button"
 								onClick={() => setMode("existing")}
-								className={
-									mode === "existing"
-										? "font-medium text-(--primary)"
-										: "text-(--text-secondary) hover:text-(--text-primary)"
-								}
+								data-selected={mode === "existing" || undefined}
+								className={styles.option}
 							>
-								Сохранённые компании
+								<span className={styles.optionMark} aria-hidden />
+								<span className={styles.optionBody}>
+									<span className={styles.optionTitle}>
+										Сохранённые компании
+									</span>
+									<span className={styles.optionText}>
+										{companies.length === 1
+											? "Одна организация"
+											: `${companies.length} организации`}
+									</span>
+								</span>
 							</button>
-							<span className="text-(--text-muted)">/</span>
 							<button
 								type="button"
 								onClick={() => {
 									setMode("new");
 									onChange({ ...value, existingCompanyId: undefined });
 								}}
-								className={
-									mode === "new"
-										? "font-medium text-(--primary)"
-										: "text-(--text-secondary) hover:text-(--text-primary)"
-								}
+								data-selected={mode === "new" || undefined}
+								className={styles.option}
 							>
-								Новая компания
+								<span className={styles.optionMark} aria-hidden />
+								<span className={styles.optionBody}>
+									<span className={styles.optionTitle}>Новая компания</span>
+									<span className={styles.optionText}>
+										Ввести реквизиты вручную
+									</span>
+								</span>
 							</button>
 						</div>
 					)}
 
 					{mode === "existing" && companies.length > 0 && (
-						<div className="flex flex-col gap-1.5">
+						<>
 							<div
 								id={CHECKOUT_FIELD_IDS.companyExisting}
 								role="radiogroup"
 								aria-label="Организация"
 								aria-invalid={existingCompanyError ? true : undefined}
-								className={cn(
-									"flex flex-col gap-2 rounded-[var(--radius-md)]",
-									existingCompanyError &&
-										"p-2 outline outline-1 outline-(--error)/50",
-								)}
+								aria-describedby={
+									existingCompanyError
+										? `${CHECKOUT_FIELD_IDS.companyExisting}-error`
+										: undefined
+								}
+								className={`${styles.options} ${
+									existingCompanyError ? styles.optionsInvalid : ""
+								}`}
 							>
-								{companies.map((c) => (
-									<CompanyCard
-										key={c.id}
-										company={c}
-										isSelected={value.existingCompanyId === String(c.id)}
-										onSelect={() => selectCompany(c)}
-									/>
-								))}
+								{companies.map((company) => {
+									const isSelected =
+										value.existingCompanyId === String(company.id);
+									return (
+										<button
+											key={company.id}
+											type="button"
+											role="radio"
+											aria-checked={isSelected}
+											onClick={() => selectCompany(company)}
+											data-selected={isSelected || undefined}
+											className={styles.option}
+										>
+											<span className={styles.optionIcon}>
+												<Building2 size={16} aria-hidden />
+											</span>
+											<span className={styles.optionBody}>
+												<span className={styles.optionTitle}>
+													{company.companyName}
+												</span>
+												<span className={styles.optionText}>
+													ИНН {company.taxNumber}
+												</span>
+											</span>
+											{isSelected && (
+												<Check
+													size={15}
+													strokeWidth={3}
+													aria-hidden
+													className={styles.optionCheck}
+												/>
+											)}
+										</button>
+									);
+								})}
 							</div>
 							{existingCompanyError && (
-								<p className="text-xs leading-none text-(--error)">
+								<p
+									id={`${CHECKOUT_FIELD_IDS.companyExisting}-error`}
+									role="alert"
+									className={styles.fieldError}
+								>
 									{existingCompanyError}
 								</p>
 							)}
-						</div>
+						</>
 					)}
 
 					{mode === "new" && (
-						<div className="flex flex-col gap-4">
-							<Input
+						<div className={styles.group}>
+							<TextField
 								id={CHECKOUT_FIELD_IDS.companyName}
 								label="Название компании"
 								autoComplete="organization"
+								placeholder="ООО «Ромашка»"
 								value={value.companyName ?? ""}
 								onChange={(e) =>
 									onChange({ ...value, companyName: e.target.value })
 								}
 								onBlur={() => onFieldBlur("company.companyName")}
-								errorMessage={errors["company.companyName"]}
+								error={errors["company.companyName"]}
 								required
 							/>
-							<Input
+							<TextField
 								id={CHECKOUT_FIELD_IDS.companyLegalAddress}
 								label="Юридический адрес"
+								placeholder="Как в ЕГРЮЛ"
 								value={value.legalAddress ?? ""}
 								onChange={(e) =>
 									onChange({ ...value, legalAddress: e.target.value })
 								}
 								onBlur={() => onFieldBlur("company.legalAddress")}
-								errorMessage={errors["company.legalAddress"]}
+								error={errors["company.legalAddress"]}
 								required
 							/>
-							<Input
+							<TextField
 								label="Фактический адрес"
+								placeholder="Если отличается от юридического"
+								optionalNote="необязательно"
 								value={value.companyAddress ?? ""}
 								onChange={(e) =>
 									onChange({ ...value, companyAddress: e.target.value })
 								}
 							/>
-							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-								<Input
+							<div className={styles.pair}>
+								<TextField
 									id={CHECKOUT_FIELD_IDS.companyTaxNumber}
 									label="ИНН"
 									inputMode="numeric"
+									numeric
+									placeholder="10 или 12 цифр"
 									value={value.taxNumber ?? ""}
 									onChange={(e) =>
 										onChange({
@@ -162,32 +226,33 @@ export function CompanySection({
 										})
 									}
 									onBlur={() => onFieldBlur("company.taxNumber")}
-									errorMessage={errors["company.taxNumber"]}
+									error={errors["company.taxNumber"]}
+									hint="Проверяем по контрольной сумме"
 									required
 								/>
-								<Input
+								<TextField
 									label="Контактное лицо"
+									placeholder="Кто подпишет документы"
+									optionalNote="необязательно"
 									value={value.contactPerson ?? ""}
 									onChange={(e) =>
 										onChange({ ...value, contactPerson: e.target.value })
 									}
 								/>
 							</div>
-							<label className="flex cursor-pointer items-center gap-2.5 text-sm text-(--text-secondary)">
-								<input
-									type="checkbox"
-									checked={value.saveCompany}
-									onChange={(e) =>
-										onChange({ ...value, saveCompany: e.target.checked })
-									}
-									className="h-4 w-4 shrink-0 accent-(--primary)"
-								/>
+							<CheckboxRow
+								checked={value.saveCompany}
+								onChange={(checked) =>
+									onChange({ ...value, saveCompany: checked })
+								}
+								note="Реквизиты появятся в списке при следующем заказе"
+							>
 								Сохранить данные компании
-							</label>
+							</CheckboxRow>
 						</div>
 					)}
 				</div>
-			)}
-		</div>
+			</Disclosure>
+		</>
 	);
 }

@@ -1,0 +1,297 @@
+/* ===========================================================================
+   Промокод
+   ===========================================================================
+   Поле живёт в колонке денег на оформлении заказа и обязано выглядеть её
+   частью, а не гостем из прежней версии витрины. Материалы и движение — те
+   же, что у остальных обновлённых поверхностей: волосяная разлиновка --rule,
+   служебные подписи моноширинным капслоком, времена и кривые из home.css.
+
+   Модуль, а не утилиты: глобальные стили @once-ui подключаются вне слоёв и
+   перебивают Tailwind на числовых отступах (разбор — в globals.css).       */
+
+.root {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	padding-bottom: 1rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+.label {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.row {
+	display: flex;
+	align-items: stretch;
+	gap: 0.5rem;
+}
+
+/* Поле кода: моноширинный капслок. Код — это то, что диктуют и сверяют по
+   буквам, и пропорциональный шрифт здесь мешает: «I» и «l» в нём неразличимы. */
+.input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0.55rem 0.7rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	outline: none;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	/* 1rem, не мельче: Safari на iOS приближает страницу к любому полю с
+	   текстом меньше 16px. */
+	font-size: 1rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-primary);
+	transition: border-color 180ms var(--ease-out-quart);
+}
+
+.input::placeholder {
+	font-family: var(--font-sans), system-ui, sans-serif;
+	font-size: 0.875rem;
+	letter-spacing: normal;
+	text-transform: none;
+	color: var(--text-muted);
+}
+
+.input:hover:not(:disabled) {
+	border-color: var(--border-light);
+}
+
+.input:focus {
+	border-color: var(--primary);
+}
+
+.input:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.inputInvalid,
+.inputInvalid:focus {
+	border-color: var(--error);
+}
+
+/* Кнопка отвечает на нажатие мгновенно (active), не дожидаясь ответа
+   сервера: без этого промежуток до ответа читается как «нажатие не
+   сработало», и покупатель жмёт ещё раз. */
+.apply {
+	flex: 0 0 auto;
+	padding: 0 0.9rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	font-size: 0.875rem;
+	font-weight: 600;
+	white-space: nowrap;
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart),
+		transform 180ms var(--ease-out-quart);
+}
+
+.apply:hover:not(:disabled) {
+	border-color: var(--primary);
+	color: var(--primary-200);
+}
+
+.apply:active:not(:disabled) {
+	transform: scale(0.97);
+}
+
+.apply:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------
+   Применённый код
+   ---------------------------------------------------------------------------
+   Применённый код показывается тем, чем он стал: строкой заказа с суммой
+   скидки и кнопкой снять. Поле ввода рядом с ним не остаётся — иначе каждый
+   раз возникает вопрос «а этот код в поле уже действует или ещё нет?».     */
+.applied {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	padding: 0.75rem 0.85rem;
+	border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--success) 9%, transparent);
+	animation: promo-in 320ms var(--ease-out-expo) both;
+}
+
+@keyframes promo-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 6px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.appliedMark {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 1.25rem;
+	height: 1.25rem;
+	margin-top: 0.1rem;
+	border-radius: 999px;
+	background: var(--success);
+	color: #06210f;
+}
+
+.appliedBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.appliedHead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.appliedCode {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	letter-spacing: 0.08em;
+}
+
+.appliedAmount {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: color-mix(in srgb, var(--success) 82%, #fff);
+}
+
+.appliedText {
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 1.75rem;
+	height: 1.75rem;
+	margin: -0.25rem -0.25rem 0 0;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart),
+		transform 150ms var(--ease-out-quart);
+}
+
+.remove:hover:not(:disabled),
+.remove:focus-visible {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+
+.remove:active:not(:disabled) {
+	transform: scale(0.9);
+}
+
+.remove:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------
+   Сообщения
+   ---------------------------------------------------------------------------
+   Ошибка живёт под полем, а не в тосте: она относится к конкретному вводу, и
+   её нужно перечитывать, исправляя код.                                    */
+.message {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.4rem;
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	animation: promo-note-in 220ms var(--ease-out-quart) both;
+}
+
+.messageError {
+	color: var(--error);
+}
+
+.messageHint {
+	color: var(--text-secondary);
+}
+
+.messageIcon {
+	flex: 0 0 auto;
+	margin-top: 0.15rem;
+}
+
+@keyframes promo-note-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, -3px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.spin {
+	animation: promo-spin 900ms linear infinite;
+}
+
+@keyframes promo-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.applied,
+	.message,
+	.spin {
+		animation: none;
+	}
+
+	.apply,
+	.remove,
+	.input {
+		transition: none;
+	}
+
+	.apply:active:not(:disabled),
+	.remove:active:not(:disabled) {
+		transform: none;
+	}
+}
