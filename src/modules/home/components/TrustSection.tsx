@@ -1,8 +1,9 @@
-import { ArrowRight, FileText, Star } from "lucide-react";
+import { ArrowRight, ExternalLink, FileText, Star } from "lucide-react";
 import Link from "next/link";
 import type { HomepageReview } from "@/payload/services/reviews.service";
 import { Reveal } from "@/shared/components/motion/Reveal";
 import { trust } from "../content/home-content";
+import type { HomeDocumentLink } from "../lib/documents";
 import { Container, Placeholder, Section } from "./primitives";
 
 /**
@@ -16,8 +17,19 @@ import { Container, Placeholder, Section } from "./primitives";
  * Отзывы здесь настоящие — из коллекции product-reviews, только одобренные
  * модерацией. Пока их нет, колонка честно об этом сообщает, а не показывает
  * выдуманные.
+ *
+ * Документы — тоже настоящие: список задаётся в админке («Настройки сайта» →
+ * «Документы на главной»), и каждая строка ведёт либо на загруженный файл,
+ * либо на указанный адрес. Названий в коде больше нет: администратор
+ * называет документы сам.
  */
-export function TrustSection({ reviews }: { reviews: HomepageReview[] }) {
+export function TrustSection({
+	reviews,
+	documents,
+}: {
+	reviews: HomepageReview[];
+	documents: HomeDocumentLink[];
+}) {
 	return (
 		<Section id="trust" className="py-[clamp(4.5rem,9vw,9rem)]">
 			<Container>
@@ -34,27 +46,19 @@ export function TrustSection({ reviews }: { reviews: HomepageReview[] }) {
 							title={trust.documents.title}
 							lead={trust.documents.lead}
 						/>
-						<ul className="mt-6 flex list-none flex-col gap-2 p-0">
-							{trust.documents.items.map((doc) => (
-								<li
-									key={doc.title}
-									className="flex items-center gap-3 border-b border-[var(--hairline)] py-3 last:border-b-0"
-								>
-									<FileText
-										className="size-4 shrink-0 text-[var(--text-muted)]"
-										aria-hidden="true"
-									/>
-									<span className="flex-1 text-[0.9375rem] text-[var(--text-secondary)]">
-										<Placeholder note={trust.documents.note}>
-											{doc.title}
-										</Placeholder>
-									</span>
-									<span className="u-mono shrink-0 text-[0.625rem] text-[var(--text-muted)]">
-										{doc.meta}
-									</span>
-								</li>
-							))}
-						</ul>
+						{documents.length === 0 ? (
+							<p className="mt-6 text-[0.875rem] text-[var(--text-muted)]">
+								{trust.documents.emptyMessage}
+							</p>
+						) : (
+							<ul className="mt-6 flex list-none flex-col gap-0 p-0">
+								{documents.map((doc) => (
+									<li key={doc.id}>
+										<DocumentLink document={doc} />
+									</li>
+								))}
+							</ul>
+						)}
 					</Reveal>
 
 					{/* ── Отзывы ────────────────────────────────────────────── */}
@@ -142,6 +146,88 @@ export function TrustSection({ reviews }: { reviews: HomepageReview[] }) {
 				</div>
 			</Container>
 		</Section>
+	);
+}
+
+/**
+ * Строка документа: кликабельна целиком.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ПОЧЕМУ ССЫЛКА — ЭТО ВСЯ СТРОКА
+ * ────────────────────────────────────────────────────────────────────────────
+ * Раньше это был просто текст в <li>, и «сертификат» ничем не отличался от
+ * подписи под картинкой. Теперь ссылкой служит вся строка целиком, а не
+ * название внутри неё: цель нажатия на телефоне должна быть шириной в
+ * колонку, а не в длину слова.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ЧЕМ ОТКРЫВАЕТСЯ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Внутренний путь — обычным переходом (next/link, предзагрузка, без потери
+ * истории). Файл и внешний адрес — в новой вкладке: посетитель, открывший
+ * сертификат, не должен терять место на длинной главной странице, к которой
+ * он почти наверняка вернётся. `rel="noopener noreferrer"` обязателен для
+ * чужого домена: без `noopener` открытая страница получает доступ к
+ * `window.opener` и может подменить нашу вкладку.
+ *
+ * Внешние ссылки помечены значком — уход на другой сайт не должен быть
+ * неожиданностью; у файлов вместо него формат и размер.
+ */
+function DocumentLink({ document }: { document: HomeDocumentLink }) {
+	const className =
+		"group flex items-center gap-3 border-b border-[var(--hairline)] py-3 no-underline transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--text-primary)_4%,transparent)]";
+
+	const body = (
+		<>
+			<FileText
+				className="size-4 shrink-0 text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--primary)]"
+				aria-hidden="true"
+			/>
+			{/* Очень длинное название не ломает раскладку: оно переносится, а
+			    подпись формата остаётся прижатой к правому краю (shrink-0). */}
+			<span className="min-w-0 flex-1 text-[0.9375rem] leading-snug text-[var(--text-secondary)] transition-colors duration-200 group-hover:text-[var(--text-primary)]">
+				{document.title}
+			</span>
+			<span className="u-mono flex shrink-0 items-center gap-1.5 text-[0.625rem] text-[var(--text-muted)]">
+				{document.meta}
+				{document.kind === "external" && (
+					<ExternalLink className="size-3" aria-hidden="true" />
+				)}
+			</span>
+		</>
+	);
+
+	// Внутренний путь — обычная навигация, без новой вкладки: это своя же
+	// страница, и история переходов должна остаться целой.
+	if (document.kind === "internal") {
+		return (
+			<Link href={document.href} className={className}>
+				{body}
+			</Link>
+		);
+	}
+
+	// Подпись для скринридера: «PDF · 1,2 МБ» рядом с названием он прочитает
+	// как часть фразы, а вот то, что ссылка уводит на другой сайт или скачает
+	// файл, из текста строки не следует.
+	const hint =
+		document.kind === "external"
+			? " — откроется на другом сайте"
+			: document.shouldDownload
+				? " — скачать файл"
+				: " — откроется в новой вкладке";
+
+	return (
+		<a
+			href={document.href}
+			className={className}
+			target="_blank"
+			rel="noopener noreferrer"
+			{...(document.shouldDownload ? { download: "" } : {})}
+			aria-label={`${document.title}${hint}`}
+		>
+			{body}
+		</a>
 	);
 }
 

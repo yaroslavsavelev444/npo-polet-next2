@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, WifiOff } from "lucide-react";
+import { AlertTriangle, WifiOff, X } from "lucide-react";
 import type { CartUnavailableItem, CartValidationIssue } from "../types";
 import styles from "./Cart.module.css";
 
@@ -14,26 +14,62 @@ import styles from "./Cart.module.css";
  * столько, сколько существует.
  */
 
+/**
+ * Полоса «эти товары больше нельзя заказать».
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ПОЧЕМУ ЕЁ МОЖНО ЗАКРЫТЬ, А ПОМЕТКУ НА ТОВАРЕ — НЕТ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Полоса — это НОВОСТЬ: «пока вы отсутствовали, вот с этим случилось вот
+ * что». Новость прочитывают один раз, и держать её на экране вечно — значит
+ * мешать разбирать остальную корзину. А вот сам факт недоступности —
+ * СОСТОЯНИЕ: строка товара остаётся перечёркнутой и подписанной всегда, и
+ * закрыть её нельзя (см. CartUnavailableLineItem). Поэтому закрытие полосы
+ * ничего не прячет: оно лишь убирает повтор того, что уже написано у каждой
+ * строки.
+ *
+ * Закрытие запоминается по id товаров (см. lib/unavailable-dismissals),
+ * поэтому полоса не возвращается ни при перерисовке, ни при перезагрузке
+ * страницы — но возвращается, если с продажи снимут ЕЩЁ один товар.
+ */
 export function CartUnavailableNotice({
 	items,
+	onDismiss,
 }: {
 	items: CartUnavailableItem[];
+	onDismiss?: () => void;
 }) {
 	if (items.length === 0) return null;
 
 	return (
 		<div className={styles.notice} role="status">
 			<AlertTriangle size={15} className={styles.noticeIcon} aria-hidden />
-			<span>
+			<span className={styles.noticeText}>
 				{items.length === 1
-					? "Один товар больше не продаётся и не войдёт в заказ:"
-					: `${items.length} товара больше не продаются и не войдут в заказ:`}
+					? "Товар больше недоступен для заказа и не войдёт в заказ:"
+					: `${items.length} товара(ов) больше недоступны для заказа и не войдут в заказ:`}
 				<ul className={styles.noticeList}>
 					{items.map((item) => (
-						<li key={item.productId}>{item.title ?? "товар снят с продажи"}</li>
+						<li key={item.productId}>
+							{item.title ?? "Товар снят с продажи"} — {item.statusLabel}
+						</li>
 					))}
 				</ul>
+				<span className={styles.noticeHint}>
+					Позиции остались в корзине, помеченными. Уберите их, чтобы оформить
+					заказ.
+				</span>
 			</span>
+			{onDismiss && (
+				<button
+					type="button"
+					className={styles.noticeClose}
+					onClick={onDismiss}
+					aria-label="Скрыть уведомление о недоступных товарах"
+				>
+					<X size={14} aria-hidden />
+				</button>
+			)}
 		</div>
 	);
 }

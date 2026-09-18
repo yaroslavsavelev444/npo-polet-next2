@@ -11,6 +11,15 @@ export const Media: CollectionConfig = {
       { name: 'card', width: 768, height: 576 },
       { name: 'full', width: 1920, height: 1080 },
     ],
+    // Белый список, а не чёрный: всё, чего здесь нет, загрузить нельзя.
+    // Поэтому в нём нет и не должно быть ничего исполняемого — ни SVG (это
+    // документ с активным содержимым: <script> внутри картинки выполняется
+    // при открытии файла по прямой ссылке), ни архивов, ни html.
+    //
+    // Офисные форматы добавлены ради документов на главной (сертификаты,
+    // декларации, прайсы, реквизиты): они не исполняются в браузере — он
+    // отдаёт их на скачивание. Разрешены и старые бинарные (.doc/.xls), и
+    // новые OOXML (.docx/.xlsx): у администратора на руках бывают оба.
     mimeTypes: [
       'image/jpeg',
       'image/png',
@@ -18,6 +27,10 @@ export const Media: CollectionConfig = {
       'application/pdf',
       'video/mp4',
       'video/webm',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ],
   },
   access: {

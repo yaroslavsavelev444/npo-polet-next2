@@ -1009,6 +1009,41 @@ a.itemName:focus-visible {
 	color: var(--text-secondary);
 }
 
+.goneTitle {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Кнопка стоит в самой строке позиции, а не одной на весь список: убрать
+   нужно конкретный товар, и «убрать всё» отняло бы у покупателя выбор,
+   который он ещё не сделал. */
+.goneRemove {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	flex: 0 0 auto;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--text-primary);
+	font: inherit;
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+	cursor: pointer;
+}
+
+.goneRemove:hover:not(:disabled),
+.goneRemove:focus-visible {
+	color: var(--error);
+}
+
+.goneRemove:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
 /* ---------------------------------------------------------------------------
    Колонка денег
    ---------------------------------------------------------------------------

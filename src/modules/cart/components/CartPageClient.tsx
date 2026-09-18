@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useCartPanel } from "../store/cart-panel.store";
+import {
+	selectHasUndismissedUnavailable,
+	useCartPanel,
+} from "../store/cart-panel.store";
 import type { CartView } from "../types";
 import styles from "./Cart.module.css";
 import { CartEmpty } from "./CartEmpty";
@@ -12,6 +15,7 @@ import {
 	CartUnavailableNotice,
 	CartValidationNotice,
 } from "./CartNotices";
+import { CartUnavailableLineItem } from "./CartUnavailableLineItem";
 import { CartProgress } from "./CartProgress";
 import { CartSkeleton } from "./CartSkeleton";
 import { CartSummary } from "./CartSummary";
@@ -64,6 +68,10 @@ export function CartPageClient({
 	const setQuantity = useCartPanel((s) => s.setQuantity);
 	const remove = useCartPanel((s) => s.remove);
 	const clear = useCartPanel((s) => s.clear);
+	const showUnavailableNotice = useCartPanel(selectHasUndismissedUnavailable);
+	const dismissUnavailableNotice = useCartPanel(
+		(s) => s.dismissUnavailableNotice,
+	);
 
 	const router = useRouter();
 	const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -102,8 +110,13 @@ export function CartPageClient({
 	}
 
 	const items = cart.items;
+	const unavailable = cart.unavailable;
 
-	if (items.length === 0) {
+	// Пустой корзина считается, только если в ней нет ни одной позиции —
+	// включая недоступные. Корзина из одних снятых с продажи товаров пустой
+	// не является: подменить её на «здесь пока пусто» значит молча стереть то,
+	// что человек выбирал.
+	if (items.length === 0 && unavailable.length === 0) {
 		return (
 			<div className={styles.page}>
 				<header className={styles.pageHead}>
@@ -132,8 +145,11 @@ export function CartPageClient({
 					{error && (
 						<CartErrorNotice message={error} onRetry={() => void refresh()} />
 					)}
-					{cart.unavailable.length > 0 && (
-						<CartUnavailableNotice items={cart.unavailable} />
+					{showUnavailableNotice && (
+						<CartUnavailableNotice
+							items={unavailable}
+							onDismiss={dismissUnavailableNotice}
+						/>
 					)}
 					{!cart.validation.isValid && (
 						<CartValidationNotice issues={cart.validation.issues} />
@@ -153,28 +169,48 @@ export function CartPageClient({
 									onRemove={() => void remove(item.product.id)}
 								/>
 							))}
+
+							{/* Недоступные позиции — в конце списка: сверху то, с чем
+							    можно работать. */}
+							{unavailable.map((entry, index) => (
+								<CartUnavailableLineItem
+									key={entry.productId}
+									item={entry}
+									index={items.length + index}
+									operation={pending[entry.productId]}
+									onRemove={() => void remove(entry.productId)}
+								/>
+							))}
 						</ul>
 					</div>
 				</div>
 
-				<aside className={styles.pageAside}>
-					<CartProgress
-						discounts={cart.discounts}
-						appliedAmount={cart.summary.centralDiscountAmount}
-					/>
-					<CartSummary
-						summary={cart.summary}
-						isValid={cart.validation.isValid}
-						isStale={isMutating}
-						isGuest={isGuest}
-						isCheckingOut={isCheckingOut}
-						onCheckout={() => {
-							setIsCheckingOut(true);
-							router.push(isGuest ? "/auth/login?from=/checkout" : "/checkout");
-						}}
-						onClear={() => void clear()}
-					/>
-				</aside>
+				{/* Итог и кнопка оформления показываются, только если есть что
+				    оформлять. Корзина из одних недоступных позиций даёт итог 0 и
+				    кнопку, ведущую в тупик, — вместо неё остаётся объяснение в
+				    полосе сверху и пометки у самих строк. */}
+				{items.length > 0 && (
+					<aside className={styles.pageAside}>
+						<CartProgress
+							discounts={cart.discounts}
+							appliedAmount={cart.summary.centralDiscountAmount}
+						/>
+						<CartSummary
+							summary={cart.summary}
+							isValid={cart.validation.isValid}
+							isStale={isMutating}
+							isGuest={isGuest}
+							isCheckingOut={isCheckingOut}
+							onCheckout={() => {
+								setIsCheckingOut(true);
+								router.push(
+									isGuest ? "/auth/login?from=/checkout" : "/checkout",
+								);
+							}}
+							onClear={() => void clear()}
+						/>
+					</aside>
+				)}
 			</div>
 		</div>
 	);

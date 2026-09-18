@@ -19,6 +19,7 @@ import * as migration_20260907_120000_faq_richtext_and_anchors from "./20260907_
 import * as migration_20260907_160000_contact_requests from "./20260907_160000_contact_requests.ts";
 import * as migration_20260909_120000_cart_onboarding_seen from "./20260909_120000_cart_onboarding_seen.ts";
 import * as migration_20260911_120000_banners_module from "./20260911_120000_banners_module.ts";
+import * as migration_20260918_120000_home_documents from "./20260918_120000_home_documents.ts";
 
 export const migrations = [
 	{
@@ -125,5 +126,10 @@ export const migrations = [
 		up: migration_20260911_120000_banners_module.up,
 		down: migration_20260911_120000_banners_module.down,
 		name: "20260911_120000_banners_module",
+	},
+	{
+		up: migration_20260918_120000_home_documents.up,
+		down: migration_20260918_120000_home_documents.down,
+		name: "20260918_120000_home_documents",
 	},
 ];

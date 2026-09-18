@@ -5,7 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RemoveScroll } from "react-remove-scroll";
-import { useCartPanel } from "../store/cart-panel.store";
+import {
+	selectHasUndismissedUnavailable,
+	useCartPanel,
+} from "../store/cart-panel.store";
 import styles from "./Cart.module.css";
 import { CartEmpty } from "./CartEmpty";
 import { CartLineItem } from "./CartLineItem";
@@ -14,6 +17,7 @@ import {
 	CartUnavailableNotice,
 	CartValidationNotice,
 } from "./CartNotices";
+import { CartUnavailableLineItem } from "./CartUnavailableLineItem";
 import { CartOnboarding } from "./CartOnboarding";
 import { CartProgress } from "./CartProgress";
 import { CartSkeleton } from "./CartSkeleton";
@@ -65,6 +69,10 @@ export function CartDrawer({ categories }: Props) {
 	const pending = useCartPanel((s) => s.pending);
 	const isGuest = useCartPanel((s) => s.isGuest);
 	const isOnboardingVisible = useCartPanel((s) => s.isOnboardingVisible);
+	const showUnavailableNotice = useCartPanel(selectHasUndismissedUnavailable);
+	const dismissUnavailableNotice = useCartPanel(
+		(s) => s.dismissUnavailableNotice,
+	);
 
 	const close = useCartPanel((s) => s.close);
 	const refresh = useCartPanel((s) => s.refresh);
@@ -213,8 +221,14 @@ export function CartDrawer({ categories }: Props) {
 	if (!mounted || typeof document === "undefined") return null;
 
 	const items = view?.items ?? [];
-	const isLoading = status === "loading" && items.length === 0;
-	const isEmpty = !isLoading && items.length === 0;
+	const unavailable = view?.unavailable ?? [];
+	// Корзина «пуста» только когда в ней нет ВООБЩЕ ничего. Корзина из одних
+	// недоступных позиций пустой не является: показать в ней «здесь пока
+	// пусто» и спрятать сами позиции — ровно то молчаливое удаление, которого
+	// быть не должно.
+	const isLoading =
+		status === "loading" && items.length === 0 && unavailable.length === 0;
+	const isEmpty = !isLoading && items.length === 0 && unavailable.length === 0;
 	const positionsLabel = view
 		? `${view.summary.itemsCount} ${pluralizePositions(view.summary.itemsCount)} · ${view.summary.totalItems} шт.`
 		: "";
@@ -264,8 +278,11 @@ export function CartDrawer({ categories }: Props) {
 							<CartErrorNotice message={error} onRetry={() => void refresh()} />
 						)}
 
-						{view && view.unavailable.length > 0 && (
-							<CartUnavailableNotice items={view.unavailable} />
+						{showUnavailableNotice && (
+							<CartUnavailableNotice
+								items={unavailable}
+								onDismiss={dismissUnavailableNotice}
+							/>
 						)}
 
 						{view && !view.validation.isValid && (
@@ -278,7 +295,7 @@ export function CartDrawer({ categories }: Props) {
 							<CartEmpty categories={categories} onNavigate={close} />
 						)}
 
-						{items.length > 0 && (
+						{(items.length > 0 || unavailable.length > 0) && (
 							<ul className={styles.list}>
 								{items.map((item, index) => (
 									<CartLineItem
@@ -290,6 +307,20 @@ export function CartDrawer({ categories }: Props) {
 											void setQuantity(item.product.id, quantity)
 										}
 										onRemove={() => void remove(item.product.id)}
+										onNavigate={close}
+									/>
+								))}
+
+								{/* Недоступные — всегда в конце списка, независимо от
+								    времени добавления: сверху должно лежать то, с чем
+								    можно работать, а не то, что уже нельзя заказать. */}
+								{unavailable.map((entry, index) => (
+									<CartUnavailableLineItem
+										key={entry.productId}
+										item={entry}
+										index={items.length + index}
+										operation={pending[entry.productId]}
+										onRemove={() => void remove(entry.productId)}
 										onNavigate={close}
 									/>
 								))}

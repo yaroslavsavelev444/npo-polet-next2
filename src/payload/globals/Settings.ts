@@ -1,6 +1,7 @@
 // src/globals/Settings.ts
 import type { GlobalConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { homeDocumentsField } from "../fields/home-documents.ts";
 import { seoField } from "../fields/seo.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
@@ -336,6 +337,9 @@ export const Settings: GlobalConfig = {
 				},
 			],
 		},
+
+		// ── Документы блока «Доверие» на главной ──
+		homeDocumentsField,
 
 		// ── Рабочие часы и карта ──
 		{

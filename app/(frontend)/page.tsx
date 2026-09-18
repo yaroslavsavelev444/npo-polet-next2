@@ -17,6 +17,7 @@ import {
 import { TimelineSection } from "@/modules/home/components/TimelineSection";
 import { TrustSection } from "@/modules/home/components/TrustSection";
 import { faq as faqCopy } from "@/modules/home/content/home-content";
+import { getHomeDocuments } from "@/modules/home/lib/documents";
 import { getCachedFaqTopics } from "@/payload/services/faq.service";
 import { getCatalogData } from "@/payload/services/products.service";
 import { getLatestApprovedReviews } from "@/payload/services/reviews.service";
@@ -82,6 +83,10 @@ export default async function Home() {
 	]);
 
 	const heroBackground = getHeroBackground(settings);
+	// Документы блока «Доверие» приезжают тем же запросом настроек, что и фон
+	// Hero: отдельного обращения к базе они не стоят, а кэш и его сброс уже
+	// настроены (getCachedSettings + хук на изменение глобала).
+	const documents = getHomeDocuments(settings);
 	const featuredQuestions = selectFeaturedQuestions(
 		mapFaqTopics(faqTopics),
 		faqCopy.limit,
@@ -118,7 +123,7 @@ export default async function Home() {
 			<AudienceSection />
 			<ProductionSection />
 			<TimelineSection />
-			<TrustSection reviews={reviews} />
+			<TrustSection reviews={reviews} documents={documents} />
 			<FaqSection questions={featuredQuestions} />
 			<FinalCta />
 		</div>

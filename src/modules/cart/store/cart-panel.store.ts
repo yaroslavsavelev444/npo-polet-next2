@@ -25,6 +25,11 @@ import {
 	setEntryQuantity,
 	writeGuestCart,
 } from "../lib/guest-cart-storage";
+import {
+	pruneDismissed,
+	readDismissed,
+	writeDismissed,
+} from "../lib/unavailable-dismissals";
 import type { CartEntry, CartView } from "../types";
 
 /* ==========================================================================
@@ -71,6 +76,21 @@ interface CartPanelState {
 	onboardingSeen: boolean;
 	isOnboardingVisible: boolean;
 
+	/* — недоступные товары ————————————————————————— */
+	/**
+	 * id товаров, о недоступности которых пользователь уже прочитал и закрыл
+	 * полосу. Сами позиции остаются помеченными — скрывается только
+	 * уведомление (см. lib/unavailable-dismissals).
+	 */
+	dismissedUnavailable: string[];
+	/**
+	 * Прочитаны ли отметки из localStorage. До этого момента полоса
+	 * показывается всегда — иначе серверная разметка страницы корзины и
+	 * первый клиентский рендер разошлись бы, и React выдал бы ошибку
+	 * гидратации.
+	 */
+	dismissalsHydrated: boolean;
+
 	/* — действия ——————————————————————————————————— */
 	init: (input: {
 		userId: string | null;
@@ -86,6 +106,8 @@ interface CartPanelState {
 	clear: () => Promise<void>;
 	dismissOnboarding: () => void;
 	syncGuestFromStorage: () => void;
+	hydrateDismissals: () => void;
+	dismissUnavailableNotice: () => void;
 }
 
 export type CartAddOutcome =
@@ -122,6 +144,19 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
 
 function syncDerivedStores(view: CartView | null): void {
 	if (!view) return;
+
+	// Отметки «уведомление закрыто» чистятся здесь, а не в компоненте: это
+	// единственная точка, через которую проходит КАЖДЫЙ новый состав корзины
+	// (обновление, добавление, правка количества, удаление, слияние). Держать
+	// чистку в интерфейсе означало бы забыть её ровно в том пути, где товар
+	// вернулся в продажу.
+	syncDismissals(view);
+
+	// В счётчик шапки идёт totalItems — а он считается только по позициям,
+	// которые можно заказать: недоступные до summary просто не доходят
+	// (см. build-cart-view). Поэтому «2 доступных + 1 снятый с продажи» дают
+	// на бейдже 2, а корзина, в которой не осталось ни одной доступной
+	// позиции, — 0, то есть бейджа нет вовсе.
 	useCartStore.getState().setItemCount(view.summary.totalItems);
 	useCartItemsStore
 		.getState()
@@ -135,6 +170,27 @@ function syncDerivedStores(view: CartView | null): void {
 		if (!next.has(id)) useCartItemsStore.getState().remove(id);
 	for (const id of next)
 		if (!current.has(id)) useCartItemsStore.getState().add(id);
+}
+
+/**
+ * Приводит список закрытых уведомлений в соответствие с новым составом.
+ *
+ * Отметка живёт ровно столько, сколько товар остаётся недоступным. Вернулся в
+ * продажу — отметка снимается, и если он однажды снова исчезнет, полоса об
+ * этом скажет.
+ */
+function syncDismissals(view: CartView): void {
+	const { dismissedUnavailable, dismissalsHydrated } = useCartPanel.getState();
+	if (!dismissalsHydrated || dismissedUnavailable.length === 0) return;
+
+	const next = pruneDismissed(
+		dismissedUnavailable,
+		view.unavailable.map((entry) => entry.productId),
+	);
+	if (next.length === dismissedUnavailable.length) return;
+
+	useCartPanel.setState({ dismissedUnavailable: next });
+	writeDismissed(next);
 }
 
 /* ==========================================================================
@@ -266,6 +322,9 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 
 	onboardingSeen: true,
 	isOnboardingVisible: false,
+
+	dismissedUnavailable: [],
+	dismissalsHydrated: false,
 
 	init: ({ userId, onboardingSeen, initialView }) => {
 		const previousUserId = get().userId;
@@ -511,7 +570,11 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 	clear: async () => {
 		const { view, isGuest } = get();
 		const previousView = view;
-		if (view) set({ view: recomputeView(view, []) });
+		// «Очистить корзину» убирает и недоступные позиции: они такие же строки
+		// корзины, и оставить их на экране после очистки значило бы показать
+		// корзину, которой уже нет. Оптимистично — сразу, чтобы список не
+		// дёргался дважды.
+		if (view) set({ view: { ...recomputeView(view, []), unavailable: [] } });
 		set({ isMutating: true, error: null });
 
 		try {
@@ -554,7 +617,67 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 		if (!get().isGuest) return;
 		void get().refresh({ silent: true });
 	},
+
+	/**
+	 * Читает закрытые уведомления из localStorage. Вызывается из эффекта
+	 * (CartProvider), а не в теле рендера: на сервере хранилища нет, и
+	 * прочитанная в рендере отметка развела бы серверную и клиентскую
+	 * разметку страницы корзины.
+	 */
+	hydrateDismissals: () => {
+		if (get().dismissalsHydrated) return;
+
+		const stored = readDismissed();
+		const view = get().view;
+		// Состав мог приехать раньше отметок (страница корзины отдаёт его
+		// сервером) — тогда чистим сразу, чтобы не показать «уже закрыто» для
+		// товара, который успел вернуться в продажу.
+		const dismissed = view
+			? pruneDismissed(
+					stored,
+					view.unavailable.map((entry) => entry.productId),
+				)
+			: stored;
+
+		set({ dismissedUnavailable: dismissed, dismissalsHydrated: true });
+		if (dismissed.length !== stored.length) writeDismissed(dismissed);
+	},
+
+	/**
+	 * Закрывает полосу для ВСЕХ товаров, недоступных прямо сейчас. Следующий
+	 * снятый с продажи товар покажет её снова: отметки хранятся по id, и id,
+	 * которого в списке нет, полосу возвращает.
+	 */
+	dismissUnavailableNotice: () => {
+		const view = get().view;
+		if (!view) return;
+
+		const ids = view.unavailable.map((entry) => entry.productId);
+		if (ids.length === 0) return;
+
+		const dismissed = [...new Set([...get().dismissedUnavailable, ...ids])];
+		set({ dismissedUnavailable: dismissed, dismissalsHydrated: true });
+		writeDismissed(dismissed);
+	},
 }));
+
+/**
+ * Есть ли ещё не прочитанные новости о недоступных товарах.
+ *
+ * Селектор, а не поле стора: значение целиком выводится из состава корзины и
+ * списка отметок, и хранить его отдельно значило бы завести третий источник
+ * правды, который однажды разойдётся с первыми двумя.
+ */
+export function selectHasUndismissedUnavailable(
+	state: CartPanelState,
+): boolean {
+	const unavailable = state.view?.unavailable ?? [];
+	if (unavailable.length === 0) return false;
+	if (!state.dismissalsHydrated) return true;
+
+	const dismissed = new Set(state.dismissedUnavailable);
+	return unavailable.some((entry) => !dismissed.has(entry.productId));
+}
 
 /**
  * Переносит гостевую корзину в аккаунт. Вызывается один раз после входа (см.

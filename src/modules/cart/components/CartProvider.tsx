@@ -40,6 +40,7 @@ export function CartProvider({ userId, onboardingSeen, categories }: Props) {
 	const init = useCartPanel((s) => s.init);
 	const refresh = useCartPanel((s) => s.refresh);
 	const syncGuestFromStorage = useCartPanel((s) => s.syncGuestFromStorage);
+	const hydrateDismissals = useCartPanel((s) => s.hydrateDismissals);
 
 	// init обязан отработать ДО первого эффекта, который на него опирается:
 	// слияние ниже читает isGuest из стора, и увидеть там прошлую сессию оно
@@ -50,6 +51,14 @@ export function CartProvider({ userId, onboardingSeen, categories }: Props) {
 		lastIdentity.current = userId;
 		init({ userId, onboardingSeen });
 	}
+
+	/* — закрытые уведомления о недоступных товарах ————————————
+	   Читаются из localStorage в эффекте, а не в рендере: на сервере
+	   хранилища нет, и прочитанная в рендере отметка развела бы серверную
+	   разметку страницы корзины с первой клиентской. */
+	useEffect(() => {
+		hydrateDismissals();
+	}, [hydrateDismissals]);
 
 	/* — гость: подтянуть локальную корзину, чтобы счётчик в шапке не врал — */
 	useEffect(() => {
@@ -67,6 +76,12 @@ export function CartProvider({ userId, onboardingSeen, categories }: Props) {
 		void mergeGuestCartIntoAccount(userId).then(({ merged, skipped }) => {
 			if (!merged) return;
 
+			// Сюда попадают ТОЛЬКО товары, которых больше нет в каталоге: снятые
+			// с продажи переносятся вместе с остальными и остаются видны в
+			// корзине с пометкой «недоступен» (см. mergeGuestCartAction). Об
+			// удалённом товаре сказать больше нечего — ни названия, ни строки в
+			// корзине у него не будет, поэтому это единственный случай, ради
+			// которого нужен отдельный тост.
 			if (skipped.length > 0) {
 				const names = skipped
 					.map((item) => item.title)
@@ -74,8 +89,8 @@ export function CartProvider({ userId, onboardingSeen, categories }: Props) {
 					.join(", ");
 				appToast.warning(
 					names
-						? `Корзина перенесена в аккаунт. Не удалось добавить: ${names} — товар больше не продаётся.`
-						: "Корзина перенесена в аккаунт. Часть товаров больше не продаётся и не была добавлена.",
+						? `Корзина перенесена в аккаунт. Не удалось добавить: ${names} — товара больше нет в каталоге.`
+						: "Корзина перенесена в аккаунт. Части товаров больше нет в каталоге, и они не были добавлены.",
 				);
 				return;
 			}

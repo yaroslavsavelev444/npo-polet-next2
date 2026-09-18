@@ -407,7 +407,11 @@ export function CheckoutPageClient({
 					return;
 				}
 
-				if (result.error === "CART_EMPTY" || result.error === "CART_INVALID") {
+				if (
+					result.error === "CART_EMPTY" ||
+					result.error === "CART_INVALID" ||
+					result.error === "CART_HAS_UNAVAILABLE"
+				) {
 					// Корзину изменили в другой вкладке или товар сняли с продажи,
 					// пока заполнялась форма. Забираем актуальный состав в стор —
 					// страница перерисуется по нему, и на экране окажется то, что
@@ -466,10 +470,20 @@ export function CheckoutPageClient({
 		});
 	}, []);
 
-	const cartIssue = cart.validation.isValid
-		? null
-		: (cart.validation.issues[0]?.message ??
-			"Проверьте количество товаров в корзине");
+	// Недоступная позиция идёт ПЕРЕД замечанием о количестве: пока она в
+	// корзине, сервер заказ не примет вовсе (см. submitOrderAction), а
+	// «доведите количество до минимальной партии» отправило бы покупателя
+	// чинить не то. Оба препятствия показываются одной строкой рядом с
+	// кнопкой, потому что оба решаются в составе заказа выше.
+	const cartIssue =
+		cart.unavailable.length > 0
+			? cart.unavailable.length === 1
+				? "Товар выше больше недоступен для заказа — уберите его, чтобы оформить заказ"
+				: "Товары выше больше недоступны для заказа — уберите их, чтобы оформить заказ"
+			: cart.validation.isValid
+				? null
+				: (cart.validation.issues[0]?.message ??
+					"Проверьте количество товаров в корзине");
 
 	// ── Тупиковое состояние: заказывать нечего ──────────────────────────────
 	if (cart.items.length === 0) {
@@ -547,7 +561,11 @@ export function CheckoutPageClient({
 							index={1}
 							title="Состав заказа"
 							hint="Количество можно поправить здесь — уходить в корзину не нужно"
-							state={cart.validation.isValid ? "done" : "error"}
+							state={
+								cart.validation.isValid && cart.unavailable.length === 0
+									? "done"
+									: "error"
+							}
 							action={
 								<Link href="/cart" className={styles.sectionLink}>
 									В корзину

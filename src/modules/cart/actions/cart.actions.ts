@@ -17,6 +17,7 @@ import {
 	getCachedProductById,
 	getCachedProducts,
 } from "@/payload/services/products.service";
+import { isProductOrderable } from "@/payload/utils/product-availability";
 import {
 	buildCartView,
 	buildCartViewFromEntries,
@@ -67,6 +68,16 @@ function normalizeProductId(productId: string): string | null {
 	const numeric = Number(productId);
 	if (!Number.isSafeInteger(numeric) || numeric <= 0) return null;
 	return String(numeric);
+}
+
+/**
+ * Идентификатор СТРОКИ массива позиций. Нужен ровно одному случаю: товар
+ * удалён из базы, связь обнулена, и сослаться на позицию больше нечем (см.
+ * removeCartItem). Формат задаёт Payload — непрозрачная строка, поэтому здесь
+ * проверяется только то, что она безопасна и правдоподобна по длине.
+ */
+function normalizeLineId(value: string): string | null {
+	return /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : null;
 }
 
 /**
@@ -130,12 +141,9 @@ export async function addToCartAction(
 	quantity = amount;
 
 	const product = await getCachedProductById(productId);
-	const status = product?.inventory?.status ?? "available";
-	if (
-		!product ||
-		!product.inventory?.isVisible ||
-		!["available", "preorder"].includes(status)
-	) {
+	// Единое правило доступности — то же, которым корзина помечает позиции
+	// недоступными (см. payload/utils/product-availability).
+	if (!product || !isProductOrderable(product)) {
 		return failure("PRODUCT_UNAVAILABLE", "Товар недоступен для заказа");
 	}
 
@@ -214,7 +222,8 @@ export async function removeFromCartAction(
 	const user = await requireUser();
 	if (!user) return failure("AUTH_REQUIRED", "Войдите в аккаунт");
 
-	const id = normalizeProductId(productId);
+	// Обычно это id товара; у строки с удалённым товаром — id самой строки.
+	const id = normalizeProductId(productId) ?? normalizeLineId(productId);
 	if (!id) return failure("PRODUCT_UNAVAILABLE", "Товар не найден");
 
 	await removeCartItem(String(user.id), id);
@@ -321,28 +330,36 @@ export async function mergeGuestCartAction(
 	for (const entry of normalized) {
 		const product = byId.get(entry.productId);
 
+		// Товара нет в базе (удалён или снят с публикации) — перенести его
+		// физически некуда: связь ссылается на несуществующую строку. Только
+		// такие позиции действительно теряются при слиянии, и только о них
+		// покупателю сообщается отдельно.
 		if (!product) {
-			skipped.push({ productId: entry.productId, title: null, reason: "gone" });
-			continue;
-		}
-
-		const status = product.inventory?.status ?? "available";
-		if (
-			!product.inventory?.isVisible ||
-			!["available", "preorder"].includes(status)
-		) {
 			skipped.push({
 				productId: entry.productId,
-				title: product.title,
-				reason: "unavailable",
+				title: null,
+				reason: "gone",
+				quantity: entry.quantity,
+				product: null,
+				statusLabel: "Товара больше нет в каталоге",
 			});
 			continue;
 		}
 
-		const ceiling = Math.min(
-			product.inventory?.maxOrderQuantity || MAX_ITEM_QUANTITY,
-			MAX_ITEM_QUANTITY,
-		);
+		// Товар существует, но заказать его сейчас нельзя. Раньше такая позиция
+		// молча не переносилась — то есть вход в аккаунт незаметно удалял её из
+		// корзины. Теперь она переносится наравне с остальными и остаётся
+		// видимой с пометкой «недоступен»: расчёт её всё равно не увидит (см.
+		// buildCartView), а покупатель — увидит и решит сам.
+		//
+		// maxOrderQuantity у недоступного товара не применяется: это ограничение
+		// заказа, а заказать его всё равно нельзя.
+		const ceiling = isProductOrderable(product)
+			? Math.min(
+					product.inventory?.maxOrderQuantity || MAX_ITEM_QUANTITY,
+					MAX_ITEM_QUANTITY,
+				)
+			: MAX_ITEM_QUANTITY;
 		const serverQuantity = serverQuantities.get(entry.productId)?.quantity ?? 0;
 		const quantity = Math.min(
 			Math.max(entry.quantity, serverQuantity),

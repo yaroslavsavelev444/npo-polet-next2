@@ -5,6 +5,7 @@ import {
 } from "@/modules/productCard";
 import { getApplicableDiscount } from "@/payload/services/discounts.service";
 import { getCachedProducts } from "@/payload/services/products.service";
+import { getProductUnavailableReason } from "@/payload/utils/product-availability";
 import type { Cart, Product } from "@/payload-types";
 import type {
 	CartEntry,
@@ -54,11 +55,48 @@ interface ResolvedEntry {
 	addedAt: string;
 }
 
-/** Товар остаётся в корзине, только пока он опубликован и продаётся. */
-function isPurchasable(product: Product): boolean {
+/**
+ * Строка «товар больше нельзя заказать» с полным набором данных для отрисовки.
+ *
+ * Причина проверяется общим правилом (product-availability) — тем же, которым
+ * пользуются добавление в корзину и слияние гостевой корзины, — а здесь
+ * только превращается в подпись для покупателя. Формулировки намеренно
+ * разные: «нет в наличии» и «снят с продажи» означают для него разное
+ * (первое можно подождать, второе — нет).
+ */
+function toUnavailableItem(
+	product: Product,
+	quantity: number,
+	reason: NonNullable<ReturnType<typeof getProductUnavailableReason>>,
+): CartUnavailableItem {
 	const status = product.inventory?.status ?? "available";
-	const isVisible = product.inventory?.isVisible ?? true;
-	return isVisible && ["available", "preorder"].includes(status);
+	const statusLabel =
+		reason === "status" && status === "out_of_stock"
+			? "Нет в наличии"
+			: reason === "status" && status === "discontinued"
+				? "Снят с производства"
+				: "Снят с продажи";
+
+	return {
+		productId: String(product.id),
+		title: product.title,
+		reason: "unavailable",
+		quantity,
+		product: mapProductToCardData(product),
+		statusLabel,
+	};
+}
+
+/** Товара нет в базе (удалён или снят с публикации) — показать нечего. */
+function toGoneItem(productId: string, quantity: number): CartUnavailableItem {
+	return {
+		productId,
+		title: null,
+		reason: "gone",
+		quantity,
+		product: null,
+		statusLabel: "Товара больше нет в каталоге",
+	};
 }
 
 /**
@@ -191,15 +229,26 @@ export async function buildCartView(cart: Cart | null): Promise<CartView> {
 	const unavailable: CartUnavailableItem[] = [];
 
 	for (const raw of rawItems) {
-		if (!isPopulatedProduct(raw.product)) continue;
+		// Связь не развернулась — товара в базе нет. Практически недостижимо:
+		// колонка carts_items.product_id объявлена NOT NULL, и Postgres просто
+		// не даёт удалить товар, лежащий у кого-то в корзине. Ветка оставлена
+		// на случай ослабления этого ограничения — и потому, что показать
+		// строку всё равно правильнее, чем потерять её молча.
+		//
+		// Идентификатором служит id самой строки массива: id товара, которым
+		// пользуются все прочие позиции, здесь попросту не существует, а
+		// убрать строку пользователь должен уметь (см. removeCartItem).
+		if (!isPopulatedProduct(raw.product)) {
+			unavailable.push(
+				toGoneItem(String(raw.product ?? raw.id ?? ""), raw.quantity),
+			);
+			continue;
+		}
 		const product = raw.product;
 
-		if (!isPurchasable(product)) {
-			unavailable.push({
-				productId: String(product.id),
-				title: product.title,
-				reason: "unavailable",
-			});
+		const reason = getProductUnavailableReason(product);
+		if (reason) {
+			unavailable.push(toUnavailableItem(product, raw.quantity, reason));
 			continue;
 		}
 
@@ -244,22 +293,15 @@ export async function buildCartViewFromEntries(
 
 		// Товара нет в выдаче — он снят с публикации или удалён. Названия у нас
 		// в этом случае нет вовсе, поэтому позиция помечается как исчезнувшая:
-		// интерфейс скажет «товар больше не продаётся», не выдумывая имя.
+		// интерфейс скажет «товара больше нет», не выдумывая имя.
 		if (!product) {
-			unavailable.push({
-				productId: entry.productId,
-				title: null,
-				reason: "gone",
-			});
+			unavailable.push(toGoneItem(entry.productId, entry.quantity));
 			continue;
 		}
 
-		if (!isPurchasable(product)) {
-			unavailable.push({
-				productId: entry.productId,
-				title: product.title,
-				reason: "unavailable",
-			});
+		const reason = getProductUnavailableReason(product);
+		if (reason) {
+			unavailable.push(toUnavailableItem(product, entry.quantity, reason));
 			continue;
 		}
 

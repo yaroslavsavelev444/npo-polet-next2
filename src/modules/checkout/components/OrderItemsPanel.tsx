@@ -77,22 +77,38 @@ export function OrderItemsPanel({
 			{unavailable.length > 0 && (
 				// Снятые с продажи позиции не исчезают молча: покупатель их
 				// выбирал, и пропажа строки читается как ошибка приложения, а не
-				// как «товар сняли с продажи». В расчёт они не входят.
+				// как «товар сняли с продажи». В расчёт они не входят — и пока
+				// они лежат в корзине, заказ не оформляется вовсе (см.
+				// submitOrderAction). Поэтому здесь не просто перечисление, а
+				// действие: убрать позицию можно не уходя со страницы.
 				<div className={`${styles.notice} ${styles.noticeWarn}`}>
 					<PackageX size={15} aria-hidden className={styles.noticeIcon} />
 					<span>
 						<strong>
 							{unavailable.length === 1
-								? "Одна позиция больше не продаётся"
-								: `Позиций больше не продаётся: ${unavailable.length}`}
+								? "Одна позиция больше недоступна для заказа"
+								: `Позиций больше недоступно для заказа: ${unavailable.length}`}
 						</strong>{" "}
 						{unavailable.length === 1
-							? "и не войдёт в заказ:"
-							: "— они не войдут в заказ:"}
+							? "— уберите её, чтобы оформить заказ:"
+							: "— уберите их, чтобы оформить заказ:"}
 						<ul className={styles.gone}>
 							{unavailable.map((entry) => (
 								<li key={entry.productId} className={styles.goneItem}>
-									{entry.title ?? "Товар снят с продажи"}
+									<span className={styles.goneTitle}>
+										{entry.title ?? "Товар удалён из каталога"} —{" "}
+										{entry.statusLabel}
+									</span>
+									<button
+										type="button"
+										className={styles.goneRemove}
+										onClick={() => onRemove(entry.productId)}
+										disabled={pending[entry.productId] !== undefined}
+										aria-label={`Убрать «${entry.title ?? "товар"}» из корзины`}
+									>
+										<X size={13} aria-hidden />
+										Убрать
+									</button>
 								</li>
 							))}
 						</ul>

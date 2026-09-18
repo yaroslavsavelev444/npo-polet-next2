@@ -481,6 +481,53 @@
 	color: var(--warning);
 }
 
+/* ---------------------------------------------------------------------------
+   Недоступная позиция
+   ---------------------------------------------------------------------------
+   Приглушается ВСЯ строка, кроме пометки и кнопки удаления: цель — чтобы
+   глаз сразу отличал её от рабочих позиций, но при этом мог прочитать, что
+   именно с ней не так и как её убрать. Полупрозрачность применяется к
+   содержимому, а не к контейнеру, иначе фон-подложка тоже выцвел бы и полоса
+   перестала бы читаться как отдельное состояние. */
+.item[data-unavailable="true"] {
+	background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
+}
+
+.item[data-unavailable="true"] .thumb,
+.item[data-unavailable="true"] .itemMeta {
+	opacity: 0.5;
+}
+
+.item[data-unavailable="true"] .thumbImage {
+	filter: grayscale(1);
+}
+
+.item[data-unavailable="true"] .itemTitle {
+	color: var(--text-muted);
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in srgb, var(--text-muted) 60%, transparent);
+	text-decoration-thickness: 1px;
+}
+
+/* Кнопка удаления у недоступной позиции видна всегда, а не по наведению:
+   убрать её — единственное осмысленное здесь действие, и прятать его за
+   наведением значит прятать выход из ситуации. */
+.item[data-unavailable="true"] .remove {
+	opacity: 1;
+}
+
+.unavailableTag {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.625rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--warning);
+}
+
 .remove {
 	display: inline-flex;
 	align-items: center;
@@ -693,6 +740,45 @@
 	margin: 0.3rem 0 0;
 	padding-left: 1rem;
 	list-style: disc;
+}
+
+/* Текст занимает всю свободную ширину, чтобы крестик прижался к правому краю
+   полосы, а не встал вплотную к последней строке. */
+.noticeText {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.noticeHint {
+	display: block;
+	margin-top: 0.35rem;
+	color: var(--text-muted);
+}
+
+.noticeClose {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	/* Отрицательный отступ сверху подтягивает крестик к первой строке текста:
+	   он относится ко всей полосе, и стоять он должен на её верхнем краю. */
+	margin: -0.15rem -0.35rem 0 0;
+	width: 1.6rem;
+	height: 1.6rem;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition:
+		color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart);
+}
+
+.noticeClose:hover,
+.noticeClose:focus-visible {
+	color: var(--text-primary);
+	background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .noticeAction {

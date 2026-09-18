@@ -3149,6 +3149,31 @@ export interface Setting {
     loginImage?: (number | null) | Media;
     registerImage?: (number | null) | Media;
   };
+  /**
+   * Блок «Чем это подтверждается» → «Документы» на главной странице. Порядок задаётся перетаскиванием строк, показываются только включённые документы. Если ни одного включённого нет, блок покажет короткое сообщение вместо списка.
+   */
+  homeDocuments?:
+    | {
+        /**
+         * Как документ называется для посетителя: «Сертификат соответствия», «Декларация соответствия», «Реквизиты компании» — любое название.
+         */
+        title: string;
+        sourceType: 'file' | 'url';
+        /**
+         * PDF, изображение или офисный документ. Список разрешённых типов задан в коллекции «Медиа».
+         */
+        file?: (number | null) | Media;
+        /**
+         * Полный адрес (https://…) или путь внутри сайта, начинающийся со «/».
+         */
+        url?: string | null;
+        /**
+         * Снимите галочку, чтобы временно убрать документ с главной, не удаляя его.
+         */
+        isActive?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
   workingHours?: string | null;
   map?: string | null;
   seo?: {
@@ -3229,6 +3254,16 @@ export interface SettingsSelect<T extends boolean = true> {
     | {
         loginImage?: T;
         registerImage?: T;
+      };
+  homeDocuments?:
+    | T
+    | {
+        title?: T;
+        sourceType?: T;
+        file?: T;
+        url?: T;
+        isActive?: T;
+        id?: T;
       };
   workingHours?: T;
   map?: T;
