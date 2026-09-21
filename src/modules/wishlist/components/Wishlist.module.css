@@ -1,0 +1,477 @@
+/* ===========================================================================
+   Избранное
+   ===========================================================================
+   Страница строится вокруг ГОТОВОЙ сетки товаров: карточка и сетка уже
+   отрисованы модулем productCard и здесь не трогаются ни одним правилом. Всё,
+   что ниже, — это обвязка вокруг них: первый экран, липкая панель, пустое
+   состояние, подтверждение очистки и хореография удаления.
+
+   Материалы те же, что в кабинете, заказах и отзывах:
+
+     • первый экран — полоса --void-deep во всю ширину с одним радиальным
+       источником снизу слева и волосяным швом по нижнему краю;
+     • управление — липкая .rail из Catalog.module.css (класс берётся оттуда
+       напрямую, чтобы страницы не могли разъехаться по росту и материалу);
+     • служебные подписи — моноширинный капслок с разрядкой;
+     • времена и кривые — --dur-* / --ease-out-expo / --ease-out-quart из
+       app/(frontend)/home.css. Движение на сайте одно.
+
+   Модуль, а не утилиты Tailwind: глобальные стили @once-ui-system
+   подключаются вне слоёв и перебивают любой слоистый CSS (разбор — в шапке
+   app/(frontend)/globals.css). Так же устроены Orders.module.css,
+   Reviews.module.css и Profile.module.css.                                  */
+
+/* ---------------------------------------------------------------------------
+   Сводка первого экрана
+   ---------------------------------------------------------------------------
+   Две величины, ради которых на эту страницу заходят: сколько всего отложено
+   и сколько из этого можно заказать прямо сейчас. Вторая — не украшение:
+   избранное копится месяцами, и вопрос «что из этого ещё есть» возникает
+   раньше, чем вопрос «что я вообще откладывал».                             */
+.summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.5rem 2.5rem;
+}
+
+.summaryItem {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.summaryValue {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 1.75rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+	line-height: 1;
+	color: var(--text-primary);
+}
+
+.summaryValueAccent {
+	color: var(--primary-200);
+}
+
+.summaryNote {
+	margin: 0;
+	max-width: 46ch;
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Счётчик в липкой панели
+   ---------------------------------------------------------------------------
+   Единственное число на странице, которое меняется прямо под курсором: убрал
+   товар — счётчик обязан отозваться, иначе непонятно, засчиталось ли действие.
+   Отклик минимальный: короткий подъём и проявление, без подскока и без смены
+   цвета. Счётчик сообщает о результате, а не празднует его.                 */
+.count {
+	display: inline-block;
+	font-variant-numeric: tabular-nums;
+}
+
+.countTick {
+	animation: wishlist-count-tick 260ms var(--ease-out-quart);
+}
+
+@keyframes wishlist-count-tick {
+	from {
+		opacity: 0.35;
+		transform: translate3d(0, -0.3em, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Кнопки
+   ---------------------------------------------------------------------------
+   Те же размеры и состояния, что в заказах и кабинете. Нажатие отзывается на
+   pointer-down, а не по клику: обратная связь, которая ждёт отпускания,
+   ощущается задержкой.                                                      */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	height: 2.5rem;
+	padding: 0 1rem;
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	font-family: inherit;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background-color 180ms var(--ease-out-quart),
+		border-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart),
+		opacity 180ms var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+	.btn {
+		height: 2.75rem;
+	}
+}
+
+.btn:active:not(:disabled) {
+	transform: scale(0.985);
+}
+
+.btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+
+.btnPrimary {
+	background: var(--primary);
+	color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+	background: var(--primary-600);
+}
+
+.btnQuiet {
+	border-color: var(--border);
+	background: transparent;
+	color: var(--text-primary);
+	font-weight: 500;
+}
+
+.btnQuiet:hover:not(:disabled) {
+	border-color: var(--border-light);
+	background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.btnDanger {
+	border-color: color-mix(in srgb, var(--error) 45%, transparent);
+	background: color-mix(in srgb, var(--error) 10%, transparent);
+	color: color-mix(in srgb, var(--error) 85%, #fff);
+}
+
+.btnDanger:hover:not(:disabled) {
+	border-color: var(--error);
+	background: var(--error);
+	color: #fff;
+}
+
+.spin {
+	animation: wishlist-spin 700ms linear infinite;
+}
+
+@keyframes wishlist-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Сортировка в панели
+   ---------------------------------------------------------------------------
+   В ряду панели три величины: счётчик, порядок показа и очистка. Первая и
+   третья по ширине постоянны, поэтому ужиматься обязана вторая — и делает она
+   это в два приёма.
+
+   На 320px без этого ряд разъезжался на 107px: кнопка очистки уезжала за
+   правый край и становилась НЕДОСТИЖИМОЙ (страница обрезана по горизонтали
+   через overflow-x: clip, то есть даже прокруткой до неё было не добраться).
+
+   Приём первый: до 30rem уходит слово «Сортировка:» — на кнопке остаётся знак
+   и само значение, которое и несёт смысл. Приём второй: значение при нехватке
+   ширины обрезается многоточием. Полную подпись при этом всегда читает
+   скринридер — она стоит в aria-label кнопки.                               */
+.sortSlot {
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
+.sortSlot button {
+	max-width: 100%;
+}
+
+.sortLabel {
+	display: none;
+}
+
+@media (min-width: 30rem) {
+	.sortLabel {
+		display: inline;
+	}
+}
+
+.sortValue {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Очистка списка
+   ---------------------------------------------------------------------------
+   Кнопка намеренно НЕ красная. Красным в этой системе помечено необратимое в
+   момент нажатия; здесь между нажатием и потерей стоит подтверждение, и
+   красная кнопка в панели пугала бы раньше времени. Красное — в самом окне,
+   на кнопке, которая действительно стирает.                                 */
+.clear {
+	flex: 0 0 auto;
+	height: 2.25rem;
+	padding: 0 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: transparent;
+	font-family: inherit;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	color: var(--text-secondary);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition:
+		border-color 180ms var(--ease-out-quart),
+		background-color 180ms var(--ease-out-quart),
+		color 180ms var(--ease-out-quart);
+}
+
+@media (pointer: coarse) {
+	.clear {
+		height: 2.5rem;
+	}
+}
+
+.clear:hover,
+.clear:focus-visible {
+	border-color: color-mix(in srgb, var(--error) 45%, transparent);
+	color: color-mix(in srgb, var(--error) 88%, #fff);
+}
+
+/* На узком экране подпись уходит, остаётся знак: в ряду с числом и
+   сортировкой слово «Очистить» отбирает ширину у того, чем пользуются чаще. */
+.clearLabel {
+	display: none;
+}
+
+@media (min-width: 30rem) {
+	.clearLabel {
+		display: inline;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Хвост выдачи
+   ---------------------------------------------------------------------------
+   Тот же приём, что в списке заказов: линия со служебной подписью. Без неё
+   непонятно, кончился список или просто не догрузился.                      */
+.tail {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-top: clamp(2rem, 4vw, 3rem);
+}
+
+.tailRule {
+	flex: 1 1 auto;
+	height: 1px;
+	background: var(--rule);
+}
+
+/* ---------------------------------------------------------------------------
+   Пустое состояние
+   ---------------------------------------------------------------------------
+   Не «нет товаров» посреди пустого экрана. Первый экран со своим заголовком
+   остаётся на месте — посетитель не должен терять понимание, куда он попал, —
+   а здесь объясняется механика: избранное наполняется сердечком на карточке.
+   Поэтому в блоке нарисован тот же знак, который нужно нажать, и он стоит в
+   такой же круглой кнопке, как на карточке товара.                          */
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1.15rem;
+	padding: clamp(3rem, 8vw, 5rem) 1rem;
+	border-top: 1px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+	text-align: center;
+	animation: wishlist-empty-in var(--dur-base) var(--ease-out-expo) both;
+}
+
+@keyframes wishlist-empty-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 12px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* Знак-приманка: та же круглая кнопка, что живёт на кадре товара, только
+   неинтерактивная. Пустое состояние показывает НЕ абстрактную иконку, а
+   ровно тот элемент, который нужно найти и нажать. */
+.emptyMark {
+	display: grid;
+	place-items: center;
+	width: 3.25rem;
+	height: 3.25rem;
+	border-radius: 999px;
+	border: 1px solid var(--rule);
+	background: color-mix(in srgb, var(--void) 70%, transparent);
+	color: var(--primary);
+}
+
+/* То же место занимает знак ошибки, когда список не удалось загрузить: та же
+   оправа, другой тон. Отдельного блока для ошибки не заводим — состояние
+   страницы одно и то же («здесь нет сетки»), различается только причина. */
+.emptyMarkError {
+	border-color: color-mix(in srgb, var(--error) 35%, transparent);
+	background: color-mix(in srgb, var(--error) 8%, transparent);
+	color: var(--error);
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--text-primary);
+}
+
+.emptyText {
+	margin: 0;
+	max-width: 46ch;
+	font-size: 0.875rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+/* Сердечко внутри объясняющей строки набирается тем же знаком, что на
+   карточке: слово «сердечко» описывает элемент, знак его показывает. */
+.emptyGlyph {
+	display: inline-block;
+	vertical-align: -0.15em;
+	margin: 0 0.1em;
+	color: var(--primary);
+}
+
+.emptyActions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.75rem;
+	margin-top: 0.35rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Окно подтверждения
+   ---------------------------------------------------------------------------
+   Материал берётся у окна выхода из кабинета: поверхность --void с тёплым
+   пятном у верхнего края — слой над страницей не может быть светлее страницы.*/
+.dialog {
+	position: relative;
+	border-color: var(--rule);
+	background: var(--void);
+	overflow: hidden;
+}
+
+.dialog::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 auto 0;
+	height: 60%;
+	pointer-events: none;
+	background: radial-gradient(
+		120% 100% at 50% 0%,
+		color-mix(in srgb, var(--primary) 8%, transparent) 0%,
+		transparent 72%
+	);
+}
+
+.dialogBody {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.dialogText {
+	margin: 0;
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+.dialogActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.75rem;
+}
+
+/* На узком экране кнопки занимают всю ширину и стоят в столбец: две кнопки в
+   строку на 320px дают цели по 130px, а промах здесь стирает весь список. */
+@media (max-width: 26rem) {
+	.dialogActions {
+		flex-direction: column-reverse;
+	}
+
+	.dialogActions .btn {
+		width: 100%;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Заглушка загрузки
+   ---------------------------------------------------------------------------
+   Геометрия повторяет настоящий первый экран слот в слот, чтобы подстановка
+   данных не давала сдвига вёрстки.                                          */
+.skeletonBlock {
+	border-radius: var(--radius-sm);
+	background: var(--surface-secondary);
+}
+
+.skeletonPulse {
+	animation: wishlist-pulse 1.6s var(--ease-out-quart) infinite;
+}
+
+@keyframes wishlist-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.45;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.countTick,
+	.empty,
+	.skeletonPulse,
+	.spin {
+		animation: none;
+	}
+
+	.empty {
+		opacity: 1;
+		transform: none;
+	}
+
+	.btn:active:not(:disabled) {
+		transform: none;
+	}
+}

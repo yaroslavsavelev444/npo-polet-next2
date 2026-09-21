@@ -1,80 +1,193 @@
 "use client";
 
-import { Heart } from "lucide-react";
-import { useEffect, useTransition } from "react";
-import { ProductListContainer } from "@/modules/productCard/components/ProductListContainer";
+import { useEffect, useMemo, useState } from "react";
+import type { BreadcrumbItem } from "@/components/Breadcrumbs/Breadcrumbs";
+import { ProductGrid } from "@/modules/productCard/components/productGrid";
+import catalog from "@/modules/productCatalog/components/Catalog.module.css";
+import { PageContainer } from "@/shared/components/PageContainer";
+import { appToast } from "@/shared/lib/toast";
 import { useWishlistStore } from "@/shared/store/wishlist.store";
-import { Button } from "@/UI";
 import { clearWishlistAction } from "../actions/wishlist.actions";
+import { useGridChoreography } from "../hooks/useGridChoreography";
+import { tailLabel } from "../lib/format";
+import {
+	DEFAULT_WISHLIST_SORT,
+	sortWishlistItems,
+	type WishlistSortValue,
+} from "../lib/sort";
 import type { WishlistView } from "../types";
+import { ClearWishlistDialog } from "./ClearWishlistDialog";
+import styles from "./Wishlist.module.css";
 import { WishlistEmptyState } from "./WishlistEmptyState";
+import { WishlistHero } from "./WishlistHero";
+import { WishlistRail } from "./WishlistRail";
 
 interface WishlistPageClientProps {
-  initialWishlist: WishlistView;
+	initialWishlist: WishlistView;
+	breadcrumbs: BreadcrumbItem[];
 }
 
 /**
- * The store's productIds Set is the single source of truth for membership.
- * There's no dedicated "remove" action here: un-hearting a product via its
- * ProductCard (the same heart used everywhere) updates the store, and the
- * grid below reactively drops that item — no extra round trip, no
- * duplicated removal UI.
+ * Страница избранного.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ТРИ ЯРУСА
+ * ────────────────────────────────────────────────────────────────────────────
+ * Как в кабинете, заказах, отзывах и на витрине каталога, от общего к
+ * частному:
+ *
+ *   1. первый экран — сколько отложено и сколько из этого есть в наличии;
+ *   2. липкая панель — счётчик, порядок показа, очистка;
+ *   3. сетка — сами товары, готовым компонентом productCard.
+ *
+ * Сетка и карточка НЕ переопределяются ни одним правилом: они уже сделаны, и
+ * страница берёт их как есть. Всё оформление вокруг них — в Wishlist.module.css.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ГДЕ ЖИВЁТ СОСТОЯНИЕ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Источник истины прежний и единственный — множество идентификаторов в сторе
+ * избранного. Отдельного действия «убрать» на странице нет: сердечко на
+ * карточке (то же самое, что в каталоге и на странице товара) обновляет стор,
+ * а список здесь реактивно теряет позицию. Дублировать кнопку удаления рядом
+ * с карточкой не нужно — она уже есть на самой карточке.
+ *
+ * Данные позиций приходят с сервера один раз и больше не меняются: стор
+ * управляет только составом. Поэтому вернувшаяся позиция (сервер отказал, и
+ * оптимистичное удаление откатилось) появляется обратно без перезагрузки.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ЧТО ПРОИСХОДИТ ПРИ УДАЛЕНИИ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Карточка гаснет на месте, соседи доезжают на новые места, счётчики в панели
+ * и в первом экране пересчитываются, а когда уходит последняя позиция — сетка
+ * сменяется пустым состоянием с тем же проявлением. Хореография вынесена в
+ * useGridChoreography, потому что работает с уже отрисованными узлами и не
+ * требует ни одной правки в карточке.
+ *
+ * Уведомление об удалении приходит от самого сердечка (useToggleWishlist) —
+ * второго здесь нет намеренно: две всплывающие подсказки об одном действии
+ * читаются как сбой.
  */
 export function WishlistPageClient({
-  initialWishlist,
+	initialWishlist,
+	breadcrumbs,
 }: WishlistPageClientProps) {
-  const hydrate = useWishlistStore((s) => s.hydrate);
-  const clear = useWishlistStore((s) => s.clear);
-  const favoriteIds = useWishlistStore((s) => s.productIds);
-  const [isClearing, startClearing] = useTransition();
+	const hydrate = useWishlistStore((s) => s.hydrate);
+	const clear = useWishlistStore((s) => s.clear);
+	const favoriteIds = useWishlistStore((s) => s.productIds);
+	const storeReady = useWishlistStore((s) => s.hydrated);
 
-  useEffect(() => {
-    hydrate(initialWishlist.productIds);
-  }, [initialWishlist, hydrate]);
+	const [sort, setSort] = useState<WishlistSortValue>(DEFAULT_WISHLIST_SORT);
+	const [clearOpen, setClearOpen] = useState(false);
 
-  const visibleItems = initialWishlist.items.filter((item) =>
-    favoriteIds.has(item.product.id),
-  );
+	useEffect(() => {
+		hydrate(initialWishlist.productIds);
+	}, [initialWishlist, hydrate]);
 
-  function handleClear() {
-    startClearing(async () => {
-      const result = await clearWishlistAction();
-      if (result.success) clear();
-    });
-  }
+	// Позиции, отложенные СЕЙЧАС, в выбранном порядке. Стор — фильтр, сервер —
+	// источник самих данных.
+	//
+	// ДО ГИДРАТАЦИИ ФИЛЬТР НЕ ПРИМЕНЯЕТСЯ, и это не мелочь. Стор наполняется в
+	// useEffect, то есть только в браузере; на сервере его множество пусто.
+	// Пока фильтр стоял безусловно, серверная разметка страницы получалась
+	// ПУСТОЙ — в HTML уезжало «в избранном пока пусто» вместе с нулями в первом
+	// экране, и только после гидратации на их месте появлялись карточки. На
+	// медленном соединении это подмигивание длиной в секунду, а без JavaScript
+	// страница так и оставалась бы пустой.
+	//
+	// Расхождения разметки это не создаёт: первый клиентский рендер тоже идёт с
+	// hydrated = false, то есть с тем же списком, что пришёл с сервера.
+	const target = useMemo(() => {
+		const visible = storeReady
+			? initialWishlist.items.filter((item) => favoriteIds.has(item.product.id))
+			: initialWishlist.items;
+		return sortWishlistItems(visible, sort);
+	}, [initialWishlist.items, favoriteIds, storeReady, sort]);
 
-  if (visibleItems.length === 0) {
-    return <WishlistEmptyState />;
-  }
+	const { gridRef, rendered } = useGridChoreography(target);
 
-  return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-[var(--text-primary)] sm:text-3xl">
-            <Heart className="h-6 w-6" />
-            Избранное
-          </h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            {visibleItems.length} товаров
-          </p>
-        </div>
+	// Счётчики считаются по ЦЕЛИ, а не по отрисованному списку: пока уходящая
+	// карточка гаснет, она уже не отложена, и число обязано это показывать —
+	// иначе отклик отстаёт от действия на треть секунды.
+	const total = target.length;
+	const available = useMemo(
+		() => target.filter((item) => item.product.status === "available").length,
+		[target],
+	);
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleClear}
-          loading={isClearing}
-          disabled={isClearing}
-        >
-          Очистить избранное
-        </Button>
-      </div>
+	async function handleClear() {
+		const result = await clearWishlistAction();
+		if (!result.success) {
+			appToast.warning(result.message ?? "Не удалось очистить избранное");
+			return;
+		}
+		clear();
+		setClearOpen(false);
+		appToast.success("Избранное очищено");
+	}
 
-      <ProductListContainer
-        products={visibleItems.map((item) => item.product)}
-        totalProducts={visibleItems.length}
-      />
-    </div>
-  );
+	return (
+		<>
+			<WishlistHero
+				breadcrumbs={breadcrumbs}
+				total={total}
+				available={available}
+			/>
+
+			<PageContainer className="pb-[4rem]">
+				{/* Панель — прямой потомок колонки, без обёртки: её собственный
+				    отступ задан в .rail, а обёртка ростом с панель отняла бы у
+				    position: sticky ход (разбор — в Catalog.module.css). */}
+				<div className="flex flex-col">
+					{total > 0 && (
+						<WishlistRail
+							count={total}
+							sort={sort}
+							onSortChange={setSort}
+							onClearRequest={() => setClearOpen(true)}
+						/>
+					)}
+
+					<div
+						className={
+							total > 0
+								? "mt-[2rem] sm:mt-[2.5rem]"
+								: "mt-[clamp(2rem,4vw,3rem)]"
+						}
+					>
+						{rendered.length > 0 ? (
+							<>
+								<div ref={gridRef}>
+									<ProductGrid
+										products={rendered.map((item) => item.product)}
+									/>
+								</div>
+
+								{/* Конец списка отмечен так же, как в каталоге и заказах:
+								    линия со служебной подписью. Без неё непонятно,
+								    кончился список или не догрузился. */}
+								<div className={styles.tail}>
+									<span aria-hidden className={styles.tailRule} />
+									<p className={catalog.micro}>{tailLabel(rendered.length)}</p>
+									<span aria-hidden className={styles.tailRule} />
+								</div>
+							</>
+						) : (
+							<WishlistEmptyState />
+						)}
+					</div>
+				</div>
+			</PageContainer>
+
+			<ClearWishlistDialog
+				open={clearOpen}
+				onClose={() => setClearOpen(false)}
+				onConfirm={handleClear}
+				count={total}
+			/>
+		</>
+	);
 }
+
+export default WishlistPageClient;

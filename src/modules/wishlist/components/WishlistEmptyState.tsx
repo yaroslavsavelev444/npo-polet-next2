@@ -1,22 +1,69 @@
-import { Heart } from "lucide-react";
+import { Heart, LayoutGrid, Star } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/UI";
+import styles from "./Wishlist.module.css";
 
+/**
+ * Пустое избранное.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ЧТО ИЗМЕНИЛОСЬ ПО СМЫСЛУ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Прежний блок ЗАМЕНЯЛ СОБОЙ ВСЮ СТРАНИЦУ: ни заголовка, ни цепочки, ни
+ * понимания, куда ты попал, — серый кружок с сердечком посреди пустоты.
+ * Теперь первый экран остаётся на месте, а сюда попадает только ответ на
+ * «почему пусто и что делать».
+ *
+ * Объяснение конкретное: избранное наполняется не «где-то в каталоге», а
+ * одним определённым элементом — сердечком на карточке товара. Поэтому знак
+ * нарисован ровно таким, каким его предстоит искать: тот же Heart в такой же
+ * круглой оправе, что и кнопка на кадре товара, и он же повторён внутри
+ * строки текста. Показать элемент дешевле, чем описать его словами.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * ДЕЙСТВИЯ
+ * ────────────────────────────────────────────────────────────────────────────
+ * Главное — каталог: наполнить избранное можно только оттуда. Второе ведёт в
+ * отзывы: когда не знаешь, что откладывать, чужой опыт — следующий разумный
+ * шаг, и это единственная витрина на сайте, которая работает без выбранной
+ * категории. Третьего действия нет: пустой экран с четырьмя кнопками решает
+ * не задачу посетителя, а задачу заполнить место.
+ */
 export function WishlistEmptyState() {
-  return (
-    <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-24 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--surface-secondary)]">
-        <Heart className="h-9 w-9 text-[var(--text-muted)]" />
-      </div>
-      <h1 className="text-xl font-semibold text-[var(--text-primary)]">
-        В избранном пока пусто
-      </h1>
-      <p className="mt-2 text-sm text-[var(--text-secondary)]">
-        Добавляйте товары в избранное, нажимая на сердечко на карточке товара
-      </p>
-      <Link href="/category" className="mt-6">
-        <Button variant="primary">Перейти в каталог</Button>
-      </Link>
-    </div>
-  );
+	return (
+		<div className={styles.empty}>
+			<span className={styles.emptyMark} aria-hidden="true">
+				<Heart size={22} strokeWidth={1.5} />
+			</span>
+
+			<h2 className={styles.emptyTitle}>В избранном пока пусто</h2>
+
+			{/* Пробелы вокруг знака заданы явно: JSX срезает перенос строки перед
+			    вложенным элементом, и без них слово слипается со знаком. */}
+			<p className={styles.emptyText}>
+				Нажмите{" "}
+				<Heart
+					size={14}
+					strokeWidth={2}
+					aria-hidden="true"
+					className={styles.emptyGlyph}
+				/>{" "}
+				на карточке товара — он появится здесь и останется в аккаунте, даже если
+				вы зайдёте с другого устройства.
+			</p>
+
+			<div className={styles.emptyActions}>
+				<Link href="/category" className={`${styles.btn} ${styles.btnPrimary}`}>
+					<LayoutGrid size={15} aria-hidden />
+					Перейти в каталог
+				</Link>
+
+				<Link href="/reviews" className={`${styles.btn} ${styles.btnQuiet}`}>
+					<Star size={15} aria-hidden />
+					Что выбирают другие
+				</Link>
+			</div>
+		</div>
+	);
 }
+
+export default WishlistEmptyState;
