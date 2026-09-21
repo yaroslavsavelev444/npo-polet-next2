@@ -1,6 +1,13 @@
 packages:
   - .
 
+# pnpm раз в сутки печатает в stdout рамку «Update available! 11.8.0 →
+# 12.x.y». В сборке образа она попадает прямо в лог шага `pnpm install`
+# (см. `#12 ... Update available` в логе job'а «Образы») и выглядит как
+# требующее внимания сообщение, хотя версия здесь прибита гвоздями через
+# packageManager и меняться по подсказке не должна.
+updateNotifier: false
+
 # Патчим уязвимые транзитивные зависимости (pnpm audit --prod).
 # undici — high: обход проверки TLS-сертификата, request smuggling, header
 # injection. dompurify — prototype pollution → XSS. postcss — XSS через

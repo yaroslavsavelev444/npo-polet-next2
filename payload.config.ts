@@ -3,6 +3,7 @@ import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { ru } from "@payloadcms/translations/languages/ru";
 import path from "path";
 import { buildConfig } from "payload";
+import sharp from "sharp";
 import { env } from "./src/env.ts";
 import { migrations } from "./src/migrations/index.ts";
 import { AccountDeletionRequests } from "./src/payload/collections/AccountDeletionRequests.ts";
@@ -37,6 +38,7 @@ import TransportCompanies from "./src/payload/collections/TransportCompanies.ts"
 import { Users } from "./src/payload/collections/User.ts";
 import { UserConsents } from "./src/payload/collections/UserConsents.ts"; // добавили
 import { Wishlists } from "./src/payload/collections/Wishlists.ts";
+import { projectEmailAdapter } from "./src/payload/email/adapter.ts";
 import { Settings } from "./src/payload/globals/Settings.ts";
 
 export default buildConfig({
@@ -63,6 +65,28 @@ export default buildConfig({
 	csrf: env.ALLOWED_ORIGINS.split(",")
 		.map((origin) => origin.trim())
 		.filter(Boolean),
+
+	// ⚠ sharp обязателен, а не «улучшение качества картинок».
+	//
+	// В Media объявлены imageSizes (thumbnail/card/full) и focalPoint, но
+	// генерирует их Payload только тем sharp, который передан сюда. Без него он
+	// на каждом старте писал в лог
+	//
+	//   WARN: Image resizing is enabled for one or more collections, but sharp
+	//         not installed.
+	//
+	// и молча не создавал НИ ОДНОГО производного размера: и витрина, и админка
+	// отдавали оригинал по 3-4 МБ там, где код просит thumbnail (см.
+	// src/modules/search/lib/adapter.ts и build-order-list-view.ts — оба с
+	// fallback'ом на media.url, из-за которого поломка и не бросалась в глаза).
+	//
+	// Уже загруженные файлы задним числом не нарежутся: размеры считаются при
+	// загрузке. Новые — будут.
+	sharp,
+
+	// Адаптер отправки писем. Подробно, почему он нужен и почему свой, —
+	// в src/payload/email/adapter.ts.
+	email: projectEmailAdapter,
 
 	// Редактор по умолчанию для полей richText, которые не задали собственный.
 	// Обязателен: без него Payload падает на старте при первом же richText-поле.

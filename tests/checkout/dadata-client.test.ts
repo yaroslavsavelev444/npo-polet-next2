@@ -23,6 +23,7 @@ import {
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_KEY = process.env.DADATA_API_KEY;
+const ORIGINAL_CONSOLE_ERROR = console.error;
 
 function jsonResponse(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -31,11 +32,27 @@ function jsonResponse(body: unknown, status = 200): Response {
 	});
 }
 
+/**
+ * Сценарии отказов ниже проверяют как раз те ветки, где клиент ПО ЗАМЫСЛУ
+ * пишет в console.error (HTTP 401/403/500, сетевой сбой, битый JSON). В
+ * прогоне тестов это давало полтора десятка строк «[dadata] auth/limit
+ * error», «[dadata] network error» вперемешку со стек-трейсами — в логе CI
+ * они неотличимы от настоящей аварии, и ровно на них уходит время при разборе
+ * упавшей сборки.
+ *
+ * Вывод подавляется целиком, а не выборочно: любой console.error здесь —
+ * ожидаемая часть проверяемого поведения. Если клиент перестанет логировать,
+ * тесты этого не заметят — но они на это и не смотрят, они смотрят на
+ * возвращаемое значение.
+ */
+
 beforeEach(() => {
 	process.env.DADATA_API_KEY = "test-key";
+	console.error = () => {};
 });
 
 afterEach(() => {
+	console.error = ORIGINAL_CONSOLE_ERROR;
 	globalThis.fetch = ORIGINAL_FETCH;
 	if (ORIGINAL_KEY === undefined) delete process.env.DADATA_API_KEY;
 	else process.env.DADATA_API_KEY = ORIGINAL_KEY;

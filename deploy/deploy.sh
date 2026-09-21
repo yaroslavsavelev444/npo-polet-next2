@@ -111,6 +111,53 @@ compose() {
         -f "$COMPOSE_FILE" "$@"
 }
 
+### ── Осиротевшие сети предыдущих имён проекта ─────────────────────────────
+#
+# На каждый `compose up` docker печатал по две строки вида
+#
+#   level=warning msg="network \"npo-polet-next2-internal\" ... carries the
+#   compose label \"internal\" but does not match the compose file (using
+#   \"polet-next-internal\"); it is left untouched — remove it manually"
+#
+# Это следы прежних имён: сначала сеть звалась `<project>_internal` (схема
+# compose по умолчанию), потом проект какое-то время назывался
+# `npo-polet-next2`. Сейчас имена заданы явно (`name:` в docker-compose.prod.yml),
+# а старые сети остались на диске с меткой того же проекта — compose находит
+# их по метке, не узнаёт по имени и честно предупреждает.
+#
+# Предупреждение безобидное ровно до тех пор, пока его читают. Две строки
+# шума на каждой выкладке — верный способ перестать читать и остальные.
+#
+# Удаляем только то, что сам compose назвал лишним: сеть с меткой нашего
+# проекта, имя которой не совпадает ни с одной из объявленных. Сеть с
+# подключёнными контейнерами docker удалить не даст — и это правильная
+# защита, поэтому неудача здесь не является ошибкой выкладки.
+prune_orphan_networks() {
+    # Держать в соответствии с `name:` в секции networks docker-compose.prod.yml.
+    # Ошибка здесь не опасна: сеть с подключёнными контейнерами docker удалить
+    # не даст, а пустую тут же пересоздаст `compose up` следующим шагом.
+    local expected="polet-next-internal polet-next-data"
+    local name
+
+    # Список берётся в переменную, а не читается из конвейера: при `set -o
+    # pipefail` неудача `docker network ls` уронила бы всю выкладку — ради
+    # уборки мусора, без которой она прекрасно обходится.
+    local listed
+    listed=$(docker network ls \
+        --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+        --format '{{.Name}}' 2>/dev/null) || return 0
+
+    while read -r name; do
+        [[ -n "$name" ]] || continue
+        [[ " $expected " == *" $name "* ]] && continue
+        if docker network rm "$name" >/dev/null 2>&1; then
+            log "🧹 Удалена осиротевшая сеть прежнего имени проекта: $name"
+        else
+            log "ℹ️  Сеть $name не удалена (к ней подключены контейнеры) — оставлена как есть"
+        fi
+    done <<< "$listed"
+}
+
 # Теги собираются из тех же переменных, что и в workflow. Совпадение
 # обеспечивается тем, что обе стороны читают одно и то же, а не тем, что
 # кто-то помнит формат.
@@ -396,9 +443,45 @@ cmd_deploy() {
     previous=$(cat "$STATE_FILE" 2>/dev/null || echo "")
     if [[ -n "$previous" ]]; then log "Предыдущий успешный SHA: $previous"; fi
 
+    # ⚠ Отфильтрован ровно один блок вывода `docker login`:
+    #
+    #   WARNING! Your credentials are stored unencrypted in '~/.docker/config.json'.
+    #   Configure a credential helper to remove this warning. See
+    #   https://docs.docker.com/go/credential-store/
+    #
+    # Это не совет, которому здесь можно последовать: credential helper на
+    # headless-сервере — это GPG-агент с ключом и парольной фразой, которую
+    # некому ввести из неинтерактивной сессии выкладки. Настоящий ответ на
+    # претензию — `docker logout` в трапе ниже: токен лежит на диске не до
+    # следующей выкладки, а только пока идёт текущая.
+    #
+    # Гасятся только эти три строки; всё остальное, включая любые ошибки,
+    # по-прежнему попадает в лог, а решение «войти удалось или нет»
+    # принимается по коду возврата самого login, а не по выводу grep.
     if [[ -n "${GHCR_TOKEN:-}" ]]; then
-        echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "${GHCR_USER:-x}" --password-stdin >/dev/null \
-            || fail "Не удалось войти в реестр $REGISTRY"
+        local login_out login_rc=0
+        # `|| login_rc=$?`, а не `login_rc=$?` отдельной строкой: при `set -e`
+        # (включён вверху файла) до второй строки дело бы не дошло — скрипт
+        # оборвался бы на самом присваивании, не напечатав, что именно сказал
+        # docker.
+        login_out=$(echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "${GHCR_USER:-x}" --password-stdin 2>&1) || login_rc=$?
+        printf '%s\n' "$login_out" \
+            | grep -vE "credentials are stored unencrypted|Configure a credential helper|docs\.docker\.com/go/credential-store|^Login Succeeded$|^$" \
+            >&2 || true
+        [[ $login_rc -eq 0 ]] || fail "Не удалось войти в реестр $REGISTRY"
+
+        # Токен GHCR не должен оставаться в ~/.docker/config.json открытым
+        # текстом до следующей выкладки — то есть постоянно (именно на это и
+        # ругается `docker login`). Выход делается ТРАПОМ, а не строкой после
+        # `docker pull`: ниже по коду есть аварийный откат, а он при
+        # отсутствующем локально образе тоже делает pull (см. rollback_to), и
+        # ранний logout сломал бы именно тот путь, который нужен в худший
+        # момент.
+        #
+        # Именно EXIT, а не RETURN: `fail` завершает скрипт через `exit`, а не
+        # возвратом из функции, и RETURN-трап на этом — самом вероятном —
+        # пути просто не сработал бы.
+        trap 'docker logout "$REGISTRY" >/dev/null 2>&1 || true' EXIT
     fi
 
     # ── 1. Образы скачиваются ДО остановки чего-либо: если тега нет или
@@ -411,6 +494,7 @@ cmd_deploy() {
     export IMAGE_TOOLS="$(image_tools "$GIT_SHA")"
 
     # ── 2. База поднимается и бэкапится до всего остального.
+    prune_orphan_networks
     log "🗄  Postgres и Redis"
     compose up -d --wait --wait-timeout 120 postgres redis \
         || fail "Postgres или Redis не поднялись"

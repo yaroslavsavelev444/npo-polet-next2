@@ -58,7 +58,19 @@ FROM base-builder AS builder
 # используется никем. Реальные значения приходят при ЗАПУСКЕ из
 # .env.production на сервере и в образ не попадают вовсе.
 ENV DATABASE_URI=postgresql://build:build@127.0.0.1:5432/build
-ENV PAYLOAD_SECRET=build-time-placeholder-not-a-secret
+
+# ⚠ PAYLOAD_SECRET задаётся НЕ через `ENV`, и это не стиль.
+#
+# BuildKit-проверка SecretsUsedInArgOrEnv ругается на любой ARG/ENV с
+# «секретным» именем: `##[warning]SecretsUsedInArgOrEnv: Do not use ARG or ENV
+# instructions for sensitive data (ENV "PAYLOAD_SECRET")`. Здесь значение
+# заведомо не секрет, но проверка судит по имени, а не по содержимому, и
+# гасить её `# check=skip=` значит выключить её и для настоящего секрета,
+# если такой однажды появится.
+#
+# Значение нужно ровно одной команде — `pnpm build` ниже, — поэтому там же
+# ему и место: переменная живёт только внутри того RUN и в слои образа не
+# записывается вовсе.
 
 # ⚠ NEXT_PUBLIC_* — это АРГУМЕНТЫ СБОРКИ, а не переменные запуска. Next
 # подставляет их значения прямо в код на этапе компиляции, поэтому задать их
@@ -98,6 +110,7 @@ RUN set -e; \
     fi; \
     export NEXT_PUBLIC_APP_URL; \
     if [ -n "${NEXT_PUBLIC_YM_ID:-}" ]; then export NEXT_PUBLIC_YM_ID; else unset NEXT_PUBLIC_YM_ID; fi; \
+    export PAYLOAD_SECRET=build-time-placeholder-not-a-secret; \
     pnpm payload:types && pnpm build
 
 # ── tools: миграции Payload и фоновые воркеры ──────────────────────────────
@@ -122,7 +135,14 @@ USER nextjs
 # стейдже выше), поэтому под непривилегированным nextjs pnpm пришлось бы
 # качать заново при каждом старте контейнера — сетевой сбой означал бы
 # несостоявшуюся миграцию.
-CMD ["node", "--experimental-strip-types", "scripts/payload-cli.mts", "migrate"]
+#
+# --disable-warning=MODULE_TYPELESS_PACKAGE_JSON гасит ровно один код
+# предупреждения Node: «Module type of file:///app/payload.config.ts is not
+# specified». Штатный способ его убрать — `"type": "module"` в package.json —
+# здесь недоступен: Next кладёт корневой package.json в .next/standalone, а
+# сгенерированный им server.js — CommonJS (require/__dirname), и боевой
+# контейнер после такой правки не стартовал бы вовсе.
+CMD ["node", "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", "--experimental-strip-types", "scripts/payload-cli.mts", "migrate"]
 
 # ── runner: минимальный production-образ ────────────────────────────────────
 FROM base AS runner

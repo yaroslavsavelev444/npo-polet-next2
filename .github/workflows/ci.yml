@@ -31,13 +31,24 @@ concurrency:
 permissions:
   contents: read
 
+# `git init` внутри actions/checkout не находит init.defaultBranch и на каждом
+# job'е печатает девять строк подсказки «Using 'master' as the name for the
+# initial branch...». Это не про репозиторий — раннер создаёт пустой .git с
+# нуля, — но в логе выглядит ровно как предупреждение. Переменные
+# GIT_CONFIG_* задают настройку без правки глобального конфига (который
+# checkout всё равно подменяет на временный) и гасят подсказку.
+env:
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: master
+
 jobs:
   checks:
     name: Типы, линт, тесты
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Версия pnpm НЕ задаётся здесь: action читает её из поля packageManager
       # в package.json. Раньше тут было жёстко прописано `version: 9`, а
@@ -45,9 +56,9 @@ jobs:
       # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH, потому что pnpm 9 не читает секцию
       # overrides из pnpm-workspace.yaml (она переехала туда в pnpm 10+).
       # Единственный источник правды о версии — packageManager.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm

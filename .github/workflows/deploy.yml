@@ -47,6 +47,16 @@ env:
   REGISTRY: ghcr.io
   NODE_VERSION: "22"
 
+  # `git init` внутри actions/checkout не находит init.defaultBranch и на каждом
+  # job'е печатает девять строк подсказки «Using 'master' as the name for the
+  # initial branch...». Это не про репозиторий — раннер создаёт пустой .git с
+  # нуля, — но в логе выглядит ровно как предупреждение. Переменные
+  # GIT_CONFIG_* задают настройку без правки глобального конфига (который
+  # checkout всё равно подменяет на временный) и гасят подсказку.
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: master
+
 jobs:
   # ── Проверки перед сборкой ────────────────────────────────────────────────
   #
@@ -58,9 +68,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -88,11 +98,11 @@ jobs:
       # прогон — отдельный секрет с паролем реестра заводить не нужно.
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -111,7 +121,7 @@ jobs:
       # Секретов среди них нет и быть не должно: боевые ключи читаются при
       # запуске из .env.production, и сборка их не видит вовсе.
       - name: Образ приложения
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: runner
@@ -132,7 +142,7 @@ jobs:
           cache-to: type=gha,scope=app,mode=max,ignore-error=true
 
       - name: Образ инструментов (миграции, воркеры)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: tools
@@ -170,7 +180,7 @@ jobs:
       name: production
       url: ${{ vars.NEXT_PUBLIC_APP_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # То же приведение к нижнему регистру, что и в job'е сборки: имя образа
       # должно совпасть с тем, под которым он опубликован, иначе `docker pull`
@@ -182,7 +192,7 @@ jobs:
       - name: Ключ SSH
         # Ключ живёт в агенте, а не в файле на диске раннера: файл пришлось бы
         # удалять самому, и любой упавший шаг оставил бы его лежать.
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
