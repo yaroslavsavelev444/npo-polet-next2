@@ -19,7 +19,8 @@ export type ContactRequestActionResult =
 	  };
 
 /**
- * Приём сообщения с формы на странице контактов.
+ * Приём сообщения с сайта: форма на странице контактов и заявка на 3D-печать
+ * с главной (одна форма, тема — поле `topic`).
  *
  * Единственная точка создания записи contact-requests: create в коллекции
  * закрыт, а сервис пишет с overrideAccess только после того, как здесь прошли
@@ -58,14 +59,19 @@ export async function submitContactRequestAction(
 		};
 	}
 
-	const { name, email, message } = parsed.data;
+	const { topic, name, email, message } = parsed.data;
+	// Пустая строка из необязательного поля в базу не пишется: «телефон не
+	// указан» — это отсутствие значения, а не пустой номер.
+	const phone = parsed.data.phone || undefined;
 	const consentAcceptedAt = new Date();
 
 	let requestId: number | string;
 	try {
 		const created = await createContactRequest({
+			topic,
 			name,
 			email,
+			phone,
 			message,
 			consentAcceptedAt,
 			consentDocument: PERSONAL_DATA_CONSENT_SLUG,
@@ -89,8 +95,10 @@ export async function submitContactRequestAction(
 	await notifyNewContactRequest(
 		{
 			id: requestId,
+			topic,
 			name,
 			email,
+			phone,
 			message,
 			consentAcceptedAt,
 			consentDocument: PERSONAL_DATA_CONSENT_SLUG,

@@ -6,6 +6,12 @@
 			"runtimeExecutable": "npx",
 			"runtimeArgs": ["next", "dev"],
 			"port": 3000
+		},
+		{
+			"name": "npo-polet-prod",
+			"runtimeExecutable": "sh",
+			"runtimeArgs": ["-c", "PAYLOAD_SECRET=\"$(awk -F= '/^PAYLOAD_SECRET/{print $2}' .env)\" DATABASE_URI=\"$(awk -F= '/^DATABASE_URI=/{sub(/^DATABASE_URI=/,\"\");print}' .env)\" EMAIL_ENABLED=false REDIS_HOST=localhost npx next start -p 3001"],
+			"port": 3001
 		}
 	]
 }

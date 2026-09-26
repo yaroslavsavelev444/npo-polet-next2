@@ -12,6 +12,7 @@ export {
 	markCartOnboardingSeenAction,
 	mergeGuestCartAction,
 	removeFromCartAction,
+	repeatOrderAction,
 	updateCartItemQuantityAction,
 } from "./actions/cart.actions";
 export { CartIcon } from "./components/CartIcon";
@@ -27,6 +28,8 @@ export type {
 	CartSummary,
 	CartUnavailableItem,
 	CartView,
+	RepeatOrderReport,
+	RepeatOrderResult,
 } from "./types";
 
 // buildCartView / buildCartViewFromEntries / EMPTY_CART_VIEW are intentionally

@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { openAuthOverlay } from '@/modules/auth/store/auth-overlay.store'
 import { toggleWishlistAction } from '@/modules/wishlist/actions/wishlist.actions'
 import { useWishlistStore } from '@/shared/store/wishlist.store'
 import type { ProductCardData } from '../types'
@@ -23,7 +23,6 @@ export interface UseToggleWishlistResult {
 }
 
 export function useToggleWishlist(productId: string): UseToggleWishlistResult {
-  const router = useRouter()
   const [isToggling, setIsToggling] = useState(false)
 
   const isInWishlist = useWishlistStore((s) => s.productIds.has(productId))
@@ -48,8 +47,19 @@ export function useToggleWishlist(productId: string): UseToggleWishlistResult {
           else remove(productId)
 
           if (result.error === 'AUTH_REQUIRED') {
-            appToast.warning(`Войдите в аккаунт, чтобы добавить товар в избранное`)
-            router.push('/auth/login?from=/wishlist')
+            // Раньше отсюда уводило на /auth/login?from=/wishlist — то есть
+            // человека, который нажал на сердечко в каталоге, выбрасывало со
+            // страницы, а после входа он оказывался не там, где был, а в
+            // избранном. Теперь окно входа открывается поверх, а после него
+            // нажатие повторяется само: намерение он уже выразил.
+            openAuthOverlay({
+              reason: 'Избранное хранится в аккаунте. Войдите — товар добавится сразу после этого.',
+              onSuccess: async () => {
+                await toggleWishlistAction(productId).then((retry) => {
+                  if (retry.success && retry.data.isFavorite) add(productId)
+                })
+              },
+            })
             return
           }
           appToast.warning(result.message ?? 'Не удалось обновить избранное. Попробуйте ещё раз.')
@@ -71,7 +81,7 @@ appToast.success(result.data.isFavorite
         setIsToggling(false)
       }
     },
-    [isInWishlist, productId, add, remove, appToast, router],
+    [isInWishlist, productId, add, remove],
   )
 
   return { isInWishlist, isToggling, toggleWishlist }

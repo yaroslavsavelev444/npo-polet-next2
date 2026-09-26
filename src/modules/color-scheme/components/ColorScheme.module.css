@@ -1,0 +1,219 @@
+/* ===========================================================================
+   Тема оформления: переключатель в шапке и выбор из трёх
+   ===========================================================================
+   Модуль, а не утилиты Tailwind: состояние знака зависит от атрибута на
+   <html> и от медиазапроса, а такие селекторы родителя в утилиты не
+   записываются (и глобальные стили @once-ui перебивают слоистые утилиты —
+   см. шапку app/(frontend)/globals.css).                                    */
+
+/* ---------------------------------------------------------------------------
+   Переключатель в шапке
+   ---------------------------------------------------------------------------
+   Размер, скругление и реакция на наведение — те же, что у соседних значков
+   шапки (корзина, избранное): переключатель — такой же значок, а не
+   отдельный виджет. */
+.toggle {
+	display: grid;
+	place-items: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	padding: 0;
+	border: 0;
+	border-radius: 0.75rem;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		background-color var(--dur-fast) var(--ease-out-quart),
+		color var(--dur-fast) var(--ease-out-quart),
+		transform 100ms var(--ease-out-quart);
+}
+
+.toggle:hover {
+	background: var(--surface-hover);
+	color: var(--text-primary);
+}
+
+/* Отклик на нажатие, а не на отпускание. */
+.toggle:active {
+	transform: scale(0.92);
+}
+
+.glyph {
+	width: 1.25rem;
+	height: 1.25rem;
+	overflow: visible;
+	transition: transform var(--dur-slow) var(--ease-out-expo);
+}
+
+/* Ядро — оранжевая точка логотипа. Нарисовано кругом радиуса 8 и в светлой
+   теме уменьшено вдвое: так в тёмной оно вырастает масштабом, а не сменой
+   геометрии, и переход остаётся композиторным. */
+.core {
+	fill: var(--primary);
+	transform-origin: 12px 12px;
+	transform: scale(0.5);
+	transition:
+		transform 700ms var(--ease-out-expo),
+		fill 350ms var(--ease-out-quart);
+}
+
+/* Тень, вырезающая серп. В светлой теме она уведена за край знака. */
+.cut {
+	fill: #000;
+	transform: translate(8px, -8px);
+	transition: transform 700ms var(--ease-out-expo);
+}
+
+.ticks line {
+	stroke: currentColor;
+	stroke-width: 1.7;
+	stroke-linecap: round;
+	transform-origin: 12px 12px;
+	transition:
+		transform 550ms var(--ease-out-expo),
+		opacity 300ms var(--ease-out-quart);
+}
+
+/* Засечки выдвигаются по очереди, по кругу — как стрелка проходит шкалу. */
+.ticks line:nth-child(2) {
+	transition-delay: 25ms;
+}
+.ticks line:nth-child(3) {
+	transition-delay: 50ms;
+}
+.ticks line:nth-child(4) {
+	transition-delay: 75ms;
+}
+.ticks line:nth-child(5) {
+	transition-delay: 100ms;
+}
+.ticks line:nth-child(6) {
+	transition-delay: 125ms;
+}
+.ticks line:nth-child(7) {
+	transition-delay: 150ms;
+}
+.ticks line:nth-child(8) {
+	transition-delay: 175ms;
+}
+
+/* Тёмная тема. Правила записаны дважды — для явного выбора и для «Авто» при
+   тёмной системе: CSS не умеет спросить у элемента его вычисленную тему,
+   а состояние знака, вычисленное в JavaScript, в режиме «Авто» было бы
+   неверным до гидратации. */
+:global(:root[data-scheme="dark"]) .glyph {
+	transform: rotate(-40deg);
+}
+
+:global(:root[data-scheme="dark"]) .core {
+	transform: scale(1);
+	fill: currentColor;
+}
+
+:global(:root[data-scheme="dark"]) .cut {
+	transform: translate(0, 0);
+}
+
+:global(:root[data-scheme="dark"]) .ticks line {
+	transform: scale(0.2) rotate(45deg);
+	opacity: 0;
+	transition-delay: 0ms;
+}
+
+@media (prefers-color-scheme: dark) {
+	:global(:root:not([data-scheme="light"])) .glyph {
+		transform: rotate(-40deg);
+	}
+
+	:global(:root:not([data-scheme="light"])) .core {
+		transform: scale(1);
+		fill: currentColor;
+	}
+
+	:global(:root:not([data-scheme="light"])) .cut {
+		transform: translate(0, 0);
+	}
+
+	:global(:root:not([data-scheme="light"])) .ticks line {
+		transform: scale(0.2) rotate(45deg);
+		opacity: 0;
+		transition-delay: 0ms;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Выбор из трёх: «Авто», «Светлая», «Тёмная»
+   ---------------------------------------------------------------------------
+   Голос — моноширинный верхний регистр подписей подвала; контур — та же
+   волосяная --rule, что у кнопки «Наверх» рядом. Бегунок — утопленная
+   поверхность, а не заливка фирменным цветом: выбор темы — настройка, а не
+   призыв к действию. */
+.switch {
+	position: relative;
+	display: inline-grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	min-inline-size: 0;
+	margin: 0;
+	padding: 3px;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+}
+
+.switchFill {
+	display: grid;
+	width: 100%;
+}
+
+.thumb {
+	position: absolute;
+	inset-block: 3px;
+	left: 3px;
+	width: calc((100% - 6px) / 3);
+	border-radius: 999px;
+	background: var(--surface-secondary);
+	box-shadow: inset 0 0 0 1px var(--border);
+	transform: translateX(calc(var(--index, 0) * 100%));
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.option {
+	position: relative;
+	min-height: 2.25rem;
+	padding: 0 0.9rem;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.65625rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+.option:hover,
+.option[aria-pressed="true"] {
+	color: var(--text-primary);
+}
+
+@media (pointer: coarse) {
+	.option {
+		min-height: 2.75rem;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.toggle,
+	.glyph,
+	.core,
+	.cut,
+	.ticks line,
+	.thumb {
+		transition-duration: 0s !important;
+		transition-delay: 0s !important;
+	}
+}

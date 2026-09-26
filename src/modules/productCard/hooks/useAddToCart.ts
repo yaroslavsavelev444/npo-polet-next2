@@ -1,8 +1,8 @@
 // src/modules/productCard/hooks/useAddToCart.ts
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { openAuthOverlay } from "@/modules/auth/store/auth-overlay.store";
 import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
 import { appToast } from "@/shared/lib/toast";
 import type { ProductCardData } from "../types";
@@ -27,8 +27,6 @@ export interface UseAddToCartResult {
  * поверх той самой панели, которая обо всём уже сказала.
  */
 export function useAddToCart(): UseAddToCartResult {
-	const router = useRouter();
-	const pathname = usePathname();
 	const [isAdding, setIsAdding] = useState(false);
 	const add = useCartPanel((s) => s.add);
 
@@ -40,11 +38,19 @@ export function useAddToCart(): UseAddToCartResult {
 
 				if (!outcome.ok) {
 					if (outcome.reason === "auth") {
-						// Сессия истекла посреди работы: возвращаем туда же, где человек
-						// был, а не на страницу корзины — он выбирал товар, а не смотрел
-						// корзину.
-						appToast.warning("Сессия истекла — войдите, чтобы продолжить");
-						router.push(`/auth/login?from=${encodeURIComponent(pathname)}`);
+						// Сессия истекла посреди работы. Раньше отсюда уводило на
+						// /auth/login с возвратом по ?from=: человек терял и место в
+						// каталоге, и выбранное количество, и после входа возвращался
+						// на страницу, где всё нужно было начинать заново. Теперь окно
+						// входа встаёт поверх — а после него товар кладётся в корзину
+						// сам, тем же нажатием, которое человек уже сделал.
+						openAuthOverlay({
+							reason:
+								"Сессия истекла. Войдите — товар отправится в корзину сразу после этого.",
+							onSuccess: async () => {
+								await add(product, quantity);
+							},
+						});
 						return;
 					}
 					appToast.warning(outcome.message);
@@ -63,7 +69,7 @@ export function useAddToCart(): UseAddToCartResult {
 				setIsAdding(false);
 			}
 		},
-		[add, pathname, router],
+		[add],
 	);
 
 	return { isAdding, addToCart };

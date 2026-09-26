@@ -62,7 +62,12 @@ export function HomeHero({
 
 	return (
 		<section
-			className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden bg-[var(--void-deep)]"
+			// Первый экран тёмный при любой теме: под ним видео, и его кадр с
+			// затемнением сверху и снизу рассчитан на светлый текст. Светлая
+			// заливка поверх видео дала бы грязно-серый кадр. .scheme-dark
+			// переключает на тёмные значения все токены внутри (см. шапку
+			// app/(frontend)/theme.css).
+			className="scheme-dark relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden bg-[var(--void-deep)]"
 			style={{
 				// Шапка сайта — position: fixed, и её место в потоке держит
 				// HeaderSpacer. Первый экран должен заезжать ПОД неё (она
@@ -259,6 +264,11 @@ function HeroMetrics() {
 						// Скринридер и поиск должны прочитать список один раз.
 						aria-hidden={index >= metrics.length ? "true" : undefined}
 					>
+						{metric.lead ? (
+							<span className="text-[0.8125rem] text-[var(--text-muted)]">
+								{metric.lead}
+							</span>
+						) : null}
 						<span className="u-mono text-[0.9375rem] font-semibold tracking-[0.02em] text-[var(--text-primary)]">
 							<Value data={metric.value} />
 						</span>

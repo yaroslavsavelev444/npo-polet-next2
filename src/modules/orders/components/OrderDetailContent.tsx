@@ -1,5 +1,6 @@
 import { ArrowUpRight, Route } from "lucide-react";
 import Link from "next/link";
+import { isOrderRepeatable } from "../lib/status.groups";
 import { buildOrderTimeline } from "../lib/status-flow";
 import { ORDER_STATUS_VIEW } from "../lib/status-view";
 import type { OrderDetailView, OrderStatus } from "../types";
@@ -11,6 +12,7 @@ import { OrderPriceSummary } from "./OrderPriceSummary";
 import { OrderProductList } from "./OrderProductList";
 import styles from "./Orders.module.css";
 import { OrderTimeline } from "./OrderTimeline";
+import { RepeatOrderAction } from "./RepeatOrderAction";
 
 interface OrderDetailContentProps {
 	detail: OrderDetailView;
@@ -107,6 +109,12 @@ export function OrderDetailContent({
 			/>
 
 			<div className={styles.actions}>
+				{/* Повтор — второстепенное действие: список нужен, чтобы найти
+				    заказ, а не чтобы подталкивать к покупке. Сводка изменений
+				    встаёт на место кнопки во всю ширину строки. */}
+				{isOrderRepeatable(detail.status) && (
+					<RepeatOrderAction orderId={detail.id} variant="quiet" />
+				)}
 				<Link
 					href={`/orders/${detail.orderNumber}`}
 					className={`${styles.btn} ${styles.btnQuiet}`}

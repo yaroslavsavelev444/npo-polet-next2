@@ -20,6 +20,9 @@ import * as migration_20260907_160000_contact_requests from "./20260907_160000_c
 import * as migration_20260909_120000_cart_onboarding_seen from "./20260909_120000_cart_onboarding_seen.ts";
 import * as migration_20260911_120000_banners_module from "./20260911_120000_banners_module.ts";
 import * as migration_20260918_120000_home_documents from "./20260918_120000_home_documents.ts";
+import * as migration_20260922_120000_trusted_devices from "./20260922_120000_trusted_devices.ts";
+import * as migration_20260924_120000_social_links_platforms from "./20260924_120000_social_links_platforms.ts";
+import * as migration_20260925_120000_print_service_requests from "./20260925_120000_print_service_requests.ts";
 
 export const migrations = [
 	{
@@ -131,5 +134,20 @@ export const migrations = [
 		up: migration_20260918_120000_home_documents.up,
 		down: migration_20260918_120000_home_documents.down,
 		name: "20260918_120000_home_documents",
+	},
+	{
+		up: migration_20260922_120000_trusted_devices.up,
+		down: migration_20260922_120000_trusted_devices.down,
+		name: "20260922_120000_trusted_devices",
+	},
+	{
+		up: migration_20260924_120000_social_links_platforms.up,
+		down: migration_20260924_120000_social_links_platforms.down,
+		name: "20260924_120000_social_links_platforms",
+	},
+	{
+		up: migration_20260925_120000_print_service_requests.up,
+		down: migration_20260925_120000_print_service_requests.down,
+		name: "20260925_120000_print_service_requests",
 	},
 ];

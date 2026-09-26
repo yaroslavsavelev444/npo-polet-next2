@@ -5,7 +5,11 @@ import {
 } from "@/modules/productCard";
 import { getApplicableDiscount } from "@/payload/services/discounts.service";
 import { getCachedProducts } from "@/payload/services/products.service";
-import { getProductUnavailableReason } from "@/payload/utils/product-availability";
+import {
+	getProductUnavailableLabel,
+	getProductUnavailableReason,
+	PRODUCT_GONE_LABEL,
+} from "@/payload/utils/product-availability";
 import type { Cart, Product } from "@/payload-types";
 import type {
 	CartEntry,
@@ -58,24 +62,16 @@ interface ResolvedEntry {
 /**
  * Строка «товар больше нельзя заказать» с полным набором данных для отрисовки.
  *
- * Причина проверяется общим правилом (product-availability) — тем же, которым
- * пользуются добавление в корзину и слияние гостевой корзины, — а здесь
- * только превращается в подпись для покупателя. Формулировки намеренно
- * разные: «нет в наличии» и «снят с продажи» означают для него разное
- * (первое можно подождать, второе — нет).
+ * Причина и её подпись берутся из общего правила (product-availability) —
+ * того же, которым пользуются добавление в корзину, слияние гостевой корзины
+ * и повтор заказа.
  */
 function toUnavailableItem(
 	product: Product,
 	quantity: number,
 	reason: NonNullable<ReturnType<typeof getProductUnavailableReason>>,
 ): CartUnavailableItem {
-	const status = product.inventory?.status ?? "available";
-	const statusLabel =
-		reason === "status" && status === "out_of_stock"
-			? "Нет в наличии"
-			: reason === "status" && status === "discontinued"
-				? "Снят с производства"
-				: "Снят с продажи";
+	const statusLabel = getProductUnavailableLabel(product, reason);
 
 	return {
 		productId: String(product.id),
@@ -95,8 +91,28 @@ function toGoneItem(productId: string, quantity: number): CartUnavailableItem {
 		reason: "gone",
 		quantity,
 		product: null,
-		statusLabel: "Товара больше нет в каталоге",
+		statusLabel: PRODUCT_GONE_LABEL,
 	};
+}
+
+/**
+ * Цена единицы товара так, как её считает корзина: до товарной скидки и после
+ * неё. Скидка КОРЗИНЫ сюда не входит — она зависит от всего состава.
+ *
+ * Вынесена отдельно ради повтора заказа: сравнивать прошлую цену с текущей
+ * нужно ровно по той формуле, по которой корзина затем её покажет, а не по
+ * второй, похожей.
+ */
+export function resolveUnitPrices(product: Product): {
+	unitPrice: number;
+	unitFinalPrice: number;
+} {
+	const cardData = mapProductToCardData(product);
+	const { finalPrice } = calculatePriceBreakdown(
+		cardData.priceForIndividual,
+		cardData.discount,
+	);
+	return { unitPrice: cardData.priceForIndividual, unitFinalPrice: finalPrice };
 }
 
 /**

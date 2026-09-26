@@ -44,12 +44,12 @@ export function NetworkSection({ settings }: { settings: Setting }) {
 	const items = [
 		...socials.map((link) => ({
 			key: `social-${link.platform}-${link.url}`,
-			label: SOCIAL_PLATFORM_LABELS[link.platform] ?? "Ссылка",
-			title: link.title || SOCIAL_PLATFORM_LABELS[link.platform] || "Перейти",
+			label: SOCIAL_PLATFORM_LABELS[link.platform],
+			title: link.title || SOCIAL_PLATFORM_LABELS[link.platform],
 			value: link.url,
 			href: link.url,
 			description: null as string | null,
-			config: socialConfig[link.platform] ?? socialConfig.other,
+			config: socialConfig[link.platform],
 		})),
 		...others.map((contact) => ({
 			key: `other-${contact.type}-${contact.value}`,

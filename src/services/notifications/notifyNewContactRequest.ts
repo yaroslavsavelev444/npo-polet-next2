@@ -9,8 +9,10 @@ import { getAdminEmailAddresses } from "../email/recipients/getAdminEmails.ts";
 
 export interface NewContactRequestNotification {
 	id: number | string;
+	topic: "general" | "print3d";
 	name: string;
 	email: string;
+	phone?: string;
 	message: string;
 	consentAcceptedAt: Date;
 	consentDocument: string;
@@ -18,7 +20,7 @@ export interface NewContactRequestNotification {
 
 /**
  * Уведомляет персонал (коллекция admins — и `admin`, и `superadmin`) о новом
- * сообщении со страницы контактов.
+ * обращении с сайта: сообщении со страницы контактов или заявке на 3D-печать.
  *
  * Вызывается из server action ПОСЛЕ успешного создания записи. Ошибки
  * доставки логируются, но НЕ пробрасываются: для отправителя сообщение уже
@@ -32,12 +34,9 @@ export async function notifyNewContactRequest(
 	try {
 		const admins = await getAdminEmailAddresses(payload);
 		if (admins.length === 0) {
-			emailLogger.warn(
-				"Новое обращение с /contacts: нет админов для уведомления",
-				{
-					contactRequestId: request.id,
-				},
-			);
+			emailLogger.warn("Новое обращение с сайта: нет админов для уведомления", {
+				contactRequestId: request.id,
+			});
 			return;
 		}
 
@@ -46,8 +45,10 @@ export async function notifyNewContactRequest(
 		await emailService.send(
 			contactRequestAdminEmailTemplate,
 			{
+				topic: request.topic,
 				name: request.name,
 				email: request.email,
+				phone: request.phone,
 				message: request.message,
 				consentAcceptedAt: request.consentAcceptedAt.toISOString(),
 				consentUrl: `${appUrl}/consents/${request.consentDocument}`,
@@ -60,7 +61,7 @@ export async function notifyNewContactRequest(
 			},
 		);
 	} catch (error) {
-		emailLogger.error("Не удалось уведомить админов о сообщении с /contacts", {
+		emailLogger.error("Не удалось уведомить админов об обращении с сайта", {
 			contactRequestId: request.id,
 			error: error instanceof Error ? error.message : String(error),
 		});

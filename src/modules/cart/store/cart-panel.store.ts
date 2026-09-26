@@ -11,6 +11,7 @@ import {
 	markCartOnboardingSeenAction,
 	mergeGuestCartAction,
 	removeFromCartAction,
+	repeatOrderAction,
 	updateCartItemQuantityAction,
 } from "../actions/cart.actions";
 import {
@@ -30,7 +31,7 @@ import {
 	readDismissed,
 	writeDismissed,
 } from "../lib/unavailable-dismissals";
-import type { CartEntry, CartView } from "../types";
+import type { CartEntry, CartView, RepeatOrderResult } from "../types";
 
 /* ==========================================================================
    Зачем этот стор
@@ -104,6 +105,7 @@ interface CartPanelState {
 	setQuantity: (productId: string, quantity: number) => Promise<void>;
 	remove: (productId: string) => Promise<{ ok: boolean; message?: string }>;
 	clear: () => Promise<void>;
+	repeatOrder: (orderId: string) => Promise<RepeatOrderResult>;
 	dismissOnboarding: () => void;
 	syncGuestFromStorage: () => void;
 	hydrateDismissals: () => void;
@@ -593,6 +595,28 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 			syncDerivedStores(result.data);
 		} catch {
 			set({ view: previousView, error: NETWORK_MESSAGE });
+		} finally {
+			set({ isMutating: false });
+		}
+	},
+
+	/**
+	 * Повтор заказа. Через ту же очередь, что и прочие записи: повтор,
+	 * запущенный во время правки количества, не должен её перетереть.
+	 * Сводку изменений возвращает вызывающему — показывать её рядом с
+	 * заказом, а не в панели корзины.
+	 */
+	repeatOrder: async (orderId) => {
+		set({ isMutating: true });
+		try {
+			const result = await enqueue(() => repeatOrderAction(orderId));
+			if (result.success) {
+				set({ view: result.data, status: "ready", error: null });
+				syncDerivedStores(result.data);
+			}
+			return result;
+		} catch {
+			return { success: false, error: "UNKNOWN", message: NETWORK_MESSAGE };
 		} finally {
 			set({ isMutating: false });
 		}

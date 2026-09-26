@@ -34,7 +34,7 @@
    задачей, вместе с переводом таких пропсов на явные значения.          */
 
 :root {
-	--foreground: #ecedee;
+	--foreground: var(--text-primary);
 	/* Высота липкой шапки. По ней HeaderSpacer отводит место под контент,
 	   scroll-margin уводит якорные переходы из-под шапки, а мобильное меню
 	   знает, где начинаться.
@@ -270,6 +270,39 @@ textarea,
 	60% {
 		transform: translateX(4px);
 	}
+}
+
+/* ===========================================================================
+   Смена темы: новая тема проявляется кругом от переключателя
+   ===========================================================================
+   Сам круг — анимация clip-path на снимке новой страницы (см.
+   src/modules/color-scheme/lib/scheme.client.ts). Здесь две вещи, без
+   которых он не работает:
+
+   1. Штатное растворение браузера выключается — иначе поверх круга шло бы
+      ещё и перекрёстное затухание, и край круга размывался бы.
+   2. На время перехода гасятся переходы цвета во всех элементах. Снимок
+      новой страницы «живой»: без этого внутри круга текст и фоны ещё
+      200-480 мс плыли бы из тёмного в светлое своими transition, и край
+      круга отделял бы не две темы, а тёмную от грязно-серой. Исключение —
+      сами переключатели (data-scheme-motion): их движение и есть отклик
+      на нажатие.
+
+   Атрибут ставится только для круга. При «уменьшить движение» его нет, и
+   браузер делает обычное короткое растворение.                            */
+:root[data-scheme-transition="reveal"]::view-transition-old(root),
+:root[data-scheme-transition="reveal"]::view-transition-new(root) {
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+:root[data-scheme-transition="reveal"]
+	:not([data-scheme-motion], [data-scheme-motion] *),
+:root[data-scheme-transition="reveal"]
+	:not([data-scheme-motion], [data-scheme-motion] *)::before,
+:root[data-scheme-transition="reveal"]
+	:not([data-scheme-motion], [data-scheme-motion] *)::after {
+	transition: none !important;
 }
 
 .ant-breadcrumb,
@@ -539,9 +572,11 @@ textarea,
    Полупрозрачный слой: список материалов проезжает под панелью, а не
    упирается в глухую полосу — так на невысоком экране видно, что список
    продолжается. Само размытие ставится утилитами Tailwind на элементе
-   (backdrop-blur-xl / backdrop-saturate-150): написанный здесь
-   backdrop-filter вырезает Lightning CSS при сборке Tailwind v4, и панель
-   оставалась просто полупрозрачной. */
+   (backdrop-blur-xl / backdrop-saturate-150): они выходят из сборки с обоими
+   свойствами. Написанный руками backdrop-filter тоже доживает до браузера,
+   если он один: пара «backdrop-filter + -webkit-backdrop-filter» Lightning
+   CSS 1.32 при минификации сворачивает в одно -webkit-, которого Chrome не
+   понимает. */
 .knowledge-toolbar {
 	background: color-mix(in srgb, var(--background) 82%, transparent);
 }
@@ -549,15 +584,12 @@ textarea,
 /* Прозрачность — это украшение, без которого содержимое обязано остаться
    читаемым. Пользователю, попросившему её убрать, отдаём плотный фон.
 
-   Липкая панель каталога сюда больше не входит: она переехала в CSS-модуль
+   Липкая панель каталога сюда больше не входит: она живёт в CSS-модуле
    (src/modules/productCatalog/components/Catalog.module.css) вместе со своим
-   размытием и своим правилом на этот запрос. Модули Lightning CSS не
-   переписывает, поэтому backdrop-filter там доживает до браузера — из-за
-   этого приёма панель и жила когда-то здесь. */
+   размытием и своим правилом на этот запрос. */
 @media (prefers-reduced-transparency: reduce) {
 	.knowledge-toolbar {
 		background: var(--background);
 		backdrop-filter: none;
-		-webkit-backdrop-filter: none;
 	}
 }

@@ -1,10 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyAccountLocked } from "@/services/notifications/notifyAccountLocked";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
+import { completeLogin } from "../lib/completeLogin";
 import {
 	classifyLoginError,
 	isAccountAccessDeniedError,
@@ -15,6 +17,11 @@ import { tryLegacyPasswordFallback } from "../lib/legacyPasswordFallback";
 import { createPendingAuth } from "../lib/pendingAuth";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { redis } from "../lib/redis";
+import { parseDeviceLabel } from "../lib/session";
+import {
+	confirmTrustedDeviceUse,
+	evaluateTrustedDevice,
+} from "../lib/trustedDevice";
 import {
 	actionError,
 	actionSuccess,
@@ -34,18 +41,27 @@ import type { LoginResult } from "../types";
  *    по числу попыток (loginAttempts/lockUntil) и её сброс на успешный вход
  *    Payload делает сам (auth.maxLoginAttempts/lockTime в Users.ts) — здесь
  *    её больше не дублируем (см. errorHandling.ts).
- * 4. Прячем выданный токен в pending-auth (Redis), клиенту отдаём только
+ * 4. РАЗВИЛКА: устройство доверенное?
+ *    • да  → вход завершается здесь же (completeLogin), OTP не запрашивается,
+ *            возвращается requiresOtp: false;
+ *    • нет → шаги 5–7 ниже.
+ * 5. Прячем выданный токен в pending-auth (Redis), клиенту отдаём только
  *    непредсказуемый идентификатор челленджа в cookie
- * 5. Генерируем OTP login_2fa + отправляем email
- * 6. Возвращаем requiresOtp: true
+ * 6. Генерируем OTP login_2fa + отправляем email
+ * 7. Возвращаем requiresOtp: true
  *
- * ВАЖНО: успешная проверка пароля НЕ авторизует пользователя.
- * Ни payload-token, ни session-id, ни запись Session здесь не создаются —
- * всё это появляется только в verifyOtpAction, после проверки OTP-кода.
- * Раньше payload-token выставлялся прямо здесь, и пользователь между вводом
- * пароля и вводом кода уже был полноценно авторизован: payload.auth() (а
- * значит getCurrentUser, Navbar, корзина, избранное) видел его как обычного
- * залогиненного юзера, и это переживало перезагрузку страницы.
+ * ВАЖНО: успешная проверка пароля САМА ПО СЕБЕ не авторизует пользователя.
+ * На OTP-пути ни payload-token, ни session-id, ни запись Session здесь не
+ * создаются — всё это появляется только в verifyOtpAction, после проверки
+ * кода. Раньше payload-token выставлялся прямо здесь, и пользователь между
+ * вводом пароля и вводом кода уже был полноценно авторизован: payload.auth()
+ * (а значит getCurrentUser, Navbar, корзина, избранное) видел его как
+ * обычного залогиненного юзера, и это переживало перезагрузку страницы.
+ *
+ * На пути доверенного устройства токен выдаётся здесь — и это не возврат к
+ * прежнему поведению: там второй фактор уже предъявлен (сама cookie
+ * устройства, выданная после подтверждения кодом), тогда как прежний вариант
+ * выдавал токен, не предъявив ничего, кроме пароля.
  */
 export async function loginAction(_prevState: unknown, formData: FormData) {
 	// Введённый email возвращаем при ЛЮБОЙ ошибке: React сбрасывает
@@ -89,6 +105,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 	let loginToken: string;
 	let userId: string | number;
 	let userName: string;
+	let userRole: string | null = null;
 
 	// AUTH_FLOW_CONTEXT обязателен: без него beforeLogin-хук
 	// requireServerAuthFlow отклонит вход как «мимо нашего flow» (так закрыт
@@ -139,6 +156,7 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 		loginToken = loginResult.token;
 		userId = loginResult.user.id;
 		userName = loginResult.user.name;
+		userRole = (loginResult.user as { role?: string | null }).role ?? null;
 	} catch (err) {
 		const { code, message } = classifyLoginError(err);
 
@@ -147,6 +165,85 @@ export async function loginAction(_prevState: unknown, formData: FormData) {
 		}
 
 		return actionError(message, undefined, code, echo);
+	}
+
+	// ── Доверенное устройство: вход без кода ────────────────────────────────
+	//
+	// Единственная развилка входа. Проверка идёт ПОСЛЕ пароля и ничего не
+	// решает сама по себе: доверие подтверждает УСТРОЙСТВО, а личность —
+	// по-прежнему пароль. Условия, при которых код всё равно потребуется
+	// (чужой браузер, другая подсеть, снятое доверие, аккаунт сотрудника),
+	// перечислены и разобраны в lib/trustedDevice.ts.
+	//
+	// Отказ проверки по любой причине, включая сбой базы, ведёт в обычный
+	// OTP-путь ниже: механизм доверия умеет только УСКОРЯТЬ вход и не имеет
+	// права его открывать, когда что-то пошло не так.
+	let trusted: Awaited<ReturnType<typeof evaluateTrustedDevice>> = {
+		trusted: false,
+		reason: "no_cookie",
+	};
+
+	try {
+		trusted = await evaluateTrustedDevice({
+			payload,
+			userId: String(userId),
+			role: userRole,
+			ip,
+			userAgent,
+		});
+	} catch (err) {
+		logUnexpectedAuthError("login.evaluateTrustedDevice", err);
+	}
+
+	if (trusted.trusted) {
+		const { sessionId } = await completeLogin({
+			payload,
+			userId: String(userId),
+			token: loginToken,
+			ip,
+			userAgent,
+			// Кода не вводили — отметку аудита о втором факторе не трогаем.
+			twoFactorPassed: false,
+		});
+
+		// Ротация секрета и привязка к только что созданной сессии. Сбой здесь
+		// вход не отменяет: у браузера остаётся прежняя cookie, она попадёт в
+		// окно ротации при следующей попытке, а за его пределами доверие
+		// снимется — то есть худший исход это лишний ввод кода, а не потеря
+		// доступа.
+		try {
+			await confirmTrustedDeviceUse({
+				payload,
+				device: trusted.device,
+				sessionId,
+				ip,
+				userAgent,
+			});
+		} catch (err) {
+			logUnexpectedAuthError("login.confirmTrustedDeviceUse", err);
+		}
+
+		// Письма о новом входе здесь нет намеренно: устройство не новое, и
+		// письмо на каждый вход с рабочего ноутбука обесценило бы то
+		// единственное письмо, ради которого механизм и существует (см.
+		// verifyOtp.ts). Внутрисайтовое уведомление остаётся: бесшумных входов
+		// в аккаунт быть не должно, а колокольчик, в отличие от почты, не
+		// требует внимания в момент события.
+		void notify(payload, String(userId), "login_new_device", {
+			deviceLabel: parseDeviceLabel(userAgent),
+			ip,
+		});
+
+		// Вход меняет то, что рендерит корневой layout (шапка с именем,
+		// корзина, избранное). Без сброса кэша роутера навбар остался бы
+		// гостевым до полной перезагрузки — подробный разбор в verifyOtp.ts.
+		revalidatePath("/", "layout");
+
+		return actionSuccess<LoginResult>({
+			requiresOtp: false,
+			email,
+			userId: String(userId),
+		});
 	}
 
 	// Уведомление о новом входе (email + in-app), запись Session и обновление

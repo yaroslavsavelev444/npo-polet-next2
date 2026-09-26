@@ -1,0 +1,832 @@
+/* ===========================================================================
+   Навигация шапки: пункты и шторка меню
+   ===========================================================================
+   Шторка — продолжение шапки, а не всплывающее окно: тот же материал
+   (матовое стекло поверх фона страницы), та же левая ось (контент до
+   1400px, поля 24px — как у NavbarShell и TopHeader), выезжает из-под её
+   нижнего края. Поэтому у неё нет скруглений и отступа от шапки — у
+   продолжения их не бывает.
+
+   Движение — одна система на всё:
+     • шторка разворачивается вниз (высота, --ease-out-expo), закрывается
+       быстрее, чем открывается;
+     • по её нижнему краю прочерчивается линия — тот же жест, что у
+       разделителей секций сайта;
+     • содержимое проявляется сверху вниз из лёгкого расфокуса — как блоки
+       главной («наведение оптики на резкость»), каскадом с шагом 28 мс;
+     • при смене меню шторка не закрывается: меняет высоту, а содержимое
+       сдвигается в сторону, куда ушёл курсор (--side).
+
+   Всё на переходах CSS, а не на ключевых кадрах: переход продолжает
+   движение от текущего значения, поэтому меню можно «перехватить» на
+   середине — закрыть, не дождавшись открытия, или сменить раздел посреди
+   смены — без рывка.
+
+   Модуль, а не утилиты Tailwind: состояния родителя (data-open,
+   data-active) в утилитах не записываются, а глобальное
+   a:not(.button) { color } из Once UI перебивает одиночный класс у <a> —
+   поэтому у ссылок цвет задан двумя классами.                              */
+
+/* ---------------------------------------------------------------------------
+   Пункты в шапке
+   --------------------------------------------------------------------------- */
+
+.nav {
+	display: flex;
+	align-items: center;
+	gap: 1.75rem;
+}
+
+.item {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.125rem;
+	height: 2.5rem;
+}
+
+.item .trigger {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	font-family: inherit;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1;
+	color: var(--text-primary);
+	text-decoration: none;
+	cursor: pointer;
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+/* Черта под пунктом прочерчивается слева направо, пока его меню открыто —
+   указатель «шторка сейчас про это». */
+.item .trigger::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0.3rem;
+	height: 1px;
+	background: var(--primary);
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.item .trigger[data-active]::after {
+	transform: scaleX(1);
+}
+
+/* Наведение приглушает пункт — как было в шапке до шторки; открытый пункт
+   остаётся полным цветом. */
+.item .trigger:hover:not([data-active]) {
+	color: var(--text-secondary);
+}
+
+.chevron {
+	display: grid;
+	place-items: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	padding: 0;
+	border: 0;
+	border-radius: 0.375rem;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition:
+		background-color var(--dur-fast) var(--ease-out-quart),
+		color var(--dur-fast) var(--ease-out-quart);
+}
+
+.chevron:hover {
+	background: var(--surface-hover);
+	color: var(--text-primary);
+}
+
+.chevronIcon {
+	width: 1rem;
+	height: 1rem;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.item .trigger .chevronIcon {
+	color: var(--text-secondary);
+}
+
+[data-active] > .chevronIcon,
+[aria-expanded="true"] > .chevronIcon {
+	transform: rotate(180deg);
+}
+
+/* ---------------------------------------------------------------------------
+   Шторка
+   --------------------------------------------------------------------------- */
+
+/* Затемнение страницы. Не перехватывает курсор: меню не модальное, и
+   уход курсора на страницу должен его закрывать, а не упираться в слой. */
+.scrim {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 18;
+	background: color-mix(in srgb, var(--void-deep) 38%, transparent);
+	backdrop-filter: blur(3px);
+	pointer-events: none;
+	opacity: 0;
+	visibility: hidden;
+	transition:
+		opacity 220ms var(--ease-out-quart),
+		visibility 0s linear 220ms;
+}
+
+.scrim[data-open="true"] {
+	opacity: 1;
+	visibility: visible;
+	transition:
+		opacity 360ms var(--ease-out-quart),
+		visibility 0s;
+}
+
+/* Высота шторки — высота активной панели (--sheet-h, замер в NavMenus).
+   Анимируется сама высота: под шторкой нет потока, который пришлось бы
+   перекладывать, панели внутри лежат абсолютно, и перерасчёт ограничен
+   одним изолированным слоем (contain). */
+.sheet {
+	position: fixed;
+	left: 0;
+	right: 0;
+	/* Под шапкой (z-index 20): шторка выезжает из-под её края. */
+	z-index: 19;
+	height: var(--sheet-h, 0px);
+	overflow: hidden;
+	contain: layout paint;
+	visibility: hidden;
+	/* Закрытие короче открытия: уходящее не должно задерживать внимание. */
+	transition:
+		height 340ms cubic-bezier(0.4, 0, 0.2, 1),
+		visibility 0s linear 340ms;
+}
+
+.sheet[data-open="true"] {
+	visibility: visible;
+	transition:
+		height 560ms var(--ease-out-expo),
+		visibility 0s;
+}
+
+/* Только непрефиксный backdrop-filter: префикс для Safari добавит сборка.
+   Если написать оба свойства, Lightning CSS 1.32 при минификации оставляет
+   одно -webkit-, которого Chrome не понимает, и размытие пропадает.
+
+   Материал — то же матовое стекло, что у шапки (--header-glass), и
+   размытие сильнее её: шторка — продолжение шапки и обязана совпадать с ней
+   тоном над любой страницей, в том числе над тёмным первым экраном в
+   светлой теме. Почти непрозрачная светлая плита под серой полупрозрачной
+   шапкой читалась бы вторым, чужим слоем; а размытие 32px превращает текст
+   страницы под шторкой в пятно, которое не спорит с пунктами меню. */
+.surface {
+	position: absolute;
+	inset: 0;
+	background: var(--header-glass);
+	backdrop-filter: blur(32px) saturate(150%);
+	box-shadow: inset 0 1px 0 var(--hairline);
+}
+
+/* Нижний край: линия прочерчивается слева направо при открытии и
+   собирается обратно при закрытии. */
+.surfaceRule {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 1px;
+	background: var(--rule);
+	transform: scaleX(0);
+	transform-origin: left center;
+	transition: transform 300ms var(--ease-out-quart);
+}
+
+.sheet[data-open="true"] .surfaceRule {
+	transform: scaleX(1);
+	transition: transform 900ms var(--ease-out-expo) 80ms;
+}
+
+.stage {
+	position: relative;
+}
+
+.panel {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	opacity: 0;
+	pointer-events: none;
+	/* Неактивная панель ждёт сбоку — со стороны своего пункта в шапке
+	   (--side: −1, 0, 1 ставит NavMenus). */
+	transform: translate3d(calc(var(--side, 0) * 1.5rem), 0, 0);
+	transition:
+		opacity 140ms var(--ease-out-quart),
+		transform 240ms var(--ease-out-quart);
+}
+
+.panel[data-active="true"] {
+	opacity: 1;
+	pointer-events: auto;
+	transform: none;
+	transition:
+		opacity 260ms var(--ease-out-quart) 60ms,
+		transform 560ms var(--ease-out-expo);
+}
+
+.inner {
+	max-width: 1400px;
+	padding: 1.75rem 24px 2.25rem;
+}
+
+/* Каскад проявления. Шаг 28 мс и потолок в восемь ступеней: длиннее каскад
+   начинает читаться как ожидание, а не как появление. */
+.reveal {
+	opacity: 0;
+	transform: translate3d(0, -0.5rem, 0);
+	filter: blur(4px);
+	transition:
+		opacity 140ms var(--ease-out-quart),
+		transform 140ms var(--ease-out-quart),
+		filter 140ms var(--ease-out-quart);
+}
+
+.panel[data-active="true"] .reveal {
+	opacity: 1;
+	transform: none;
+	filter: blur(0);
+	transition:
+		opacity 360ms var(--ease-out-quart),
+		transform 560ms var(--ease-out-expo),
+		filter 360ms var(--ease-out-quart);
+	transition-delay: calc(90ms + min(var(--i, 0), 8) * 28ms);
+}
+
+/* Моноширинная подпись раздела — голос подписей подвала и каталога. */
+.label {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.labelCount {
+	color: var(--text-secondary);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Каталог: указатель разделов и сцена
+   --------------------------------------------------------------------------- */
+
+.catalog {
+	display: grid;
+	grid-template-columns: 18rem minmax(0, 1fr);
+	gap: clamp(2rem, 3.5vw, 3.5rem);
+	align-items: start;
+}
+
+.index {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.sections {
+	position: relative;
+	margin: 0.875rem 0 0;
+	padding: 0;
+	list-style: none;
+	border-top: 1px solid var(--rule);
+}
+
+/* Бегунок: подложка и засечка у выбранной строки. Едет, а не
+   перескакивает — видно, откуда и куда сменился выбор. */
+.marker {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 3rem;
+	background: color-mix(in srgb, var(--primary) 7%, transparent);
+	transform: translate3d(0, calc(var(--current, 0) * 3rem), 0);
+	transition: transform 460ms var(--ease-out-expo);
+	pointer-events: none;
+}
+
+.marker::before {
+	content: "";
+	position: absolute;
+	top: 0.75rem;
+	bottom: 0.75rem;
+	left: 0;
+	width: 2px;
+	background: var(--primary);
+}
+
+.sections .row {
+	position: relative;
+	display: grid;
+	grid-template-columns: 2rem minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.5rem;
+	height: 3rem;
+	padding: 0 0.75rem 0 1rem;
+	border-bottom: 1px solid var(--hairline);
+	color: var(--text-secondary);
+	text-decoration: none;
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+.sections .row[data-current] {
+	color: var(--text-primary);
+}
+
+.rowIndex,
+.rowCount {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	letter-spacing: 0.06em;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+.row[data-current] .rowIndex {
+	color: var(--primary);
+}
+
+.rowName {
+	min-width: 0;
+	overflow: hidden;
+	font-size: 0.875rem;
+	font-weight: 500;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* «Весь каталог» — главный выход меню, поэтому кнопка, а не строка. */
+.index .cta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-top: 1.25rem;
+	padding: 0.875rem 1rem 0.875rem 1.125rem;
+	border-radius: var(--radius-sm);
+	background: var(--primary);
+	color: #fff;
+	text-decoration: none;
+}
+
+.panel[data-active="true"] .index .cta {
+	transition:
+		opacity 360ms var(--ease-out-quart),
+		transform 560ms var(--ease-out-expo),
+		filter 360ms var(--ease-out-quart),
+		background-color var(--dur-fast) var(--ease-out-quart);
+	transition-delay:
+		calc(90ms + min(var(--i, 0), 8) * 28ms),
+		calc(90ms + min(var(--i, 0), 8) * 28ms),
+		calc(90ms + min(var(--i, 0), 8) * 28ms), 0ms;
+}
+
+.index .cta:hover {
+	background: var(--primary-hover);
+}
+
+.index .cta:active {
+	transform: scale(0.98);
+}
+
+.ctaBody {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.ctaTitle {
+	font-size: 0.9375rem;
+	font-weight: 600;
+	line-height: 1.1;
+}
+
+.ctaMeta {
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.65625rem;
+	letter-spacing: 0.1em;
+	line-height: 1;
+	text-transform: uppercase;
+	opacity: 0.82;
+}
+
+.ctaIcon {
+	width: 1.125rem;
+	height: 1.125rem;
+	flex: 0 0 auto;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.index .cta:hover .ctaIcon {
+	transform: translate3d(0.25rem, 0, 0);
+}
+
+/* Сцены лежат в одной ячейке сетки: высота блока — по самой высокой, и
+   смена раздела не дёргает шторку. */
+.scenes {
+	display: grid;
+	min-width: 0;
+}
+
+.scene {
+	grid-area: 1 / 1;
+	min-width: 0;
+	opacity: 0;
+	transition: opacity 140ms var(--ease-out-quart);
+}
+
+.scene[data-current="true"] {
+	opacity: 1;
+	transition: opacity 280ms var(--ease-out-quart) 40ms;
+}
+
+.panel[data-active="false"] .scene[data-current="true"] {
+	opacity: 0;
+}
+
+.sceneHead {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 2rem;
+	padding-bottom: 1rem;
+	margin-bottom: 1.25rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+.sceneText {
+	min-width: 0;
+}
+
+.sceneTitle {
+	display: -webkit-box;
+	margin: 0;
+	max-width: 40ch;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	font-size: 1.375rem;
+	font-weight: 600;
+	line-height: 1.2;
+	letter-spacing: -0.02em;
+	color: var(--text-primary);
+}
+
+.sceneSubtitle {
+	display: -webkit-box;
+	margin: 0.4rem 0 0;
+	max-width: 64ch;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	font-size: 0.875rem;
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.scene .sceneLink {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 0.375rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--primary);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.sceneLinkIcon {
+	width: 1rem;
+	height: 1rem;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.scene .sceneLink:hover .sceneLinkIcon {
+	transform: translate3d(0.2rem, -0.2rem, 0);
+}
+
+.tiles {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 1.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* Плитки въезжают справа по очереди — сцена читается слева направо, как и
+   указатель разделов рядом. */
+.tileItem {
+	min-width: 0;
+	opacity: 0;
+	transform: translate3d(0.75rem, 0, 0);
+	filter: blur(3px);
+	transition:
+		opacity 120ms var(--ease-out-quart),
+		transform 120ms var(--ease-out-quart),
+		filter 120ms var(--ease-out-quart);
+}
+
+.panel[data-active="true"] .scene[data-current="true"] .tileItem {
+	opacity: 1;
+	transform: none;
+	filter: blur(0);
+	transition:
+		opacity 320ms var(--ease-out-quart),
+		transform 520ms var(--ease-out-expo),
+		filter 320ms var(--ease-out-quart);
+	transition-delay: calc(120ms + var(--t, 0) * 55ms);
+}
+
+.tiles .tile {
+	display: flex;
+	flex-direction: column;
+	gap: 0.625rem;
+	color: var(--text-primary);
+	text-decoration: none;
+}
+
+.tileFrame {
+	position: relative;
+	display: grid;
+	place-items: center;
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	border-radius: var(--radius-md);
+	background: var(--media-plate);
+}
+
+/* Уголковые метки — те же, что на карточке товара: наведённый кадр
+   «берётся в прицел». */
+.tileFrame::before,
+.tileFrame::after {
+	content: "";
+	position: absolute;
+	z-index: 1;
+	width: 12px;
+	height: 12px;
+	pointer-events: none;
+	opacity: 0;
+	transition:
+		inset 420ms var(--ease-out-quart),
+		opacity 260ms var(--ease-out-quart);
+}
+
+.tileFrame::before {
+	top: 10px;
+	left: 10px;
+	border-top: 1px solid var(--primary);
+	border-left: 1px solid var(--primary);
+}
+
+.tileFrame::after {
+	right: 10px;
+	bottom: 10px;
+	border-right: 1px solid var(--primary);
+	border-bottom: 1px solid var(--primary);
+}
+
+.tile:hover .tileFrame::before,
+.tile:focus-visible .tileFrame::before {
+	top: 0;
+	left: 0;
+	opacity: 1;
+}
+
+.tile:hover .tileFrame::after,
+.tile:focus-visible .tileFrame::after {
+	right: 0;
+	bottom: 0;
+	opacity: 1;
+}
+
+.tileImage {
+	object-fit: contain;
+	padding: 0.75rem;
+	transition: transform 700ms var(--ease-out-expo);
+}
+
+.tile:hover .tileImage {
+	transform: scale(1.04);
+}
+
+.tileEmpty {
+	width: 1.75rem;
+	height: 1.75rem;
+	color: var(--text-muted);
+	opacity: 0.6;
+}
+
+.tileTitle {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1.4;
+}
+
+.tilePrice {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+.tileOldPrice {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.scene .empty {
+	position: relative;
+	display: flex;
+	align-items: flex-end;
+	min-height: 11rem;
+	overflow: hidden;
+	padding: 1rem 1.125rem;
+	border-radius: var(--radius-md);
+	background: var(--media-plate);
+	color: var(--text-secondary);
+	text-decoration: none;
+}
+
+.emptyImage {
+	object-fit: cover;
+	opacity: 0.85;
+}
+
+.emptyText {
+	position: relative;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------------------
+   «Ресурсы» и «О нас»
+   --------------------------------------------------------------------------- */
+
+.links {
+	display: grid;
+	grid-template-columns: 18rem minmax(0, 1fr);
+	gap: clamp(2rem, 3.5vw, 3.5rem);
+	align-items: start;
+}
+
+.linkList {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+	/* Строки одной высоты: пояснение в две строки у одного пункта не должно
+	   сдвигать нижнюю черту только у него. */
+	grid-auto-rows: 1fr;
+	gap: 0 clamp(1.5rem, 3vw, 2.5rem);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-top: 1px solid var(--rule);
+}
+
+.linkList .linkCard {
+	position: relative;
+	display: grid;
+	height: 100%;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-rows: auto auto;
+	align-content: start;
+	column-gap: 1rem;
+	row-gap: 0.35rem;
+	padding: 1rem 0 1.125rem;
+	border-bottom: 1px solid var(--hairline);
+	color: var(--text-primary);
+	text-decoration: none;
+}
+
+.linkTitle {
+	font-size: 1.0625rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	transition: color var(--dur-fast) var(--ease-out-quart);
+}
+
+.linkHint {
+	grid-column: 1;
+	font-size: 0.8125rem;
+	line-height: 1.45;
+	color: var(--text-secondary);
+}
+
+.linkArrow {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	align-self: center;
+	width: 1rem;
+	height: 1rem;
+	color: var(--text-muted);
+	transition:
+		transform var(--dur-base) var(--ease-out-expo),
+		color var(--dur-fast) var(--ease-out-quart);
+}
+
+.linkCard:hover .linkTitle {
+	color: var(--primary);
+}
+
+.linkCard:hover .linkArrow {
+	color: var(--primary);
+	transform: translate3d(0.2rem, -0.2rem, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Настройки пользователя
+   --------------------------------------------------------------------------- */
+
+/* Движение убирается, смысл остаётся: шторка появляется и исчезает
+   растворением, без разворота, сдвигов и расфокуса. */
+@media (prefers-reduced-motion: reduce) {
+	.sheet,
+	.sheet[data-open="true"] {
+		transition:
+			opacity 160ms linear,
+			visibility 0s;
+	}
+
+	.surfaceRule,
+	.marker,
+	.chevronIcon,
+	.item .trigger::after,
+	.tileImage,
+	.ctaIcon,
+	.sceneLinkIcon,
+	.linkArrow {
+		transition: none !important;
+	}
+
+	.panel,
+	.panel[data-active="true"],
+	.reveal,
+	.panel[data-active="true"] .reveal,
+	.tileItem,
+	.panel[data-active="true"] .scene[data-current="true"] .tileItem {
+		transform: none !important;
+		filter: none !important;
+		transition: opacity 160ms linear !important;
+		transition-delay: 0ms !important;
+	}
+
+	.tileFrame::before,
+	.tileFrame::after {
+		display: none;
+	}
+}
+
+/* Без прозрачности — плотный материал: текст меню не должен читаться
+   поверх просвечивающей страницы. */
+@media (prefers-reduced-transparency: reduce) {
+	.surface {
+		background: var(--background);
+		backdrop-filter: none;
+	}
+
+	.scrim {
+		backdrop-filter: none;
+	}
+}

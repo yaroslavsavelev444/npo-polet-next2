@@ -40,33 +40,45 @@ const CATEGORIES: {
 	value: FeedbackType;
 	label: string;
 	icon: LucideIcon;
+	/** Цвет знака: пара для светлой и тёмной темы (light-dark разрешает
+	 *  браузер по теме страницы — инлайн-стиль сборка не переписывает). */
 	tint: string;
 }[] = [
-	{ value: "bug", label: "Ошибка / баг", icon: Bug, tint: "#FF6B6B" },
+	{
+		value: "bug",
+		label: "Ошибка / баг",
+		icon: Bug,
+		tint: "light-dark(#c92a2a, #ff6b6b)",
+	},
 	{
 		value: "improvement",
 		label: "Улучшение",
 		icon: Lightbulb,
-		tint: "#FFB020",
+		tint: "light-dark(#8a6100, #ffb020)",
 	},
-	{ value: "question", label: "Вопрос", icon: HelpCircle, tint: "#008CFF" },
+	{
+		value: "question",
+		label: "Вопрос",
+		icon: HelpCircle,
+		tint: "light-dark(#0068c2, #008cff)",
+	},
 	{
 		value: "order_issue",
 		label: "Проблема с заказом",
 		icon: ShoppingBag,
-		tint: "#FF8A3D",
+		tint: "light-dark(#b8480f, #ff8a3d)",
 	},
 	{
 		value: "account_issue",
 		label: "Проблема с аккаунтом",
 		icon: UserRound,
-		tint: "#26C6DA",
+		tint: "light-dark(#0e7c8c, #26c6da)",
 	},
 	{
 		value: "other",
 		label: "Другое",
 		icon: MessageCircleMore,
-		tint: "#A0A0A0",
+		tint: "light-dark(#5b6474, #a0a0a0)",
 	},
 ];
 
@@ -142,7 +154,7 @@ export function FeedbackForm({ userEmail, onSuccess }: FeedbackFormProps) {
 									"group relative flex items-center gap-3 rounded-[var(--radius-md)] border p-3 cursor-pointer",
 									"transition-colors duration-150",
 									isSelected
-										? "border-[var(--primary)] bg-[rgba(255,69,0,0.10)]"
+										? "border-[var(--primary)] bg-[var(--primary)]/10"
 										: "border-[var(--border)] bg-[var(--surface-secondary)] hover:border-[var(--text-muted)]",
 								)}
 							>

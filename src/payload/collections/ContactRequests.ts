@@ -3,7 +3,13 @@ import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
 /**
- * Обращения с публичной страницы контактов (/contacts).
+ * Обращения с сайта: форма на странице контактов (/contacts) и заявки на
+ * 3D-печать из блока на главной.
+ *
+ * Оба потока — одна очередь: их разбирает отдел продаж, и заявка на печать в
+ * отдельной таблице лежала бы там, куда реже заглядывают. Различает их поле
+ * «Тема» — по нему в админке фильтруется список и выбирается заголовок
+ * письма-уведомления.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * ПОЧЕМУ ОТДЕЛЬНАЯ КОЛЛЕКЦИЯ, А НЕ `feedbacks`
@@ -43,12 +49,14 @@ import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
  */
 export const ContactRequests: CollectionConfig = {
 	slug: "contact-requests",
+	labels: { singular: "Обращение", plural: "Обращения" },
 
 	admin: {
 		useAsTitle: "name",
-		defaultColumns: ["name", "email", "status", "createdAt"],
+		defaultColumns: ["name", "topic", "email", "phone", "status", "createdAt"],
 		group: "Поддержка",
-		description: "Сообщения, отправленные через форму на странице «Контакты»",
+		description:
+			"Сообщения со страницы «Контакты» и заявки на 3D-печать с главной",
 	},
 
 	access: {
@@ -65,6 +73,19 @@ export const ContactRequests: CollectionConfig = {
 
 	fields: [
 		{
+			name: "topic",
+			type: "select",
+			required: true,
+			defaultValue: "general",
+			index: true,
+			label: "Тема",
+			options: [
+				{ label: "Обращение", value: "general" },
+				{ label: "3D-печать", value: "print3d" },
+			],
+			admin: { position: "sidebar" },
+		},
+		{
 			name: "name",
 			type: "text",
 			required: true,
@@ -78,6 +99,13 @@ export const ContactRequests: CollectionConfig = {
 			required: true,
 			index: true,
 			label: "Email",
+		},
+		{
+			// Необязателен: форма на контактах его не спрашивает, в заявке на
+			// печать — по желанию (условия печати удобнее обсудить голосом).
+			name: "phone",
+			type: "text",
+			label: "Телефон",
 		},
 		{
 			name: "message",

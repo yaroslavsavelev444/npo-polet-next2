@@ -3,8 +3,10 @@ import type { ContactRequest } from "../../../payload-types";
 import { getPayloadInstance } from "./getPayload";
 
 export interface CreateContactRequestInput {
+	topic: ContactRequest["topic"];
 	name: string;
 	email: string;
+	phone?: string;
 	message: string;
 	/** Момент подтверждения согласия. Ставит сервер, не клиент. */
 	consentAcceptedAt: Date;
@@ -31,8 +33,10 @@ export async function createContactRequest(
 		collection: "contact-requests",
 		overrideAccess: true,
 		data: {
+			topic: input.topic,
 			name: input.name,
 			email: input.email,
+			phone: input.phone,
 			message: input.message,
 			consentAcceptedAt: input.consentAcceptedAt.toISOString(),
 			consentDocument: input.consentDocument,

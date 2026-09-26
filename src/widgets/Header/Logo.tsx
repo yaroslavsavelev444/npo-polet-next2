@@ -16,7 +16,7 @@ export default function Logo({ settings }: LogoProps) {
       {logoUrl ? (
         <img src={logoUrl} alt={companyName} className="h-8 w-auto" />
       ) : (
-        <span className="font-semibold text-xl text-white">{companyName}</span>
+        <span className="font-semibold text-xl text-[color:var(--text-primary)]">{companyName}</span>
       )}
     </Link>
   );

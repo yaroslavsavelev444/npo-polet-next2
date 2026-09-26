@@ -1,22 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyNewSessionLogin } from "@/services/notifications/notifyNewSessionLogin";
+import { completeLogin } from "../lib/completeLogin";
 import { logUnexpectedAuthError } from "../lib/errorHandling";
 import { verifyOtpCode } from "../lib/OtpStore";
-import { extractPayloadSessionId } from "../lib/payloadSessions";
 import { clearPendingAuth, readPendingAuth } from "../lib/pendingAuth";
 import { RATE_LIMITS } from "../lib/rateLimit";
-import { createSession, parseDeviceLabel } from "../lib/session";
-import { actionError, getRequestMeta } from "../lib/utils";
-import type { AuthErrorCode } from "../types";
+import { parseDeviceLabel } from "../lib/session";
+import { issueTrustedDevice } from "../lib/trustedDevice";
+import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import type { AuthErrorCode, OtpVerifyResult } from "../types";
 
-/** Куда попадает пользователь сразу после завершения входа. */
+/** Куда попадает пользователь сразу после завершения входа на своей странице. */
 const REDIRECT_AFTER_LOGIN = "/profile";
 
 const verifyOtpSchema = z.object({
@@ -25,11 +25,25 @@ const verifyOtpSchema = z.object({
 		.length(6, "Код должен содержать 6 цифр")
 		.regex(/^\d{6}$/, "Код должен содержать только цифры"),
 	type: z.enum(["login_2fa", "email_verify"]),
+	/**
+	 * Откуда пришла форма.
+	 *
+	 * `page`    — отдельная страница входа/регистрации: по завершении нужен
+	 *             серверный redirect, потому что после него приезжает свежее
+	 *             RSC-дерево уже с выставленными cookie (разбор ниже).
+	 * `overlay` — форма открыта поверх корзины или оформления. Уводить оттуда
+	 *             нельзя: смысл оверлея ровно в том, чтобы человек остался на
+	 *             месте. Действие возвращает успех, навигацию решает клиент.
+	 *
+	 * Поле необязательное и по умолчанию `page`: так поведение существующих
+	 * страниц не меняется от самого факта появления второго режима.
+	 */
+	flow: z.enum(["page", "overlay"]).optional().default("page"),
 });
 
 /**
- * Server Action: верификация OTP-кода — единственное место, где вход
- * становится завершённым.
+ * Server Action: верификация OTP-кода — точка, где вход становится
+ * завершённым, если устройство ещё не доверенное.
  *
  * Единый action для двух сценариев:
  * - email_verify (регистрация)
@@ -40,20 +54,22 @@ const verifyOtpSchema = z.object({
  * Поэтому идентифицируем его по pending-auth челленджу, а не через
  * payload.auth() — авторизовывать пока нечего.
  *
- * Только после успешной проверки кода: выдаём payload-token, создаём Session
- * и ставим session-id.
+ * Только после успешной проверки кода: выдаём payload-token, создаём Session,
+ * ставим session-id (всё это — completeLogin) и ЗАПОМИНАЕМ УСТРОЙСТВО, чтобы
+ * следующий вход с него обошёлся без кода (см. lib/trustedDevice.ts).
  */
 export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 	const parsed = verifyOtpSchema.safeParse({
 		code: formData.get("code"),
 		type: formData.get("type"),
+		flow: formData.get("flow") ?? undefined,
 	});
 
 	if (!parsed.success) {
 		return actionError("Некорректный код", parsed.error.flatten().fieldErrors);
 	}
 
-	const { code, type } = parsed.data;
+	const { code, type, flow } = parsed.data;
 
 	// Перебор кода ограничен не только счётчиком попыток самого OTP: без
 	// лимита по IP атакующий проходил бы цепочку «новый код → 5 попыток →
@@ -120,81 +136,84 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 	}
 
 	// ── Код верный: с этого момента вход считается состоявшимся ──────────────
-	const now = new Date().toISOString();
-
-	// lastLoginAt — наше поле, которое Payload не знает и не обновляет сам (в
-	// отличие от loginAttempts/lockUntil). Обновляем его здесь, а не после
-	// проверки пароля: вход завершается именно тут.
-	await payload.update({
-		collection: "users",
-		id: Number(pending.userId),
-		data: {
-			twoFAVerified: true,
-			twoFAVerifiedAt: now,
-			lastLoginAt: now,
-			...(type === "email_verify" ? { emailVerified: true } : {}),
-		},
-		overrideAccess: true,
-	});
-
-	// Выдаём JWT, который payload.login() вернул ещё на шаге проверки пароля.
-	// Имя 'payload-token' — стандартное имя, которое использует Payload; в
-	// Server Action он не ставит cookie сам, только в Route Handler.
-	const cookieStore = await cookies();
-	cookieStore.set("payload-token", pending.token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		sameSite: "lax",
-		path: "/",
-		maxAge: 7 * 24 * 60 * 60, // 7 дней — совпадает с auth.tokenExpiration
-	});
-
-	// Session — артефакт для «Активных устройств» в профиле; сбой не должен
-	// отменять уже состоявшийся вход (payload-token выше уже выдан).
+	//
 	// ip/userAgent берём из челленджа — это данные того же запроса, которым
 	// вводили пароль.
-	try {
-		const session = await createSession(payload, {
-			userId: pending.userId,
-			ip: pending.ip,
-			userAgent: pending.userAgent,
-			// Привязка записи к самой сессии Payload: без неё «завершить
-			// сессию»/«выйти» отзывали бы только витринную запись, а выданный
-			// выше JWT продолжал бы работать (см. payloadSessions.ts).
-			payloadSessionId: extractPayloadSessionId(pending.token),
-		});
-
-		cookieStore.set("session-id", String(session.id), {
-			httpOnly: true,
-			secure: process.env.NODE_ENV === "production",
-			sameSite: "lax",
-			path: "/",
-			maxAge: 7 * 24 * 60 * 60,
-		});
-	} catch (err) {
-		logUnexpectedAuthError("verifyOtp.createSession", err);
-	}
+	const { sessionId } = await completeLogin({
+		payload,
+		userId: pending.userId,
+		token: pending.token,
+		ip: pending.ip,
+		userAgent: pending.userAgent,
+		twoFactorPassed: true,
+		markEmailVerified: type === "email_verify",
+	});
 
 	await clearPendingAuth();
+
+	// ── Запоминаем устройство ────────────────────────────────────────────────
+	//
+	// Основание доверять этому браузеру появилось ровно сейчас: с него только
+	// что подтвердили владение почтой. Выдаём доверие и для регистрации тоже —
+	// подтверждение почты при регистрации ничем не слабее подтверждения при
+	// входе, а человек, который завёл аккаунт ради одной покупки, не должен
+	// на следующем же шаге доставать код заново.
+	//
+	// Роль читаем из базы, а не из челленджа: между вводом пароля и вводом
+	// кода администратор мог изменить её, и решение о доверии обязано
+	// опираться на текущее состояние. Сбой не отменяет вход — доверие это
+	// удобство следующего раза.
+	let deviceRemembered = false;
+	try {
+		const user = await payload.findByID({
+			collection: "users",
+			id: Number(pending.userId),
+			depth: 0,
+			overrideAccess: true,
+		});
+
+		const outcome = await issueTrustedDevice({
+			payload,
+			userId: pending.userId,
+			sessionId,
+			role: (user as { role?: string | null })?.role ?? null,
+			ip: pending.ip,
+			userAgent: pending.userAgent,
+		});
+		deviceRemembered = outcome.issued && outcome.isNew;
+	} catch (err) {
+		logUnexpectedAuthError("verifyOtp.issueTrustedDevice", err);
+	}
 
 	// ── Уведомление о входе ─────────────────────────────────────────────────
 	// Раньше уходило из loginAction сразу после проверки пароля — то есть
 	// одновременно с письмом с OTP-кодом, хотя фактический вход завершается
 	// только здесь. Отправляем только для login_2fa: email_verify — это
 	// подтверждение регистрации, не вход.
+	//
+	// С появлением доверенных устройств это письмо стало точнее, а не реже:
+	// сюда попадают ровно те входы, которым потребовался код, — то есть
+	// незнакомый браузер или другая сеть. Именно о них и стоит писать, и
+	// именно поэтому в письме теперь сказано, что устройство запомнено и как
+	// это отменить (см. notifyNewSessionLogin).
+	const deviceLabel = parseDeviceLabel(pending.userAgent);
+
 	if (type === "login_2fa") {
-		const deviceLabel = parseDeviceLabel(pending.userAgent);
 		void notifyNewSessionLogin({
 			email: pending.email,
 			userName: pending.name,
 			deviceLabel,
 			ip: pending.ip,
-		});
-		void notify(payload, pending.userId, "login_new_device", {
-			deviceLabel,
-			ip: pending.ip,
+			deviceRemembered,
 		});
 	}
+
+	void notify(
+		payload,
+		pending.userId,
+		deviceRemembered ? "device_trusted" : "login_new_device",
+		{ deviceLabel, ip: pending.ip },
+	);
 
 	// Вход только что изменил то, что рендерит корневой layout (Navbar с именем
 	// пользователя, корзина, избранное). Без сброса кэша роутера клиент оставил
@@ -203,6 +222,14 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 	// выдавался ещё до экрана OTP, и layout успевал отрендериться уже с
 	// пользователем.
 	revalidatePath("/", "layout");
+
+	// Оверлей поверх корзины/оформления уводить со страницы нельзя — в этом
+	// весь его смысл. Возвращаем успех и отдаём решение клиенту; id
+	// покупателя нужен ему, чтобы перенести гостевую корзину до перехода к
+	// оформлению.
+	if (flow === "overlay") {
+		return actionSuccess<OtpVerifyResult>({ userId: pending.userId });
+	}
 
 	// redirect() именно здесь, а не router.push() на клиенте: навигация из
 	// Server Action идёт уже после того, как выставлены cookies, и приносит

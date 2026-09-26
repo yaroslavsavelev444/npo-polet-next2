@@ -1,15 +1,40 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
 import Link from 'next/link';
+import { useActionState, useEffect } from 'react';
+import Button from '@/UI/Button/Button';
+import Input from '@/UI/Input/Input';
 import { loginAction } from '../actions/login';
 import { AuthAlert } from './AuthAlert';
 import { Typewriter } from './Typewriter';
-import Input from '@/UI/Input/Input';
-import Button from '@/UI/Button/Button';
 
 interface LoginFormProps {
+  /** Устройство не доверенное — дальше экран ввода кода. */
   onRequiresOtp: (email: string) => void;
+  /**
+   * Вход завершён без кода: устройство доверенное (см. lib/trustedDevice.ts).
+   * Cookie на этот момент уже выставлены, остаётся только решить, куда вести
+   * пользователя, — и это решает вызывающий: страница входа уводит на
+   * исходный адрес, оверлей закрывается и остаётся на месте.
+   */
+  onAuthenticated: (userId: string) => void;
+  /**
+   * Переключение на регистрацию БЕЗ перехода по адресу.
+   *
+   * Нужно оверлею: ссылка на /auth/register увела бы человека из корзины —
+   * то есть воспроизвела бы ровно ту потерю контекста, ради устранения
+   * которой оверлей и сделан. На отдельной странице входа проп не
+   * передаётся, и остаётся обычная ссылка.
+   */
+  onSwitchToRegister?: () => void;
+  /** Ссылку «Забыли пароль?» оверлей сопровождает закрытием — см. AuthOverlay. */
+  onForgotPassword?: () => void;
+  /**
+   * Компактная шапка: в оверлее крупный заголовок с анимацией печати съел бы
+   * половину высоты окна, а объяснять, куда человек попал, там не нужно — он
+   * сам нажал «Войти и оформить».
+   */
+  compact?: boolean;
 }
 
 type LoginState = Awaited<ReturnType<typeof loginAction>> | null;
@@ -26,23 +51,44 @@ function getFieldError(
   return undefined;
 }
 
-export function LoginForm({ onRequiresOtp }: LoginFormProps) {
+export function LoginForm({
+  onRequiresOtp,
+  onAuthenticated,
+  onSwitchToRegister,
+  onForgotPassword,
+  compact = false,
+}: LoginFormProps) {
   const [state, action, isPending] = useActionState(loginAction, null);
 
   useEffect(() => {
-    if (state?.success && state.data.requiresOtp) {
+    if (!state?.success) return;
+
+    // Две развилки одного успеха: код нужен — показываем экран ввода;
+    // не нужен — вход уже завершён, и заниматься им форме больше нечем.
+    if (state.data.requiresOtp) {
       onRequiresOtp(state.data.email);
+      return;
     }
-  }, [state, onRequiresOtp]);
+
+    onAuthenticated(state.data.userId ?? '');
+  }, [state, onRequiresOtp, onAuthenticated]);
 
   return (
     <div className="w-full">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
-          <Typewriter text="Добро пожаловать" />
+      <div className={compact ? 'mb-6' : 'mb-8'}>
+        <h1
+          className={
+            compact
+              ? 'text-xl font-semibold tracking-tight text-[var(--text-primary)]'
+              : 'text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl'
+          }
+        >
+          {compact ? 'Вход в аккаунт' : <Typewriter text="Добро пожаловать" />}
         </h1>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          Введите данные, чтобы войти в аккаунт
+          {compact
+            ? 'Корзина сохранится — вы вернётесь на этот же экран'
+            : 'Введите данные, чтобы войти в аккаунт'}
         </p>
       </div>
 
@@ -87,6 +133,7 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
         <div className="flex items-center justify-end">
           <Link
             href="/auth/forgot-password"
+            onClick={onForgotPassword}
             className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
           >
             Забыли пароль?
@@ -106,12 +153,23 @@ export function LoginForm({ onRequiresOtp }: LoginFormProps) {
 
         <p className="text-center text-sm text-[var(--text-secondary)]">
           Нет аккаунта?{' '}
-          <Link
-            href="/auth/register"
-            className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
-          >
-            Зарегистрироваться
-          </Link>
+          {onSwitchToRegister ? (
+            <button
+              type="button"
+              onClick={onSwitchToRegister}
+              disabled={isPending}
+              className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors disabled:opacity-50"
+            >
+              Зарегистрироваться
+            </button>
+          ) : (
+            <Link
+              href="/auth/register"
+              className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+            >
+              Зарегистрироваться
+            </Link>
+          )}
         </p>
       </form>
     </div>

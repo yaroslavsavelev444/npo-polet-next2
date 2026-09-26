@@ -93,9 +93,13 @@
 
    Полупрозрачный слой с размытием: сетка проезжает ПОД панелью, и по краю
    видно, что список продолжается. Плотный фон здесь читался бы как вторая
-   шапка. Размытие живёт в этом же файле (а не утилитами Tailwind, как у
-   .catalog-toolbar раньше), потому что CSS-модули Lightning CSS не
-   переписывает и backdrop-filter доживает до браузера.                     */
+   шапка.
+
+   backdrop-filter записан один раз, без -webkit-: префикс для Safari
+   добавляет сборка. Lightning CSS переписывает и модули; если написать оба
+   свойства (непрефиксное первым), версия 1.32 при минификации оставляет
+   только -webkit-, которого Chrome не понимает, — и размытие пропадает в
+   production-сборке, хотя в dev работает.                                   */
 .rail {
 	position: sticky;
 	top: var(--sticky-header-height);
@@ -116,7 +120,6 @@
 	border-bottom: 1px solid var(--rule);
 	background: color-mix(in srgb, var(--background) 86%, transparent);
 	backdrop-filter: blur(20px) saturate(160%);
-	-webkit-backdrop-filter: blur(20px) saturate(160%);
 }
 
 @media (min-width: 40rem) {
@@ -129,7 +132,6 @@
 	.rail {
 		background: var(--background);
 		backdrop-filter: none;
-		-webkit-backdrop-filter: none;
 	}
 }
 
@@ -939,7 +941,6 @@
 	inset: 0;
 	background: color-mix(in srgb, #000 62%, transparent);
 	backdrop-filter: blur(4px);
-	-webkit-backdrop-filter: blur(4px);
 	opacity: 0;
 	transition: opacity 260ms var(--ease-out-quart);
 }

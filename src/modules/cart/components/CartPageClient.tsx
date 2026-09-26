@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { startCheckout } from "../lib/start-checkout";
 import {
 	selectHasUndismissedUnavailable,
 	useCartPanel,
@@ -74,6 +75,7 @@ export function CartPageClient({
 	);
 
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const [isCheckingOut, setIsCheckingOut] = useState(false);
 
 	// Серверные данные заезжают в стор синхронно, до первой отрисовки: иначе
@@ -90,6 +92,23 @@ export function CartPageClient({
 		if (userId) return;
 		void refresh({ silent: Boolean(useCartPanel.getState().view) });
 	}, [userId, refresh]);
+
+	/* — гость пришёл прямо на /checkout ————————————————————————
+	   Серверная страница оформления развернула его сюда с меткой ?auth=1 (см.
+	   app/(frontend)/checkout/page.tsx): форму оформления показать нечем, пока
+	   неизвестно, кто её заполняет. Корзина — ближайшее место, где ожидание
+	   осмысленно, и окно входа открывается прямо над ней, чтобы человек
+	   продолжил оттуда, куда шёл, а не разбирался, почему его перекинуло.
+
+	   Метка снимается из адреса сразу: обновление страницы или возврат по
+	   «назад» не должны открывать окно заново. */
+	useEffect(() => {
+		if (userId) return;
+		if (searchParams.get("auth") !== "1") return;
+
+		router.replace("/cart", { scroll: false });
+		startCheckout({ isGuest: true, navigate: (href) => router.push(href) });
+	}, [userId, searchParams, router]);
 
 	const cart = view ?? initialCart;
 
@@ -202,10 +221,14 @@ export function CartPageClient({
 							isGuest={isGuest}
 							isCheckingOut={isCheckingOut}
 							onCheckout={() => {
-								setIsCheckingOut(true);
-								router.push(
-									isGuest ? "/auth/login?from=/checkout" : "/checkout",
-								);
+								// Ожидание — только для вошедшего: гостю сейчас откроется
+								// окно входа, которое он вправе закрыть, и крутящаяся под
+								// ним кнопка осталась бы крутиться навсегда.
+								if (!isGuest) setIsCheckingOut(true);
+								startCheckout({
+									isGuest,
+									navigate: (href) => router.push(href),
+								});
 							}}
 							onClear={() => void clear()}
 						/>

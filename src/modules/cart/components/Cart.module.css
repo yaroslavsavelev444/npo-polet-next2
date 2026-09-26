@@ -40,7 +40,6 @@
 	inset: 0;
 	background: color-mix(in srgb, #000 62%, transparent);
 	backdrop-filter: blur(4px);
-	-webkit-backdrop-filter: blur(4px);
 	opacity: 0;
 	transition: opacity 260ms var(--ease-out-quart);
 }
@@ -1029,6 +1028,14 @@
 	margin-bottom: 1.75rem;
 }
 
+/* Цвет подписи — отдельным правилом с удвоенным классом: это <a>, и
+   глобальное a:not(.button) из Once UI (вес 0,1,1) перебивает одиночный
+   класс. В тёмной теме это было незаметно — ссылка наследовала почти белый
+   текст страницы; в светлой она наследует тёмные чернила. */
+.emptyPrimary.emptyPrimary {
+	color: var(--text-inverse);
+}
+
 .emptyPrimary {
 	display: inline-flex;
 	align-items: center;
@@ -1036,7 +1043,6 @@
 	padding: 0.75rem 1.25rem;
 	border-radius: 999px;
 	background: var(--primary);
-	color: var(--text-inverse);
 	font-size: 0.875rem;
 	font-weight: 600;
 	line-height: 1;

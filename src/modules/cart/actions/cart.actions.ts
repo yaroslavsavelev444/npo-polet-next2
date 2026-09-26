@@ -3,6 +3,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
+import { isOrderRepeatable } from "@/modules/orders/lib/status.groups";
 import type { ProductCardData } from "@/modules/productCard";
 import { mapProductToCardData } from "@/modules/productCard";
 import {
@@ -13,6 +14,7 @@ import {
 	setCartItems,
 } from "@/payload/services/carts.service";
 import { getPayloadInstance } from "@/payload/services/getPayload";
+import { getOrderByIdForUser } from "@/payload/services/orders.service";
 import {
 	getCachedProductById,
 	getCachedProducts,
@@ -22,13 +24,16 @@ import {
 	buildCartView,
 	buildCartViewFromEntries,
 	EMPTY_CART_VIEW,
+	resolveUnitPrices,
 } from "../lib/build-cart-view";
+import { planOrderRepeat } from "../lib/repeat-order";
 import type {
 	CartActionErrorCode,
 	CartActionResult,
 	CartEntry,
 	CartMergeResult,
 	CartUnavailableItem,
+	RepeatOrderResult,
 } from "../types";
 
 async function requireUser() {
@@ -397,6 +402,111 @@ function earliest(a?: string | null, b?: string | null): string {
 	const dates = [a, b].filter(Boolean) as string[];
 	if (dates.length === 0) return new Date().toISOString();
 	return dates.sort()[0];
+}
+
+/* ==========================================================================
+   Повтор заказа
+   ========================================================================== */
+
+/**
+ * Кладёт в корзину позиции прошлого заказа — по ТЕКУЩЕМУ каталогу.
+ *
+ * Источник позиций — снимок order.items, но цены, доступность и ограничения
+ * берутся у товаров сейчас: повтор не обещает ни прежней суммы, ни прежнего
+ * состава. Все решения (что доступно, сколько класть, что изменилось)
+ * принимает planOrderRepeat; здесь — только чтение, одна запись и сводка.
+ *
+ * Почему не addToCartAction в цикле: он СКЛАДЫВАЕТ количества (каждый повтор
+ * добавлял бы ещё одну копию заказа), отказывает вместо того, чтобы привести
+ * количество к пределу, и дал бы по записи в базу на позицию — с окном между
+ * ними, в которое вклинивается параллельная вкладка. Здесь, как и при
+ * слиянии гостевой корзины, состав пишется одним setCartItems, а итоговая
+ * корзина считается тем же buildCartView, что и везде.
+ *
+ * Товары берутся из самого заказа (findByID с depth: 2, без кэша) — тем же
+ * способом, каким их получает корзина: через связь. Так доступность и цена в
+ * сводке совпадают с тем, что корзина покажет сразу после.
+ */
+export async function repeatOrderAction(
+	orderId: string,
+): Promise<RepeatOrderResult> {
+	const user = await requireUser();
+	if (!user) {
+		return {
+			success: false,
+			error: "AUTH_REQUIRED",
+			message: "Войдите в аккаунт, чтобы повторить заказ",
+		};
+	}
+
+	const id = normalizeProductId(String(orderId ?? ""));
+	const order = id ? await getOrderByIdForUser(id, String(user.id)) : null;
+	if (!order) {
+		return { success: false, error: "NOT_FOUND", message: "Заказ не найден" };
+	}
+	if (!isOrderRepeatable(order.status)) {
+		return {
+			success: false,
+			error: "NOT_REPEATABLE",
+			message: "Повторить можно полученный или отменённый заказ",
+		};
+	}
+
+	try {
+		const userId = String(user.id);
+		const existingCart = await getCartByUserId(userId);
+
+		const current: { productId: string; quantity: number; addedAt: string }[] =
+			[];
+		for (const item of existingCart?.items ?? []) {
+			// Строку без товара записать обратно нельзя (см. serializeItems).
+			if (item.product == null) continue;
+			current.push({
+				productId: String(
+					typeof item.product === "object" ? item.product.id : item.product,
+				),
+				quantity: item.quantity,
+				addedAt: item.addedAt ?? new Date().toISOString(),
+			});
+		}
+
+		const plan = planOrderRepeat({
+			items: order.items ?? [],
+			cartQuantities: new Map(current.map((e) => [e.productId, e.quantity])),
+			unitFinalPriceOf: (product) => resolveUnitPrices(product).unitFinalPrice,
+			maxItemQuantity: MAX_ITEM_QUANTITY,
+		});
+
+		// Нечего менять — не пишем: повторный запуск остаётся без побочных
+		// эффектов, а у updatedAt корзины не появляется ложной правки.
+		if (plan.writes.length > 0) {
+			const now = new Date().toISOString();
+			const next = new Map(current.map((e) => [e.productId, e]));
+			for (const write of plan.writes) {
+				// Изменённая позиция поднимается наверх — как при обычном
+				// добавлении (см. setCartItemQuantity).
+				next.set(write.productId, { ...write, addedAt: now });
+			}
+			await setCartItems(userId, [...next.values()], existingCart ?? undefined);
+			revalidatePath("/cart");
+		}
+
+		return {
+			success: true,
+			data: await buildCartView(await getCartByUserId(userId)),
+			report: {
+				orderNumber: order.orderNumber,
+				lines: plan.lines,
+				skipped: plan.skipped,
+			},
+		};
+	} catch {
+		return {
+			success: false,
+			error: "UNKNOWN",
+			message: "Не удалось повторить заказ. Попробуйте ещё раз.",
+		};
+	}
 }
 
 /* ==========================================================================

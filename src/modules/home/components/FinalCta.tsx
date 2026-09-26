@@ -32,7 +32,7 @@ export function FinalCta() {
 			{/* Затемнение поверх фона: текст обязан читаться независимо от
 			    того, какой кадр туда положат. */}
 			<div
-				className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,var(--void-deep)_0%,rgba(13,16,21,0.82)_45%,var(--void-deep)_100%)]"
+				className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,var(--void-deep)_0%,color-mix(in_srgb,var(--void-deep)_82%,transparent)_45%,var(--void-deep)_100%)]"
 				aria-hidden="true"
 			/>
 

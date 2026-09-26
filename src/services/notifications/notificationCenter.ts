@@ -20,6 +20,7 @@ import type { NotificationType } from "../../modules/notifications/types.ts";
 
 export type NotificationScenario =
   | "login_new_device"
+  | "device_trusted"
   | "password_changed"
   | "account_locked"
   | "account_blocked"
@@ -36,6 +37,7 @@ export type NotificationScenario =
 
 interface ScenarioDataMap {
   login_new_device: { deviceLabel: string; ip: string };
+  device_trusted: { deviceLabel: string; ip: string };
   password_changed: Record<string, never>;
   account_locked: { minutesLeft: number };
   account_blocked: Record<string, never>;
@@ -77,6 +79,27 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
     build: ({ deviceLabel, ip }) => ({
       title: "Вход в аккаунт",
       body: `Выполнен вход с устройства «${deviceLabel}» (IP ${ip}). Если это не вы — смените пароль и завершите чужие сессии.`,
+      link: "/profile?tab=sessions",
+    }),
+  },
+  /**
+   * Устройство запомнено — с него больше не будут спрашивать код.
+   *
+   * Отдельный сценарий, а не приписка к login_new_device, и это не оформление:
+   * события разные по последствиям. «Вход выполнен» сообщает о том, что уже
+   * произошло; «устройство запомнено» — о правиле, которое теперь действует на
+   * будущее, и именно его человек обязан заметить, чтобы успеть отменить, если
+   * это был не он. Смешав их в одну формулировку, мы спрятали бы второе за
+   * привычным текстом первого.
+   *
+   * Тип `security`, а не `login_from_new_device`: это изменение настроек
+   * безопасности аккаунта, а не факт входа.
+   */
+  device_trusted: {
+    type: "security",
+    build: ({ deviceLabel, ip }) => ({
+      title: "Устройство запомнено",
+      body: `«${deviceLabel}» (IP ${ip}) добавлено в доверенные: при следующих входах с него код подтверждения запрашиваться не будет. Если это не ваше устройство — отзовите доверие и смените пароль.`,
       link: "/profile?tab=sessions",
     }),
   },

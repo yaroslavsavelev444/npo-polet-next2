@@ -8,6 +8,7 @@ import type {
 	ChangePasswordPayload,
 	ProfileSession,
 	ProfileTab,
+	ProfileTrustedDevice,
 	ProfileUser,
 	UpdateAccountPayload,
 } from "../types/profile.types";
@@ -29,6 +30,8 @@ const BREADCRUMBS = [
 interface ProfileClientProps {
 	user: ProfileUser;
 	sessions: ProfileSession[];
+	/** Браузеры, которым разрешён вход без кода. См. TrustedDevicesSection. */
+	trustedDevices: ProfileTrustedDevice[];
 	/** Раздел, разобранный сервером из адреса. */
 	initialTab: ProfileTab;
 	actions: {
@@ -36,6 +39,8 @@ interface ProfileClientProps {
 		changePassword: (payload: ChangePasswordPayload) => Promise<void>;
 		revokeSession: (sessionId: string) => Promise<void>;
 		refreshSessions: () => Promise<ProfileSession[]>;
+		revokeTrustedDevice: (deviceId: string) => Promise<void>;
+		revokeAllTrustedDevices: () => Promise<void>;
 		logout: () => Promise<void>;
 	};
 }
@@ -77,12 +82,16 @@ interface ProfileClientProps {
 export function ProfileClient({
 	user: initialUser,
 	sessions: initialSessions,
+	trustedDevices: initialTrustedDevices,
 	initialTab,
 	actions,
 }: ProfileClientProps) {
 	const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
 	const [user, setUser] = useState<ProfileUser>(initialUser);
 	const [sessions, setSessions] = useState<ProfileSession[]>(initialSessions);
+	const [trustedDevices, setTrustedDevices] = useState<ProfileTrustedDevice[]>(
+		initialTrustedDevices,
+	);
 	const [logoutOpen, setLogoutOpen] = useState(false);
 
 	const changeTab = useCallback((tab: ProfileTab) => {
@@ -128,6 +137,21 @@ export function ProfileClient({
 
 	async function handleRefreshSessions() {
 		setSessions(await actions.refreshSessions());
+	}
+
+	// Список правится на месте, без повторного запроса: серверное действие
+	// либо отозвало доверие, либо бросило исключение — третьего состояния нет,
+	// и перечитывать список ради того же результата незачем.
+	async function handleRevokeTrustedDevice(deviceId: string) {
+		await actions.revokeTrustedDevice(deviceId);
+		setTrustedDevices((prev) =>
+			prev.filter((device) => device.deviceId !== deviceId),
+		);
+	}
+
+	async function handleRevokeAllTrustedDevices() {
+		await actions.revokeAllTrustedDevices();
+		setTrustedDevices([]);
 	}
 
 	const otherDevices = sessions.filter((session) => !session.isCurrent).length;
@@ -181,8 +205,11 @@ export function ProfileClient({
 						{activeTab === "sessions" && (
 							<SessionsTab
 								sessions={sessions}
+								trustedDevices={trustedDevices}
 								onRevoke={handleRevokeSession}
 								onRefresh={handleRefreshSessions}
+								onRevokeTrustedDevice={handleRevokeTrustedDevice}
+								onRevokeAllTrustedDevices={handleRevokeAllTrustedDevices}
 							/>
 						)}
 					</div>

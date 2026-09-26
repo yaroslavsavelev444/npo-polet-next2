@@ -17,6 +17,14 @@ import { ConsentListItem } from '../types';
 interface RegisterFormProps {
   consents: ConsentListItem[];
   onRequiresOtp: (email: string) => void;
+  /**
+   * Переключение на вход БЕЗ перехода по адресу — нужно оверлею в корзине:
+   * ссылка на /auth/login увела бы человека с оформления. См. LoginForm, там
+   * то же самое в обратную сторону.
+   */
+  onSwitchToLogin?: () => void;
+  /** Компактная шапка для оверлея — см. LoginForm. */
+  compact?: boolean;
 }
 
 type RegisterState = Awaited<ReturnType<typeof registerAction>> | null;
@@ -48,7 +56,12 @@ function getFieldValue(state: RegisterState, field: 'email' | 'name'): string {
   return state.values?.[field] ?? '';
 }
 
-export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
+export function RegisterForm({
+  consents,
+  onRequiresOtp,
+  onSwitchToLogin,
+  compact = false,
+}: RegisterFormProps) {
   const [state, action, isPending] = useActionState(registerAction, null);
   const [checkedSlugs, setCheckedSlugs] = useState<Record<string, boolean>>({});
   const [emailError, setEmailError] = useState<string | undefined>(undefined);
@@ -94,12 +107,20 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
-          <Typewriter text="Рады знакомству!" />
+      <div className={compact ? 'mb-6' : 'mb-8'}>
+        <h1
+          className={
+            compact
+              ? 'text-xl font-semibold tracking-tight text-[var(--text-primary)]'
+              : 'text-3xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl'
+          }
+        >
+          {compact ? 'Регистрация' : <Typewriter text="Рады знакомству!" />}
         </h1>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          Создайте аккаунт, чтобы начать
+          {compact
+            ? 'Займёт минуту — корзина останется на месте'
+            : 'Создайте аккаунт, чтобы начать'}
         </p>
       </div>
 
@@ -189,12 +210,23 @@ export function RegisterForm({ consents, onRequiresOtp }: RegisterFormProps) {
 
         <Typography variant="body-sm" color="secondary" className="text-center">
           Уже есть аккаунт?{' '}
-          <Link
-            href="/auth/login"
-            className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
-          >
-            Войти
-          </Link>
+          {onSwitchToLogin ? (
+            <button
+              type="button"
+              onClick={onSwitchToLogin}
+              disabled={isPending}
+              className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors disabled:opacity-50"
+            >
+              Войти
+            </button>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+            >
+              Войти
+            </Link>
+          )}
         </Typography>
       </form>
     </div>

@@ -105,7 +105,7 @@ export function Modal({
           className={cn(
             'relative flex flex-col w-full max-h-[90vh]',
             'bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-lg)]',
-            'shadow-[0_24px_64px_rgba(0,0,0,0.5)]',
+            'shadow-[var(--shadow-xl)]',
             className,
           )}
         >

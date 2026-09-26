@@ -10,6 +10,12 @@ import {
 	invalidateSession,
 	revokeAllUserSessions,
 } from "@/modules/auth/lib/session";
+import {
+	readTrustedDeviceCookie,
+	revokeAllOwnTrustedDevices,
+	revokeOwnTrustedDevice,
+} from "@/modules/auth/lib/trustedDevice";
+import { getUserTrustedDevices } from "@/modules/auth/lib/trustedDevice.db";
 import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
@@ -17,6 +23,7 @@ import { notifyPasswordChanged } from "@/services/notifications/notifyPasswordCh
 import {
 	ChangePasswordPayload,
 	ProfileSession,
+	ProfileTrustedDevice,
 	UpdateAccountPayload,
 } from "./types/profile.types";
 
@@ -132,6 +139,63 @@ export async function refreshSessionsAction(): Promise<ProfileSession[]> {
 		lastActiveAt: s.lastActiveAt as string,
 		isCurrent: String(s.id) === currentSessionId,
 	}));
+}
+
+/**
+ * Доверенные устройства владельца — те, с которых код не спрашивают.
+ *
+ * Отдельный список рядом с активными сессиями, а не колонка в нём: сессия
+ * живёт неделю и исчезает при выходе, доверие живёт девяносто дней и выход
+ * переживает. Сведя их в одну таблицу, мы получили бы строку, у которой
+ * «Завершить» означает то одно, то другое.
+ */
+export async function listTrustedDevicesAction(): Promise<
+	ProfileTrustedDevice[]
+> {
+	const { payload, user } = await getAuthedUser();
+
+	const [devices, cookie] = await Promise.all([
+		getUserTrustedDevices(payload, String(user.id)),
+		readTrustedDeviceCookie(),
+	]);
+
+	return devices.map((device) => ({
+		deviceId: device.deviceId,
+		deviceLabel: device.deviceLabel ?? "Устройство",
+		lastIp: device.lastIp ?? undefined,
+		lastUsedAt: device.lastUsedAt,
+		expiresAt: device.expiresAt,
+		isCurrent: cookie?.deviceId === device.deviceId,
+	}));
+}
+
+/**
+ * Снять доверие с одного устройства.
+ *
+ * Принадлежность проверяет revokeOwnTrustedDevice: идентификатор приходит с
+ * клиента, и без проверки владельца по нему можно было бы отозвать чужое
+ * устройство. Там же удаляется cookie, если отзывают текущий браузер, — иначе
+ * при следующем входе сработала бы защита от повторного использования секрета
+ * и доверие слетело бы со ВСЕХ устройств вместо одного.
+ */
+export async function revokeTrustedDeviceAction(
+	deviceId: string,
+): Promise<void> {
+	const { payload, user } = await getAuthedUser();
+
+	const ok = await revokeOwnTrustedDevice(payload, String(user.id), deviceId);
+	if (!ok) {
+		throw new Error("Не удалось отозвать доверие к устройству");
+	}
+
+	revalidatePath("/profile");
+}
+
+/** Снять доверие со всех устройств сразу — включая текущее. */
+export async function revokeAllTrustedDevicesAction(): Promise<void> {
+	const { payload, user } = await getAuthedUser();
+	await revokeAllOwnTrustedDevices(payload, String(user.id));
+	revalidatePath("/profile");
 }
 
 export async function logoutAction(): Promise<void> {

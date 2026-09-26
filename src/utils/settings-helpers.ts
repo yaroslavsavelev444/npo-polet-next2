@@ -43,10 +43,14 @@ export function getLogoUrl(Setting: Setting | null): string | null {
 /**
  * Получить массив социальных ссылок с сортировкой по sortOrder
  */
-export function getSocialLinks(Setting: Setting | null): Array<{ platform: string; url: string; title?: string | null }> {
+export function getSocialLinks(Setting: Setting | null): Array<{
+  platform: NonNullable<Setting['socialLinks']>[number]['platform']
+  url: string
+  title?: string | null
+}> {
   if (!Setting?.socialLinks) return []
   return Setting.socialLinks
-    .slice()
+    .filter((link) => link.url?.trim())
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     .map(({ platform, url, title }) => ({ platform, url, title: title ?? null }))
 }

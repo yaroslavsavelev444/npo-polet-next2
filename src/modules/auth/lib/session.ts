@@ -4,6 +4,7 @@ import {
   revokeAllPayloadSessions,
   revokePayloadSession,
 } from './payloadSessions'
+import { revokeAllTrustedDevices } from './trustedDevice.db'
 import { isUser } from './typeGuards'
 
 // ─── Константы ────────────────────────────────────────────────────────────────
@@ -204,6 +205,30 @@ export async function revokeAllUserSessions(
     ? await getSidForSessionRow(payload, exceptSessionId)
     : null
   await revokeAllPayloadSessions(payload, userId, exceptSid)
+
+  // Доверенные устройства снимаются ВСЕГДА и ЦЕЛИКОМ — включая то, с которого
+  // пришёл запрос, и даже когда одну сессию просили оставить.
+  //
+  // Оба повода вызвать эту функцию означают «закрыть доступ везде»: смена или
+  // сброс пароля и «выйти со всех устройств». Право входить без кода — такой
+  // же доступ, как живая сессия, только отложенный: сохранив его, мы оставили
+  // бы скомпрометированному браузеру возможность войти по одному лишь паролю,
+  // тогда как смена пароля затевается именно затем, чтобы такую возможность
+  // закрыть. Поэтому после неё второй фактор подтверждается заново на каждом
+  // устройстве, включая своё, — это и есть выполнение требования «OTP
+  // обязателен после смены пароля».
+  //
+  // Сбой отзыва не должен мешать отзыву сессий — они и есть немедленный
+  // доступ, — поэтому исключение только логируется.
+  try {
+    await revokeAllTrustedDevices(
+      payload,
+      userId,
+      reason === 'password_changed' ? 'password_changed' : 'logout_all',
+    )
+  } catch (err) {
+    console.error('[session] revokeAllTrustedDevices failed:', err)
+  }
 
   const { docs } = await payload.find({
     collection: 'sessions',

@@ -7,16 +7,21 @@ import { useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { cn } from "@/utils/cn";
 import { submitContactRequestAction } from "../actions/submit-contact-request";
-import { form as copy } from "../content/contacts-content";
+import { form, printForm } from "../content/contacts-content";
 import {
 	CONTACT_REQUEST_LIMITS,
 	type ContactRequestFormData,
+	type ContactTopic,
 	contactRequestSchema,
 	PERSONAL_DATA_CONSENT_HREF,
 } from "../schemas/contact-request.schema";
 
 /**
  * Форма обратной связи.
+ *
+ * Одна форма на два повода (topic): сообщение со страницы контактов и заявка
+ * на 3D-печать с главной. У заявки свои подписи и необязательный телефон;
+ * поведение, проверка и путь до админки — общие.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * СОСТОЯНИЯ
@@ -51,7 +56,13 @@ import {
  * нельзя — схема требует literal(true), и та же схема повторно проверяется на
  * сервере.
  */
-export function ContactForm() {
+export function ContactForm({
+	topic = "general",
+}: {
+	/** Повод обращения — определяет подписи, поле телефона и тему записи. */
+	topic?: ContactTopic;
+}) {
+	const copy = topic === "print3d" ? printForm : form;
 	const [serverError, setServerError] = useState<string | null>(null);
 	const [sent, setSent] = useState(false);
 	const consentRef = useRef<HTMLInputElement | null>(null);
@@ -70,6 +81,7 @@ export function ContactForm() {
 
 	const nameId = useId();
 	const emailId = useId();
+	const phoneId = useId();
 	const messageId = useId();
 	const consentId = useId();
 
@@ -85,8 +97,10 @@ export function ContactForm() {
 		resolver: zodResolver(contactRequestSchema),
 		mode: "onTouched",
 		defaultValues: {
+			topic,
 			name: "",
 			email: "",
+			phone: "",
 			message: "",
 			// false, а не undefined: неотмеченный чекбокс должен быть валидным
 			// значением, которое схема отвергнет, а не «поля нет».
@@ -111,6 +125,8 @@ export function ContactForm() {
 			const result = await submitContactRequestAction(data);
 
 			if (result.success) {
+				// reset() без аргументов вернул бы и topic к значению по
+				// умолчанию — это тот же набор defaultValues, так что безопасно.
 				reset();
 				setSent(true);
 				return;
@@ -133,6 +149,7 @@ export function ContactForm() {
 	if (sent) {
 		return (
 			<SuccessPanel
+				copy={copy.success}
 				onRestart={() => {
 					setSent(false);
 					// Возврат к форме — это продолжение того же разговора,
@@ -181,6 +198,25 @@ export function ContactForm() {
 					{...register("email")}
 				/>
 			</Field>
+
+			{topic === "print3d" ? (
+				<Field
+					id={phoneId}
+					label={printForm.fields.phone.label}
+					error={errors.phone?.message}
+				>
+					<input
+						id={phoneId}
+						type="tel"
+						inputMode="tel"
+						autoComplete={printForm.fields.phone.autoComplete}
+						placeholder={printForm.fields.phone.placeholder}
+						maxLength={CONTACT_REQUEST_LIMITS.phone.max}
+						className="contact-field__control text-[1.0625rem]"
+						{...register("phone")}
+					/>
+				</Field>
+			) : null}
 
 			<Field
 				id={messageId}
@@ -390,7 +426,13 @@ function Field({
  * нет» возникает позже. Ответ должен оставаться на экране — вместе с
  * обещанием срока и возможностью написать ещё.
  */
-function SuccessPanel({ onRestart }: { onRestart: () => void }) {
+function SuccessPanel({
+	copy,
+	onRestart,
+}: {
+	copy: { title: string; body: string; again: string };
+	onRestart: () => void;
+}) {
 	return (
 		<div
 			className="contact-success flex flex-col items-start gap-5"
@@ -416,10 +458,10 @@ function SuccessPanel({ onRestart }: { onRestart: () => void }) {
 
 			<div className="flex flex-col gap-3">
 				<p className="text-[clamp(1.25rem,1.05rem+0.8vw,1.75rem)] font-bold leading-tight tracking-[-0.02em] text-[var(--text-primary)]">
-					{copy.success.title}
+					{copy.title}
 				</p>
 				<p className="max-w-[46ch] text-[0.9375rem] leading-relaxed text-[var(--text-secondary)]">
-					{copy.success.body}
+					{copy.body}
 				</p>
 			</div>
 
@@ -428,7 +470,7 @@ function SuccessPanel({ onRestart }: { onRestart: () => void }) {
 				onClick={onRestart}
 				className="group inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] px-5 py-3 text-[0.9375rem] font-medium text-[var(--text-primary)] transition-colors duration-200 hover:border-[var(--border-light)] hover:bg-[color-mix(in_srgb,var(--surface)_60%,transparent)]"
 			>
-				{copy.success.again}
+				{copy.again}
 				<ArrowRight
 					className="size-4 transition-transform duration-200 group-hover:translate-x-1"
 					aria-hidden="true"

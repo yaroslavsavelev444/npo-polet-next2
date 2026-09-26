@@ -24,12 +24,6 @@ export interface FooterLink {
 	 * приходят из админки и бывают длиной в предложение.
 	 */
 	title?: string;
-	external?: boolean;
-	/**
-	 * Площадка из настроек сайта. Только у ссылок группы «Мы в сети» — по ней
-	 * подбираются знак и фирменный оттенок (src/modules/contact/lib/social-config).
-	 */
-	platform?: string;
 }
 
 export interface FooterGroup {

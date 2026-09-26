@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { openAuthOverlay } from "@/modules/auth/store/auth-overlay.store";
 import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
 import { markOrderJustCreated } from "@/modules/orders/lib/celebrate-order";
 import type { PromoApplyPreview } from "@/modules/promo";
@@ -402,8 +403,27 @@ export function CheckoutPageClient({
 				inFlightRef.current = false;
 
 				if (result.error === "AUTH_REQUIRED") {
-					appToast.warning(result.message);
-					router.push("/auth/login?from=/checkout");
+					// Сессия истекла, пока заполняли форму. Уводить отсюда на
+					// /auth/login нельзя ни в коем случае: вместе со страницей
+					// пропала бы вся анкета — получатель, адрес, реквизиты
+					// организации, — и человек заполнял бы её заново. Окно входа
+					// встаёт поверх формы, форма остаётся нетронутой.
+					//
+					// Заказ после входа НЕ отправляется сам. Между истёкшей
+					// сессией и повторным входом проходит время, за которое могли
+					// измениться и состав корзины, и цены, и действие промокода;
+					// подтвердить итог обязан покупатель, а не мы за него. Ровно
+					// так же поступает ветка PROMO_INVALID ниже и по той же
+					// причине.
+					openAuthOverlay({
+						reason:
+							"Сессия истекла, пока вы заполняли форму. Войдите — данные заказа сохранены.",
+						onSuccess: () => {
+							appToast.success(
+								"Вы снова в аккаунте. Проверьте итог и подтвердите заказ",
+							);
+						},
+					});
 					return;
 				}
 

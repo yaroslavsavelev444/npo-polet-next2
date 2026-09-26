@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RemoveScroll } from "react-remove-scroll";
+import { startCheckout } from "../lib/start-checkout";
 import {
 	selectHasUndismissedUnavailable,
 	useCartPanel,
@@ -211,11 +212,24 @@ export function CartDrawer({ categories }: Props) {
 	}, [isOpen, handleKeyDown]);
 
 	const handleCheckout = useCallback(() => {
-		setIsCheckingOut(true);
-		// Панель закрывается вместе с переходом: возвращаться со страницы
-		// оформления в открытую поверх неё корзину незачем.
+		// Ожидание на кнопке включается только для вошедшего покупателя: у него
+		// следом идёт переход, во время которого панель ещё на экране. Гостю
+		// показывать его нечего и вредно — окно входа он может закрыть, и
+		// вернувшись в корзину увидел бы вечно крутящуюся кнопку.
+		if (!isGuest) setIsCheckingOut(true);
+
+		// Панель закрывается в обоих случаях: при переходе — потому что
+		// возвращаться со страницы оформления в открытую поверх неё корзину
+		// незачем; перед входом — потому что окно авторизации встаёт поверх
+		// страницы, а не поверх панели (две наложенные друг на друга
+		// поверхности, каждая со своей блокировкой прокрутки, читаются как
+		// поломка).
 		close();
-		router.push(isGuest ? "/auth/login?from=/checkout" : "/checkout");
+
+		startCheckout({
+			isGuest,
+			navigate: (href) => router.push(href),
+		});
 	}, [close, isGuest, router]);
 
 	if (!mounted || typeof document === "undefined") return null;

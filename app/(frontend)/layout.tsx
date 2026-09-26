@@ -9,7 +9,12 @@ import { Column, Flex, Meta } from "@once-ui-system/core";
 import type { Viewport } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import localFont from "next/font/local";
+import { cookies } from "next/headers";
 import { BannerGate } from "@/modules/banners/components/BannerGate";
+import {
+	parseSchemePreference,
+	SCHEME_COOKIE,
+} from "@/modules/color-scheme/lib/scheme";
 import { AnalyticsGate } from "@/modules/cookie-consent/components/AnalyticsGate";
 import { CookieConsentBanner } from "@/modules/cookie-consent/components/CookieConsentBanner";
 import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
@@ -77,16 +82,16 @@ const mono = IBM_Plex_Mono({
 	variable: "--font-ibm-plex-mono",
 });
 
-// Красит адресную строку/UI браузера на мобильных под тему ОС — то же значение,
-// что theme_color/background_color в app/manifest.ts, чтобы вкладка, favicon и
-// PWA-запуск выглядели согласованно в светлой и тёмной теме.
+// Красит адресную строку/UI браузера на мобильных под тему ОС — цвет фона
+// страницы в светлой и тёмной теме (--background в theme.css), чтобы полоса
+// браузера продолжала страницу, а не спорила с ней.
 export const viewport: Viewport = {
 	// viewport-fit=cover нужен, чтобы на устройствах с вырезами/жестовой
 	// навигацией работали env(safe-area-inset-*) — их используют липкие панели
 	// (напр. ProductStickyBar), чтобы не заезжать под системные элементы.
 	viewportFit: "cover",
 	themeColor: [
-		{ media: "(prefers-color-scheme: light)", color: "#FF4500" },
+		{ media: "(prefers-color-scheme: light)", color: "#F3F4F7" },
 		{ media: "(prefers-color-scheme: dark)", color: "#1A1D24" },
 	],
 };
@@ -113,7 +118,17 @@ export default async function RootLayout({
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
-	const settings = await getCachedSettings();
+	const [settings, cookieStore] = await Promise.all([
+		getCachedSettings(),
+		cookies(),
+	]);
+	// Явный выбор темы. «Авто» — отсутствие атрибута: тему по настройке
+	// системы разрешает CSS (см. шапку app/(frontend)/theme.css). Выставляется
+	// здесь, в первом HTML, а не скриптом после загрузки — иначе страница
+	// посетителя со светлой темой при тёмной системе мигала бы тёмной.
+	const schemePreference = parseSchemePreference(
+		cookieStore.get(SCHEME_COOKIE)?.value,
+	);
 
 	return (
 		<Providers>
@@ -123,6 +138,7 @@ export default async function RootLayout({
 				fillWidth
 				className={cn(manrope.variable, mono.variable, display.variable)}
 				style={{ height: "100%" }}
+				data-scheme={schemePreference === "auto" ? undefined : schemePreference}
 			>
 				<Column
 					as="body"

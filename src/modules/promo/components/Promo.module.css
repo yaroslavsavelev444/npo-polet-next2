@@ -154,7 +154,10 @@
 	margin-top: 0.1rem;
 	border-radius: 999px;
 	background: var(--success);
-	color: #06210f;
+	/* Цвет фона страницы, а не фиксированный тёмно-зелёный: заливка в
+	   светлой теме темнее, в тёмной — ярче, и галочка должна быть
+	   противоположна ей в обеих. */
+	color: var(--background);
 }
 
 .appliedBody {
@@ -184,7 +187,7 @@
 .appliedAmount {
 	font-weight: 600;
 	font-variant-numeric: tabular-nums;
-	color: color-mix(in srgb, var(--success) 82%, #fff);
+	color: color-mix(in srgb, var(--success) 82%, var(--contrast-pole));
 }
 
 .appliedText {

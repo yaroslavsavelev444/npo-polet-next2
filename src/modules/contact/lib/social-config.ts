@@ -1,13 +1,21 @@
 import {
 	Bot,
-	Code2,
 	Globe,
 	type LucideIcon,
 	MessageCircle,
 	MessageSquare,
-	Send,
 	Users,
 } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
+import type { Setting } from "@/payload-types";
+import {
+	DzenIcon,
+	MaxIcon,
+	OkIcon,
+	RutubeIcon,
+	TelegramIcon,
+	VkIcon,
+} from "./social-icons";
 
 /**
  * Иконки и фирменные оттенки каналов.
@@ -15,37 +23,42 @@ import {
  * ────────────────────────────────────────────────────────────────────────────
  * ГДЕ ЖИВЁТ ЦВЕТ
  * ────────────────────────────────────────────────────────────────────────────
- * Только в иконке и только при наведении (см. .net-link в contacts.css).
- * Раскрашивать целиком плашку, как это было раньше, нельзя: пять чужих
- * фирменных цветов рядом друг с другом не складываются ни во что и первыми
- * разваливают палитру страницы. При этом узнаваемость канала нужна — её и
- * даёт подсветка иконки в момент, когда посетитель до неё дотянулся.
+ * Только в иконке и только при наведении (см. .net-link в contacts.css и
+ * .social в Footer.module.css). Раскрашивать целиком плашку, как это было
+ * раньше, нельзя: пять чужих фирменных цветов рядом друг с другом не
+ * складываются ни во что и первыми разваливают палитру страницы. При этом
+ * узнаваемость канала нужна — её и даёт подсветка иконки в момент, когда
+ * посетитель до неё дотянулся.
  *
- * Иконки взяты из одного набора (lucide) с одинаковой толщиной штриха.
- * Фирменных знаков площадок в нём больше нет (бренд-иконки вынесены из набора
- * начиная с 1.x), поэтому у всех каналов стоят нейтральные знаки из того же
- * семейства. Дорисовать один-два логотипа вручную было бы хуже: чужеродная
- * иконка в другом стиле заметнее, чем её отсутствие.
+ * У соцсетей — фирменные знаки площадок (./social-icons): в подвале они
+ * стоят плитками без подписи, и узнаются только по знаку. У «других
+ * контактов» площадки нет, поэтому там нейтральные знаки lucide.
  */
+export type SocialPlatform = NonNullable<
+	Setting["socialLinks"]
+>[number]["platform"];
+
 export interface SocialConfigItem {
+	/** Цвет CSS; где фирменный оттенок не читается на светлом фоне — пара
+	 *  light-dark(светлая, тёмная), её разрешает браузер по теме страницы. */
 	color: string;
-	icon: LucideIcon;
+	icon: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>;
 }
 
-export const socialConfig: Record<string, SocialConfigItem> = {
-	telegram: { color: "#2AABEE", icon: Send },
-	whatsapp: { color: "#25D366", icon: MessageCircle },
-	vk: { color: "#0077FF", icon: MessageSquare },
-	github: { color: "#E6E6E6", icon: Code2 },
-	max: { color: "#7C5CFF", icon: Globe },
-	other: { color: "#8B94A3", icon: Globe },
+export const socialConfig: Record<SocialPlatform, SocialConfigItem> = {
+	telegram: { color: "light-dark(#1e8bc3, #2aabee)", icon: TelegramIcon },
+	vk: { color: "#0077ff", icon: VkIcon },
+	max: { color: "light-dark(#6d3fe0, #8b5cf6)", icon: MaxIcon },
+	ok: { color: "light-dark(#c96a00, #ee8208)", icon: OkIcon },
+	rutube: { color: "#ed143b", icon: RutubeIcon },
+	dzen: { color: "light-dark(#12151b, #f2f2f2)", icon: DzenIcon },
 };
 
 /** То же для «других контактов» — мессенджеров, ботов, форумов, чатов. */
 export const otherContactConfig: Record<string, SocialConfigItem> = {
-	messenger: { color: "#2AABEE", icon: MessageCircle },
-	forum: { color: "#8B94A3", icon: Users },
-	bot: { color: "#00C853", icon: Bot },
-	chat: { color: "#008CFF", icon: MessageSquare },
-	custom: { color: "#8B94A3", icon: Globe },
+	messenger: { color: "light-dark(#1e8bc3, #2aabee)", icon: MessageCircle },
+	forum: { color: "light-dark(#5b6474, #8b94a3)", icon: Users },
+	bot: { color: "light-dark(#0b7a37, #00c853)", icon: Bot },
+	chat: { color: "light-dark(#0068c2, #008cff)", icon: MessageSquare },
+	custom: { color: "light-dark(#5b6474, #8b94a3)", icon: Globe },
 };

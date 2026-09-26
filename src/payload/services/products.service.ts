@@ -367,3 +367,105 @@ export const getCachedCategoryProductCounts = () => {
 		},
 	)();
 };
+
+/**
+ * Товар в превью раздела — для меню каталога в шапке.
+ */
+export interface CategoryPreviewProduct {
+	id: string;
+	title: string;
+	slug: string;
+	imageUrl: string | null;
+	imageAlt: string;
+	priceForIndividual: number;
+	discount: Product["pricing"]["discount"];
+}
+
+/** Сколько товаров показывает меню на раздел. */
+const PREVIEWS_PER_CATEGORY = 3;
+
+function previewImage(images: Product["images"]): {
+	url: string | null;
+	alt: string;
+} {
+	const first = images?.find(
+		(image): image is Exclude<typeof image, number> =>
+			typeof image === "object" && image !== null && Boolean(image.url),
+	);
+	if (!first) return { url: null, alt: "" };
+	// Миниатюра 400×300 — ровно под плитку меню; оригинал весил бы в десятки
+	// раз больше, а плиток на экране шесть и больше.
+	return {
+		url: first.sizes?.thumbnail?.url || first.url || null,
+		alt: first.alt ?? "",
+	};
+}
+
+/**
+ * Несколько товаров каждого раздела — ключ id категории строкой.
+ *
+ * Одна выборка на весь каталог, как у счётчиков выше: шапка рисуется на
+ * каждой странице, и запрос на раздел превратился бы в десяток обращений к
+ * базе на каждый переход. Поля ограничены select — из базы приезжает только
+ * то, что меню показывает.
+ *
+ * Внутри раздела сначала идут товары с фотографией: меню продаёт разделы
+ * картинкой, и плитка-заглушка на первом месте работала бы против него.
+ * Условия видимости — те же, что у выдачи раздела.
+ */
+async function fetchCategoryPreviews(): Promise<
+	Record<string, CategoryPreviewProduct[]>
+> {
+	const payload = await getPayloadInstance();
+	const result = await payload.find({
+		collection: "products",
+		where: buildProductWhere({ isVisible: true }),
+		depth: 1,
+		pagination: false,
+		sort: "title",
+		select: {
+			title: true,
+			slug: true,
+			category: true,
+			images: true,
+			pricing: true,
+		},
+	});
+
+	const grouped: Record<string, CategoryPreviewProduct[]> = {};
+	for (const doc of result.docs as unknown as Product[]) {
+		const relation = doc.category as number | { id: number } | null;
+		const categoryId = typeof relation === "object" ? relation?.id : relation;
+		if (categoryId === null || categoryId === undefined) continue;
+
+		const image = previewImage(doc.images);
+		const key = String(categoryId);
+		grouped[key] ??= [];
+		grouped[key].push({
+			id: String(doc.id),
+			title: doc.title,
+			slug: doc.slug ?? String(doc.id),
+			imageUrl: image.url,
+			imageAlt: image.alt,
+			priceForIndividual: doc.pricing?.priceForIndividual ?? 0,
+			discount: doc.pricing?.discount,
+		});
+	}
+
+	for (const key of Object.keys(grouped)) {
+		grouped[key] = grouped[key]
+			.sort((a, b) => Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl)))
+			.slice(0, PREVIEWS_PER_CATEGORY);
+	}
+	return grouped;
+}
+
+export const getCachedCategoryPreviews = () => {
+	if (env.NODE_ENV === "development") {
+		return fetchCategoryPreviews();
+	}
+	return unstable_cache(fetchCategoryPreviews, ["category-previews"], {
+		tags: ["products"],
+		revalidate: false,
+	})();
+};

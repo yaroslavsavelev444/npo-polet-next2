@@ -149,10 +149,18 @@ export const Settings: GlobalConfig = {
 		},
 
 		// ── Социальные сети ──
+		// Выводятся плитками в подвале и списком на /contacts. Площадки —
+		// закрытый список, а не «Другое» со свободной ссылкой: у каждой есть
+		// свой знак, и в список не попадает ничего, что заблокировано или
+		// признано запрещённым в РФ (Telegram оставлен сознательно).
 		{
 			name: "socialLinks",
 			type: "array",
 			label: "Социальные сети",
+			admin: {
+				description:
+					"Показываются в подвале сайта и на странице контактов. Площадка без ссылки не выводится.",
+			},
 			fields: [
 				{
 					name: "platform",
@@ -160,11 +168,11 @@ export const Settings: GlobalConfig = {
 					required: true,
 					options: [
 						{ label: "Telegram", value: "telegram" },
-						{ label: "WhatsApp", value: "whatsapp" },
 						{ label: "ВКонтакте", value: "vk" },
-						{ label: "GitHub", value: "github" },
-						{ label: "Max (?)", value: "max" },
-						{ label: "Другое", value: "other" },
+						{ label: "Max", value: "max" },
+						{ label: "Одноклассники", value: "ok" },
+						{ label: "Rutube", value: "rutube" },
+						{ label: "Дзен", value: "dzen" },
 					],
 				},
 				{
@@ -175,8 +183,12 @@ export const Settings: GlobalConfig = {
 					validate: (value: string | string[] | null | undefined) => {
 						if (!value || typeof value !== "string") return "URL обязателен";
 						try {
-							new URL(value);
-							return true;
+							const { protocol } = new URL(value);
+							return (
+								protocol === "https:" ||
+								protocol === "http:" ||
+								"Ссылка должна начинаться с https://"
+							);
 						} catch {
 							return "Неверный формат URL";
 						}
@@ -257,6 +269,27 @@ export const Settings: GlobalConfig = {
 					type: "checkbox",
 					label: "Отключить возможность заказать товар",
 					defaultValue: false,
+				},
+			],
+		},
+
+		// ── Блок «3D-печать на заказ» на главной ──
+		// Свободные мощности — состояние временное: когда принтеры загружены,
+		// блок снимается здесь, без выкладки кода.
+		{
+			name: "printService",
+			type: "group",
+			label: "3D-печать на заказ",
+			fields: [
+				{
+					name: "enabled",
+					type: "checkbox",
+					label: "Показывать блок на главной",
+					defaultValue: true,
+					admin: {
+						description:
+							"Сообщает, что есть свободные 3D-принтеры, и принимает заявки. Заявки приходят в «Поддержка → Обращения» с темой «3D-печать» и письмом администраторам.",
+					},
 				},
 			],
 		},

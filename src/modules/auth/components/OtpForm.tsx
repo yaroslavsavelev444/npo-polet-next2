@@ -20,6 +20,23 @@ interface OtpFormProps {
 	email: string;
 	title: string;
 	description: string;
+	/**
+	 * Где показана форма.
+	 *
+	 * `page`    — отдельная страница: verifyOtpAction завершает вход серверным
+	 *             redirect(), и клиенту делать нечего.
+	 * `overlay` — окно поверх корзины/оформления: уводить со страницы нельзя,
+	 *             action возвращает успех, и дальше решает `onAuthenticated`.
+	 *
+	 * Значение уходит на сервер скрытым полем `flow` — см. verifyOtp.ts.
+	 */
+	flow?: "page" | "overlay";
+	/** Вход завершён (только для flow="overlay"). */
+	onAuthenticated?: (userId: string) => void;
+	/** Вернуться к вводу пароля/анкете, не закрывая окно. */
+	onBack?: () => void;
+	/** Убирает карточку-обёртку: в оверлее она была бы рамкой внутри рамки. */
+	bare?: boolean;
 }
 
 /**
@@ -31,7 +48,16 @@ interface OtpFormProps {
  * контекстное меню, кнопка «Вставить из буфера»), автозаполнение OTP на
  * мобильных (autoComplete="one-time-code").
  */
-export function OtpForm({ type, email, title, description }: OtpFormProps) {
+export function OtpForm({
+	type,
+	email,
+	title,
+	description,
+	flow = "page",
+	onAuthenticated,
+	onBack,
+	bare = false,
+}: OtpFormProps) {
 	const formRef = useRef<HTMLFormElement>(null);
 
 	const [code, setCode] = useState(EMPTY_CODE);
@@ -50,10 +76,16 @@ export function OtpForm({ type, email, title, description }: OtpFormProps) {
 
 	const compactCode = code.replace(/\s/g, "");
 
-	// Редиректа здесь нет: verifyOtpAction при успехе сам делает redirect() уже
-	// после того, как выставил cookies, и приносит свежее RSC-дерево (иначе
-	// Navbar остаётся отрисованным для гостя, см. комментарий в verifyOtp.ts).
-	// Поэтому verifyState здесь бывает только ошибкой.
+	// На странице редиректа здесь нет: verifyOtpAction при успехе сам делает
+	// redirect() уже после того, как выставил cookies, и приносит свежее
+	// RSC-дерево (иначе Navbar остаётся отрисованным для гостя, см.
+	// комментарий в verifyOtp.ts). В оверлее уводить со страницы нельзя,
+	// поэтому там action возвращает успех и навигацию решает вызывающий.
+	useEffect(() => {
+		if (verifyState?.success) {
+			onAuthenticated?.(verifyState.data.userId);
+		}
+	}, [verifyState, onAuthenticated]);
 
 	// Неверный код — очищаем поля, трясём группу и возвращаем фокус на первую ячейку
 	useEffect(() => {
@@ -120,103 +152,130 @@ export function OtpForm({ type, email, title, description }: OtpFormProps) {
 
 	const maskedEmail = maskEmail(email);
 
-	return (
-		<div className="w-full max-w-md mx-auto animate-[fade-in-up_300ms_ease-out]">
-			<Card variant="elevated" size="lg">
-				<div className="mb-6 text-center">
-					<Heading level={1} className="mb-1.5">
-						{title}
-					</Heading>
-					<Typography variant="body-sm" color="secondary">
-						{description}{" "}
-						<span className="font-medium text-[var(--text-primary)]">
-							{maskedEmail}
-						</span>
+	const body = (
+		<>
+			<div className="mb-6 text-center">
+				<Heading level={bare ? 2 : 1} className="mb-1.5">
+					{title}
+				</Heading>
+				<Typography variant="body-sm" color="secondary">
+					{description}{" "}
+					<span className="font-medium text-[var(--text-primary)]">
+						{maskedEmail}
+					</span>
+				</Typography>
+			</div>
+
+			<form ref={formRef} action={verifyAction} className="space-y-5">
+				<input type="hidden" name="type" value={type} />
+				<input type="hidden" name="flow" value={flow} />
+				<input type="hidden" name="code" value={compactCode} readOnly />
+
+				{verifyState && !verifyState.success && (
+					<AuthAlert message={verifyState.error} code={verifyState.code} />
+				)}
+				{resendState?.success && (
+					<AuthAlert message={resendState.data.message} severity="success" />
+				)}
+				{resendState && !resendState.success && (
+					<AuthAlert message={resendState.error} code={resendState.code} />
+				)}
+
+				<div className="flex flex-col items-center gap-3">
+					<CodeInput
+						value={code}
+						onChange={setCode}
+						onComplete={handleComplete}
+						disabled={isVerifying}
+						error={!!(verifyState && !verifyState.success)}
+						autoFocus
+						shakeSignal={shakeSignal}
+						length={OTP_LENGTH}
+					/>
+
+					<button
+						type="button"
+						onClick={handlePasteFromClipboard}
+						disabled={isVerifying}
+						className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]
+                         hover:text-[var(--primary)] transition-colors duration-150
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						<ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
+						Вставить из буфера
+					</button>
+
+					{clipboardError && (
+						<p
+							role="alert"
+							className="text-xs text-[var(--error)] text-center animate-[fade-in-up_150ms_ease-out]"
+						>
+							{clipboardError}
+						</p>
+					)}
+
+					<Typography variant="caption" color="muted">
+						Код действителен 10 минут
 					</Typography>
 				</div>
 
-				<form ref={formRef} action={verifyAction} className="space-y-5">
+				<Button
+					type="submit"
+					variant="primary"
+					size="md"
+					fullWidth
+					loading={isVerifying}
+					disabled={isVerifying || compactCode.length !== OTP_LENGTH}
+				>
+					Подтвердить
+				</Button>
+			</form>
+
+			<div className="mt-5 flex flex-col items-center gap-2 text-center">
+				<form action={resendAction}>
 					<input type="hidden" name="type" value={type} />
-					<input type="hidden" name="code" value={compactCode} readOnly />
-
-					{verifyState && !verifyState.success && (
-						<AuthAlert message={verifyState.error} code={verifyState.code} />
-					)}
-					{resendState?.success && (
-						<AuthAlert message={resendState.data.message} severity="success" />
-					)}
-					{resendState && !resendState.success && (
-						<AuthAlert message={resendState.error} code={resendState.code} />
-					)}
-
-					<div className="flex flex-col items-center gap-3">
-						<CodeInput
-							value={code}
-							onChange={setCode}
-							onComplete={handleComplete}
-							disabled={isVerifying}
-							error={!!(verifyState && !verifyState.success)}
-							autoFocus
-							shakeSignal={shakeSignal}
-							length={OTP_LENGTH}
-						/>
-
-						<button
-							type="button"
-							onClick={handlePasteFromClipboard}
-							disabled={isVerifying}
-							className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]
-                         hover:text-[var(--primary)] transition-colors duration-150
-                         disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							<ClipboardPaste className="h-3.5 w-3.5" aria-hidden />
-							Вставить из буфера
-						</button>
-
-						{clipboardError && (
-							<p
-								role="alert"
-								className="text-xs text-[var(--error)] text-center animate-[fade-in-up_150ms_ease-out]"
-							>
-								{clipboardError}
-							</p>
-						)}
-
-						<Typography variant="caption" color="muted">
-							Код действителен 10 минут
-						</Typography>
-					</div>
-
-					<Button
+					<button
 						type="submit"
-						variant="primary"
-						size="md"
-						fullWidth
-						loading={isVerifying}
-						disabled={isVerifying || compactCode.length !== OTP_LENGTH}
-					>
-						Подтвердить
-					</Button>
-				</form>
-
-				<div className="mt-5 text-center">
-					<form action={resendAction}>
-						<input type="hidden" name="type" value={type} />
-						<button
-							type="submit"
-							disabled={isResending || isVerifying || cooldown > 0}
-							className="text-sm font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]
+						disabled={isResending || isVerifying || cooldown > 0}
+						className="text-sm font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]
                          disabled:text-[var(--text-muted)] disabled:cursor-not-allowed
                          transition-colors duration-150"
-						>
-							{isResending
-								? "Отправка..."
-								: cooldown > 0
-									? `Отправить код повторно (${cooldown}с)`
-									: "Отправить код повторно"}
-						</button>
-					</form>
-				</div>
+					>
+						{isResending
+							? "Отправка..."
+							: cooldown > 0
+								? `Отправить код повторно (${cooldown}с)`
+								: "Отправить код повторно"}
+					</button>
+				</form>
+
+				{onBack && (
+					<button
+						type="button"
+						onClick={onBack}
+						disabled={isVerifying}
+						className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]
+                         disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-150"
+					>
+						Ввести другой адрес
+					</button>
+				)}
+			</div>
+		</>
+	);
+
+	// В оверлее карточка не нужна: окно само по себе уже поверхность с рамкой
+	// и тенью, и вложенная в него вторая читалась бы рамкой внутри рамки.
+	if (bare) {
+		return (
+			<div className="w-full animate-[fade-in-up_200ms_ease-out]">{body}</div>
+		);
+	}
+
+	return (
+		<div className="w-full max-w-md mx-auto animate-[fade-in-up_300ms_ease-out]">
+			<Card variant="elevated" size="lg">
+				{body}
 			</Card>
 		</div>
 	);

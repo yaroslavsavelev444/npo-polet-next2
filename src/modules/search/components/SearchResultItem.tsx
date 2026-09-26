@@ -31,11 +31,11 @@ export function SearchResultItem({ result, index, isActive, onSelect }: SearchRe
         onMouseEnter={() => setActiveIndex(index)}
         className={cn(
           'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-150',
-          isActive ? 'bg-white/10' : 'hover:bg-white/5',
+          isActive ? 'bg-[var(--text-primary)]/10' : 'hover:bg-[var(--text-primary)]/5',
         )}
       >
         {/* Товар: изображение */}
-        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/5">
           {result.imageUrl ? (
             <Image
               src={result.imageUrl}
@@ -45,7 +45,7 @@ export function SearchResultItem({ result, index, isActive, onSelect }: SearchRe
               className="object-contain p-1"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-white/30">
+            <div className="flex h-full w-full items-center justify-center text-[color:var(--text-primary)]/30">
               <ImageOff className="h-4 w-4" aria-hidden />
             </div>
           )}
@@ -53,18 +53,18 @@ export function SearchResultItem({ result, index, isActive, onSelect }: SearchRe
 
         {/* Товар: название и цена */}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white">{result.title}</p>
+          <p className="truncate text-sm font-medium text-[color:var(--text-primary)]">{result.title}</p>
           <p className="mt-0.5 flex items-center gap-1.5 text-xs">
             <span
               className={cn(
                 'font-semibold',
-                result.hasDiscount ? 'text-[var(--error)]' : 'text-white/60',
+                result.hasDiscount ? 'text-[var(--error)]' : 'text-[color:var(--text-primary)]/60',
               )}
             >
               {formatPrice(result.finalPrice)}
             </span>
             {result.hasDiscount && (
-              <span className="text-white/35 line-through">
+              <span className="text-[color:var(--text-primary)]/35 line-through">
                 {formatPrice(result.originalPrice)}
               </span>
             )}
@@ -79,7 +79,7 @@ export function SearchResultItem({ result, index, isActive, onSelect }: SearchRe
 
         {/* Категория товара */}
         {result.category && (
-          <span className="max-w-[120px] shrink-0 truncate whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60">
+          <span className="max-w-[120px] shrink-0 truncate whitespace-nowrap rounded-full border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/5 px-2.5 py-1 text-xs font-medium text-[color:var(--text-primary)]/60">
             {result.category.name}
           </span>
         )}

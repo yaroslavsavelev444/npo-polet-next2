@@ -10,6 +10,11 @@ export async function notifyNewSessionLogin(params: {
   userName: string;
   deviceLabel: string;
   ip: string;
+  /**
+   * Устройство одновременно стало доверенным. Меняет тему, preview-текст и
+   * содержание письма — см. new-session-login.template.ts.
+   */
+  deviceRemembered?: boolean;
 }): Promise<void> {
   try {
     const { appUrl } = getEmailConfig();
@@ -21,6 +26,7 @@ export async function notifyNewSessionLogin(params: {
         ip: params.ip,
         loginAt: new Date(),
         sessionsUrl: `${appUrl}/profile?tab=sessions`,
+        deviceRemembered: params.deviceRemembered ?? false,
       },
       { to: { email: params.email } },
     );

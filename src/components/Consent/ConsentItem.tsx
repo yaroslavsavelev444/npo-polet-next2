@@ -28,7 +28,7 @@ export function ConsentItem({ consent, checked, onChange, disabled }: ConsentIte
       />
       <Typography variant="body-sm" color="secondary" className="flex-1">
         {isRequired && (
-          <span className="text-red-500 mr-1">*</span>
+          <span className="text-[color:var(--error)] mr-1">*</span>
         )}
         {documentUrl ? (
           <a
@@ -49,7 +49,7 @@ export function ConsentItem({ consent, checked, onChange, disabled }: ConsentIte
           </Link>
         )}
         {isRequired && (
-          <span className="ml-1 text-xs text-gray-400">(обязательно)</span>
+          <span className="ml-1 text-xs text-[color:var(--text-muted)]">(обязательно)</span>
         )}
       </Typography>
     </label>

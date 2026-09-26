@@ -1,13 +1,13 @@
 // ─── Orders list & cancellation (append to existing file) ──────────────────
 
 import type { Where } from "payload";
-import { CheckoutSubmitInput } from "@/modules/checkout";
+import type { CheckoutSubmitInput } from "@/modules/checkout";
 import { composeAddressLine } from "@/modules/checkout/lib/address";
 import { resolveOrderContact } from "@/modules/orders/lib/order-contact";
 import type { CheckoutPricing } from "@/modules/promo/lib/promo-resolution";
 import type { PromoAcceptance } from "@/modules/promo/types";
 import type { Order } from "../../../payload-types";
-import { CartView } from "../../modules/cart";
+import type { CartView } from "../../modules/cart";
 import { createRelationshipUser } from "../access/createRelationshipUser";
 import { getPayloadInstance } from "./getPayload";
 

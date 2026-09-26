@@ -21,15 +21,20 @@ interface Props {
 }
 
 /**
- * Меню в навбаре: открывается ТОЛЬКО по клику (повторный клик закрывает),
- * закрывается кликом вне, Escape и переходом по пункту.
+ * Выпадающее меню в шапке (сейчас — меню профиля).
  *
- * Открытия по hover здесь намеренно нет. На тач-устройствах его нечем
- * воспроизвести, а браузер синтезирует из тапа mouseenter — меню открывалось
- * по нему и тут же закрывалось пришедшим следом onClick. На desktop была
- * обратная сторона той же проблемы: hover уже открыл меню, поэтому клик по
- * триггеру читался как «закрыть».
+ * Мышью открывается наведением — так же, как пункты навигации рядом (см.
+ * NavMenus): в шапке одна логика на все меню. Клик тоже работает и нужен
+ * пальцу и клавиатуре: переключает меню. Закрывается уходом курсора, кликом
+ * вне, Escape и переходом по пункту.
+ *
+ * Прежняя проблема наведения — тап синтезирует mouseenter, меню открывалось
+ * и тут же закрывалось пришедшим следом кликом — снята проверкой pointerType:
+ * касание пальцем событием наведения не считается.
  */
+const OPEN_DELAY_MS = 70;
+const CLOSE_DELAY_MS = 200;
+
 export default function DropdownMenu({
 	trigger,
 	items,
@@ -39,6 +44,23 @@ export default function DropdownMenu({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const menuId = useId();
+	const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const lastPointer = useRef<string>("");
+
+	const schedule = (open: boolean) => {
+		if (hoverTimer.current) clearTimeout(hoverTimer.current);
+		hoverTimer.current = setTimeout(
+			() => setIsOpen(open),
+			open ? OPEN_DELAY_MS : CLOSE_DELAY_MS,
+		);
+	};
+
+	useEffect(
+		() => () => {
+			if (hoverTimer.current) clearTimeout(hoverTimer.current);
+		},
+		[],
+	);
 
 	useEffect(() => {
 		// Глобальные обработчики нужны только пока меню открыто.
@@ -68,15 +90,37 @@ export default function DropdownMenu({
 	}, [isOpen]);
 
 	return (
-		<div ref={containerRef} className="relative">
+		<div
+			ref={containerRef}
+			className="relative"
+			onPointerEnter={(event) => {
+				if (event.pointerType === "mouse") schedule(true);
+			}}
+			onPointerLeave={(event) => {
+				if (event.pointerType === "mouse") schedule(false);
+			}}
+		>
 			<button
 				ref={triggerRef}
 				type="button"
-				onClick={() => setIsOpen((open) => !open)}
+				onPointerDown={(event) => {
+					lastPointer.current = event.pointerType;
+				}}
+				onClick={() => {
+					if (hoverTimer.current) clearTimeout(hoverTimer.current);
+					// Мышью меню к клику уже открыто наведением: клик его не
+					// закрывает, а подтверждает. Переключает — палец и клавиатура.
+					if (lastPointer.current === "mouse") {
+						lastPointer.current = "";
+						setIsOpen(true);
+						return;
+					}
+					setIsOpen((open) => !open);
+				}}
 				aria-haspopup="menu"
 				aria-expanded={isOpen}
 				aria-controls={isOpen ? menuId : undefined}
-				className="flex items-center gap-1.5 text-sm font-medium text-white hover:text-white/80 transition-colors"
+				className="flex items-center gap-1.5 text-sm font-medium text-[color:var(--text-primary)] hover:text-[color:var(--text-secondary)] transition-colors"
 			>
 				{trigger}
 				<ChevronDown
@@ -91,14 +135,14 @@ export default function DropdownMenu({
 					id={menuId}
 					role="menu"
 					aria-label={trigger}
-					className={`absolute top-full ${align === "right" ? "right-0" : "left-0"} mt-2 min-w-[200px] rounded-2xl bg-[#1f252e]/95 backdrop-blur-2xl border border-white/10 shadow-2xl py-2 z-50`}
+					className={`absolute top-full ${align === "right" ? "right-0" : "left-0"} mt-2 min-w-[200px] rounded-2xl bg-[var(--surface)]/95 backdrop-blur-2xl border border-[var(--text-primary)]/10 shadow-2xl py-2 z-50`}
 				>
 					{items.map((item) => (
 						<Link
 							key={item.href}
 							role="menuitem"
 							href={item.href}
-							className="block px-5 py-2.5 text-sm hover:bg-white/5 transition-colors"
+							className="block px-5 py-2.5 text-sm hover:bg-[var(--text-primary)]/5 transition-colors"
 							onClick={() => setIsOpen(false)}
 						>
 							{item.label}

@@ -60,8 +60,8 @@ export function NotificationBell({ initialUnreadCount }: NotificationBellProps) 
         aria-haspopup="true"
         aria-expanded={isOpen}
         className={cn(
-          "relative flex h-9 w-9 items-center justify-center rounded-xl text-white transition-colors hover:bg-white/10",
-          isOpen && "bg-white/10",
+          "relative flex h-9 w-9 items-center justify-center rounded-xl text-[color:var(--text-primary)] transition-colors hover:bg-[var(--text-primary)]/10",
+          isOpen && "bg-[var(--text-primary)]/10",
         )}
       >
         <Bell size={18} className={cn(isRinging && styles.bellRinging)} />

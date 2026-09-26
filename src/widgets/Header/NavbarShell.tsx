@@ -1,10 +1,12 @@
 import { Flex } from "@once-ui-system/core";
 import type { Category, Setting, User } from "@/payload-types"; // или твой тип пользователя
+import type { CatalogMenuData } from "./catalog-menu";
 import NavbarClientIsland from "./NavbarClientIsland";
 
 interface Props {
   user: User | null;
   categories: Category[];
+  catalogMenu: CatalogMenuData;
   settings: Setting | null;
   cartItemCount: number;
   cartProductIds: string[];
@@ -16,6 +18,7 @@ interface Props {
 export default function NavbarShell({
   user,
   categories,
+  catalogMenu,
   settings,
   cartItemCount,
   cartProductIds,
@@ -35,8 +38,9 @@ export default function NavbarShell({
         padding: "12px 24px",
         backdropFilter: "blur(18px)",
         WebkitBackdropFilter: "blur(18px)",
-        backgroundColor: "rgba(10, 12, 16, 0.75)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        backgroundColor: "var(--header-glass)",
+        borderBottom:
+          "1px solid color-mix(in srgb, var(--text-primary) 6%, transparent)",
         boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -49,6 +53,7 @@ export default function NavbarShell({
         <NavbarClientIsland
           user={user}
           categories={categories}
+          catalogMenu={catalogMenu}
           settings={settings}
           cartItemCount={cartItemCount}
           cartProductIds={cartProductIds}

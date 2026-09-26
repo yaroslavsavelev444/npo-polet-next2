@@ -128,7 +128,7 @@ export function BannerModal({
 					className={cn(
 						"relative flex w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border",
 						"border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)]",
-						"shadow-[0_24px_64px_rgba(0,0,0,0.5)]",
+						"shadow-[var(--shadow-xl)]",
 					)}
 					style={{ maxHeight: "min(90dvh, 44rem)" }}
 				>

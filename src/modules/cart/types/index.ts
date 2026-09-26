@@ -133,3 +133,68 @@ export type CartActionResult =
 export type CartMergeResult =
 	| { success: true; data: CartView; skipped: CartUnavailableItem[] }
 	| { success: false; error: CartActionErrorCode; message: string };
+
+/* ==========================================================================
+   Повтор заказа
+   ========================================================================== */
+
+/**
+ * Позиция заказа, попавшая в корзину при повторе (или уже лежавшая там).
+ *
+ * Несёт ВСЕ расхождения с исходным заказом, чтобы сводка могла их назвать:
+ * человек повторяет «тот же заказ», и любое отличие — цена, количество — без
+ * объяснения читается как ошибка.
+ */
+export interface RepeatOrderLine {
+	productId: string;
+	title: string;
+	/** Сколько было в заказе. */
+	orderedQuantity: number;
+	/** Сколько лежало в корзине до повтора. */
+	previousCartQuantity: number;
+	/** Сколько лежит в корзине теперь. */
+	cartQuantity: number;
+	/**
+	 * `added` — корзина изменилась; `already_in_cart` — нужное количество там
+	 * уже было (например, заказ повторили второй раз), и позиция не тронута.
+	 */
+	outcome: "added" | "already_in_cart";
+	/**
+	 * Количество из заказа пришлось поправить под текущие ограничения товара:
+	 * минимальную партию или предел на один заказ. `null` — не пришлось.
+	 */
+	quantityAdjustment: {
+		reason: "min_order" | "max_order";
+		limit: number;
+	} | null;
+	/**
+	 * Цена единицы (с товарной скидкой) в заказе и сейчас. `null` — не
+	 * изменилась. Скидка корзины сюда не входит: она зависит от всего состава
+	 * и пересчитывается корзиной.
+	 */
+	priceChange: { ordered: number; current: number } | null;
+}
+
+/** Позиция заказа, которую добавить нельзя. В корзину она НЕ кладётся. */
+export interface RepeatOrderSkippedLine {
+	productId: string | null;
+	title: string;
+	quantity: number;
+	statusLabel: string;
+}
+
+export interface RepeatOrderReport {
+	orderNumber: string;
+	lines: RepeatOrderLine[];
+	skipped: RepeatOrderSkippedLine[];
+}
+
+export type RepeatOrderErrorCode =
+	| "AUTH_REQUIRED"
+	| "NOT_FOUND"
+	| "NOT_REPEATABLE"
+	| "UNKNOWN";
+
+export type RepeatOrderResult =
+	| { success: true; data: CartView; report: RepeatOrderReport }
+	| { success: false; error: RepeatOrderErrorCode; message: string };

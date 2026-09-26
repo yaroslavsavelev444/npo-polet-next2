@@ -37,7 +37,7 @@ export const BurgerButton = forwardRef<HTMLButtonElement, Props>(
 				aria-controls={controls}
 				className={cn(
 					styles.button,
-					"flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition-colors hover:bg-white/10 lg:hidden",
+					"flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/5 text-[color:var(--text-primary)] transition-colors hover:bg-[var(--text-primary)]/10 lg:hidden",
 					className,
 				)}
 			>

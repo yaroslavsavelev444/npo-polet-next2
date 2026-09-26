@@ -11,7 +11,7 @@ function SkeletonRow() {
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
+            "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--text-primary) 8%, transparent) 50%, transparent 100%)",
           animation: "consent-skeleton-sweep 1.8s ease-in-out infinite",
         }}
       />
@@ -22,11 +22,11 @@ function SkeletonRow() {
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div
           className="h-4 w-2/5 rounded-md"
-          style={{ background: "rgba(0,0,0,0.08)" }}
+          style={{ background: "color-mix(in srgb, var(--text-primary) 8%, transparent)" }}
         />
         <div
           className="h-3.5 w-4/5 rounded-md"
-          style={{ background: "rgba(0,0,0,0.06)" }}
+          style={{ background: "color-mix(in srgb, var(--text-primary) 6%, transparent)" }}
         />
       </div>
     </div>

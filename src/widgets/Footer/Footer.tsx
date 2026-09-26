@@ -1,7 +1,13 @@
-import { ArrowUpRight, Mail, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
+import { cookies } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
+import {
+	parseSchemePreference,
+	SCHEME_COOKIE,
+} from "@/modules/color-scheme/lib/scheme";
 import { SOCIAL_PLATFORM_LABELS } from "@/modules/contact/content/contacts-content";
 import { telHref } from "@/modules/contact/lib/format";
 import { socialConfig } from "@/modules/contact/lib/social-config";
@@ -39,8 +45,8 @@ import {
  * Подвал — единственный блок, который посетитель видит на каждой странице
  * сайта, поэтому он обязан отвечать на четыре вопроса и ни на один больше:
  * чей это сайт, как связаться, куда ещё пойти, на каких условиях всё это
- * работает. Отсюда четыре зоны сверху вниз: знак с подписью, полка каналов
- * связи, колонки разделов, строка реквизитов.
+ * работает. Отсюда пять зон сверху вниз: знак с подписью, полка каналов
+ * связи, ряд соцсетей, колонки разделов, строка реквизитов.
  *
  * ЦЕЛЕВЫХ КНОПОК ЗДЕСЬ НЕТ НАМЕРЕННО. На главной подвал идёт сразу за
  * финальным призывом, у которого ровно те же два действия («Смотреть
@@ -68,11 +74,18 @@ export interface FooterProps {
 }
 
 export default async function Footer({ className }: FooterProps = {}) {
-	const [settings, consentsResult, categoriesResult] = await Promise.all([
-		getCachedSettings(),
-		getCachedConsents({ isActive: true, sort: "title" }),
-		getCachedCategories({ isActive: true, sort: "order" }),
-	]);
+	const [settings, consentsResult, categoriesResult, cookieStore] =
+		await Promise.all([
+			getCachedSettings(),
+			getCachedConsents({ isActive: true, sort: "title" }),
+			getCachedCategories({ isActive: true, sort: "order" }),
+			cookies(),
+		]);
+	// Выбор темы из cookie — чтобы переключатель в подвале пришёл с сервера
+	// уже в верном положении, а не перескакивал после гидратации.
+	const schemePreference = parseSchemePreference(
+		cookieStore.get(SCHEME_COOKIE)?.value,
+	);
 
 	const companyName = getCompanyName(settings) || "НПО «Полёт»";
 	const logoUrl = getLogoUrl(settings);
@@ -127,18 +140,6 @@ export default async function Footer({ className }: FooterProps = {}) {
 		{ title: "Компания", links: COMPANY_LINKS },
 		{ title: "Кабинет", links: ACCOUNT_LINKS },
 	];
-
-	if (socialLinks.length > 0) {
-		groups.push({
-			title: "Мы в сети",
-			links: socialLinks.map((link) => ({
-				label: link.title || SOCIAL_PLATFORM_LABELS[link.platform] || "Перейти",
-				href: link.url,
-				external: true,
-				platform: link.platform,
-			})),
-		});
-	}
 
 	// Ячейки полки каналов считаются заранее: число колонок уезжает в CSS
 	// переменной, потому что их бывает две или три, и repeat(auto-fit)
@@ -222,11 +223,46 @@ export default async function Footer({ className }: FooterProps = {}) {
 					</div>
 				) : null}
 
-				<nav
-					className={styles.nav}
-					aria-label="Разделы сайта"
-					style={{ "--nav-cols": groups.length } as CSSProperties}
-				>
+				{/* Соцсети — плитками со знаком площадки, без подписей: ряд
+				    из шести подписанных ссылок занял бы целую колонку ради
+				    того, что узнаётся по знаку. Название остаётся в
+				    aria-label и в title. Площадка без ссылки сюда не попадает
+				    (getSocialLinks), пустой ряд не выводится вовсе. */}
+				{socialLinks.length > 0 ? (
+					<div
+						className={cn(styles.socials, styles.item)}
+						style={{ "--i": order++ } as CSSProperties}
+					>
+						<h2 className={styles.groupTitle}>Мы в сети</h2>
+						<ul className={styles.socialList}>
+							{socialLinks.map((link) => {
+								const { icon: Icon, color } = socialConfig[link.platform];
+								const platformLabel = SOCIAL_PLATFORM_LABELS[link.platform];
+								const label = link.title
+									? `${platformLabel} — ${link.title}`
+									: platformLabel;
+
+								return (
+									<li key={link.url}>
+										<a
+											href={link.url}
+											target="_blank"
+											rel="noopener noreferrer"
+											aria-label={label}
+											title={label}
+											className={styles.social}
+											style={{ "--net-tint": color } as CSSProperties}
+										>
+											<Icon className={styles.socialIcon} aria-hidden="true" />
+										</a>
+									</li>
+								);
+							})}
+						</ul>
+					</div>
+				) : null}
+
+				<nav className={styles.nav} aria-label="Разделы сайта">
 					{groups.map((group) => (
 						<div
 							key={group.title}
@@ -241,11 +277,6 @@ export default async function Footer({ className }: FooterProps = {}) {
 									// над единственным пунктом.
 									const isAll =
 										link.href === "/category" && categories.length > 0;
-									const config = link.platform
-										? (socialConfig[link.platform] ?? socialConfig.other)
-										: undefined;
-									const Icon = config?.icon;
-
 									// Подпись обрезается на второй строке во ВСЕХ колонках, а не
 									// только у категорий: названия приходят из админки, и
 									// правило, работающее лишь для сегодняшних данных, — это
@@ -258,42 +289,13 @@ export default async function Footer({ className }: FooterProps = {}) {
 
 									return (
 										<li key={link.href} className={cn(isAll && styles.itemAll)}>
-											{link.external ? (
-												<a
-													href={link.href}
-													target="_blank"
-													rel="noopener noreferrer"
-													title={link.title}
-													className={styles.link}
-													style={
-														config
-															? ({
-																	"--net-tint": config.color,
-																} as CSSProperties)
-															: undefined
-													}
-												>
-													{Icon ? (
-														<Icon
-															className={styles.linkIcon}
-															aria-hidden="true"
-														/>
-													) : null}
-													{body}
-													<ArrowUpRight
-														className={styles.linkArrow}
-														aria-hidden="true"
-													/>
-												</a>
-											) : (
-												<Link
-													href={link.href}
-													title={link.title}
-													className={styles.link}
-												>
-													{body}
-												</Link>
-											)}
+											<Link
+												href={link.href}
+												title={link.title}
+												className={styles.link}
+											>
+												{body}
+											</Link>
 										</li>
 									);
 								})}
@@ -333,7 +335,10 @@ export default async function Footer({ className }: FooterProps = {}) {
 							))}
 						</ul>
 
-						<BackToTop />
+						<div className={styles.legalActions}>
+							<SchemeSwitch serverPreference={schemePreference} />
+							<BackToTop />
+						</div>
 					</div>
 				</div>
 			</FooterReveal>

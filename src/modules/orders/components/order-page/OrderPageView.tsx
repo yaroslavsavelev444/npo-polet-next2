@@ -154,7 +154,7 @@ export function OrderPageView({ order, breadcrumbs }: Props) {
 								paymentStatus={detail.payment.status}
 							/>
 
-							<OrderPageActions status={detail.status} />
+							<OrderPageActions orderId={detail.id} status={detail.status} />
 
 							<OrderCancelPanel
 								orderId={detail.id}

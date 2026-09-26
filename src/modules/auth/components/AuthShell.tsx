@@ -108,7 +108,7 @@ export function AuthShell({
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(90deg, var(--background) 0%, rgba(26,29,36,0) 10%)",
+              "linear-gradient(90deg, var(--background) 0%, transparent 10%)",
           }}
         />
       </div>

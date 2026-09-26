@@ -9,6 +9,8 @@
  * админке. Здесь только обвязка — заголовки, пояснения, подписи кнопок.
  */
 
+import type { SocialPlatform } from "../lib/social-config";
+
 export const hero = {
   /**
    * Заголовок разбит на строки вручную: PaluiSP2 — очень широкая унициальная
@@ -88,6 +90,45 @@ export const form = {
   errorFallback: "Не удалось отправить. Проверьте связь и попробуйте ещё раз.",
 } as const;
 
+/**
+ * Та же форма в роли заявки на 3D-печать (блок на главной). Отличается
+ * вопросом — «что напечатать» вместо свободного сообщения — и необязательным
+ * телефоном: материал, сроки и цену печати проще обсудить голосом.
+ */
+export const printForm = {
+  fields: {
+    name: form.fields.name,
+    email: form.fields.email,
+    phone: {
+      label: "Телефон — по желанию",
+      placeholder: "+7 900 000-00-00",
+      autoComplete: "tel",
+    },
+    message: {
+      label: "Что напечатать",
+      placeholder:
+        "Деталь или модель, размеры, количество, сроки. Ссылку на файл модели можно вставить сюда.",
+    },
+  },
+
+  consent: form.consent,
+
+  submit: {
+    idle: "Отправить заявку",
+    pending: "Отправляем",
+  },
+
+  note: "Свяжемся по телефону или почте, чтобы обсудить материал, сроки и стоимость.",
+
+  success: {
+    title: "Заявка отправлена",
+    body: "Свяжемся с вами, чтобы обсудить материал, сроки и стоимость печати. Обычно отвечаем в течение рабочего дня.",
+    again: "Отправить ещё одну",
+  },
+
+  errorFallback: form.errorFallback,
+} as const;
+
 export const details = {
   /**
    * Показывать ли карту рядом с реквизитами.
@@ -165,13 +206,13 @@ export const EMAIL_TYPE_LABELS: Record<string, string> = {
   other: "Почта",
 };
 
-export const SOCIAL_PLATFORM_LABELS: Record<string, string> = {
+export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   telegram: "Telegram",
-  whatsapp: "WhatsApp",
   vk: "ВКонтакте",
-  github: "GitHub",
-  max: "Макс",
-  other: "Ссылка",
+  max: "Max",
+  ok: "Одноклассники",
+  rutube: "Rutube",
+  dzen: "Дзен",
 };
 
 export const OTHER_CONTACT_TYPE_LABELS: Record<string, string> = {

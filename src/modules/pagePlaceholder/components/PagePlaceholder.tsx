@@ -43,10 +43,10 @@ export function PagePlaceholder({
       )}
     >
       <div className="mb-6">{displayIcon}</div>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+      <h1 className="text-2xl font-bold text-[color:var(--text-primary)]">
         {title}
       </h1>
-      <p className="mt-3 max-w-md text-base text-gray-600 dark:text-gray-400">
+      <p className="mt-3 max-w-md text-base text-[color:var(--text-secondary)]">
         {displayDescription}
       </p>
       {action && <PlaceholderActions action={action} />}

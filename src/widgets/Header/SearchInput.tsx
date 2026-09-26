@@ -64,12 +64,12 @@ export default function SearchInput({ expanded = false }: Props) {
     >
       <div
         className={cn(
-          'flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5',
+          'flex w-full items-center gap-3 rounded-2xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/5',
           'px-4 py-2.5 backdrop-blur-xl transition-all',
-          'focus-within:border-white/25 focus-within:bg-white/[0.07]',
+          'focus-within:border-[var(--text-primary)]/25 focus-within:bg-[var(--text-primary)]/[0.07]',
         )}
       >
-        <Search size={18} className="shrink-0 text-neutral-400" aria-hidden />
+        <Search size={18} className="shrink-0 text-[color:var(--text-muted)]" aria-hidden />
 
         <input
           ref={inputRef}
@@ -92,14 +92,14 @@ export default function SearchInput({ expanded = false }: Props) {
           onKeyDown={handleKeyDown}
           placeholder="Поиск товаров..."
           className={cn(
-            'min-w-0 flex-1 border-none bg-transparent text-sm text-white outline-none',
-            'placeholder:text-neutral-400',
+            'min-w-0 flex-1 border-none bg-transparent text-sm text-[color:var(--text-primary)] outline-none',
+            'placeholder:text-[color:var(--text-muted)]',
             '[&::-webkit-search-cancel-button]:appearance-none',
           )}
         />
 
         {showLoader && (
-          <Loader2 size={16} className="shrink-0 animate-spin text-neutral-400" aria-hidden />
+          <Loader2 size={16} className="shrink-0 animate-spin text-[color:var(--text-muted)]" aria-hidden />
         )}
 
         {!showLoader && query.length > 0 && (
@@ -107,7 +107,7 @@ export default function SearchInput({ expanded = false }: Props) {
             type="button"
             onClick={handleClear}
             aria-label="Очистить поиск"
-            className="shrink-0 text-neutral-400 transition-colors hover:text-white"
+            className="shrink-0 text-[color:var(--text-muted)] transition-colors hover:text-[color:var(--text-primary)]"
           >
             <X size={16} />
           </button>

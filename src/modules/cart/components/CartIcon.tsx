@@ -76,7 +76,7 @@ export function CartIcon({
 			}
 			aria-haspopup="dialog"
 			className={cn(
-				"relative flex h-9 w-9 items-center justify-center rounded-xl text-white transition-colors hover:bg-white/10",
+				"relative flex h-9 w-9 items-center justify-center rounded-xl text-[color:var(--text-primary)] transition-colors hover:bg-[var(--text-primary)]/10",
 				className,
 			)}
 		>

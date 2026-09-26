@@ -35,6 +35,7 @@ import { PromoCodes } from "./src/payload/collections/PromoCodes.ts";
 import { ProductReviews } from "./src/payload/collections/Reviews.ts"; // добавили (если экспортируется как ProductReviews)
 import { Sessions } from "./src/payload/collections/Sessions.ts"; // добавили
 import TransportCompanies from "./src/payload/collections/TransportCompanies.ts";
+import { TrustedDevices } from "./src/payload/collections/TrustedDevices.ts";
 import { Users } from "./src/payload/collections/User.ts";
 import { UserConsents } from "./src/payload/collections/UserConsents.ts"; // добавили
 import { Wishlists } from "./src/payload/collections/Wishlists.ts";
@@ -136,6 +137,10 @@ export default buildConfig({
 		OtpCodes, // добавили
 		ProductReviews, // добавили
 		Sessions, // добавили
+		// Доверенные устройства — спутник Sessions: там «где сейчас открыт
+		// аккаунт», здесь «какому браузеру разрешено входить без кода». Сроки
+		// жизни у них разные, поэтому и коллекции разные (см. шапку).
+		TrustedDevices,
 		UserConsents, // добавили
 		AccountDeletionRequests,
 		CheckoutPreferences,

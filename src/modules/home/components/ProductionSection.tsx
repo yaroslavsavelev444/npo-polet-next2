@@ -102,7 +102,7 @@ export function ProductionSection() {
 						    страницы, и без него кадр «выпрыгивает» из тёмной
 						    секции белым пятном. */}
 						<div
-							className="absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_50%,transparent_40%,rgba(13,16,21,0.55)_100%)]"
+							className="absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_50%,transparent_40%,color-mix(in_srgb,var(--void-deep)_55%,transparent)_100%)]"
 							aria-hidden="true"
 						/>
 					</ParallaxFrame>

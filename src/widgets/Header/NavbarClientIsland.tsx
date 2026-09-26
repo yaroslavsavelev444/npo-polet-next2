@@ -2,12 +2,15 @@
 
 import { Flex } from "@once-ui-system/core";
 import { useEffect, useRef, useState } from "react";
+import { AuthOverlayHost } from "@/modules/auth/components/AuthOverlayHost";
 import { CartIcon } from "@/modules/cart/components/CartIcon";
 import { CartProvider } from "@/modules/cart/components/CartProvider";
+import { ThemeToggle } from "@/modules/color-scheme/components/ThemeToggle";
 import { NotificationBell } from "@/modules/notifications";
 import { WishlistIcon } from "@/modules/wishlist";
 import type { Category, Setting, User } from "@/payload-types";
 import { BurgerButton } from "./BurgerButton";
+import type { CatalogMenuData } from "./catalog-menu";
 import Logo from "./Logo";
 import MobileMenu from "./MobileMenu";
 import NavMenus from "./NavMenus";
@@ -17,6 +20,8 @@ import UserMenu from "./UserMenu";
 interface Props {
 	user: User | null;
 	categories: Category[];
+	/** Разделы с превью товаров для меню каталога на desktop. */
+	catalogMenu: CatalogMenuData;
 	settings: Setting | null;
 	cartItemCount: number;
 	cartProductIds: string[];
@@ -31,6 +36,7 @@ const MOBILE_MENU_ID = "mobile-nav-panel";
 export default function NavbarClientIsland({
 	user,
 	categories,
+	catalogMenu,
 	settings,
 	cartItemCount,
 	cartProductIds,
@@ -79,7 +85,12 @@ export default function NavbarClientIsland({
 				<Flex vertical="center" gap="12" className="flex-shrink-0">
 					{/* Desktop Nav */}
 					<div className="hidden lg:flex items-center gap-8">
-						<NavMenus categories={categories} />
+						<NavMenus catalogMenu={catalogMenu} />
+					</div>
+					{/* Тема — на desktop рядом со значками. Ниже lg её место в
+					    бургер-меню, где есть и возврат к «как в системе». */}
+					<div className="hidden lg:flex">
+						<ThemeToggle />
 					</div>
 					{user && <WishlistIcon initialProductIds={wishlistProductIds} />}
 					{/* Корзина на desktop остаётся ровно там, где была. На мобильных
@@ -122,6 +133,13 @@ export default function NavbarClientIsland({
 					/>
 				</Flex>
 			</Flex>
+
+			{/* Окно входа поверх текущей страницы. Стоит рядом с CartProvider и
+			    по той же причине: шапка есть на каждой странице витрины, а
+			    открывать окно нужно откуда угодно — из панели корзины, с
+			    оформления, с карточки товара. Пока оно закрыто, в дереве нет
+			    ничего, кроме подписки на флаг (см. AuthOverlayHost). */}
+			<AuthOverlayHost />
 
 			<CartProvider
 				userId={user ? String(user.id) : null}

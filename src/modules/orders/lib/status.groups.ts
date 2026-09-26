@@ -83,3 +83,15 @@ export function isOrderCancellable(status: OrderStatus): boolean {
 		status !== "cancelled" && status !== "refunded" && status !== "delivered"
 	);
 }
+
+/**
+ * Можно ли повторить заказ. Только закрытые: полученный (купить то же ещё
+ * раз) и отменённый или возвращённый (оформить заново). Заказ в работе
+ * повторять рано — он ещё может измениться, а кнопка рядом с ним читалась бы
+ * как «оформить дубль», а не как «купить снова».
+ */
+export function isOrderRepeatable(status: OrderStatus): boolean {
+	return (
+		status === "delivered" || status === "cancelled" || status === "refunded"
+	);
+}

@@ -38,7 +38,16 @@ const BREADCRUMBS = [
  */
 export default async function CheckoutPage() {
 	const user = await getCurrentUser();
-	if (!user) redirect("/auth/login?from=/checkout");
+	// Гостя разворачиваем в корзину с меткой, по которой она сама откроет окно
+	// входа поверх себя (см. CartPageClient), а НЕ на /auth/login: страница
+	// входа уводила из пути покупки и оставляла человека один на один с
+	// формой, после которой он ещё должен был найти дорогу обратно.
+	//
+	// Именно корзина, а не эта страница: форму оформления нечем наполнить,
+	// пока неизвестно, кто её заполняет (buildCheckoutView принимает id
+	// покупателя), а корзина видна и гостю. Ближайшее место, где ожидание
+	// осмысленно, — она.
+	if (!user) redirect("/cart?auth=1");
 
 	const checkoutView = await buildCheckoutView(String(user.id));
 

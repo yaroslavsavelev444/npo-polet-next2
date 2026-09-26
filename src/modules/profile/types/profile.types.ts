@@ -20,6 +20,25 @@ export interface ProfileSession {
 	isCurrent: boolean;
 }
 
+/**
+ * Доверенное устройство в кабинете.
+ *
+ * Отдельный тип от ProfileSession, потому что это разные сущности с разным
+ * сроком жизни: сессия — «где аккаунт открыт прямо сейчас», доверие — «какому
+ * браузеру разрешено входить без кода». Разбор — в шапке коллекции
+ * TrustedDevices.
+ */
+export interface ProfileTrustedDevice {
+	/** Открытый идентификатор из cookie — им же устройство и отзывается. */
+	deviceId: string;
+	deviceLabel: string;
+	lastIp?: string;
+	lastUsedAt: string;
+	expiresAt: string;
+	/** Доверие выдано тому браузеру, из которого открыта эта страница. */
+	isCurrent: boolean;
+}
+
 export interface ProfileConsent {
 	id: string;
 	consentSlug: string;

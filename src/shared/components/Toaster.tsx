@@ -15,7 +15,7 @@ export function AppToaster() {
       toastOptions={{
         classNames: {
           toast:
-            'rounded-xl border border-white/10 shadow-2xl',
+            'rounded-xl border border-[var(--text-primary)]/10 shadow-2xl',
           title:
             'font-semibold',
           description:

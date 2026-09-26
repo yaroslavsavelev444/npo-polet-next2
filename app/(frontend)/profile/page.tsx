@@ -5,18 +5,23 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getUserActiveSessions } from "@/modules/auth/lib/session";
+import { readTrustedDeviceCookie } from "@/modules/auth/lib/trustedDevice";
+import { getUserTrustedDevices } from "@/modules/auth/lib/trustedDevice.db";
 import { isUser } from "@/modules/auth/lib/typeGuards";
 import {
 	changePasswordAction,
 	logoutAction,
 	refreshSessionsAction,
+	revokeAllTrustedDevicesAction,
 	revokeSessionAction,
+	revokeTrustedDeviceAction,
 	updateAccountAction,
 } from "@/modules/profile/actions";
 import { ProfileClient } from "@/modules/profile/components/ProfileClient";
 import type {
 	ProfileSession,
 	ProfileTab,
+	ProfileTrustedDevice,
 	ProfileUser,
 } from "@/modules/profile/types/profile.types";
 import { getPayloadInstance } from "@/payload/services/getPayload";
@@ -73,7 +78,14 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 	const initialTab = parseTab((await searchParams).tab);
 	const currentSessionId = cookieStore.get("session-id")?.value;
 
-	const rawSessions = await getUserActiveSessions(payload, String(user.id));
+	// Сессии, доверенные устройства и cookie текущего браузера читаются
+	// одновременно: три независимых чтения, и последовательное ожидание
+	// добавило бы к первому экрану кабинета два лишних обхода базы.
+	const [rawSessions, rawTrustedDevices, trustedCookie] = await Promise.all([
+		getUserActiveSessions(payload, String(user.id)),
+		getUserTrustedDevices(payload, String(user.id)),
+		readTrustedDeviceCookie(),
+	]);
 	const sessions: ProfileSession[] = rawSessions.map((s) => ({
 		id: String(s.id),
 		deviceLabel: (s.deviceLabel ?? "Устройство") as string,
@@ -82,6 +94,20 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 		lastActiveAt: s.lastActiveAt as string,
 		isCurrent: String(s.id) === currentSessionId,
 	}));
+
+	const trustedDevices: ProfileTrustedDevice[] = rawTrustedDevices.map(
+		(device) => ({
+			deviceId: device.deviceId,
+			deviceLabel: device.deviceLabel ?? "Устройство",
+			lastIp: device.lastIp ?? undefined,
+			lastUsedAt: device.lastUsedAt,
+			expiresAt: device.expiresAt,
+			// «Это устройство» определяется по cookie, а не по совпадению
+			// User-Agent: у одного человека бывает два одинаковых браузера на
+			// разных машинах, и различает их только сама cookie.
+			isCurrent: trustedCookie?.deviceId === device.deviceId,
+		}),
+	);
 
 	const profileUser: ProfileUser = {
 		id: String(user.id),
@@ -106,12 +132,15 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 			<ProfileClient
 				user={profileUser}
 				sessions={sessions}
+				trustedDevices={trustedDevices}
 				initialTab={initialTab}
 				actions={{
 					updateAccount: updateAccountAction,
 					changePassword: changePasswordAction,
 					revokeSession: revokeSessionAction,
 					refreshSessions: refreshSessionsAction,
+					revokeTrustedDevice: revokeTrustedDeviceAction,
+					revokeAllTrustedDevices: revokeAllTrustedDevicesAction,
 					logout: logoutAction,
 				}}
 			/>

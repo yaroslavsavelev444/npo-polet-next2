@@ -14,8 +14,16 @@ import { z } from "zod";
  */
 export const CONTACT_REQUEST_LIMITS = {
 	name: { min: 2, max: 80 },
+	phone: { max: 32 },
 	message: { min: 10, max: 4000 },
 } as const;
+
+/**
+ * Тема обращения — откуда оно пришло: форма на странице контактов или заявка
+ * на 3D-печать с главной. Те же значения — у поля `topic` коллекции.
+ */
+export const CONTACT_TOPICS = ["general", "print3d"] as const;
+export type ContactTopic = (typeof CONTACT_TOPICS)[number];
 
 /**
  * Slug соглашения на обработку персональных данных. Страница существует и
@@ -43,6 +51,24 @@ export const contactRequestSchema = z.object({
 		.trim()
 		.min(1, "Укажите email — на него придёт ответ")
 		.email("Похоже на опечатку в адресе"),
+
+	topic: z.enum(CONTACT_TOPICS),
+
+	/**
+	 * Телефон — по желанию (спрашивает только заявка на 3D-печать). Пустая
+	 * строка допустима; непустая должна быть похожа на номер: 10–15 цифр,
+	 * пробелы, скобки и дефисы не в счёт — то же правило, что у телефонов в
+	 * «Настройках сайта».
+	 */
+	phone: z
+		.string()
+		.trim()
+		.max(CONTACT_REQUEST_LIMITS.phone.max, "Слишком длинный номер")
+		.refine(
+			(value) =>
+				value === "" || /^\+?\d{10,15}$/.test(value.replace(/[\s\-()]/g, "")),
+			"Похоже на опечатку в номере",
+		),
 
 	message: z
 		.string()

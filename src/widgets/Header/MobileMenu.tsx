@@ -7,8 +7,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RemoveScroll } from "react-remove-scroll";
 import { logoutAction } from "@/modules/auth/actions/logout";
-import type { Category, Setting, User } from "@/payload-types";
 import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
+import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
+import type { Category, Setting, User } from "@/payload-types";
 import { useCartStore } from "@/shared/store/cart.store";
 import { getPrimaryEmail, getPrimaryPhone } from "@/utils/settings-helpers";
 import styles from "./MobileMenu.module.css";
@@ -342,6 +343,16 @@ export default function MobileMenu({
 							</div>
 						)}
 					</div>
+
+					<section
+						className={`${styles.section} ${styles.reveal}`}
+						style={{ "--i": order++ } as React.CSSProperties}
+					>
+						<h2 className={styles.sectionLabel} id={`${panelId}-scheme`}>
+							Тема оформления
+						</h2>
+						<SchemeSwitch fill labelledBy={`${panelId}-scheme`} />
+					</section>
 
 					<p
 						className={`${styles.strap} ${styles.reveal}`}

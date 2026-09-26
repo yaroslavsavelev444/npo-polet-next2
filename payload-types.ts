@@ -97,6 +97,7 @@ export interface Config {
     'otp-codes': OtpCode;
     'product-reviews': ProductReview;
     sessions: Session;
+    'trusted-devices': TrustedDevice;
     'user-consents': UserConsent;
     'account-deletion-requests': AccountDeletionRequest;
     'checkout-preferences': CheckoutPreference;
@@ -136,6 +137,7 @@ export interface Config {
     'otp-codes': OtpCodesSelect<false> | OtpCodesSelect<true>;
     'product-reviews': ProductReviewsSelect<false> | ProductReviewsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
+    'trusted-devices': TrustedDevicesSelect<false> | TrustedDevicesSelect<true>;
     'user-consents': UserConsentsSelect<false> | UserConsentsSelect<true>;
     'account-deletion-requests': AccountDeletionRequestsSelect<false> | AccountDeletionRequestsSelect<true>;
     'checkout-preferences': CheckoutPreferencesSelect<false> | CheckoutPreferencesSelect<true>;
@@ -889,15 +891,17 @@ export interface Feedback {
   createdAt: string;
 }
 /**
- * Сообщения, отправленные через форму на странице «Контакты»
+ * Сообщения со страницы «Контакты» и заявки на 3D-печать с главной
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "contact-requests".
  */
 export interface ContactRequest {
   id: number;
+  topic: 'general' | 'print3d';
   name: string;
   email: string;
+  phone?: string | null;
   message: string;
   status?: ('new' | 'in_progress' | 'done') | null;
   /**
@@ -1662,6 +1666,35 @@ export interface Session {
   updatedAt: string;
 }
 /**
+ * Браузеры, которым разрешён вход без одноразового кода. Отзыв здесь вернёт запрос кода при следующем входе.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trusted-devices".
+ */
+export interface TrustedDevice {
+  id: number;
+  user: number | User;
+  session?: (number | null) | Session;
+  deviceId: string;
+  tokenHash: string;
+  previousTokenHash?: string | null;
+  rotatedAt?: string | null;
+  deviceLabel?: string | null;
+  userAgent?: string | null;
+  fingerprint: string;
+  /**
+   * Сеть, из которой устройству разрешён вход без кода
+   */
+  ipPrefix?: string | null;
+  lastIp?: string | null;
+  lastUsedAt: string;
+  expiresAt: string;
+  revoked?: boolean | null;
+  revokedReason?: ('user' | 'password_changed' | 'logout_all' | 'reuse' | 'admin') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Журнал принятых пользователями соглашений
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1901,6 +1934,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'sessions';
         value: number | Session;
+      } | null)
+    | ({
+        relationTo: 'trusted-devices';
+        value: number | TrustedDevice;
       } | null)
     | ({
         relationTo: 'user-consents';
@@ -2408,8 +2445,10 @@ export interface FeedbacksSelect<T extends boolean = true> {
  * via the `definition` "contact-requests_select".
  */
 export interface ContactRequestsSelect<T extends boolean = true> {
+  topic?: T;
   name?: T;
   email?: T;
+  phone?: T;
   message?: T;
   status?: T;
   consentAcceptedAt?: T;
@@ -2953,6 +2992,29 @@ export interface SessionsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trusted-devices_select".
+ */
+export interface TrustedDevicesSelect<T extends boolean = true> {
+  user?: T;
+  session?: T;
+  deviceId?: T;
+  tokenHash?: T;
+  previousTokenHash?: T;
+  rotatedAt?: T;
+  deviceLabel?: T;
+  userAgent?: T;
+  fingerprint?: T;
+  ipPrefix?: T;
+  lastIp?: T;
+  lastUsedAt?: T;
+  expiresAt?: T;
+  revoked?: T;
+  revokedReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "user-consents_select".
  */
 export interface UserConsentsSelect<T extends boolean = true> {
@@ -3104,9 +3166,12 @@ export interface Setting {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Показываются в подвале сайта и на странице контактов. Площадка без ссылки не выводится.
+   */
   socialLinks?:
     | {
-        platform: 'telegram' | 'whatsapp' | 'vk' | 'github' | 'max' | 'other';
+        platform: 'telegram' | 'vk' | 'max' | 'ok' | 'rutube' | 'dzen';
         url: string;
         title?: string | null;
         sortOrder?: number | null;
@@ -3126,6 +3191,12 @@ export interface Setting {
   restrictions?: {
     disableRegistration?: boolean | null;
     disableOrdering?: boolean | null;
+  };
+  printService?: {
+    /**
+     * Сообщает, что есть свободные 3D-принтеры, и принимает заявки. Заявки приходят в «Поддержка → Обращения» с темой «3D-печать» и письмом администраторам.
+     */
+    enabled?: boolean | null;
   };
   heroBackground?: {
     type?: ('none' | 'image' | 'video') | null;
@@ -3240,6 +3311,11 @@ export interface SettingsSelect<T extends boolean = true> {
     | {
         disableRegistration?: T;
         disableOrdering?: T;
+      };
+  printService?:
+    | T
+    | {
+        enabled?: T;
       };
   heroBackground?:
     | T

@@ -4,14 +4,22 @@ import { AlertCircle, MonitorSmartphone, RefreshCw } from "lucide-react";
 import { useState, useTransition } from "react";
 import catalog from "@/modules/productCatalog/components/Catalog.module.css";
 import { plural, pluralSessions } from "../lib/format";
-import type { ProfileSession } from "../types/profile.types";
+import type {
+	ProfileSession,
+	ProfileTrustedDevice,
+} from "../types/profile.types";
 import styles from "./Profile.module.css";
 import { SessionRow } from "./SessionRow";
+import { TrustedDevicesSection } from "./TrustedDevicesSection";
 
 interface SessionsTabProps {
 	sessions: ProfileSession[];
+	/** Браузеры, которым разрешён вход без кода. См. TrustedDevicesSection. */
+	trustedDevices: ProfileTrustedDevice[];
 	onRevoke: (sessionId: string) => Promise<void>;
 	onRefresh: () => Promise<void>;
+	onRevokeTrustedDevice: (deviceId: string) => Promise<void>;
+	onRevokeAllTrustedDevices: () => Promise<void>;
 }
 
 /**
@@ -44,8 +52,11 @@ interface SessionsTabProps {
  */
 export function SessionsTab({
 	sessions,
+	trustedDevices,
 	onRevoke,
 	onRefresh,
+	onRevokeTrustedDevice,
+	onRevokeAllTrustedDevices,
 }: SessionsTabProps) {
 	const [revokingId, setRevokingId] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -89,6 +100,17 @@ export function SessionsTab({
 
 	return (
 		<div className="flex flex-col">
+			{/* Доверенные устройства идут первыми: список активных сессий
+			    говорит, где аккаунт открыт СЕЙЧАС, а этот — откуда в него смогут
+			    войти, зная один пароль. Второе важнее, потому что чужая сессия
+			    истечёт через неделю сама, а чужое доверенное устройство будет
+			    пускать девяносто дней. */}
+			<TrustedDevicesSection
+				devices={trustedDevices}
+				onRevoke={onRevokeTrustedDevice}
+				onRevokeAll={onRevokeAllTrustedDevices}
+			/>
+
 			<section className={styles.section}>
 				<div className={styles.sectionAside}>
 					<h2 className={styles.sectionTitle}>Активные устройства</h2>

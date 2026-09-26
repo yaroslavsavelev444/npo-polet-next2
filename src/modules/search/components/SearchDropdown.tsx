@@ -43,14 +43,14 @@ export function SearchDropdown({ id, onSelect }: SearchDropdownProps) {
 			onMouseDown={(e) => e.preventDefault()}
 			className="
         absolute left-0 right-0 top-[calc(100%+8px)] z-50
-        overflow-hidden rounded-2xl border border-white/10
-        bg-[#1f252e]/95 shadow-2xl backdrop-blur-2xl
+        overflow-hidden rounded-2xl border border-[var(--text-primary)]/10
+        bg-[var(--surface)]/95 shadow-2xl backdrop-blur-2xl
         animate-[dropdown-in_150ms_ease-out]
       "
 		>
 			<div className="max-h-[70vh] overflow-y-auto p-2">
 				{isBelowMinLength && (
-					<p className="px-3 py-6 text-center text-sm text-white/50">
+					<p className="px-3 py-6 text-center text-sm text-[color:var(--text-primary)]/50">
 						Введите ещё {SEARCH_MIN_QUERY_LENGTH - query.length}{" "}
 						{SEARCH_MIN_QUERY_LENGTH - query.length === 1
 							? "символ"
@@ -86,7 +86,7 @@ export function SearchDropdown({ id, onSelect }: SearchDropdownProps) {
 						<button
 							type="button"
 							onClick={retry}
-							className="rounded-full border border-white/15 px-4 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/5"
+							className="rounded-full border border-[var(--text-primary)]/15 px-4 py-1.5 text-xs font-medium text-[color:var(--text-primary)]/80 transition-colors hover:bg-[var(--text-primary)]/5"
 						>
 							Повторить попытку
 						</button>

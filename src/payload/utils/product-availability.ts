@@ -78,3 +78,24 @@ export function isProductOrderable(
 ): boolean {
 	return getProductUnavailableReason(product) === null;
 }
+
+/**
+ * Подпись причины для покупателя. Формулировки намеренно разные: «нет в
+ * наличии» и «снят с продажи» означают для него разное (первое можно
+ * подождать, второе — нет). Живёт рядом с самой проверкой, чтобы корзина и
+ * повтор заказа не заводили каждая свою таблицу соответствий.
+ */
+export function getProductUnavailableLabel(
+	product: ProductAvailabilityInput,
+	reason: ProductUnavailableReason,
+): string {
+	const status = product.inventory?.status ?? "available";
+	if (reason === "status" && status === "out_of_stock") return "Нет в наличии";
+	if (reason === "status" && status === "discontinued") {
+		return "Снят с производства";
+	}
+	return "Снят с продажи";
+}
+
+/** Подпись для позиции, товара которой в базе больше нет. */
+export const PRODUCT_GONE_LABEL = "Товара больше нет в каталоге";

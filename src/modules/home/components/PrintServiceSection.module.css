@@ -1,0 +1,308 @@
+/* ===========================================================================
+   3D-печать на заказ
+   ===========================================================================
+   Вклейка, а не секция первого ряда: фон страницы (светлее соседних плит),
+   отступы вдвое меньше, чем у разделов главной, заголовок — основной
+   гарнитурой. Всё остальное — из общего языка: разлиновка сверху (Section),
+   моноширинные подписи, --rule между строками, движение на --ease-out-expo. */
+
+.inner {
+	padding-block: clamp(2.75rem, 5.5vw, 4.25rem);
+}
+
+.band {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+@media (min-width: 48rem) {
+	.band {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		gap: 2.5rem;
+	}
+}
+
+.lead {
+	display: flex;
+	align-items: flex-start;
+	gap: 1.25rem;
+	min-width: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Знак: сопло над слоями
+   --------------------------------------------------------------------------- */
+
+.glyph {
+	display: grid;
+	flex: 0 0 auto;
+	place-items: center;
+	width: 3.25rem;
+	height: 3.25rem;
+	border: 1px solid var(--rule);
+	border-radius: var(--radius-sm);
+	color: var(--text-muted);
+}
+
+.glyph svg {
+	width: 1.75rem;
+	height: 1.75rem;
+}
+
+.nozzle,
+.layer,
+.layerActive {
+	stroke-width: 1.6;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.nozzle,
+.layer {
+	stroke: currentColor;
+}
+
+/* Верхний слой — единственная деталь цвета бренда. Прочерчивается слева
+   направо, когда блок появляется в кадре: один раз, без повторов — печать
+   идёт, а не мигает. */
+.layerActive {
+	stroke: var(--primary);
+	stroke-dasharray: 14;
+	stroke-dashoffset: 14;
+	transition: stroke-dashoffset 1400ms var(--ease-out-expo) 350ms;
+}
+
+[data-revealed="true"] .layerActive {
+	stroke-dashoffset: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Текст
+   --------------------------------------------------------------------------- */
+
+.text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.action {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.875rem;
+}
+
+@media (min-width: 48rem) {
+	.action {
+		flex: 0 0 auto;
+		align-items: flex-end;
+	}
+}
+
+.status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.12em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+/* Статус «свободно» — зелёная точка без пульсации: бесконечная анимация ради
+   побочной услуги перетягивала бы внимание со всей страницы. */
+.statusDot {
+	width: 0.4375rem;
+	height: 0.4375rem;
+	flex: 0 0 auto;
+	border-radius: 999px;
+	background: var(--success);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.title {
+	margin: 0;
+	font-size: clamp(1.25rem, 1.05rem + 0.8vw, 1.625rem);
+	font-weight: 600;
+	line-height: 1.2;
+	letter-spacing: -0.02em;
+	color: var(--text-primary);
+}
+
+.body {
+	max-width: 58ch;
+	margin: 0;
+	font-size: 0.9375rem;
+	line-height: 1.6;
+	color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Кнопка
+   --------------------------------------------------------------------------- */
+
+/* Контурная, как второстепенные кнопки главной: оранжевая заливка здесь
+   поспорила бы с «Смотреть продукцию» финального призыва прямо над блоком. */
+.toggle {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	min-height: 3rem;
+	padding: 0 1.5rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	font-family: inherit;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		border-color var(--dur-fast) var(--ease-out-quart),
+		background-color var(--dur-fast) var(--ease-out-quart),
+		transform 100ms var(--ease-out-quart);
+}
+
+.toggle:hover {
+	border-color: var(--border-light);
+	background: var(--surface);
+}
+
+.toggle:active {
+	transform: scale(0.98);
+}
+
+.toggleIcon {
+	width: 1rem;
+	height: 1rem;
+	transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.toggle[aria-expanded="true"] .toggleIcon {
+	transform: rotate(180deg);
+}
+
+/* ---------------------------------------------------------------------------
+   Раскрывающаяся форма
+   ---------------------------------------------------------------------------
+   Высота — через grid-template-rows 0fr → 1fr: содержимое меряет себя само,
+   и анимация доходит ровно до его высоты без замеров в JavaScript. Закрытие
+   короче открытия. visibility переключается в конце закрытия — свёрнутая
+   форма не должна ловить Tab (для этого же inert на регионе). */
+.region {
+	display: grid;
+	grid-template-rows: 0fr;
+	visibility: hidden;
+	transition:
+		grid-template-rows 320ms cubic-bezier(0.4, 0, 0.2, 1),
+		visibility 0s linear 320ms;
+}
+
+.region[data-open="true"] {
+	grid-template-rows: 1fr;
+	visibility: visible;
+	transition:
+		grid-template-rows 560ms var(--ease-out-expo),
+		visibility 0s;
+}
+
+.regionClip {
+	min-height: 0;
+	overflow: hidden;
+}
+
+.regionInner {
+	display: grid;
+	gap: 2rem;
+	margin-top: clamp(1.75rem, 3.5vw, 2.5rem);
+	padding-top: clamp(1.75rem, 3.5vw, 2.5rem);
+	border-top: 1px solid var(--rule);
+	opacity: 0;
+	transform: translate3d(0, -0.5rem, 0);
+	filter: blur(4px);
+	transition:
+		opacity 160ms var(--ease-out-quart),
+		transform 160ms var(--ease-out-quart),
+		filter 160ms var(--ease-out-quart);
+}
+
+.region[data-open="true"] .regionInner {
+	opacity: 1;
+	transform: none;
+	filter: blur(0);
+	transition:
+		opacity 360ms var(--ease-out-quart) 120ms,
+		transform 560ms var(--ease-out-expo) 80ms,
+		filter 360ms var(--ease-out-quart) 120ms;
+}
+
+@media (min-width: 64rem) {
+	.regionInner {
+		grid-template-columns: 16rem minmax(0, 40rem);
+		gap: clamp(2.5rem, 6vw, 5rem);
+	}
+}
+
+/* Подсказка «что указать» — моноширинные строки через разлиновку, тот же
+   приём, что у списков характеристик. */
+.checklistTitle {
+	margin: 0 0 0.75rem;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.checklistList {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-top: 1px solid var(--rule);
+}
+
+.checklistList li {
+	padding: 0.75rem 0;
+	border-bottom: 1px solid var(--hairline);
+	font-size: 0.9375rem;
+	color: var(--text-secondary);
+}
+
+.form {
+	min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.region,
+	.region[data-open="true"] {
+		transition: visibility 0s;
+	}
+
+	.regionInner,
+	.region[data-open="true"] .regionInner {
+		transform: none;
+		filter: none;
+		transition: opacity 160ms linear;
+	}
+
+	.layerActive {
+		transition: none;
+		stroke-dashoffset: 0;
+	}
+
+	.toggleIcon {
+		transition: none;
+	}
+}
