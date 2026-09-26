@@ -1,4 +1,4 @@
-// app/(frontend)/robots.ts
+// app/robots.ts
 import type { MetadataRoute } from "next";
 import { baseURL } from "@/resources/content";
 
@@ -7,7 +7,16 @@ export default function robots(): MetadataRoute.Robots {
 		rules: [
 			{
 				userAgent: "*",
-				allow: "/",
+				// Файлы медиатеки Payload отдаются из-под /api (/api/media/file/…),
+				// поэтому общий запрет /api/ закрывал от роботов ВСЕ изображения
+				// товаров: og:image, image в JSON-LD Product и логотип Organization.
+				// Google требует, чтобы картинка из Product была доступна для
+				// сканирования, иначе товар не получает расширенный сниппет, а сами
+				// изображения не попадают в поиск по картинкам. Разрешение длиннее
+				// запрета, поэтому и Google, и Яндекс (оба выбирают самое длинное
+				// совпавшее правило) применяют его, а остальной /api/ остаётся
+				// закрытым.
+				allow: ["/", "/api/media/file/"],
 				disallow: [
 					"/admin",
 					"/admin/*",
@@ -29,6 +38,8 @@ export default function robots(): MetadataRoute.Robots {
 			},
 		],
 		sitemap: `${baseURL}/sitemap.xml`,
+		// Host понимает только Яндекс (Google пропускает неизвестные поля) —
+		// оставлен ради существующей настройки в Вебмастере.
 		host: baseURL,
 	};
 }

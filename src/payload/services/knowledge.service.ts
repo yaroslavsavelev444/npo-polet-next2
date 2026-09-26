@@ -663,11 +663,33 @@ async function fetchSitemapEntries(): Promise<KnowledgeSitemapEntry[]> {
 		];
 	});
 
+	// Раздел попадает в sitemap, только если в нём есть опубликованный материал:
+	// пустой раздел — это страница «материалов пока нет», которую Google
+	// считает soft 404 (сама страница в этом случае отдаёт noindex). Дата
+	// раздела — самая поздняя из его собственной и его материалов: новая статья
+	// меняет и содержимое страницы раздела.
+	const latestTopicByCategory = new Map<number, string>();
+	for (const doc of result.docs as Array<Partial<KnowledgeTopic>>) {
+		const categoryId = relationId(doc.category);
+		if (categoryId === null || !doc.slug || !doc.updatedAt) continue;
+		const current = latestTopicByCategory.get(categoryId);
+		if (!current || doc.updatedAt > current) {
+			latestTopicByCategory.set(categoryId, doc.updatedAt);
+		}
+	}
+
 	return [
-		...categories.map((category) => ({
-			path: `/knowledge/${category.slug}`,
-			updatedAt: category.updatedAt,
-		})),
+		...categories.flatMap((category) => {
+			const latestTopic = latestTopicByCategory.get(category.id);
+			if (!latestTopic) return [];
+			return [
+				{
+					path: `/knowledge/${category.slug}`,
+					updatedAt:
+						latestTopic > category.updatedAt ? latestTopic : category.updatedAt,
+				},
+			];
+		}),
 		...topics,
 	];
 }

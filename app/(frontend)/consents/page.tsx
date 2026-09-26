@@ -8,14 +8,25 @@ import { ConsentsList } from "@/modules/consents";
 import { baseURL } from "@/resources/content";
 
 export async function generateMetadata() {
-  return Meta.generate({
+  // Картинки превью у раздела нет: прежний /og/consents.jpg в проекте не
+  // существует (404), а без image Meta.generate подставляет /api/og/generate —
+  // такого маршрута тоже нет. Поэтому images из его результата убираем.
+  // Canonical Meta.generate проставляет только вместе с hreflang-альтернативами,
+  // поэтому задаётся здесь явно — как на остальных публичных страницах.
+  const { openGraph, twitter, ...meta } = Meta.generate({
     title: "Соглашения",
     description:
       "Пользовательские соглашения и документы о согласии на обработку данных.",
     baseURL,
     path: "/consents",
-    image: "/og/consents.jpg",
   });
+
+  return {
+    ...meta,
+    openGraph: { ...openGraph, images: undefined },
+    twitter: { ...twitter, images: undefined },
+    alternates: { canonical: `${baseURL}/consents` },
+  };
 }
 
 export default function ConsentsPage() {

@@ -1,11 +1,31 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { HTML_LIMITED_BOT_UA_RE } from "next/dist/shared/lib/router/utils/html-bots";
 import "./src/env.ts";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+
+  // Метаданные (title, canonical, robots) для Googlebot — всегда в <head>.
+  //
+  // Next 16 стримит результат generateMetadata: если оболочка страницы готова
+  // раньше метаданных, теги дописываются в <body>. Блокирующий режим (теги в
+  // <head>) получают только «HTML-limited» боты из встроенного списка — туда
+  // входит yandex, но НЕ Googlebot: его Next считает ботом, который выполнит
+  // JS (см. HEADLESS_BROWSER_BOT_UA_RE в next/dist/shared/lib/router/utils/
+  // is-bot.js). Google же принимает rel="canonical" только из <head> исходного
+  // HTML. Сейчас теги оказываются в <head> лишь потому, что метаданные
+  // успевают раньше оболочки — это совпадение по времени, а не гарантия.
+  // Список расширяется, а не заменяется: встроенные боты (yandex, соцсети)
+  // сохраняют прежнее поведение (Google-InspectionTool — инструмент проверки
+  // URL в Search Console — уже покрыт шаблоном Google-[\w-]+). Цена — чуть
+  // больший TTFB только для Googlebot.
+  htmlLimitedBots: new RegExp(
+    `${HTML_LIMITED_BOT_UA_RE.source}|Googlebot`,
+    "i",
+  ),
 
   images: {
     formats: ["image/avif", "image/webp"],

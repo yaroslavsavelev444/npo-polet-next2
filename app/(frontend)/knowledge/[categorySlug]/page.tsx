@@ -49,9 +49,20 @@ export async function generateMetadata({
 		category.description ||
 		`Материалы базы знаний НПО «Полёт» в разделе «${category.title}».`;
 
+	// Пустой раздел («материалов пока нет») — не посадочная страница: Google
+	// видит в ней soft 404, Яндекс — малоценную. Закрываем от индексации до
+	// первого опубликованного материала; ссылки с неё по-прежнему учитываются.
+	// Из sitemap такой раздел исключён тем же правилом
+	// (getKnowledgeSitemapEntries).
+	const overview = await getKnowledgeOverview();
+	const isEmpty =
+		(overview.tree.find((entry) => entry.category.id === category.id)?.total ??
+			0) === 0;
+
 	return {
 		title,
 		description,
+		robots: isEmpty ? { index: false, follow: true } : undefined,
 		alternates: { canonical: `${baseURL}/knowledge/${category.slug}` },
 		openGraph: {
 			type: "website",

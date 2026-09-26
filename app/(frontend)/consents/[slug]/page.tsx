@@ -27,13 +27,24 @@ export async function generateMetadata({
     return { title: "Соглашение не найдено" };
   }
 
-  return Meta.generate({
+  // Картинки превью у раздела нет: прежний /og/consents.jpg в проекте не
+  // существует (404), а без image Meta.generate подставляет /api/og/generate —
+  // такого маршрута тоже нет. Поэтому images из его результата убираем.
+  // Canonical Meta.generate проставляет только вместе с hreflang-альтернативами,
+  // поэтому задаётся здесь явно — как на остальных публичных страницах.
+  const { openGraph, twitter, ...meta } = Meta.generate({
     title: consent.title,
     description: consent.description || consent.title,
     baseURL,
     path: `/consents/${slug}`,
-    image: "/og/consents.jpg",
   });
+
+  return {
+    ...meta,
+    openGraph: { ...openGraph, images: undefined },
+    twitter: { ...twitter, images: undefined },
+    alternates: { canonical: `${baseURL}/consents/${slug}` },
+  };
 }
 
 export default async function ConsentPage({ params }: ConsentPageProps) {

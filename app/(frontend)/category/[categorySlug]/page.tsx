@@ -11,6 +11,7 @@ import { parseCatalogSearchParams } from "@/modules/productCatalog/lib/parseFilt
 import { getCachedCategoryBySlug } from "@/payload/services/categories.service";
 import {
 	getCachedCategoryPriceBounds,
+	getCachedCategoryProductCounts,
 	getCatalogData,
 } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
@@ -23,12 +24,23 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { categorySlug } = await params;
-	const category = await getCachedCategoryBySlug(categorySlug);
+	const [category, productCounts] = await Promise.all([
+		getCachedCategoryBySlug(categorySlug),
+		getCachedCategoryProductCounts(),
+	]);
 
 	if (!category) return { title: "Категория не найдена" };
 
+	// Раздел без видимых товаров отдаёт пустую выдачу — для Google это soft
+	// 404, для Яндекса малоценная страница. Закрываем его от индексации (ссылки
+	// остаются рабочими) и не кладём в sitemap (см. sitemap.ts). Считается по
+	// всему разделу, а не по текущим фильтрам: пустая выдача из-за фильтра
+	// индексацию не меняет — такие адреса и так схлопываются canonical-ом.
+	const isEmpty = (productCounts[String(category.id)] ?? 0) === 0;
+
 	return {
 		title: category.metaTitle || category.name,
+		robots: isEmpty ? { index: false, follow: true } : undefined,
 		description: category.metaDescription || category.description,
 		alternates: { canonical: `${baseURL}/category/${categorySlug}` },
 		openGraph: {
