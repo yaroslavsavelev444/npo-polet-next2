@@ -14,7 +14,9 @@ push в master
    └─ Deploy (.github/workflows/deploy.yml)
         ├─ verify  ── те же проверки ещё раз (workflow_dispatch тоже проходит барьер)
         ├─ build   ── два образа → ghcr.io, тег = SHA коммита
-        ├─ deploy  ── ssh: конфигурация архивом в releases/<sha>/, затем deploy.sh
+        ├─ deploy  ── ssh: конфигурация архивом в releases/<sha>/, затем
+        │              detach.sh запускает deploy.sh отдельно от SSH-сессии,
+        │              а раннер опрашивает его и печатает лог
         │              └─ pull образов → дамп БД + архив медиа → миграции
         │                 → up -d --wait → при неудаче автооткат
         └─ smoke   ── проверка снаружи: https://npo-polet.ru и /api/health
@@ -43,7 +45,9 @@ push в master
 ├── releases/<sha>/            ← конфигурация конкретной выкладки (приезжает по SSH)
 │   ├── docker-compose.prod.yml
 │   ├── deploy/
-│   └── scripts/backup/
+│   ├── scripts/backup/
+│   ├── deploy.out             ← вывод этой выкладки (его и печатает Actions)
+│   └── deploy.exitcode        ← код завершения; появляется только по окончании
 ├── current -> releases/<sha>  ← симлинк на работающую версию
 └── logs/deploy-*.log
 ```
@@ -331,6 +335,23 @@ curl -sD - -o /dev/null http://127.0.0.1:3004/ | wc -c
 tail -f /home/y4s/polet-next/logs/latest.log
 docker compose -p polet-next logs -f app
 ```
+
+### Если в Actions оборвалась связь с сервером
+
+Выкладка на сервере от этого не прерывается: `deploy/detach.sh` запускает
+`deploy.sh` в отдельной сессии, а шаг «Запуск выкладки» только опрашивает
+его. Короткие обрывы шаг переживает сам (предупреждения «Опрос сервера не
+удался»). Если связи не было дольше ~10 минут, шаг краснеет с сообщением
+«Связь с сервером потеряна», а результат нужно смотреть на сервере:
+
+```
+[VPS]
+cat /home/y4s/polet-next/releases/<sha>/deploy.exitcode   # 0 — выкладка прошла
+tail -n 50 /home/y4s/polet-next/logs/latest.log
+```
+
+Раньше `deploy.sh` выполнялся прямо в SSH-сессии, и обрыв
+(«client_loop: send disconnect: Broken pipe») убивал его посреди работы.
 
 ### Восстановление данных
 

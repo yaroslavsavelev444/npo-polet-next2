@@ -174,6 +174,21 @@ REPO="${REPO:-$(cat "$STATE_DIR/repo" 2>/dev/null || echo '')}"
 # реально существует на сервере.
 MEDIA_VOLUME="${MEDIA_VOLUME:-polet-next_media_data}"
 
+# `docker pull` с повторами. Скачивание — единственный шаг выкладки, который
+# зависит от сети между VPS и GHCR, и разовый сбой соединения посреди слоя не
+# должен отменять выкладку: образ никуда не делся, повтор докачает остаток
+# (готовые слои docker не качает заново). Ошибка после всех попыток — честный
+# отказ, как и раньше.
+pull_image() {
+    local image="$1" attempt
+    for attempt in 1 2 3; do
+        docker pull "$image" && return 0
+        log "⚠️  Не удалось скачать $image (попытка $attempt из 3)"
+        sleep $((attempt * 10))
+    done
+    return 1
+}
+
 image_app()   { echo "${REGISTRY}/${REPO}-app:${1}"; }
 image_tools() { echo "${REGISTRY}/${REPO}-tools:${1}"; }
 
@@ -487,8 +502,8 @@ cmd_deploy() {
     # ── 1. Образы скачиваются ДО остановки чего-либо: если тега нет или
     #      реестр недоступен, выкладка прерывается, ничего не тронув.
     log "⬇️  Скачивание образов $GIT_SHA"
-    docker pull "$(image_app "$GIT_SHA")"   || fail "Образ приложения не скачался"
-    docker pull "$(image_tools "$GIT_SHA")" || fail "Образ инструментов не скачался"
+    pull_image "$(image_app "$GIT_SHA")"   || fail "Образ приложения не скачался"
+    pull_image "$(image_tools "$GIT_SHA")" || fail "Образ инструментов не скачался"
 
     export IMAGE_APP="$(image_app "$GIT_SHA")"
     export IMAGE_TOOLS="$(image_tools "$GIT_SHA")"

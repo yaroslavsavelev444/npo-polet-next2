@@ -123,9 +123,30 @@ RUN set -e; \
 # ⚠ uid/gid 1001 менять нельзя. Docker на этом сервере работает с
 # userns-remap, а том polet-next_media_data уже создан с владельцем,
 # производным от 1001. Другой uid — это EACCES при записи медиа.
-FROM base-builder AS tools
+#
+# ⚠ Владелец задаётся флагом `COPY --chown`, а не `RUN chown -R /app`.
+#
+# `chown -R` поверх уже скопированного дерева не меняет права «на месте»: в
+# слоях образа это ПОЛНАЯ КОПИЯ /app — node_modules целиком плюс исходники,
+# около гигабайта. И поскольку исходники меняются в каждом коммите, этот
+# гигабайтный слой был новым в каждой сборке: CI тратил на него ~80 с, а VPS
+# на каждой выкладке заново скачивал его из GHCR. На этом скачивании SSH-сессия
+# выкладки однажды и оборвалась («client_loop: send disconnect: Broken pipe»).
+#
+# С `--chown` слоёв два, и порядок важен: node_modules (большой) меняется
+# только вместе с lock-файлом и в остальных выкладках уже лежит на сервере;
+# исходники (единицы мегабайт) идут вторым слоем и меняются каждый раз.
+# Поэтому стадия строится от `base`, а не от `base-builder`: тот копирует
+# файлы от root, и сменить владельца поверх него можно было бы только тем же
+# `chown -R`.
+FROM base AS tools
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs \
-    && chown -R nextjs:nodejs /app
+    && chown nextjs:nodejs /app
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+# public/ (картинки витрины, ~90 МБ) миграциям и воркерам не нужен — его
+# отдаёт образ приложения. Без него слой исходников весит единицы мегабайт.
+COPY --chown=nextjs:nodejs --exclude=public . .
+ENV NEXT_TELEMETRY_DISABLED=1
 USER nextjs
 # Команду задаёт docker-compose.prod.yml (миграции или воркер). CMD по
 # умолчанию — миграции: самое частое применение этого образа.

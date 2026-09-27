@@ -156,8 +156,8 @@ jobs:
           # `mode=max` в него не помещаются, и каждый прогон вытеснял бы
           # предыдущий, переписывая гигабайты — сборка выглядит зависшей на
           # «exporting to GitHub Actions Cache» до отмены по таймауту.
-          # Стадии до `base-builder` всё равно общие с образом приложения и
-          # приезжают из его кеша.
+          # Стадия `deps` (node_modules) всё равно общая с образом приложения
+          # и приезжает из его кеша.
           cache-from: |
             type=gha,scope=tools
             type=gha,scope=app
@@ -204,10 +204,23 @@ jobs:
         # ⚠ Секрет снимается командой `ssh-keyscan -p 48965 <хост>`. При
         # нестандартном порте запись имеет вид `[адрес]:порт` и с записью,
         # снятой без `-p`, не совпадёт — проверка отклонит соединение.
+        #
+        # ServerAlive* — для каждого ssh ниже: без них соединение, по которому
+        # долго не идут данные от раннера, молча умирает где-то в NAT между
+        # GitHub и VPS, и ssh узнаёт об этом только при следующей записи
+        # («client_loop: send disconnect: Broken pipe»). С ними обрыв
+        # обнаруживается за минуту, а не через десять.
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'CONFIG'
+          Host *
+            ServerAliveInterval 15
+            ServerAliveCountMax 4
+            ConnectTimeout 30
+          CONFIG
+          chmod 600 ~/.ssh/config
 
       # Конфигурация уезжает на сервер архивом по SSH — без git, без rsync и
       # без промежуточных файлов на диске раннера. В bundle только то, что
@@ -230,10 +243,22 @@ jobs:
             | ssh -p "$PORT" "$USER@$HOST" \
               "tar xzf - -C '$PROJECT_DIR/releases/$SHA' && chmod +x '$PROJECT_DIR/releases/$SHA/deploy/'*.sh"
 
-      # ⚠ `bash <путь>`, а не `<путь>` напрямую. Скрипт приезжает архивом, и
-      # его права зависят от режима файла в дереве git. `bash` убирает саму
-      # зависимость: выкладка не может сломаться от того, что кто-то создал
-      # файл редактором с другим umask.
+      # ⚠ Выкладка НЕ выполняется внутри SSH-сессии раннера.
+      #
+      # Раньше здесь был один `ssh ... bash deploy.sh`, и выкладка жила ровно
+      # столько, сколько жило соединение. 27.09 оно оборвалось посреди
+      # `docker pull` («client_loop: send disconnect: Broken pipe», код 255) —
+      # sshd убил deploy.sh вместе с сессией. На скачивании это безвредно, но
+      # тот же обрыв во время миграций или подмены контейнеров оставил бы
+      # сервер в состоянии, которого не хотел никто, и без автоотката.
+      #
+      # Теперь deploy/detach.sh запускает deploy.sh отвязанным от сессии
+      # (setsid + nohup), а этот шаг только опрашивает его короткими
+      # SSH-вызовами и печатает новый кусок лога. Оборвался опрос — следующий
+      # продолжит с того же смещения; сама выкладка обрыва не замечает.
+      #
+      # `bash <путь>`, а не `<путь>` напрямую: скрипт приезжает архивом, и его
+      # права зависят от режима файла в дереве git.
       - name: Запуск выкладки
         env:
           HOST: ${{ secrets.VPS_HOST }}
@@ -245,14 +270,70 @@ jobs:
           PROJECT_DIR: ${{ vars.VPS_PROJECT_DIR || '/home/y4s/polet-next' }}
         run: |
           set -euo pipefail
-          ssh -p "$PORT" "$USER@$HOST" \
-            "GIT_SHA='$SHA' \
-             REGISTRY='${{ env.REGISTRY }}' \
-             REPO='${{ steps.name.outputs.repo }}' \
-             GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
-             GHCR_USER='${{ github.actor }}' \
-             PROJECT_DIR='$PROJECT_DIR' \
-             bash '$PROJECT_DIR/releases/$SHA/deploy/deploy.sh'"
+          remote() { ssh -p "$PORT" "$USER@$HOST" "$@"; }
+          DETACH="$PROJECT_DIR/releases/$SHA/deploy/detach.sh"
+
+          # Запуск. Повтор безопасен: detach.sh не стартует вторую выкладку,
+          # если первая уже идёт или закончилась.
+          started=""
+          for attempt in 1 2 3; do
+            if remote "GIT_SHA='$SHA' \
+                REGISTRY='${{ env.REGISTRY }}' \
+                REPO='${{ steps.name.outputs.repo }}' \
+                GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+                GHCR_USER='${{ github.actor }}' \
+                PROJECT_DIR='$PROJECT_DIR' \
+                bash '$DETACH' start"; then
+              started=1
+              break
+            fi
+            echo "::warning::Не удалось запустить выкладку (попытка $attempt из 3), повтор через 10 с"
+            sleep 10
+          done
+          [[ -n "$started" ]] || { echo "::error::Выкладку не удалось запустить на сервере"; exit 1; }
+
+          # Опрос. 40 подряд неудачных опросов (~10 минут без связи) — повод
+          # сдаться; выкладка при этом продолжается на сервере, её лог —
+          # logs/latest.log. Верхняя граница всего шага — timeout-minutes job'а.
+          offset=0
+          failures=0
+          chunk="$(mktemp)"
+          while :; do
+            sleep 5
+            if ! remote "bash '$DETACH' poll $offset" >"$chunk"; then
+              failures=$((failures + 1))
+              if ((failures >= 40)); then
+                echo "::error::Связь с сервером потеряна. Выкладка продолжается там сама — см. $PROJECT_DIR/logs/latest.log"
+                exit 1
+              fi
+              echo "::warning::Опрос сервера не удался ($failures), повтор"
+              sleep 10
+              continue
+            fi
+            failures=0
+
+            # Первая строка — состояние, дальше — новый кусок лога байт в байт.
+            read -r _ state first second < <(head -n 1 "$chunk")
+            tail -n +2 "$chunk"
+
+            case "$state" in
+              running) offset="$first" ;;
+              exit)
+                if [[ "$first" != "0" ]]; then
+                  echo "::error::deploy.sh завершился с кодом $first"
+                fi
+                exit "$first"
+                ;;
+              lost)
+                echo "::error::Процесс выкладки исчез, не сообщив результата (перезагрузка сервера?). См. $PROJECT_DIR/logs/latest.log"
+                exit 1
+                ;;
+              *)
+                echo "::error::Непонятный ответ сервера: $(head -n 1 "$chunk")"
+                exit 1
+                ;;
+            esac
+          done
 
   # ── Дымовая проверка снаружи ──────────────────────────────────────────────
   #
