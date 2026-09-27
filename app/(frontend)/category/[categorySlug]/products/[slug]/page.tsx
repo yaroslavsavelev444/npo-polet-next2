@@ -128,7 +128,11 @@ export default async function ProductDetailPage({ params }: Props) {
 	cardData.reviewsCount = ratingBreakdown.count;
 
 	const canonicalUrl = `${baseURL}${getProductHref(cardData)}`;
-	const jsonLd = buildProductJsonLd(cardData, canonicalUrl);
+	const jsonLd = buildProductJsonLd(
+		cardData,
+		canonicalUrl,
+		reviewsData.initialReviews,
+	);
 
 	const breadcrumbItems = [
 		{ title: "Главная", href: "/" },
