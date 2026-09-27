@@ -1,3 +1,39 @@
+import type { SearchResultType } from './types.ts'
+
 export const SEARCH_MIN_QUERY_LENGTH = 2
-export const SEARCH_DEBOUNCE_MS = 300
-export const SEARCH_RESULTS_LIMIT = 8
+
+/**
+ * Пауза после последнего нажатия перед запросом. 250 мс — меньше, чем
+ * обычная пауза между словами, и больше, чем между буквами внутри слова:
+ * запрос уходит, когда человек «дописал мысль», а не на каждый символ.
+ */
+export const SEARCH_DEBOUNCE_MS = 250
+
+/** Предел длины запроса: дальше — не поиск, а вставленный абзац. */
+export const SEARCH_MAX_QUERY_LENGTH = 100
+
+/**
+ * Первая порция каждой секции. Товаров больше: они главное, и строка товара
+ * информативнее (фото, цена, наличие). Вместе это ~12 строк — столько
+ * помещается в панель без прокрутки на обычном ноутбуке.
+ */
+export const SEARCH_INITIAL_LIMIT: Record<SearchResultType, number> = {
+  product: 6,
+  knowledge: 3,
+  faq: 3,
+}
+
+/** Сколько подгружает «Показать ещё» в секции. */
+export const SEARCH_MORE_LIMIT: Record<SearchResultType, number> = {
+  product: 10,
+  knowledge: 5,
+  faq: 5,
+}
+
+/**
+ * Сколько кандидатов источник отдаёт на ранжирование. Ранжирование идёт по
+ * всему набору, а не по странице, — иначе «Показать ещё» подгружал бы
+ * результаты лучше уже показанных. Потолок же ограничивает худший случай
+ * (запрос из одной буквы-цифры, совпадающий со всем каталогом).
+ */
+export const SEARCH_CANDIDATE_LIMIT = 200

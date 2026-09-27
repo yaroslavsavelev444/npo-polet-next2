@@ -35,7 +35,8 @@ export default function NavbarShell({
         position: "sticky",
         top: 0,
         zIndex: 50,
-        padding: "12px 24px",
+        // На 360px каждые 8px на счету: поля сужаются до 16px.
+        padding: "12px clamp(16px, 4vw, 24px)",
         backdropFilter: "blur(18px)",
         WebkitBackdropFilter: "blur(18px)",
         backgroundColor: "var(--header-glass)",

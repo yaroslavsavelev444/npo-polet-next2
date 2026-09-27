@@ -1,62 +1,37 @@
 import { create } from 'zustand'
-import type { SearchResultProduct } from '@/modules/search/types'
 
+/**
+ * Состояние поля поиска в шапке — только интерфейс.
+ *
+ * Сами результаты здесь не хранятся: их держит React Query (useSiteSearch) —
+ * с кэшем по запросу, отменой устаревших запросов и повтором после ошибки.
+ * Раньше стор вёл результаты, загрузку и ошибку вручную, и всё это
+ * приходилось синхронизировать с AbortController самостоятельно.
+ */
 interface SearchState {
   query: string
   isOpen: boolean
-  loading: boolean
-  error: string | null
-  results: SearchResultProduct[]
-  activeIndex: number
-  /** Инкрементируется кнопкой "Повторить попытку" — форсирует рефетч без изменения query */
-  retryToken: number
+  /** Ключ выделенного результата (`${type}-${id}`), а не индекс: индекс
+   *  съезжает, когда «Показать ещё» дописывает строки в середину списка. */
+  activeKey: string | null
 
   setQuery: (query: string) => void
-  setResults: (results: SearchResultProduct[]) => void
-  setLoading: (loading: boolean) => void
-  setError: (error: string | null) => void
-  setActiveIndex: (index: number) => void
-  moveActiveIndex: (direction: 1 | -1) => void
+  setActiveKey: (key: string | null) => void
   open: () => void
   close: () => void
   reset: () => void
-  retry: () => void
 }
 
-export const useSearchStore = create<SearchState>((set, get) => ({
+export const useSearchStore = create<SearchState>((set) => ({
   query: '',
   isOpen: false,
-  loading: false,
-  error: null,
-  results: [],
-  activeIndex: -1,
-  retryToken: 0,
+  activeKey: null,
 
-  setQuery: (query) => set({ query }),
-  setResults: (results) => set({ results, activeIndex: -1 }),
-  setLoading: (loading) => set({ loading }),
-  setError: (error) => set({ error }),
-  setActiveIndex: (activeIndex) => set({ activeIndex }),
-
-  moveActiveIndex: (direction) => {
-    const { results, activeIndex } = get()
-    if (results.length === 0) return
-    const next = (activeIndex + direction + results.length) % results.length
-    set({ activeIndex: next })
-  },
+  setQuery: (query) => set({ query, activeKey: null }),
+  setActiveKey: (activeKey) => set({ activeKey }),
 
   open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false, activeIndex: -1 }),
+  close: () => set({ isOpen: false, activeKey: null }),
 
-  reset: () =>
-    set({
-      query: '',
-      isOpen: false,
-      loading: false,
-      error: null,
-      results: [],
-      activeIndex: -1,
-    }),
-
-  retry: () => set((s) => ({ retryToken: s.retryToken + 1 })),
+  reset: () => set({ query: '', isOpen: false, activeKey: null }),
 }))

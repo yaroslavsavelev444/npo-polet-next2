@@ -11,6 +11,7 @@ import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
 import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
 import type { Category, Setting, User } from "@/payload-types";
 import { useCartStore } from "@/shared/store/cart.store";
+import { useWishlistStore } from "@/shared/store/wishlist.store";
 import { getPrimaryEmail, getPrimaryPhone } from "@/utils/settings-helpers";
 import styles from "./MobileMenu.module.css";
 import {
@@ -83,6 +84,9 @@ export default function MobileMenu({
 	const cartCount = useCartStore((s) => s.itemCount);
 	const cartBadge = cartHydrated ? cartCount : cartItemCount;
 	const openCart = useCartPanel((s) => s.open);
+	// Ниже sm значка избранного в шапке нет (см. NavbarClientIsland) — его
+	// счётчик переезжает сюда, к пункту «Избранное».
+	const wishlistCount = useWishlistStore((s) => s.productIds.size);
 
 	useEffect(() => {
 		if (isOpen) {
@@ -365,22 +369,36 @@ export default function MobileMenu({
 						className={`${styles.foot} ${styles.reveal}`}
 						style={{ "--i": order++ } as React.CSSProperties}
 					>
-						{secondaryLinks.map((link) => (
-							<Link
-								key={link.href}
-								href={link.href}
-								onClick={onClose}
-								aria-label={link.label}
-								aria-current={
-									isLinkActive(pathname, link.href) ? "page" : undefined
-								}
-								className={styles.footLink}
-							>
-								<span aria-hidden>
-									<RollingText text={link.label} />
-								</span>
-							</Link>
-						))}
+						{secondaryLinks.map((link) => {
+							const count =
+								link.href === "/wishlist" && wishlistCount > 0
+									? wishlistCount
+									: null;
+							return (
+								<Link
+									key={link.href}
+									href={link.href}
+									onClick={onClose}
+									aria-label={
+										count ? `${link.label}, товаров: ${count}` : link.label
+									}
+									aria-current={
+										isLinkActive(pathname, link.href) ? "page" : undefined
+									}
+									className={styles.footLink}
+								>
+									<span aria-hidden>
+										<RollingText
+											text={
+												count
+													? `${link.label} · ${count > 99 ? "99+" : count}`
+													: link.label
+											}
+										/>
+									</span>
+								</Link>
+							);
+						})}
 
 						{isAuthenticated && (
 							<form action={logoutAction}>

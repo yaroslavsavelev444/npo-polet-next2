@@ -298,6 +298,11 @@ export interface SearchKnowledgeArgs {
 	categorySlug?: string | null;
 	sectionSlug?: string | null;
 	page?: number;
+	/**
+	 * Размер страницы. По умолчанию — страница выдачи /knowledge; поиск в
+	 * шапке берёт свою порцию (см. search.service).
+	 */
+	pageSize?: number;
 }
 
 const EMPTY_RESULT: KnowledgeSearchResult = {
@@ -332,6 +337,7 @@ async function fetchSearch({
 	categorySlug = null,
 	sectionSlug = null,
 	page = 1,
+	pageSize = SEARCH_PAGE_SIZE,
 }: SearchKnowledgeArgs): Promise<KnowledgeSearchResult> {
 	const payload = await getPayloadInstance();
 	const [categories, sections] = await Promise.all([
@@ -362,12 +368,14 @@ async function fetchSearch({
 				categoryId: category?.id ?? null,
 				sectionId: section?.id ?? null,
 				page,
+				pageSize,
 			})
 		: await findFilteredIds({
 				payload,
 				categoryId: category?.id ?? null,
 				sectionId: section?.id ?? null,
 				page,
+				pageSize,
 			});
 
 	if (ids.length === 0) return { ...EMPTY_RESULT, page: 1 };
@@ -402,7 +410,7 @@ async function fetchSearch({
 			(hit) => hit.categoryId !== null && categoryMap.has(hit.categoryId),
 		);
 
-	const totalPages = Math.max(1, Math.ceil(total / SEARCH_PAGE_SIZE));
+	const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
 	return {
 		hits,
@@ -420,6 +428,7 @@ interface RankedIdsArgs {
 	categoryId: number | null;
 	sectionId: number | null;
 	page: number;
+	pageSize: number;
 }
 
 /**
@@ -434,8 +443,9 @@ async function findRankedIds({
 	categoryId,
 	sectionId,
 	page,
+	pageSize,
 }: RankedIdsArgs): Promise<{ ids: number[]; total: number }> {
-	const offset = (Math.max(1, page) - 1) * SEARCH_PAGE_SIZE;
+	const offset = (Math.max(1, page) - 1) * pageSize;
 
 	// Значения уходят параметрами; в tsQuery к этому моменту остались только
 	// буквы, цифры и служебные `:*`/`&`, собранные нами (см. buildTsQuery).
@@ -461,7 +471,7 @@ async function findRankedIds({
 			kt."featured" DESC NULLS LAST,
 			kt."position" ASC NULLS LAST,
 			kt."title" ASC
-		LIMIT ${SEARCH_PAGE_SIZE}
+		LIMIT ${pageSize}
 		OFFSET ${offset};
 	`);
 
@@ -477,11 +487,13 @@ async function findFilteredIds({
 	categoryId,
 	sectionId,
 	page,
+	pageSize,
 }: {
 	payload: PayloadInstance;
 	categoryId: number | null;
 	sectionId: number | null;
 	page: number;
+	pageSize: number;
 }): Promise<{ ids: number[]; total: number }> {
 	const conditions: Where[] = [PUBLISHED];
 	if (categoryId !== null)
@@ -492,7 +504,7 @@ async function findFilteredIds({
 		collection: "knowledge-topics",
 		where: { and: conditions },
 		sort: ["position", "title"],
-		limit: SEARCH_PAGE_SIZE,
+		limit: pageSize,
 		page: Math.max(1, page),
 		depth: 0,
 		select: {},

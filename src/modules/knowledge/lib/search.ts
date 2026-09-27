@@ -3,7 +3,7 @@ import {
 	SEARCH_MAX_TERMS,
 	SEARCH_MIN_TERM_LENGTH,
 	SNIPPET_LENGTH,
-} from "./constants";
+} from "./constants.ts";
 
 /**
  * Разбор пользовательского запроса на термы.

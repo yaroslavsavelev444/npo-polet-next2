@@ -78,11 +78,13 @@ export default function NavbarClientIsland({
             скрывался на мобильных и выталкивал иконки (в т.ч. колокольчик)
             за пределы экрана. */}
 				<Flex flex={1} horizontal="center" className="!hidden md:!flex">
-					<SearchInput expanded />
+					<SearchInput variant="desktop" />
 				</Flex>
 
-				{/* RIGHT */}
-				<Flex vertical="center" gap="12" className="flex-shrink-0">
+				{/* RIGHT. Обычный div, а не Flex: промежуток на телефоне уже, чем на
+				    desktop, а responsive-gap через классы Flex из once-ui не
+				    перебить (его стили грузятся раньше Tailwind). */}
+				<div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
 					{/* Desktop Nav */}
 					<div className="hidden lg:flex items-center gap-8">
 						<NavMenus catalogMenu={catalogMenu} />
@@ -92,7 +94,16 @@ export default function NavbarClientIsland({
 					<div className="hidden lg:flex">
 						<ThemeToggle />
 					</div>
-					{user && <WishlistIcon initialProductIds={wishlistProductIds} />}
+					{/* Ниже sm — только в бургер-меню («Избранное» со счётчиком):
+					    на 360px рядом с логотипом помещаются четыре значка, не шесть.
+					    Скрыто классом, а не снято с рендера: значок заодно
+					    наполняет стор избранного, на котором держатся сердечки на
+					    карточках товаров. */}
+					{user && (
+						<div className="hidden sm:flex">
+							<WishlistIcon initialProductIds={wishlistProductIds} />
+						</div>
+					)}
 					{/* Корзина на desktop остаётся ровно там, где была. На мобильных
 					    она рисуется вторым экземпляром — вплотную к бургеру (ниже),
 					    потому что там это последнее, до чего дотягивается большой
@@ -110,10 +121,20 @@ export default function NavbarClientIsland({
 							isAuthenticated={Boolean(user)}
 						/>
 					</div>
+					{/* Поиск на телефоне: поля в шапке нет — лупа открывает тот же
+					    поиск на весь экран (см. SearchInput). */}
+					<div className="flex md:hidden">
+						<SearchInput variant="mobile" />
+					</div>
 					{user && (
 						<NotificationBell initialUnreadCount={unreadNotificationCount} />
 					)}
-					<UserMenu user={user} />
+					{/* Меню профиля ниже sm целиком повторено в бургер-меню
+					    (Профиль, Заказы, Мои отзывы, Выйти) — в шапке телефона
+					    оно занимало половину ширины. Гостю «Войти» видно всегда. */}
+					<div className={user ? "hidden sm:flex" : "flex"}>
+						<UserMenu user={user} />
+					</div>
 
 					{/* Mobile: корзина рядом с бургером — последнее, до чего
 					    дотягивается большой палец. */}
@@ -131,7 +152,7 @@ export default function NavbarClientIsland({
 						onClick={() => setIsMobileOpen((prev) => !prev)}
 						controls={MOBILE_MENU_ID}
 					/>
-				</Flex>
+				</div>
 			</Flex>
 
 			{/* Окно входа поверх текущей страницы. Стоит рядом с CartProvider и

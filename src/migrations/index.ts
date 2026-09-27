@@ -23,6 +23,7 @@ import * as migration_20260918_120000_home_documents from "./20260918_120000_hom
 import * as migration_20260922_120000_trusted_devices from "./20260922_120000_trusted_devices.ts";
 import * as migration_20260924_120000_social_links_platforms from "./20260924_120000_social_links_platforms.ts";
 import * as migration_20260925_120000_print_service_requests from "./20260925_120000_print_service_requests.ts";
+import * as migration_20260927_120000_search_trgm from "./20260927_120000_search_trgm.ts";
 
 export const migrations = [
 	{
@@ -149,5 +150,10 @@ export const migrations = [
 		up: migration_20260925_120000_print_service_requests.up,
 		down: migration_20260925_120000_print_service_requests.down,
 		name: "20260925_120000_print_service_requests",
+	},
+	{
+		up: migration_20260927_120000_search_trgm.up,
+		down: migration_20260927_120000_search_trgm.down,
+		name: "20260927_120000_search_trgm",
 	},
 ];

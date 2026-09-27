@@ -1,5 +1,6 @@
 import type { Media, Product } from '@/payload-types'
-import { mapDiscountPercentage, calculatePriceBreakdown } from '@/modules/productCard'
+import { calculatePriceBreakdown, mapDiscountPercentage } from '@/modules/productCard'
+import { getProductHrefFromDoc } from '@/modules/productCard/lib/routing'
 import type { SearchResultProduct } from '../types'
 
 function isPopulatedMedia(value: unknown): value is Media {
@@ -11,7 +12,10 @@ function isPopulatedMedia(value: unknown): value is Media {
  * Расчёт цены/скидки переиспользует логику из modules/productCard, чтобы цена
  * в поиске всегда совпадала с ценой на карточке товара.
  */
-export function mapProductToSearchResult(product: Product): SearchResultProduct {
+export function mapProductToSearchResult(
+  product: Product,
+  matchedSpec: SearchResultProduct['matchedSpec'] = null,
+): SearchResultProduct {
   const category =
     typeof product.category === 'object' && product.category !== null
       ? {
@@ -35,6 +39,7 @@ export function mapProductToSearchResult(product: Product): SearchResultProduct 
     id: String(product.id),
     title: product.title,
     slug: product.slug ?? '',
+    href: getProductHrefFromDoc(product),
     finalPrice,
     originalPrice,
     hasDiscount,
@@ -42,5 +47,6 @@ export function mapProductToSearchResult(product: Product): SearchResultProduct 
     imageAlt: media?.alt || product.title,
     category,
     status: product.inventory?.status ?? 'available',
+    matchedSpec,
   }
 }

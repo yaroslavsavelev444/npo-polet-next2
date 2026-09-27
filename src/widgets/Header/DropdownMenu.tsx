@@ -122,7 +122,8 @@ export default function DropdownMenu({
 				aria-controls={isOpen ? menuId : undefined}
 				className="flex items-center gap-1.5 text-sm font-medium text-[color:var(--text-primary)] hover:text-[color:var(--text-secondary)] transition-colors"
 			>
-				{trigger}
+				{/* Длинное имя не должно раздвигать шапку: обрезается многоточием. */}
+				<span className="max-w-[10rem] truncate">{trigger}</span>
 				<ChevronDown
 					size={16}
 					aria-hidden
