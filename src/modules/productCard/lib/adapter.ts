@@ -74,8 +74,8 @@ export function mapDiscountPercentage(
 
 /**
  * Агрегат рейтинга товара (среднее + количество одобренных отзывов).
- * Считается отдельно (см. reviews.service) и прокидывается сюда, чтобы карточка
- * показывала рейтинг без хранения денормализованного поля в самой коллекции.
+ * Хранится денормализованным в analytics товара (см. product-rating.db.ts) и
+ * прокидывается сюда вызывающей стороной.
  */
 export interface ProductRatingAggregate {
 	average: number;

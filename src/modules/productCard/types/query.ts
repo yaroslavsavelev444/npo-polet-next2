@@ -1,3 +1,5 @@
+import type { FacetSelection } from '@/modules/productCatalog/types/filters';
+
 export interface ProductQuery {
   categorySlug?: string;       // для страниц категорий
   categoryId?: string;         // если уже известен ID
@@ -13,4 +15,6 @@ export interface ProductQuery {
   order?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+  /** Фасеты каталога (производитель, скидка, характеристики). */
+  facets?: FacetSelection;
 }

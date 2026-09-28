@@ -13,6 +13,7 @@ import {
 	getCachedCategoryPriceBounds,
 	getCachedCategoryProductCounts,
 	getCatalogData,
+	getCatalogFacetsData,
 } from "@/payload/services/products.service";
 import { baseURL } from "@/resources/content";
 import { PageContainer } from "@/shared/components/PageContainer";
@@ -42,6 +43,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 		title: category.metaTitle || category.name,
 		robots: isEmpty ? { index: false, follow: true } : undefined,
 		description: category.metaDescription || category.description,
+		// Фасетная выдача (производитель, скидка, характеристики) — та же
+		// категория в другой нарезке, а комбинаций у фасетов — произведение числа
+		// значений. Как и сортировка с ценой, она схлопывается canonical-ом на
+		// адрес категории, а обход фасетных параметров закрыт в robots.ts. noindex
+		// сюда сознательно не добавлен: вместе с canonical это противоречивый
+		// сигнал, и поисковик вправе перенести noindex на саму категорию.
 		alternates: { canonical: `${baseURL}/category/${categorySlug}` },
 		openGraph: {
 			title: category.metaTitle || category.name,
@@ -78,10 +85,12 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 		order: filters.order,
 		limit: 24,
 		page: filters.page,
+		facets: filters.facets,
 	};
 
-	const [catalogResult, priceBounds] = await Promise.all([
+	const [catalogResult, facets, priceBounds] = await Promise.all([
 		getCatalogData(query),
+		getCatalogFacetsData(query),
 		getCachedCategoryPriceBounds(categoryId),
 	]);
 
@@ -100,6 +109,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 					breadcrumbs={breadcrumbItems}
 					filters={filters}
 					priceBounds={priceBounds}
+					facets={facets}
 					initialPage={{
 						...catalogResult,
 						nextCursor: catalogResult.pagination.hasNextPage

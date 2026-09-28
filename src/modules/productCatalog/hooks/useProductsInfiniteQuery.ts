@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchProductsPage } from "../api";
+import { facetSelectionSignature } from "../lib/facetParams";
 import type { CatalogFilters, ProductsPageResponse } from "../types/filters";
 
 const PAGE_SIZE = 24;
@@ -36,6 +37,7 @@ export function useProductsInfiniteQuery({
 			filters.priceTo ?? null,
 			filters.field,
 			filters.order,
+			facetSelectionSignature(filters.facets),
 		],
 		queryFn: ({ pageParam }) =>
 			fetchProductsPage({

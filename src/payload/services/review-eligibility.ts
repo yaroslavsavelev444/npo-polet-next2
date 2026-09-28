@@ -108,7 +108,7 @@ export async function filterReviewableProducts(
 
 	// Явный список биндов вместо массива: drizzle разворачивает JS-массив в
 	// кортеж параметров, из-за чего `= ANY(${ids}::int[])` собирается в
-	// невалидный SQL (тот же разбор — у getRatingAggregatesForProducts).
+	// невалидный SQL (тот же разбор — у catalog-facets.service, функция list).
 	const idList = sql.join(
 		ids.map((value) => sql`${value}`),
 		sql`, `,

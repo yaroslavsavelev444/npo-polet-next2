@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { CatalogFilters } from "../types/filters";
+import { EMPTY_FACET_SELECTION, readFacetSelection } from "./facetParams";
 
 const catalogFiltersSchema = z.object({
 	priceFrom: z.coerce.number().min(0).optional(),
@@ -9,7 +10,14 @@ const catalogFiltersSchema = z.object({
 		.optional()
 		.default("all"),
 	sort: z
-		.enum(["createdAt", "price", "title", "viewsCount", "purchasesCount"])
+		.enum([
+			"createdAt",
+			"price",
+			"title",
+			"viewsCount",
+			"purchasesCount",
+			"rating",
+		])
 		.optional()
 		.default("createdAt"),
 	order: z.enum(["asc", "desc"]).optional().default("desc"),
@@ -21,13 +29,15 @@ const DEFAULT_FILTERS: CatalogFilters = {
 	field: "createdAt",
 	order: "desc",
 	page: 1,
+	facets: EMPTY_FACET_SELECTION,
 };
 
 export function parseCatalogSearchParams(
 	searchParams: Record<string, string | string[] | undefined>,
 ): CatalogFilters {
 	const parsed = catalogFiltersSchema.safeParse(searchParams);
-	if (!parsed.success) return DEFAULT_FILTERS;
+	if (!parsed.success)
+		return { ...DEFAULT_FILTERS, facets: readFacetSelection(searchParams) };
 
 	const { priceFrom, priceTo, status, sort, order, page } = parsed.data;
 	// Пользователь мог перетащить ползунки местами — не роняем запрос, а меняем их местами.
@@ -41,5 +51,8 @@ export function parseCatalogSearchParams(
 		field: sort,
 		order,
 		page,
+		// Фасеты здесь проверены только синтаксически. Сверка с фасетами
+		// раздела — на сервере (sanitizeFacetSelection), когда они известны.
+		facets: readFacetSelection(searchParams),
 	};
 }

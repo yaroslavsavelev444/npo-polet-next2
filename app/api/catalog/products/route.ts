@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ProductQuery } from "@/modules/productCard/types/query";
+import { readFacetSelection } from "@/modules/productCatalog/lib/facetParams";
 import type { ProductsPageResponse } from "@/modules/productCatalog/types/filters";
 import { getCatalogData } from "@/payload/services/products.service";
 
@@ -27,10 +28,17 @@ const ALLOWED_SORTS = [
 	"title",
 	"viewsCount",
 	"purchasesCount",
+	"rating",
 ];
 
+function parsePrice(raw: string | null): number | undefined {
+	if (!raw) return undefined;
+	const value = Number(raw);
+	return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
 /**
- * GET /api/catalog/products?categoryId=...&cursor=<page>&limit=<n>&status=...&sort=...&order=...&priceFrom=...&priceTo=...
+ * GET /api/catalog/products?categoryId=...&cursor=<page>&limit=<n>&status=...&sort=...&order=...&priceFrom=...&priceTo=...&brand=...&discount=1&f.<ключ>=...
  *
  * Подгрузка страниц каталога категории для infinite scroll на клиенте.
  * Первая страница приходит с сервера вместе с самим page.tsx категории —
@@ -83,8 +91,10 @@ export async function GET(
 	const orderParam = params.get("order");
 	const order = orderParam === "asc" || orderParam === "desc" ? orderParam : undefined;
 
-	const priceFrom = params.get("priceFrom");
-	const priceTo = params.get("priceTo");
+	// Цена — только конечное неотрицательное число: «abc» или «1e400» иначе
+	// превратились бы в NaN/Infinity в SQL-условии.
+	const priceFrom = parsePrice(params.get("priceFrom"));
+	const priceTo = parsePrice(params.get("priceTo"));
 
 	const query: ProductQuery = {
 		categoryId,
@@ -92,10 +102,14 @@ export async function GET(
 		status,
 		sort,
 		order,
-		priceFrom: priceFrom ? Number(priceFrom) : undefined,
-		priceTo: priceTo ? Number(priceTo) : undefined,
+		priceFrom,
+		priceTo,
 		page,
 		limit,
+		// Здесь фасеты проверены только синтаксически; ключи и значения,
+		// которых нет в разделе, отбрасывает getCatalogData
+		// (sanitizeFacetSelection) до SQL и до ключа кэша.
+		facets: readFacetSelection(params),
 	};
 
 	try {

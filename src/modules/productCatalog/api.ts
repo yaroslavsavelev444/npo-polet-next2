@@ -1,3 +1,4 @@
+import { writeFacetSelection } from "./lib/facetParams";
 import type { CatalogFilters, ProductsPageResponse } from "./types/filters";
 
 async function parseJsonOrThrow<T>(
@@ -36,6 +37,7 @@ export async function fetchProductsPage({
 		params.set("priceFrom", String(filters.priceFrom));
 	if (filters.priceTo !== undefined)
 		params.set("priceTo", String(filters.priceTo));
+	writeFacetSelection(params, filters.facets);
 
 	const res = await fetch(`/api/catalog/products?${params.toString()}`);
 	return parseJsonOrThrow<ProductsPageResponse>(

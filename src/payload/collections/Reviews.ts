@@ -5,6 +5,7 @@ import { notifyReviewStatusChanged } from "../../services/notifications/notifyRe
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isStaffUser } from "../access/ownership.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
+import { syncProductRating } from "../services/product-rating.db.ts";
 
 // Средний рейтинг и количество отзывов показываются на карточках каталога,
 // а он кэшируется с тегом "products" (см. products.service.ts). Одобрение или
@@ -15,6 +16,16 @@ import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 // товару, поэтому сбросом тега "products" не обновляется: без второго тега
 // одобренный отзыв не появлялся бы на главной до редеплоя.
 const revalidateProducts = createRevalidateCacheHook("products", "reviews");
+
+/** id товара из связи — и числом (depth 0), и документом. */
+function productIdOf(value: unknown): number | null {
+	const id =
+		typeof value === "object" && value !== null
+			? (value as { id?: unknown }).id
+			: value;
+	const n = Number(id);
+	return Number.isInteger(n) && n > 0 ? n : null;
+}
 
 export const ProductReviews: CollectionConfig = {
 	slug: "product-reviews",
@@ -139,16 +150,31 @@ export const ProductReviews: CollectionConfig = {
 					}
 				}
 
-				// Изменение статуса (в т.ч. переход в/из "approved") меняет агрегат
-				// рейтинга на карточках — сбрасываем кэш каталога.
-				if (operation === "create" || previousDoc?.status !== doc.status) {
+				// Изменение статуса (в т.ч. переход в/из "approved"), оценки или
+				// товара меняет агрегат рейтинга — пересчитываем денормализованное
+				// поле товара (по нему сортируется каталог) в той же транзакции и
+				// сбрасываем кэш каталога.
+				const productId = productIdOf(doc.product);
+				const previousProductId = productIdOf(previousDoc?.product);
+				if (
+					operation === "create" ||
+					previousDoc?.status !== doc.status ||
+					previousDoc?.rating !== doc.rating ||
+					previousProductId !== productId
+				) {
+					await syncProductRating(
+						req.payload,
+						[productId, previousProductId],
+						req,
+					);
 					revalidateProducts();
 				}
 				return doc;
 			},
 		],
 		afterDelete: [
-			() => {
+			async ({ doc, req }) => {
+				await syncProductRating(req.payload, [productIdOf(doc.product)], req);
 				revalidateProducts();
 			},
 		],

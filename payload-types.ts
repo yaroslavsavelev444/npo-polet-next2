@@ -73,6 +73,7 @@ export interface Config {
     media: Media;
     categories: Category;
     products: Product;
+    'catalog-facets': CatalogFacet;
     carts: Cart;
     orders: Order;
     consents: Consent;
@@ -113,6 +114,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
+    'catalog-facets': CatalogFacetsSelect<false> | CatalogFacetsSelect<true>;
     carts: CartsSelect<false> | CartsSelect<true>;
     orders: OrdersSelect<false> | OrdersSelect<true>;
     consents: ConsentsSelect<false> | ConsentsSelect<true>;
@@ -400,6 +402,10 @@ export interface Product {
         unit?: string | null;
         group?: string | null;
         isVisible?: boolean | null;
+        nameKey?: string | null;
+        valueKey?: string | null;
+        valueNum?: number | null;
+        unitKey?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -408,6 +414,7 @@ export interface Product {
   };
   brand?: {
     manufacturer?: string | null;
+    manufacturerKey?: string | null;
     warrantyMonths?: number | null;
   };
   dimensions?: {
@@ -429,6 +436,8 @@ export interface Product {
   analytics?: {
     viewsCount?: number | null;
     purchasesCount?: number | null;
+    ratingAverage?: number | null;
+    reviewsCount?: number | null;
   };
   /**
    * ID документа в старой базе (заполняется только миграцией)
@@ -437,6 +446,41 @@ export interface Product {
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * Фильтры раздела строятся из характеристик товаров автоматически. Запись здесь нужна, чтобы объединить разные названия одной характеристики, выбрать вид фильтра, скрыть его или задать порядок.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "catalog-facets".
+ */
+export interface CatalogFacet {
+  id: number;
+  category: number | Category;
+  /**
+   * Название так, как оно записано в характеристиках товаров. Оно же — подпись фильтра на сайте.
+   */
+  label: string;
+  /**
+   * Названия той же характеристики у других товаров раздела (например, «Вес» для «Масса»). Регистр, ё, пробелы и единица в названии («Масса, кг») учитываются автоматически.
+   */
+  aliases?:
+    | {
+        name: string;
+        id?: string | null;
+      }[]
+    | null;
+  display?: ('auto' | 'list' | 'range' | 'hidden') | null;
+  /**
+   * Для числовых характеристик: в какой единице показывать значения (например, «кВт»). Пусто — самая частая в разделе.
+   */
+  unit?: string | null;
+  /**
+   * Пусто — группа характеристики из карточек товаров.
+   */
+  group?: string | null;
+  order?: number | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * Корзины пользователей (одна корзина на пользователя)
@@ -1840,6 +1884,10 @@ export interface PayloadLockedDocument {
         value: number | Product;
       } | null)
     | ({
+        relationTo: 'catalog-facets';
+        value: number | CatalogFacet;
+      } | null)
+    | ({
         relationTo: 'carts';
         value: number | Cart;
       } | null)
@@ -2195,6 +2243,10 @@ export interface ProductsSelect<T extends boolean = true> {
         unit?: T;
         group?: T;
         isVisible?: T;
+        nameKey?: T;
+        valueKey?: T;
+        valueNum?: T;
+        unitKey?: T;
         id?: T;
       };
   relations?:
@@ -2206,6 +2258,7 @@ export interface ProductsSelect<T extends boolean = true> {
     | T
     | {
         manufacturer?: T;
+        manufacturerKey?: T;
         warrantyMonths?: T;
       };
   dimensions?:
@@ -2233,11 +2286,33 @@ export interface ProductsSelect<T extends boolean = true> {
     | {
         viewsCount?: T;
         purchasesCount?: T;
+        ratingAverage?: T;
+        reviewsCount?: T;
       };
   legacyId?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "catalog-facets_select".
+ */
+export interface CatalogFacetsSelect<T extends boolean = true> {
+  category?: T;
+  label?: T;
+  aliases?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  display?: T;
+  unit?: T;
+  group?: T;
+  order?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

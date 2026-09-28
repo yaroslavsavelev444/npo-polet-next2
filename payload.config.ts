@@ -12,6 +12,7 @@ import { BannerEvents } from "./src/payload/collections/BannerEvents.ts";
 import { Banners } from "./src/payload/collections/Banners.ts";
 import { BannerStates } from "./src/payload/collections/BannerStates.ts";
 import { Carts } from "./src/payload/collections/Carts.ts";
+import { CatalogFacets } from "./src/payload/collections/CatalogFacets.ts";
 import { Categories } from "./src/payload/collections/Categories.ts";
 import { CheckoutPreferences } from "./src/payload/collections/CheckoutPreferences.ts";
 import { Companies } from "./src/payload/collections/Companies.ts";
@@ -107,6 +108,9 @@ export default buildConfig({
 		Media,
 		Categories,
 		Products,
+		// Словарь фасетов раздела — необязательная настройка фильтров каталога
+		// поверх автоматически нормализованных характеристик.
+		CatalogFacets,
 		Carts,
 		Orders,
 		Consents,

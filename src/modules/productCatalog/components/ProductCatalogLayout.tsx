@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { BreadcrumbItem } from "@/components/Breadcrumbs/Breadcrumbs";
 import { CategoryPageHeader } from "@/modules/category/components/CategoryPageHeader";
 import type {
+	CatalogFacets,
 	CatalogFilters,
 	PriceBounds,
 	ProductsPageResponse,
@@ -24,6 +25,7 @@ interface ProductCatalogLayoutProps {
 	breadcrumbs: BreadcrumbItem[];
 	filters: CatalogFilters;
 	priceBounds: PriceBounds;
+	facets: CatalogFacets;
 	initialPage: ProductsPageResponse;
 }
 
@@ -34,8 +36,9 @@ interface ProductCatalogLayoutProps {
  *   2. липкая панель — сколько тут позиций и как их отобрать;
  *   3. сетка — сами товары.
  *
- * Боковой колонки фильтров больше нет: под два фильтра она занимала четверть
- * ширины и отбирала у сетки колонку товаров — разбор в шапке CatalogToolbar.
+ * Боковой колонки фильтров нет: частые фильтры живут в панели, а фасеты по
+ * характеристикам — в выезжающем листе, так что сетка не теряет колонку
+ * товаров — разбор в шапке CatalogToolbar.
  * Сетка идёт во всю ширину контента, и число колонок ей задают контейнерные
  * запросы (см. productGrid), а не вьюпорт.
  *
@@ -49,6 +52,7 @@ export function ProductCatalogLayout({
 	breadcrumbs,
 	filters,
 	priceBounds,
+	facets,
 	initialPage,
 }: ProductCatalogLayoutProps) {
 	const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -68,6 +72,7 @@ export function ProductCatalogLayout({
 			<CatalogToolbar
 				totalDocs={initialPage.totalDocs}
 				priceBounds={priceBounds}
+				facets={facets}
 				onOpenFilters={() => setMobileFiltersOpen(true)}
 				onOpenSort={() => setMobileSortOpen(true)}
 			/>
@@ -84,6 +89,7 @@ export function ProductCatalogLayout({
 				open={mobileFiltersOpen}
 				onClose={() => setMobileFiltersOpen(false)}
 				priceBounds={priceBounds}
+				facets={facets}
 				resultCount={initialPage.totalDocs}
 			/>
 			<MobileSortSheet

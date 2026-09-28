@@ -10,8 +10,13 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/modules/productCard";
 import { useProductFilters } from "../hooks/useProductFilters";
-import { pluralizeProducts, statusLabel } from "../lib/catalogOptions";
-import type { PriceBounds } from "../types/filters";
+import {
+	formatFacetNumber,
+	pluralizeProducts,
+	statusLabel,
+} from "../lib/catalogOptions";
+import { countFacetSelection } from "../lib/facetParams";
+import type { CatalogFacets, PriceBounds } from "../types/filters";
 import styles from "./Catalog.module.css";
 import { CatalogPopover } from "./CatalogPopover";
 import { PriceFilter } from "./PriceFilter";
@@ -21,6 +26,7 @@ import { StatusFilter } from "./StatusFilter";
 interface CatalogToolbarProps {
 	totalDocs: number;
 	priceBounds: PriceBounds;
+	facets: CatalogFacets;
 	onOpenFilters: () => void;
 	onOpenSort: () => void;
 }
@@ -42,6 +48,14 @@ interface CatalogToolbarProps {
  * Каноничность здесь именно в этом: боковая панель канонична там, где
  * фильтров десять и они с фасетами. Под два фильтра канонична панель.
  *
+ * ─── Фасеты ─────────────────────────────────────────────────────────────────
+ * Производитель, скидка и характеристики раздела — динамический набор: у
+ * одного раздела их нет вовсе, у другого два десятка. В строку панели они не
+ * помещаются и в неё не лезут: на широком экране их открывает кнопка «Все
+ * фильтры» — тот же лист, что на телефоне, только выезжающий сбоку, — а
+ * выбранное видно чипами под панелью (цена и наличие чипов на десктопе не
+ * дают: их состояние и так напечатано на своих кнопках).
+ *
  * ─── Десктоп и телефон — разные интерфейсы, а не масштаб ────────────────────
  * На широком экране наличие развёрнуто в сегментированный переключатель прямо
  * в панели (один клик), цена — в поповере у своей кнопки, сортировка — в меню
@@ -52,11 +66,78 @@ interface CatalogToolbarProps {
 export function CatalogToolbar({
 	totalDocs,
 	priceBounds,
+	facets,
 	onOpenFilters,
 	onOpenSort,
 }: CatalogToolbarProps) {
-	const { filters, updateFilters, resetFilters, activeFiltersCount } =
-		useProductFilters();
+	const {
+		filters,
+		facets: selection,
+		updateFilters,
+		resetFilters,
+		activeFiltersCount,
+		toggleBrand,
+		setDiscount,
+		toggleSpecValue,
+		clearSpec,
+	} = useProductFilters();
+
+	const hasFacets =
+		facets.manufacturers.length > 0 ||
+		facets.discount !== null ||
+		facets.specs.length > 0;
+	const facetCount = countFacetSelection(selection);
+
+	// Чипы фасетов строятся из ответа сервера, а не из адреса: там выбор уже
+	// сверен с разделом и у значений есть человеческие подписи.
+	const facetChips: { key: string; label: string; onRemove: () => void }[] = [
+		...facets.manufacturers
+			.filter((value) => value.selected)
+			.map((value) => ({
+				key: `brand-${value.value}`,
+				label: value.label,
+				onRemove: () => toggleBrand(value.value),
+			})),
+		...(facets.discount?.selected
+			? [
+					{
+						key: "discount",
+						label: "Со скидкой",
+						onRemove: () => setDiscount(false),
+					},
+				]
+			: []),
+		...facets.specs.flatMap((facet) => {
+			if (facet.kind === "list") {
+				return facet.values
+					.filter((value) => value.selected)
+					.map((value) => ({
+						key: `${facet.key}-${value.value}`,
+						label: `${facet.label}: ${value.label}`,
+						onRemove: () => toggleSpecValue(facet.key, value.value),
+					}));
+			}
+			if (facet.selectedMin === undefined && facet.selectedMax === undefined)
+				return [];
+			const from =
+				facet.selectedMin !== undefined
+					? formatFacetNumber(facet.selectedMin)
+					: "";
+			const to =
+				facet.selectedMax !== undefined
+					? formatFacetNumber(facet.selectedMax)
+					: "";
+			const range =
+				from && to ? `${from}–${to}` : from ? `от ${from}` : `до ${to}`;
+			return [
+				{
+					key: facet.key,
+					label: `${facet.label}: ${range}${facet.unit ? ` ${facet.unit}` : ""}`,
+					onRemove: () => clearSpec(facet.key),
+				},
+			];
+		}),
+	];
 
 	const hasPriceFilter =
 		filters.priceFrom !== undefined || filters.priceTo !== undefined;
@@ -135,6 +216,26 @@ export function CatalogToolbar({
 						<PriceFilter priceBounds={priceBounds} showLabel={false} />
 					</CatalogPopover>
 
+					{hasFacets && (
+						<button
+							type="button"
+							onClick={onOpenFilters}
+							aria-label="Все фильтры"
+							data-active={facetCount > 0 || undefined}
+							className={styles.control}
+						>
+							<SlidersHorizontal
+								size={14}
+								aria-hidden
+								className={styles.controlIcon}
+							/>
+							Все фильтры
+							{facetCount > 0 && (
+								<span className={styles.controlBadge}>{facetCount}</span>
+							)}
+						</button>
+					)}
+
 					{/* Сброс появляется только когда есть что сбрасывать, и стоит в
 					    группе фильтров, а не рядом с сортировкой: сортировка не
 					    сбрасывается. */}
@@ -187,20 +288,24 @@ export function CatalogToolbar({
 				</div>
 			</div>
 
-			{/* Строка активных фильтров — ТОЛЬКО на узком экране. На десктопе
-			    состояние уже напечатано на самих органах управления (залитый
-			    сегмент наличия, диапазон на кнопке цены), и чипы повторяли бы то
-			    же самое второй строкой; сброс там живёт кнопкой в панели. На
-			    телефоне управление спрятано в листах, и чипы — единственное
-			    место, где видно, что выдача сужена, и единственный способ снять
-			    фильтр по одному.
+			{/* Строка активных фильтров. На телефоне управление спрятано в
+			    листах, и чипы — единственное место, где видно, что выдача
+			    сужена, и единственный способ снять фильтр по одному. На
+			    десктопе состояние цены и наличия уже напечатано на самих
+			    органах управления, и их чипы повторяли бы то же самое второй
+			    строкой — они там скрыты (activeChipMobile). Фасеты же на
+			    десктопе живут в боковом листе, поэтому их чипы видны везде, и
+			    строка на десктопе появляется только ради них (data-desktop).
 
 			    Строка появляется только когда есть что снимать, поэтому у панели
 			    два роста — и потому она проявляется, а не возникает рывком. */}
 			{activeFiltersCount > 0 && (
-				<div className={styles.activeRow}>
+				<div
+					className={styles.activeRow}
+					data-desktop={facetChips.length > 0 || undefined}
+				>
 					{hasPriceFilter && (
-						<span className={styles.activeChip}>
+						<span className={`${styles.activeChip} ${styles.activeChipMobile}`}>
 							{priceChipLabel}
 							<button
 								type="button"
@@ -216,7 +321,7 @@ export function CatalogToolbar({
 					)}
 
 					{hasStatusFilter && (
-						<span className={styles.activeChip}>
+						<span className={`${styles.activeChip} ${styles.activeChipMobile}`}>
 							{statusLabel(filters.status)}
 							<button
 								type="button"
@@ -228,6 +333,20 @@ export function CatalogToolbar({
 							</button>
 						</span>
 					)}
+
+					{facetChips.map((chip) => (
+						<span key={chip.key} className={styles.activeChip}>
+							{chip.label}
+							<button
+								type="button"
+								onClick={chip.onRemove}
+								aria-label={`Убрать фильтр: ${chip.label}`}
+								className={styles.activeChipRemove}
+							>
+								<X size={11} aria-hidden />
+							</button>
+						</span>
+					))}
 
 					<button
 						type="button"

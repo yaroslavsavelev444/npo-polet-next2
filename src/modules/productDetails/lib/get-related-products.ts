@@ -1,17 +1,11 @@
 import type { ProductCardData } from "@/modules/productCard";
-import { mapProductToCardData } from "@/modules/productCard";
-import { getCachedProducts } from "@/payload/services/products.service";
-import { getRatingAggregatesForProducts } from "@/payload/services/reviews.service";
+import {
+	getCachedProducts,
+	mapProductsToCardsWithRating as mapWithRating,
+} from "@/payload/services/products.service";
 import type { Product } from "@/payload-types";
 
 const RELATED_PRODUCTS_LIMIT = 8;
-
-async function mapWithRating(docs: Product[]): Promise<ProductCardData[]> {
-	const ratingMap = await getRatingAggregatesForProducts(docs.map((p) => p.id));
-	return docs.map((doc) =>
-		mapProductToCardData(doc, ratingMap.get(String(doc.id))),
-	);
-}
 
 export async function getRelatedProducts(
 	categoryId: string,

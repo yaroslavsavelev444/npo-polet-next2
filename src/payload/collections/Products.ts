@@ -1,6 +1,7 @@
 import type { CollectionConfig } from "payload";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
+import { normalizeProductForCatalog } from "../hooks/normalizeProductForCatalog.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 import { trackPreviousSlug } from "../hooks/trackPreviousSlug.ts";
 import { generateSlug } from "../utils/generateSlug.ts";
@@ -21,7 +22,7 @@ export const Products: CollectionConfig = {
 		delete: isAdminOrSuperAdmin,
 	},
 	hooks: {
-		beforeChange: [trackPreviousSlug],
+		beforeChange: [trackPreviousSlug, normalizeProductForCatalog],
 		// getCachedProducts кэширует список/карточки с revalidate:false — без
 		// этого хука изменения товаров не появлялись бы на сайте до редеплоя.
 		afterChange: [createRevalidateCacheHook("products")],
@@ -281,6 +282,12 @@ export const Products: CollectionConfig = {
 				{ name: "unit", type: "text" },
 				{ name: "group", type: "text" },
 				{ name: "isVisible", type: "checkbox", defaultValue: true },
+				// Ключи для фасетов каталога — вычисляются хуком
+				// normalizeProductForCatalog, в админке не показываются.
+				{ name: "nameKey", type: "text", admin: { hidden: true } },
+				{ name: "valueKey", type: "text", admin: { hidden: true } },
+				{ name: "valueNum", type: "number", admin: { hidden: true } },
+				{ name: "unitKey", type: "text", admin: { hidden: true } },
 			],
 		},
 
@@ -310,6 +317,13 @@ export const Products: CollectionConfig = {
 					name: "manufacturer",
 
 					type: "text",
+				},
+				{
+					// Нормализованный производитель для фасета каталога — см.
+					// normalizeProductForCatalog.
+					name: "manufacturerKey",
+					type: "text",
+					admin: { hidden: true },
 				},
 				{
 					name: "warrantyMonths",
@@ -379,6 +393,19 @@ export const Products: CollectionConfig = {
 					name: "purchasesCount",
 					type: "number",
 					defaultValue: 0,
+				},
+				// Денормализованный агрегат одобренных отзывов — для сортировки
+				// каталога по рейтингу (см. product-rating.db.ts).
+				{
+					name: "ratingAverage",
+					type: "number",
+					label: "Средняя оценка",
+				},
+				{
+					name: "reviewsCount",
+					type: "number",
+					defaultValue: 0,
+					label: "Одобренных отзывов",
 				},
 			],
 		},

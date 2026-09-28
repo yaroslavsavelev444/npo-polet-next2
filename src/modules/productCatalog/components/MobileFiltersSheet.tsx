@@ -2,7 +2,7 @@
 
 import { useProductFilters } from "../hooks/useProductFilters";
 import { pluralizeProducts } from "../lib/catalogOptions";
-import type { PriceBounds } from "../types/filters";
+import type { CatalogFacets, PriceBounds } from "../types/filters";
 import styles from "./Catalog.module.css";
 import { CatalogSheet } from "./CatalogSheet";
 import { FiltersPanel } from "./FiltersPanel";
@@ -11,11 +11,13 @@ interface Props {
 	open: boolean;
 	onClose: () => void;
 	priceBounds: PriceBounds;
+	facets: CatalogFacets;
 	resultCount: number;
 }
 
 /**
- * Фильтры на узком экране.
+ * Лист фильтров: на узком экране — нижний, на широком — боковой (там в него
+ * уходят фасеты, которым не место в одной строке панели).
  *
  * Подвал листа несёт оба исхода сразу: «Сбросить» слева и «Показать N» во всю
  * оставшуюся ширину справа. Число в подписи — не украшение: оно обновляется по
@@ -26,6 +28,7 @@ export function MobileFiltersSheet({
 	open,
 	onClose,
 	priceBounds,
+	facets,
 	resultCount,
 }: Props) {
 	const { activeFiltersCount, resetFilters } = useProductFilters();
@@ -60,7 +63,7 @@ export function MobileFiltersSheet({
 				</>
 			}
 		>
-			<FiltersPanel priceBounds={priceBounds} />
+			<FiltersPanel priceBounds={priceBounds} facets={facets} />
 		</CatalogSheet>
 	);
 }

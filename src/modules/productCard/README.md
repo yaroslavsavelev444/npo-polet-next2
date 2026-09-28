@@ -141,10 +141,9 @@ function CategoryGrid({ products, categorySlug }: { products: Product[]; categor
 
 ## Известные TODO / задел на будущее
 
-- **`lib/adapter.ts`**: `rating`/`reviewsCount` зашиты как `0` — нужна
-  агрегация из коллекции `reviews` (Payload `afterChange` hook, обновляющий
-  денормализованные `analytics.rating`/`analytics.reviewsCount` на `Product`,
-  либо отдельный сервис `getProductRatingAggregate(productId)`).
+- ~~`rating`/`reviewsCount`~~ — сделано: денормализованы в
+  `analytics.ratingAverage`/`analytics.reviewsCount` товара, обновляются хуком
+  отзывов (`payload/services/product-rating.db.ts`); по ним же сортирует каталог.
 - **`lib/adapter.ts`**: нет `sku` в схеме — используется `id` для URL. Если
   `sku` понадобится для отображения (не только для роутинга), добавить поле
   в коллекцию `Products` и прокинуть в адаптер.

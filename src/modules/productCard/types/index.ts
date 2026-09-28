@@ -57,9 +57,10 @@ export interface ProductCardData {
   brand?: string;
 
   /**
-   * Средняя оценка и количество ОДОБРЕННЫХ отзывов. Агрегируются из коллекции
-   * `product-reviews` (см. reviews.service `getRatingAggregatesForProducts`) и
-   * прокидываются в adapter вторым аргументом. Если агрегат не передан — 0.
+   * Средняя оценка и количество ОДОБРЕННЫХ отзывов. Денормализованы в
+   * `analytics.ratingAverage/reviewsCount` товара (см.
+   * payload/services/product-rating.db.ts) и прокидываются в adapter вторым
+   * аргументом. Если агрегат не передан — 0.
    */
   rating: number;
   reviewsCount: number;

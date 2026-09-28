@@ -24,6 +24,7 @@ import * as migration_20260922_120000_trusted_devices from "./20260922_120000_tr
 import * as migration_20260924_120000_social_links_platforms from "./20260924_120000_social_links_platforms.ts";
 import * as migration_20260925_120000_print_service_requests from "./20260925_120000_print_service_requests.ts";
 import * as migration_20260927_120000_search_trgm from "./20260927_120000_search_trgm.ts";
+import * as migration_20260927_180000_catalog_facets from "./20260927_180000_catalog_facets.ts";
 
 export const migrations = [
 	{
@@ -155,5 +156,10 @@ export const migrations = [
 		up: migration_20260927_120000_search_trgm.up,
 		down: migration_20260927_120000_search_trgm.down,
 		name: "20260927_120000_search_trgm",
+	},
+	{
+		up: migration_20260927_180000_catalog_facets.up,
+		down: migration_20260927_180000_catalog_facets.down,
+		name: "20260927_180000_catalog_facets",
 	},
 ];

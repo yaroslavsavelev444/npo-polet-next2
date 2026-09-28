@@ -33,6 +33,12 @@ export const SORT_OPTIONS: SortOption[] = [
 		label: "Сначала дороже",
 	},
 	{
+		value: "rating-desc",
+		field: "rating",
+		order: "desc",
+		label: "По рейтингу",
+	},
+	{
 		value: "purchasesCount-desc",
 		field: "purchasesCount",
 		order: "desc",
@@ -82,4 +88,25 @@ export function pluralizeProducts(count: number): string {
 	if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20))
 		return "товара";
 	return "товаров";
+}
+
+const facetNumberFormat = new Intl.NumberFormat("ru-RU", {
+	maximumFractionDigits: 3,
+});
+
+/** Число фасета с единицей: «1 200 Вт», «0,4 кг». */
+export function formatFacetNumber(value: number, unit?: string | null): string {
+	const number = facetNumberFormat.format(value);
+	return unit ? `${number} ${unit}` : number;
+}
+
+/**
+ * Шаг шкалы числового фасета. Целые — шагом 1: крупный шаг не дотягивал бы
+ * ползунок до максимума, если размах ему не кратен. Дробные — десятая доля
+ * порядка размаха (0,4–2,5 кг → 0,1).
+ */
+export function rangeStep(min: number, max: number): number {
+	if (Number.isInteger(min) && Number.isInteger(max)) return 1;
+	const span = Math.max(max - min, Number.EPSILON);
+	return Math.min(1, 10 ** Math.floor(Math.log10(span / 10)));
 }

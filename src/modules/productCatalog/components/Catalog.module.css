@@ -450,7 +450,8 @@
    на этом элементе не срабатывал вовсе, и на десктопе чипы дублировали
    состояние, уже напечатанное на самих органах управления. */
 @media (min-width: 64rem) {
-	.activeRow {
+	.activeRow:not([data-desktop="true"]),
+	.activeChipMobile {
 		display: none;
 	}
 }
@@ -918,6 +919,134 @@
 	transform: translate(-50%, -50%) scale(1);
 }
 
+/* --- Флажки фасетов -------------------------------------------------------
+   Та же строка списка, что у вариантов наличия, но метка — квадрат с
+   галочкой: значения фасета складываются, а не исключают друг друга, и
+   форма метки говорит об этом раньше, чем подпись.                        */
+.optionBox {
+	position: relative;
+	flex: 0 0 auto;
+	width: 1rem;
+	height: 1rem;
+	border: 1px solid var(--border);
+	border-radius: 0.25rem;
+	transition:
+		border-color 150ms var(--ease-out-quart),
+		background-color 150ms var(--ease-out-quart);
+}
+
+.optionBox::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 45%;
+	width: 0.3rem;
+	height: 0.55rem;
+	border: solid #fff;
+	border-width: 0 2px 2px 0;
+	transform: translate(-50%, -50%) rotate(45deg) scale(0);
+	transition: transform 180ms var(--ease-out-expo);
+}
+
+.controlInput:checked ~ .optionBox {
+	border-color: var(--primary);
+	background: var(--primary);
+}
+
+.controlInput:checked ~ .optionBox::after {
+	transform: translate(-50%, -50%) rotate(45deg) scale(1);
+}
+
+.controlInput:focus-visible ~ .optionBox {
+	outline: 2px solid var(--accent-400);
+	outline-offset: 2px;
+}
+
+.option .optionLabel {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Число — служебное: моноширинные цифры, приглушённо, по правому краю. */
+.optionCount {
+	flex: 0 0 auto;
+	font-family: var(--font-mono), ui-monospace, monospace;
+	font-size: 0.7rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+.option[data-disabled="true"] {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.option[data-disabled="true"]:hover {
+	background: transparent;
+	color: var(--text-secondary);
+}
+
+/* --- Фасеты характеристик -------------------------------------------------
+   Раздел («Электропитание») — микроподпись; под ним фасеты-аккордеоны на
+   нативном <details>: раскрытие не требует ни строчки JS и доступно с
+   клавиатуры само по себе.                                                */
+.facetSection {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.facet + .facet {
+	border-top: 1px solid var(--hairline);
+}
+
+.facetSummary {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	min-height: 2.75rem;
+	padding: 0 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text-primary);
+	cursor: pointer;
+	list-style: none;
+}
+
+.facetSummary::-webkit-details-marker {
+	display: none;
+}
+
+.facetSummary::after {
+	content: "";
+	flex: 0 0 auto;
+	width: 0.45rem;
+	height: 0.45rem;
+	margin-left: auto;
+	border: solid var(--text-muted);
+	border-width: 0 1.5px 1.5px 0;
+	transform: rotate(45deg);
+	transition: transform 200ms var(--ease-out-quart);
+}
+
+.facet[open] > .facetSummary::after {
+	transform: rotate(-135deg);
+}
+
+.facetSummary:focus-visible {
+	outline: 2px solid var(--accent-400);
+	outline-offset: -2px;
+	border-radius: var(--radius-sm);
+}
+
+.facetTitle {
+	min-width: 0;
+}
+
+.facetBody {
+	padding: 0 0 0.9rem;
+}
+
 /* ---------------------------------------------------------------------------
    Нижний лист (мобильные фильтры и сортировка)
    ---------------------------------------------------------------------------
@@ -1144,6 +1273,25 @@
 .sheetReset:disabled {
 	opacity: 0.4;
 	pointer-events: none;
+}
+
+/* На широком экране лист фильтров выезжает справа во всю высоту: снизу
+   во всю ширину 1440px он читался бы баннером, а не панелью фильтров.
+   Сортировку в лист на десктопе не открывают — там она в меню панели. */
+@media (min-width: 64rem) {
+	.sheetPanel {
+		inset: 0 0 0 auto;
+		width: min(26rem, 100vw);
+		max-height: none;
+		border-top: 0;
+		border-left: 1px solid var(--rule);
+		border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+		transform: translate3d(100%, 0, 0);
+	}
+
+	.sheetGrabber {
+		display: none;
+	}
 }
 
 /* Разделитель между группами фильтров в листе. */

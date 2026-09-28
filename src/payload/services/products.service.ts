@@ -7,21 +7,39 @@ import {
 	ProductCardData,
 } from "../../modules/productCard";
 import { ProductQuery } from "../../modules/productCard/types/query";
-import { ProductCatalogResult } from "../../modules/productCatalog/types/filters";
+import { EMPTY_FACET_SELECTION } from "../../modules/productCatalog/lib/facetParams";
+import type {
+	CatalogFacets,
+	ProductCatalogResult,
+	SortField,
+} from "../../modules/productCatalog/types/filters";
+import {
+	type CatalogQueryContext,
+	type CategoryFacetDefinitions,
+	getCatalogFacets,
+	getCategoryFacetDefinitions,
+	isSimpleContext,
+	MAX_CACHED_PAGE,
+	queryCatalogProductIds,
+	sanitizeFacetSelection,
+} from "./catalog-facets.service";
 import { getPayloadInstance } from "./getPayload";
-import { getRatingAggregatesForProducts } from "./reviews.service";
 
 /**
- * Превращает список Payload-товаров в карточки, подмешивая агрегаты рейтинга
- * одним группированным запросом (без N+1). Рейтинг берётся из отзывов на лету,
- * а не из кэша товаров, — чтобы одобренный отзыв отражался в каталоге сразу.
+ * Превращает список Payload-товаров в карточки. Рейтинг берётся из
+ * денормализованных analytics.ratingAverage/reviewsCount (см.
+ * product-rating.db.ts): они обновляются в транзакции одобрения отзыва, а кэш
+ * товаров сбрасывается тем же хуком, так что свежий отзыв виден сразу — и без
+ * отдельного запроса к отзывам на каждую страницу выдачи.
  */
-async function mapProductsToCardsWithRating(
+export function mapProductsToCardsWithRating(
 	docs: Product[],
-): Promise<ProductCardData[]> {
-	const ratingMap = await getRatingAggregatesForProducts(docs.map((p) => p.id));
+): ProductCardData[] {
 	return docs.map((doc) =>
-		mapProductToCardData(doc, ratingMap.get(String(doc.id))),
+		mapProductToCardData(doc, {
+			average: doc.analytics?.ratingAverage ?? 0,
+			count: doc.analytics?.reviewsCount ?? 0,
+		}),
 	);
 }
 
@@ -225,53 +243,142 @@ export const getCachedProductByPreviousSlug = (slug: string) => {
 	})();
 };
 
-// Payload сортирует по реальному пути поля с префиксом "-" для убывания
-// (см. src/payload/services/search.service.ts: "-analytics.viewsCount"), а не
-// по синтаксису "field:order" — часть полей каталога вложена в группы,
-// поэтому дружественное имя сортировки транслируется в реальный путь здесь.
-const SORT_FIELD_PATHS: Record<string, string> = {
-	createdAt: "createdAt",
-	price: "pricing.priceForIndividual",
-	title: "title",
-	viewsCount: "analytics.viewsCount",
-	purchasesCount: "analytics.purchasesCount",
-};
+const SORT_FIELDS: SortField[] = [
+	"createdAt",
+	"price",
+	"title",
+	"viewsCount",
+	"purchasesCount",
+	"rating",
+];
 
-function buildCatalogSort(sort?: string, order?: "asc" | "desc"): string {
-	const field = SORT_FIELD_PATHS[sort || "createdAt"] || "createdAt";
-	return order === "asc" ? field : `-${field}`;
+/** Контекст выдачи раздела: фасеты сверены с разделом (sanitize). */
+function buildCatalogContext(
+	query: ProductQuery,
+	defs: CategoryFacetDefinitions,
+): CatalogQueryContext {
+	return {
+		categoryId: Number(query.categoryId),
+		status: query.status,
+		priceFrom: query.priceFrom,
+		priceTo: query.priceTo,
+		selection: sanitizeFacetSelection(
+			query.facets ?? EMPTY_FACET_SELECTION,
+			defs,
+		),
+	};
 }
 
+/**
+ * Документы по id в заданном порядке. Условие публикации повторено и здесь:
+ * между выборкой id и этой выборкой товар могли снять с публикации.
+ */
+async function fetchProductsByIds(ids: number[]): Promise<Product[]> {
+	if (ids.length === 0) return [];
+	const payload = await getPayloadInstance();
+	const { docs } = await payload.find({
+		collection: "products",
+		where: { and: [PUBLISHED_ONLY, { id: { in: ids } }] },
+		depth: 1,
+		limit: ids.length,
+		pagination: false,
+	});
+	const byId = new Map(
+		(docs as unknown as Product[]).map((doc) => [Number(doc.id), doc]),
+	);
+	return ids
+		.map((id) => byId.get(id))
+		.filter((doc): doc is Product => doc !== undefined);
+}
+
+/**
+ * Страница выдачи раздела.
+ *
+ * Отбор, сортировка и пагинация — одним SQL-запросом по нормализованным
+ * данным (catalog-facets.service): фасеты по характеристикам (И между
+ * характеристиками одной строки товара) через where Payload не выражаются, а
+ * сортировка по рейтингу обязана выполняться ДО пагинации. Документы затем
+ * подтягиваются обычным payload.find по id страницы.
+ */
 export async function getCatalogData(
 	query: ProductQuery,
 ): Promise<ProductCatalogResult> {
-	const options: GetProductsOptions = {
-		category: query.categoryId,
-		isVisible: query.isVisible,
-		status: query.status,
-		minPrice: query.priceFrom,
-		maxPrice: query.priceTo,
-		sort: buildCatalogSort(query.sort, query.order),
-		limit: query.limit || 24,
-		page: query.page || 1,
-		depth: 1,
-	};
+	const limit = query.limit || 24;
+	const page = query.page || 1;
+	const field = SORT_FIELDS.includes(query.sort as SortField)
+		? (query.sort as SortField)
+		: "createdAt";
+	const order = query.order === "asc" ? "asc" : "desc";
 
-	const { docs, totalDocs } = await getCachedProducts(options);
-
-	const totalPages = Math.ceil(totalDocs / (options.limit || 24));
-
-	return {
-		products: await mapProductsToCardsWithRating(docs),
-		totalDocs,
+	const categoryId = Number(query.categoryId);
+	const empty: ProductCatalogResult = {
+		products: [],
+		totalDocs: 0,
 		pagination: {
-			page: options.page || 1,
-			limit: options.limit || 24,
-			totalPages,
-			hasNextPage: (options.page || 1) < totalPages,
-			hasPrevPage: (options.page || 1) > 1,
+			page,
+			limit,
+			totalPages: 0,
+			hasNextPage: false,
+			hasPrevPage: page > 1,
 		},
 	};
+	if (!Number.isInteger(categoryId) || categoryId <= 0) return empty;
+
+	const defs = await getCategoryFacetDefinitions(categoryId);
+	const ctx = buildCatalogContext(query, defs);
+
+	const fetchFn = async (): Promise<ProductCatalogResult> => {
+		const { ids, total } = await queryCatalogProductIds(
+			ctx,
+			defs,
+			{ field, order },
+			page,
+			limit,
+		);
+		const totalPages = Math.ceil(total / limit);
+		return {
+			products: mapProductsToCardsWithRating(await fetchProductsByIds(ids)),
+			totalDocs: total,
+			pagination: {
+				page,
+				limit,
+				totalPages,
+				hasNextPage: page < totalPages,
+				hasPrevPage: page > 1,
+			},
+		};
+	};
+
+	// В кэш — только выдача без фасетов и цены и только первые страницы:
+	// число таких вариантов конечно (раздел × наличие × сортировка ×
+	// страница). Остальное считается запросом к базе — см. шапку
+	// catalog-facets.service.ts.
+	if (
+		env.NODE_ENV === "development" ||
+		!isSimpleContext(ctx) ||
+		page > MAX_CACHED_PAGE
+	) {
+		return fetchFn();
+	}
+	return unstable_cache(
+		fetchFn,
+		[
+			`catalog-page-${categoryId}-st-${ctx.status ?? "any"}-${field}-${order}-l-${limit}-p-${page}`,
+		],
+		{ tags: ["products", "catalog-facets"], revalidate: false },
+	)();
+}
+
+/** Фасеты раздела со счётчиками под текущий выбор. */
+export async function getCatalogFacetsData(
+	query: ProductQuery,
+): Promise<CatalogFacets> {
+	const categoryId = Number(query.categoryId);
+	if (!Number.isInteger(categoryId) || categoryId <= 0) {
+		return { manufacturers: [], discount: null, specs: [] };
+	}
+	const defs = await getCategoryFacetDefinitions(categoryId);
+	return getCatalogFacets(buildCatalogContext(query, defs), defs);
 }
 
 export interface CategoryPriceBounds {
