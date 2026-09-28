@@ -7,6 +7,8 @@ import {
 import { RU_PHONE_E164_RE } from "./phone.ts";
 import { validateFullName } from "./validate-full-name.ts";
 import { validateInn } from "./validate-inn.ts";
+import { validateKpp } from "./validate-kpp.ts";
+import { validateOgrn } from "./validate-ogrn.ts";
 
 /**
  * Единственный источник правды о валидности оформления заказа.
@@ -101,6 +103,19 @@ export const checkoutSchema = z
 				legalAddress: z.string().optional(),
 				companyAddress: z.string().optional(),
 				taxNumber: z.string().optional(),
+				// Пробелы и регистр нормализуются здесь, а не в форме: сервер
+				// берёт в заказ результат разбора, и значение в счёте не должно
+				// зависеть от того, как покупатель его набрал.
+				kpp: z
+					.string()
+					.max(20)
+					.optional()
+					.transform((v) => v?.replace(/\s/g, "").toUpperCase()),
+				ogrn: z
+					.string()
+					.max(20)
+					.optional()
+					.transform((v) => v?.replace(/\s/g, "")),
 				contactPerson: z.string().optional(),
 				saveCompany: z.boolean(),
 			})
@@ -271,6 +286,25 @@ export const checkoutSchema = z
 					code: "custom",
 					path: ["company", "taxNumber"],
 					message: innError,
+				});
+			}
+			// КПП и ОГРН необязательны (у ИП КПП нет, ручной ввод без них
+			// работает как раньше), но введённые — должны быть корректны:
+			// они уходят в счёт, и опечатка в них вернёт платёж.
+			const kppError = validateKpp(data.company.kpp ?? "");
+			if (kppError) {
+				ctx.addIssue({
+					code: "custom",
+					path: ["company", "kpp"],
+					message: kppError,
+				});
+			}
+			const ogrnError = validateOgrn(data.company.ogrn ?? "");
+			if (ogrnError) {
+				ctx.addIssue({
+					code: "custom",
+					path: ["company", "ogrn"],
+					message: ogrnError,
 				});
 			}
 		}

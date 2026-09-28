@@ -33,6 +33,7 @@ export type NotificationScenario =
   | "review_approved"
   | "review_rejected"
   | "review_invitation"
+  | "product_back_in_stock"
   | "welcome";
 
 interface ScenarioDataMap {
@@ -54,6 +55,11 @@ interface ScenarioDataMap {
     reason?: string | null;
   };
   review_invitation: { orderNumber: string; productCount: number };
+  product_back_in_stock: {
+    productId: number;
+    productTitle: string;
+    productUrl: string;
+  };
   welcome: Record<string, never>;
 }
 
@@ -224,6 +230,24 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
       link: "/profile/reviews?status=to-review",
     }),
   },
+  /**
+   * Товар, о поступлении которого просил покупатель, снова можно заказать.
+   *
+   * Канал только внутрисайтовый — письма и мессенджеров для этого сценария
+   * нет намеренно (см. modules/restock). Создаётся не через notify(), а
+   * массовой вставкой из воркера (restock-subscriptions.db.ts): подписчиков у
+   * товара может быть много, и уведомление обязано появиться ровно в том же
+   * SQL-запросе, который закрывает подписку. Формулировка при этом берётся
+   * отсюда же — через renderNotification.
+   */
+  product_back_in_stock: {
+    type: "product",
+    build: ({ productTitle, productUrl }) => ({
+      title: "Товар снова в продаже",
+      body: `«${productTitle}», о поступлении которого вы просили сообщить, снова можно заказать.`,
+      link: productUrl,
+    }),
+  },
   welcome: {
     type: "system",
     build: () => ({
@@ -256,6 +280,22 @@ function pluralizeItems(count: number): string {
   if (mod10 === 1 && mod100 !== 11) return "товара";
   if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "товаров";
   return "товаров";
+}
+
+/**
+ * Текст и тип уведомления по сценарию — без записи в базу.
+ *
+ * Нужен там, где уведомления создаются не по одному, а массовой вставкой
+ * (см. restock-subscriptions.db.ts): формулировки всё равно живут только в
+ * каталоге выше.
+ */
+export function renderNotification<S extends NotificationScenario>(
+  scenario: S,
+  data: ScenarioDataMap[S],
+): { type: NotificationType; title: string; body: string; link: string | null } {
+  const entry = CATALOG[scenario];
+  const { title, body, link } = entry.build(data);
+  return { type: entry.type, title, body, link: link ?? null };
 }
 
 /**

@@ -1773,6 +1773,13 @@ a.itemName:focus-visible {
 	color: var(--text-muted);
 }
 
+/* Статус организации в реестре: ликвидирована, банкротство и т.п. */
+.suggestWarn {
+	font-size: 0.75rem;
+	line-height: 1.4;
+	color: var(--warning);
+}
+
 .suggestState {
 	display: flex;
 	flex-direction: column;

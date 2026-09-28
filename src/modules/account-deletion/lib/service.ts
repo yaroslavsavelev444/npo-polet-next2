@@ -37,16 +37,22 @@ export type AccountDeletionView = {
 	lastErrorCode?: string;
 };
 
+export type AccountDeletionErrorCode =
+	| "ALREADY_PENDING"
+	| "NOT_CANCELLABLE"
+	| "REQUEST_NOT_FOUND"
+	| "INVALID_PASSWORD";
+
+// Поля объявлены явно, а не через parameter properties конструктора: модуль
+// грузит воркер, запускаемый `node --experimental-strip-types`, а этот режим
+// умеет только вырезать типы и на parameter properties падает
+// (ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX). См. также server/suggestion-cache.ts.
 export class AccountDeletionError extends Error {
-	constructor(
-		message: string,
-		readonly code:
-			| "ALREADY_PENDING"
-			| "NOT_CANCELLABLE"
-			| "REQUEST_NOT_FOUND"
-			| "INVALID_PASSWORD",
-	) {
+	readonly code: AccountDeletionErrorCode;
+
+	constructor(message: string, code: AccountDeletionErrorCode) {
 		super(message);
+		this.code = code;
 	}
 }
 
@@ -92,7 +98,11 @@ function errorCode(error: unknown): string {
  * which the generic collection API cannot make atomic.
  */
 export class AccountDeletionService {
-	constructor(private readonly payload: Payload) {}
+	private readonly payload: Payload;
+
+	constructor(payload: Payload) {
+		this.payload = payload;
+	}
 
 	async getCurrentRequest(
 		userId: number | string,

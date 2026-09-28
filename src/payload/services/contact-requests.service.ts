@@ -5,9 +5,16 @@ import { getPayloadInstance } from "./getPayload";
 export interface CreateContactRequestInput {
 	topic: ContactRequest["topic"];
 	name: string;
-	email: string;
+	/** Не спрашивается в заявке на товар. */
+	email?: string;
 	phone?: string;
-	message: string;
+	/** В заявке на товар — необязательный комментарий. */
+	message?: string;
+	/** Заявка на товар: сам товар и количество. */
+	product?: number;
+	quantity?: number;
+	/** Аккаунт отправителя, если он авторизован. */
+	user?: number;
 	/** Момент подтверждения согласия. Ставит сервер, не клиент. */
 	consentAcceptedAt: Date;
 	/** Slug соглашения, на которое ссылалась форма. */
@@ -16,7 +23,8 @@ export interface CreateContactRequestInput {
 }
 
 /**
- * Создаёт обращение со страницы контактов.
+ * Создаёт обращение: со страницы контактов, заявку на 3D-печать или заявку
+ * на товар.
  *
  * `overrideAccess: true` — намеренно: create в коллекции закрыт (() => false),
  * единственный легитимный путь проходит через server action
@@ -38,6 +46,9 @@ export async function createContactRequest(
 			email: input.email,
 			phone: input.phone,
 			message: input.message,
+			product: input.product,
+			quantity: input.quantity,
+			user: input.user,
 			consentAcceptedAt: input.consentAcceptedAt.toISOString(),
 			consentDocument: input.consentDocument,
 			userAgent: input.userAgent,

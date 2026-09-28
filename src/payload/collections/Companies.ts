@@ -18,7 +18,7 @@ export const Companies: CollectionConfig = {
 	access: {
 		// Владелец — только свои организации, персонал — все. См. ownership.ts.
 		read: ownedByUserOrStaff,
-// Создание закрыто для покупателей: поле-владелец `user` не имеет
+		// Создание закрыто для покупателей: поле-владелец `user` не имеет
 		// field-level access, поэтому `isLoggedIn` позволял любому вошедшему
 		// создать документ, записав в `user` ЧУЖОЙ id (mass assignment), а заодно
 		// плодить документы без ограничений. Легитимный путь — сервисы
@@ -65,6 +65,21 @@ export const Companies: CollectionConfig = {
 			index: true,
 		},
 
+		// КПП и ОГРН необязательны: у ИП КПП нет, а организации, сохранённые
+		// до автозаполнения по ИНН, заведены без них. Нужны в счёте — КПП
+		// отличает филиал от головной организации с тем же ИНН.
+		{
+			name: "kpp",
+			type: "text",
+			label: "КПП",
+		},
+
+		{
+			name: "ogrn",
+			type: "text",
+			label: "ОГРН / ОГРНИП",
+		},
+
 		{
 			name: "contactPerson",
 			type: "text",
@@ -88,6 +103,12 @@ export const Companies: CollectionConfig = {
 			({ data }) => {
 				if (data?.taxNumber) {
 					data.taxNumber = data.taxNumber.replace(/\s/g, "");
+				}
+				if (data?.kpp) {
+					data.kpp = data.kpp.replace(/\s/g, "").toUpperCase();
+				}
+				if (data?.ogrn) {
+					data.ogrn = data.ogrn.replace(/\s/g, "");
 				}
 
 				return data;

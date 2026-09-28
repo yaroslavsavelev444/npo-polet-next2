@@ -5,10 +5,10 @@ import {
 	fetchAddressSuggestions,
 	isDadataConfigured,
 	MAX_QUERY_LENGTH,
+	toDegradeReason,
 } from "@/modules/checkout/server/dadata-client";
 import { SuggestionCache } from "@/modules/checkout/server/suggestion-cache";
 import type {
-	AddressSuggestDegradeReason,
 	AddressSuggestion,
 	AddressSuggestResponse,
 } from "@/modules/checkout/types";
@@ -71,21 +71,6 @@ function ok(
 	});
 }
 
-function mapFailureReason(
-	reason:
-		| "not_configured"
-		| "unauthorized"
-		| "rate_limited"
-		| "timeout"
-		| "upstream_error",
-): AddressSuggestDegradeReason {
-	if (reason === "not_configured") return "not_configured";
-	if (reason === "rate_limited") return "rate_limited";
-	// unauthorized у DaData означает и неверный ключ, и исчерпанную квоту:
-	// пользователю в обоих случаях нужен ручной ввод, а не разные тексты.
-	return "unavailable";
-}
-
 export async function POST(
 	request: NextRequest,
 ): Promise<NextResponse<AddressSuggestResponse | { error: string }>> {
@@ -145,7 +130,7 @@ export async function POST(
 	if (!result.ok) {
 		return ok({
 			suggestions: [],
-			degraded: mapFailureReason(result.reason),
+			degraded: toDegradeReason(result.reason),
 		});
 	}
 

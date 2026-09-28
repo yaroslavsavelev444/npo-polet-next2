@@ -9,11 +9,13 @@ import { getAdminEmailAddresses } from "../email/recipients/getAdminEmails.ts";
 
 export interface NewContactRequestNotification {
 	id: number | string;
-	topic: "general" | "print3d";
+	topic: "general" | "print3d" | "product";
 	name: string;
-	email: string;
+	email?: string;
 	phone?: string;
-	message: string;
+	message?: string;
+	/** Заявка на товар: что и сколько. */
+	product?: { title: string; url: string; quantity: number };
 	consentAcceptedAt: Date;
 	consentDocument: string;
 }
@@ -50,6 +52,13 @@ export async function notifyNewContactRequest(
 				email: request.email,
 				phone: request.phone,
 				message: request.message,
+				product: request.product
+					? {
+							title: request.product.title,
+							url: `${appUrl}${request.product.url}`,
+							quantity: request.product.quantity,
+						}
+					: undefined,
 				consentAcceptedAt: request.consentAcceptedAt.toISOString(),
 				consentUrl: `${appUrl}/consents/${request.consentDocument}`,
 				adminUrl: `${appUrl}/admin/collections/contact-requests/${request.id}`,
@@ -57,7 +66,8 @@ export async function notifyNewContactRequest(
 			{
 				to: admins,
 				// Ответить можно прямо из почтового клиента — сразу отправителю.
-				replyTo: request.email,
+				// В заявке на товар почты нет: там отвечают звонком.
+				...(request.email ? { replyTo: request.email } : {}),
 			},
 		);
 	} catch (error) {

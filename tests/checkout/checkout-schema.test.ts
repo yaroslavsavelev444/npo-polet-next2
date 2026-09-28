@@ -356,6 +356,52 @@ test("некорректный ИНН отклоняется по контрол
 	assert.ok(validateCheckout(input)["company.taxNumber"]);
 });
 
+test("КПП и ОГРН необязательны — ручной ввод без них проходит", () => {
+	const input = selfPickup({
+		company: {
+			isCompany: true,
+			companyName: "ООО Ромашка",
+			legalAddress: "г Москва, ул Ленина, д 1",
+			taxNumber: "7707083893",
+			saveCompany: false,
+		},
+	});
+	assert.deepEqual(validateCheckout(input), {});
+});
+
+test("введённые КПП и ОГРН проверяются", () => {
+	const input = selfPickup({
+		company: {
+			isCompany: true,
+			companyName: "ООО Ромашка",
+			legalAddress: "г Москва, ул Ленина, д 1",
+			taxNumber: "7707083893",
+			kpp: "7736",
+			ogrn: "1027700132196",
+			saveCompany: false,
+		},
+	});
+	const errors = validateCheckout(input);
+	assert.equal(errors["company.kpp"], "КПП должен содержать 9 знаков");
+	assert.equal(errors["company.ogrn"], "Неверная контрольная цифра ОГРН");
+});
+
+test("корректные КПП и ОГРН из реестра проходят", () => {
+	const input = selfPickup({
+		company: {
+			isCompany: true,
+			companyName: 'ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО "СБЕРБАНК РОССИИ"',
+			legalAddress: "117312, г Москва, ул Вавилова, д 19",
+			taxNumber: "7707083893",
+			kpp: "773601001",
+			ogrn: "1027700132195",
+			contactPerson: "Греф Герман Оскарович",
+			saveCompany: true,
+		},
+	});
+	assert.deepEqual(validateCheckout(input), {});
+});
+
 // ── Несколько ошибок одновременно ───────────────────────────────────────────
 
 test("возвращаются ВСЕ ошибки формы, а не первая", () => {

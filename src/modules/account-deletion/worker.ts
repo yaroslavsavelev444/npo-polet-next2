@@ -1,3 +1,7 @@
+// Первым: при локальном запуске (pnpm worker:account-deletion) переменные
+// берутся из .env; в проде их передаёт compose (env_file), файла в контейнере
+// нет, и dotenv ничего не делает — уже заданное он не перезаписывает.
+import "dotenv/config";
 import { Worker } from "bullmq";
 import { redisConfig } from "@/modules/auth/lib/redis-config";
 import {

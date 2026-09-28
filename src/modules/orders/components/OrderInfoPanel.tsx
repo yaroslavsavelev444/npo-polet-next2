@@ -36,6 +36,8 @@ interface OrderInfoPanelProps {
 	company?: {
 		name?: string | null;
 		taxNumber?: string | null;
+		kpp?: string | null;
+		ogrn?: string | null;
 		contactPerson?: string | null;
 		legalAddress?: string | null;
 	} | null;
@@ -135,6 +137,22 @@ export function OrderInfoPanel({
 								icon={Building2}
 								label="ИНН"
 								value={company.taxNumber}
+								code
+							/>
+						)}
+						{company.kpp && (
+							<OrderField
+								icon={Building2}
+								label="КПП"
+								value={company.kpp}
+								code
+							/>
+						)}
+						{company.ogrn && (
+							<OrderField
+								icon={Building2}
+								label={company.ogrn.length === 15 ? "ОГРНИП" : "ОГРН"}
+								value={company.ogrn}
 								code
 							/>
 						)}

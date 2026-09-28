@@ -100,6 +100,7 @@ export default defineConfig({
 			env: {
 				DADATA_API_KEY,
 				DADATA_SUGGEST_URL: `http://127.0.0.1:${MOCK_PORT}/suggest`,
+				DADATA_PARTY_SUGGEST_URL: `http://127.0.0.1:${MOCK_PORT}/suggest/party`,
 				// Письма прогон НЕ шлёт — и это не зависит от того, что стоит в
 				// .env у запускающего.
 				//

@@ -169,6 +169,8 @@ export function mapOrderToDetailView(order: Order): OrderDetailView {
 			? {
 					name: order.companyInfo.name ?? null,
 					taxNumber: order.companyInfo.taxNumber ?? null,
+					kpp: order.companyInfo.kpp ?? null,
+					ogrn: order.companyInfo.ogrn ?? null,
 					contactPerson: order.companyInfo.contactPerson ?? null,
 					legalAddress: order.companyInfo.legalAddress ?? null,
 				}

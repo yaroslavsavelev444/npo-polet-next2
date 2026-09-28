@@ -1,12 +1,16 @@
 "use client";
 
-import { Building2, Check } from "lucide-react";
+import { AlertTriangle, Building2, Check, FileCheck2 } from "lucide-react";
 import { useState } from "react";
 import type { Company } from "@/payload-types";
 import { CHECKOUT_FIELD_IDS } from "../lib/checkout-fields";
 import type { CheckoutFieldErrors } from "../lib/checkout-schema";
-import type { CheckoutCompanyInput } from "../types";
+import type { CheckoutCompanyInput, CompanySuggestion } from "../types";
 import styles from "./Checkout.module.css";
+import {
+	COMPANY_STATUS_LABELS,
+	CompanyAutocomplete,
+} from "./CompanyAutocomplete";
 import { CheckboxRow, Disclosure, TextField } from "./fields";
 
 interface Props {
@@ -15,6 +19,8 @@ interface Props {
 	companies: Company[];
 	errors: CheckoutFieldErrors;
 	onFieldBlur: (path: string) => void;
+	/** Подсказки DaData настроены на сервере (тот же ключ, что у адресов). */
+	suggestionsEnabled: boolean;
 }
 
 /**
@@ -29,6 +35,11 @@ interface Props {
  * Принадлежность выбранной организации проверяет СЕРВЕР (см.
  * checkout.actions.ts): id приходит из формы, то есть полностью управляется
  * клиентом, и без проверки заказ можно было бы привязать к чужой организации.
+ *
+ * Новую организацию можно найти по ИНН или названию (CompanyAutocomplete):
+ * выбор заполняет поля реквизитов, но не блокирует их. Выписка ЕГРЮЛ может
+ * отставать от действительности, поэтому подставленное — исходное значение,
+ * которое покупатель проверяет и при необходимости исправляет.
  */
 export function CompanySection({
 	value,
@@ -36,10 +47,39 @@ export function CompanySection({
 	companies,
 	errors,
 	onFieldBlur,
+	suggestionsEnabled,
 }: Props) {
 	const [mode, setMode] = useState<"existing" | "new">(
 		companies.length > 0 ? "existing" : "new",
 	);
+	// Последняя выбранная из реестра организация — только для пояснения под
+	// полями. Данные формы живут в `value`, а не здесь.
+	const [filledFrom, setFilledFrom] = useState<CompanySuggestion | null>(null);
+
+	function applySuggestion(suggestion: CompanySuggestion) {
+		const { requisites } = suggestion;
+		setFilledFrom(suggestion);
+		onChange({
+			...value,
+			// Реестровые поля перезаписываются целиком, включая пустые: иначе
+			// при смене организации КПП предыдущей остался бы у ИП, у которого
+			// КПП нет вовсе.
+			companyName: requisites.companyName,
+			legalAddress: requisites.legalAddress,
+			taxNumber: requisites.taxNumber,
+			kpp: requisites.kpp,
+			ogrn: requisites.ogrn,
+			// Фактический адрес и контактное лицо — данные покупателя, а не
+			// реестра. Руководителя подставляем, только если реестр его знает.
+			contactPerson: requisites.director || value.contactPerson,
+		});
+	}
+
+	// Пояснение актуально, пока ИНН совпадает с выбранным: ввёл другой ИНН
+	// руками — реквизиты уже не «из реестра».
+	const registryMatch =
+		filledFrom && filledFrom.inn === value.taxNumber ? filledFrom : null;
+	const isIndividual = value.taxNumber?.length === 12;
 
 	function selectCompany(company: Company) {
 		onChange({
@@ -49,6 +89,8 @@ export function CompanySection({
 			legalAddress: company.legalAddress,
 			companyAddress: company.companyAddress ?? undefined,
 			taxNumber: company.taxNumber,
+			kpp: company.kpp ?? undefined,
+			ogrn: company.ogrn ?? undefined,
 			contactPerson: company.contactPerson ?? undefined,
 		});
 	}
@@ -104,7 +146,9 @@ export function CompanySection({
 								<span className={styles.optionBody}>
 									<span className={styles.optionTitle}>Новая компания</span>
 									<span className={styles.optionText}>
-										Ввести реквизиты вручную
+										{suggestionsEnabled
+											? "Найти по ИНН или ввести вручную"
+											: "Ввести реквизиты вручную"}
 									</span>
 								</span>
 							</button>
@@ -177,6 +221,12 @@ export function CompanySection({
 
 					{mode === "new" && (
 						<div className={styles.group}>
+							{suggestionsEnabled && (
+								<CompanyAutocomplete
+									inputId={CHECKOUT_FIELD_IDS.companySearch}
+									onSelect={applySuggestion}
+								/>
+							)}
 							<TextField
 								id={CHECKOUT_FIELD_IDS.companyName}
 								label="Название компании"
@@ -231,6 +281,47 @@ export function CompanySection({
 									required
 								/>
 								<TextField
+									id={CHECKOUT_FIELD_IDS.companyKpp}
+									label="КПП"
+									numeric
+									placeholder="9 знаков"
+									optionalNote="необязательно"
+									value={value.kpp ?? ""}
+									onChange={(e) =>
+										onChange({
+											...value,
+											// В 5–6 позиции КПП допустимы заглавные латинские
+											// буквы — фильтр не может быть «только цифры».
+											kpp: e.target.value
+												.toUpperCase()
+												.replace(/[^0-9A-Z]/g, "")
+												.slice(0, 9),
+										})
+									}
+									onBlur={() => onFieldBlur("company.kpp")}
+									error={errors["company.kpp"]}
+									hint={
+										isIndividual ? "У ИП КПП нет — оставьте пустым" : undefined
+									}
+								/>
+								<TextField
+									id={CHECKOUT_FIELD_IDS.companyOgrn}
+									label={isIndividual ? "ОГРНИП" : "ОГРН"}
+									inputMode="numeric"
+									numeric
+									placeholder={isIndividual ? "15 цифр" : "13 цифр"}
+									optionalNote="необязательно"
+									value={value.ogrn ?? ""}
+									onChange={(e) =>
+										onChange({
+											...value,
+											ogrn: e.target.value.replace(/\D/g, "").slice(0, 15),
+										})
+									}
+									onBlur={() => onFieldBlur("company.ogrn")}
+									error={errors["company.ogrn"]}
+								/>
+								<TextField
 									label="Контактное лицо"
 									placeholder="Кто подпишет документы"
 									optionalNote="необязательно"
@@ -238,8 +329,43 @@ export function CompanySection({
 									onChange={(e) =>
 										onChange({ ...value, contactPerson: e.target.value })
 									}
+									hint={
+										registryMatch?.requisites.directorPost &&
+										value.contactPerson === registryMatch.requisites.director
+											? `${registryMatch.requisites.directorPost} по данным ЕГРЮЛ`
+											: undefined
+									}
 								/>
 							</div>
+							{registryMatch && (
+								<p
+									role="status"
+									className={`${styles.notice} ${
+										registryMatch.status === "ACTIVE"
+											? styles.noticeInfo
+											: styles.noticeWarn
+									}`}
+								>
+									{registryMatch.status === "ACTIVE" ? (
+										<FileCheck2
+											size={15}
+											aria-hidden
+											className={styles.noticeIcon}
+										/>
+									) : (
+										<AlertTriangle
+											size={15}
+											aria-hidden
+											className={styles.noticeIcon}
+										/>
+									)}
+									<span>
+										{registryMatch.status === "ACTIVE"
+											? "Реквизиты заполнены по данным ЕГРЮЛ. Выписка может отставать — проверьте их и при необходимости исправьте."
+											: `Статус организации по данным ЕГРЮЛ: «${COMPANY_STATUS_LABELS[registryMatch.status]}». Проверьте, что счёт нужен именно на неё.`}
+									</span>
+								</p>
+							)}
 							<CheckboxRow
 								checked={value.saveCompany}
 								onChange={(checked) =>

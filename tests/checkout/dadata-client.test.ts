@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import {
 	fetchAddressSuggestions,
+	fetchCompanySuggestions,
 	isDadataConfigured,
+	mapPartySuggestion,
 	mapSuggestion,
+	toDegradeReason,
 } from "../../src/modules/checkout/server/dadata-client.ts";
 
 /**
@@ -23,6 +26,8 @@ import {
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_KEY = process.env.DADATA_API_KEY;
+const ORIGINAL_SUGGEST_URL = process.env.DADATA_SUGGEST_URL;
+const ORIGINAL_PARTY_URL = process.env.DADATA_PARTY_SUGGEST_URL;
 const ORIGINAL_CONSOLE_ERROR = console.error;
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -56,6 +61,11 @@ afterEach(() => {
 	globalThis.fetch = ORIGINAL_FETCH;
 	if (ORIGINAL_KEY === undefined) delete process.env.DADATA_API_KEY;
 	else process.env.DADATA_API_KEY = ORIGINAL_KEY;
+	if (ORIGINAL_SUGGEST_URL === undefined) delete process.env.DADATA_SUGGEST_URL;
+	else process.env.DADATA_SUGGEST_URL = ORIGINAL_SUGGEST_URL;
+	if (ORIGINAL_PARTY_URL === undefined)
+		delete process.env.DADATA_PARTY_SUGGEST_URL;
+	else process.env.DADATA_PARTY_SUGGEST_URL = ORIGINAL_PARTY_URL;
 });
 
 // ── Маппинг ─────────────────────────────────────────────────────────────────
@@ -324,4 +334,197 @@ test("неожиданная форма ответа трактуется как
 	const result = await fetchAddressSuggestions({ query: "москва" });
 
 	assert.deepEqual(result, { ok: true, suggestions: [] });
+});
+
+// ── Организации (suggest/party) ─────────────────────────────────────────────
+
+/** Форма ответа suggest/party на бесплатном тарифе — только нужные поля. */
+const SBERBANK = {
+	value: "ПАО СБЕРБАНК",
+	data: {
+		inn: "7707083893",
+		kpp: "773601001",
+		ogrn: "1027700132195",
+		hid: "145a83ab38c9ad95889a7b894ff57c8a6d4d8b8e8b0f0f2a0c1c5f1e0a1c1e1f",
+		type: "LEGAL",
+		branch_type: "MAIN",
+		name: {
+			full_with_opf: 'ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО "СБЕРБАНК РОССИИ"',
+			short_with_opf: "ПАО СБЕРБАНК",
+		},
+		management: { name: "Греф Герман Оскарович", post: "ПРЕЗИДЕНТ" },
+		state: { status: "ACTIVE" },
+		address: {
+			value: "г Москва, ул Вавилова, д 19",
+			unrestricted_value: "117312, г Москва, ул Вавилова, д 19",
+			data: { city_with_type: "г Москва", region_with_type: "г Москва" },
+		},
+	},
+};
+
+test("mapPartySuggestion раскладывает реквизиты юрлица", () => {
+	const mapped = mapPartySuggestion(SBERBANK);
+	assert.ok(mapped);
+	assert.equal(mapped.label, "ПАО СБЕРБАНК");
+	assert.equal(mapped.inn, "7707083893");
+	assert.equal(mapped.city, "г Москва");
+	assert.equal(mapped.status, "ACTIVE");
+	assert.equal(mapped.isBranch, false);
+	assert.deepEqual(mapped.requisites, {
+		// Полное наименование с ОПФ — именно оно нужно в счёте.
+		companyName: 'ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО "СБЕРБАНК РОССИИ"',
+		// Адрес с индексом предпочтительнее короткого.
+		legalAddress: "117312, г Москва, ул Вавилова, д 19",
+		taxNumber: "7707083893",
+		kpp: "773601001",
+		ogrn: "1027700132195",
+		director: "Греф Герман Оскарович",
+		directorPost: "ПРЕЗИДЕНТ",
+	});
+});
+
+test("ИП: без КПП, руководитель — сам предприниматель", () => {
+	const mapped = mapPartySuggestion({
+		value: "ИП Иванов Иван Иванович",
+		data: {
+			inn: "500100732259",
+			ogrn: "304500116000157",
+			type: "INDIVIDUAL",
+			fio: { surname: "Иванов", name: "Иван", patronymic: "Иванович" },
+			name: {
+				full_with_opf: "Индивидуальный предприниматель Иванов Иван Иванович",
+			},
+			state: { status: "ACTIVE" },
+			address: { value: "Московская обл, г Химки" },
+		},
+	});
+	assert.ok(mapped);
+	assert.equal(mapped.isIndividual, true);
+	assert.equal(mapped.requisites.kpp, "");
+	assert.equal(mapped.requisites.ogrn, "304500116000157");
+	assert.equal(mapped.requisites.director, "Иванов Иван Иванович");
+	assert.equal(mapped.requisites.directorPost, "");
+	assert.equal(mapped.requisites.legalAddress, "Московская обл, г Химки");
+});
+
+test("филиал отличается от головной организации по id и флагу", () => {
+	const branch = mapPartySuggestion({
+		value: "ПАО СБЕРБАНК",
+		data: {
+			...SBERBANK.data,
+			hid: undefined,
+			kpp: "784243001",
+			branch_type: "BRANCH",
+		},
+	});
+	const main = mapPartySuggestion({
+		...SBERBANK,
+		data: { ...SBERBANK.data, hid: undefined },
+	});
+	assert.ok(branch && main);
+	assert.equal(branch.isBranch, true);
+	assert.notEqual(branch.id, main.id);
+});
+
+test("неизвестный статус не выдаётся за действующую организацию", () => {
+	const mapped = mapPartySuggestion({
+		...SBERBANK,
+		data: { ...SBERBANK.data, state: { status: "SOMETHING_NEW" } },
+	});
+	assert.equal(mapped?.status, "UNKNOWN");
+
+	const liquidated = mapPartySuggestion({
+		...SBERBANK,
+		data: { ...SBERBANK.data, state: { status: "liquidated" } },
+	});
+	assert.equal(liquidated?.status, "LIQUIDATED");
+});
+
+test("подсказка без ИНН или не-объект отбрасывается", () => {
+	assert.equal(
+		mapPartySuggestion({ value: "ООО Без ИНН", data: { kpp: "1" } }),
+		null,
+	);
+	// biome-ignore lint/suspicious/noExplicitAny: проверяется мусор из ответа
+	assert.equal(mapPartySuggestion(null as any), null);
+});
+
+test("fetchCompanySuggestions ходит в suggest/party, а не в адреса", async () => {
+	process.env.DADATA_SUGGEST_URL = "http://mock/address";
+	delete process.env.DADATA_PARTY_SUGGEST_URL;
+	let calledUrl = "";
+	let sentBody: Record<string, unknown> = {};
+	globalThis.fetch = async (url, init) => {
+		calledUrl = String(url);
+		sentBody = JSON.parse(String(init?.body));
+		return jsonResponse({ suggestions: [SBERBANK, { value: "мусор" }] });
+	};
+
+	const result = await fetchCompanySuggestions({
+		query: " 7707083893 ",
+		count: 7,
+	});
+
+	// Переопределение адресного апстрима не уводит организации туда же.
+	assert.equal(
+		calledUrl,
+		"https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/party",
+	);
+	assert.deepEqual(sentBody, { query: "7707083893", count: 7 });
+	assert.ok(result.ok);
+	assert.equal(result.suggestions.length, 1);
+});
+
+test("DADATA_PARTY_SUGGEST_URL подменяет апстрим организаций (E2E-мок)", async () => {
+	process.env.DADATA_PARTY_SUGGEST_URL = "http://127.0.0.1:4599/suggest/party";
+	let calledUrl = "";
+	globalThis.fetch = async (url) => {
+		calledUrl = String(url);
+		return jsonResponse({ suggestions: [] });
+	};
+	await fetchCompanySuggestions({ query: "ромашка" });
+	assert.equal(calledUrl, "http://127.0.0.1:4599/suggest/party");
+});
+
+test("адреса по-прежнему уважают DADATA_SUGGEST_URL", async () => {
+	process.env.DADATA_SUGGEST_URL = "http://127.0.0.1:4599/suggest";
+	process.env.DADATA_PARTY_SUGGEST_URL = "http://127.0.0.1:4599/suggest/party";
+	let calledUrl = "";
+	globalThis.fetch = async (url) => {
+		calledUrl = String(url);
+		return jsonResponse({ suggestions: [] });
+	};
+	await fetchAddressSuggestions({ query: "москва" });
+	assert.equal(calledUrl, "http://127.0.0.1:4599/suggest");
+});
+
+test("отказы suggest/party обрабатываются как у адресов", async () => {
+	delete process.env.DADATA_API_KEY;
+	assert.deepEqual(await fetchCompanySuggestions({ query: "ромашка" }), {
+		ok: false,
+		reason: "not_configured",
+	});
+
+	process.env.DADATA_API_KEY = "test-key";
+	globalThis.fetch = async () => new Response("", { status: 403 });
+	assert.deepEqual(await fetchCompanySuggestions({ query: "ромашка" }), {
+		ok: false,
+		reason: "unauthorized",
+	});
+
+	globalThis.fetch = async () => {
+		throw Object.assign(new Error("timeout"), { name: "TimeoutError" });
+	};
+	assert.deepEqual(await fetchCompanySuggestions({ query: "ромашка" }), {
+		ok: false,
+		reason: "timeout",
+	});
+});
+
+test("причины отказа сводятся к трём вариантам для формы", () => {
+	assert.equal(toDegradeReason("not_configured"), "not_configured");
+	assert.equal(toDegradeReason("rate_limited"), "rate_limited");
+	assert.equal(toDegradeReason("unauthorized"), "unavailable");
+	assert.equal(toDegradeReason("timeout"), "unavailable");
+	assert.equal(toDegradeReason("upstream_error"), "unavailable");
 });

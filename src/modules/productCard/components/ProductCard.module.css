@@ -421,15 +421,31 @@
 	display: inline-flex;
 }
 
-/* Недоступный товар: кнопка называет исход и ничем не приглашает нажать.
-   Точный статус уже напечатан в служебной строке выше — повторять его на
-   кнопке значит сказать одно и то же дважды в одном блоке. */
-.ctaUnavailable,
-.card:hover .ctaUnavailable {
-	border-color: var(--hairline);
+/* Недоступный товар: «Сообщить о поступлении» и «Оставить заявку».
+   Кнопки живые, но тихие: без акцентной заливки ни при наведении на карточку,
+   ни на сенсорном экране — оранжевый на сайте означает «купить», а купить
+   этот товар нельзя. Наведение на саму кнопку лишь проявляет контур. */
+.ctaQuiet,
+.card:hover .ctaQuiet {
+	border-color: var(--border);
 	background: transparent;
-	color: var(--text-muted);
-	cursor: not-allowed;
+	color: var(--text-primary);
+}
+
+.ctaQuiet:hover,
+.ctaQuiet:focus-visible,
+.card:hover .ctaQuiet:hover {
+	border-color: var(--text-secondary);
+	background: var(--surface-hover);
+	color: var(--text-primary);
+}
+
+@media (hover: none) {
+	.ctaQuiet {
+		border-color: var(--border);
+		background: transparent;
+		color: var(--text-primary);
+	}
 }
 
 /* ---------------------------------------------------------------------------

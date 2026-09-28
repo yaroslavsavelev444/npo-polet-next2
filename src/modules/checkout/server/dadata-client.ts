@@ -1,8 +1,12 @@
 import type { CheckoutAddress } from "../lib/address";
-import type { AddressSuggestion } from "../types";
+import type {
+	AddressSuggestion,
+	CompanyRegistryStatus,
+	CompanySuggestion,
+} from "../types";
 
 /**
- * Клиент подсказок адресов DaData.
+ * Клиент подсказок DaData: адреса и организации.
  *
  * Почему запрос идёт с сервера, а не напрямую из браузера:
  *
@@ -19,7 +23,8 @@ import type { AddressSuggestion } from "../types";
  *  4. Тестируемость. Маппинг — чистая функция, которую можно проверить
  *     юнит-тестом без сети (tests/checkout/dadata-client.test.ts).
  *
- * Модуль импортируется ТОЛЬКО из серверного кода (app/api/address/suggest).
+ * Модуль импортируется ТОЛЬКО из серверного кода (app/api/address/suggest,
+ * app/api/company/suggest).
  * Ключ читается из `process.env.DADATA_API_KEY` без префикса NEXT_PUBLIC_,
  * поэтому даже при случайном импорте в клиентский компонент значение в бандл
  * не попадёт — Next.js подставляет в клиент только NEXT_PUBLIC_*-переменные.
@@ -27,6 +32,8 @@ import type { AddressSuggestion } from "../types";
 
 const DADATA_DEFAULT_URL =
 	"https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address";
+const DADATA_PARTY_DEFAULT_URL =
+	"https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/party";
 
 /**
  * Адрес апстрима. Переопределяется только серверной переменной окружения —
@@ -38,6 +45,18 @@ const DADATA_DEFAULT_URL =
  */
 function resolveSuggestUrl(): string {
 	return process.env.DADATA_SUGGEST_URL?.trim() || DADATA_DEFAULT_URL;
+}
+
+/**
+ * То же для подсказок организаций. Отдельная переменная, а не производная от
+ * DADATA_SUGGEST_URL: та уже указывает на конкретный метод (адреса), и
+ * вычислять из неё соседний путь значило бы менять смысл существующей
+ * настройки.
+ */
+function resolvePartySuggestUrl(): string {
+	return (
+		process.env.DADATA_PARTY_SUGGEST_URL?.trim() || DADATA_PARTY_DEFAULT_URL
+	);
 }
 
 /** DaData режет запрос по 300 символам — обрезаем заранее. */
@@ -92,6 +111,10 @@ export type DadataFailureReason =
 
 export type DadataResult =
 	| { ok: true; suggestions: AddressSuggestion[] }
+	| { ok: false; reason: DadataFailureReason };
+
+export type CompanyDadataResult =
+	| { ok: true; suggestions: CompanySuggestion[] }
 	| { ok: false; reason: DadataFailureReason };
 
 function text(value: string | null | undefined): string {
@@ -179,46 +202,40 @@ export interface FetchSuggestionsOptions {
 	toBound?: string;
 }
 
+type DadataRawResult =
+	| { ok: true; suggestions: unknown[] }
+	| { ok: false; reason: DadataFailureReason };
+
 /**
- * Запрашивает подсказки у DaData. Никогда не бросает: любая проблема —
- * это `{ ok: false }`, потому что недоступность подсказок не должна мешать
- * оформить заказ с адресом, введённым вручную.
+ * Общий транспорт подсказок: ключ, таймаут, разбор кодов ответа. Адреса и
+ * организации отличаются только URL, телом запроса и маппингом, а отказы
+ * DaData (лимит, неверный ключ, сбой) одинаковы для всех методов — и
+ * обрабатываться должны одинаково.
+ *
+ * Никогда не бросает: любая проблема — это `{ ok: false }`, потому что
+ * недоступность подсказок не должна мешать оформить заказ с данными,
+ * введёнными вручную.
  */
-export async function fetchAddressSuggestions(
-	options: FetchSuggestionsOptions,
-): Promise<DadataResult> {
+async function requestSuggestions(
+	url: string,
+	body: Record<string, unknown>,
+): Promise<DadataRawResult> {
 	const apiKey = process.env.DADATA_API_KEY?.trim();
 	if (!apiKey) return { ok: false, reason: "not_configured" };
 
-	const query = options.query.trim().slice(0, MAX_QUERY_LENGTH);
-	if (!query) return { ok: true, suggestions: [] };
-
-	const count = Math.min(
-		Math.max(options.count ?? DEFAULT_COUNT, 1),
-		MAX_SUGGESTION_COUNT,
-	);
-
 	let response: Response;
 	try {
-		response = await fetch(resolveSuggestUrl(), {
+		response = await fetch(url, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 				Accept: "application/json",
 				Authorization: `Token ${apiKey}`,
 			},
-			body: JSON.stringify({
-				query,
-				count,
-				...(options.locations ? { locations: options.locations } : {}),
-				...(options.fromBound
-					? { from_bound: { value: options.fromBound } }
-					: {}),
-				...(options.toBound ? { to_bound: { value: options.toBound } } : {}),
-			}),
+			body: JSON.stringify(body),
 			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-			// Ответ зависит от ключа и меняется вместе со справочником ФИАС —
-			// кэш Next.js здесь только мешает; своё кэширование живёт в роуте.
+			// Ответ зависит от ключа и меняется вместе со справочниками —
+			// кэш Next.js здесь только мешает; своё кэширование живёт в роутах.
 			cache: "no-store",
 		});
 	} catch (error) {
@@ -253,15 +270,196 @@ export async function fetchAddressSuggestions(
 	}
 
 	const rawSuggestions = (payload as { suggestions?: unknown })?.suggestions;
-	if (!Array.isArray(rawSuggestions)) {
-		// Неожиданная форма ответа не должна ломать форму — считаем, что
-		// подсказок нет.
-		return { ok: true, suggestions: [] };
-	}
+	// Неожиданная форма ответа не должна ломать форму — считаем, что
+	// подсказок нет.
+	return {
+		ok: true,
+		suggestions: Array.isArray(rawSuggestions) ? rawSuggestions : [],
+	};
+}
 
-	const suggestions = rawSuggestions
+function clampCount(count: number | undefined): number {
+	return Math.min(Math.max(count ?? DEFAULT_COUNT, 1), MAX_SUGGESTION_COUNT);
+}
+
+/**
+ * Запрашивает подсказки адреса у DaData. Никогда не бросает — см.
+ * requestSuggestions.
+ */
+export async function fetchAddressSuggestions(
+	options: FetchSuggestionsOptions,
+): Promise<DadataResult> {
+	if (!isDadataConfigured()) return { ok: false, reason: "not_configured" };
+
+	const query = options.query.trim().slice(0, MAX_QUERY_LENGTH);
+	if (!query) return { ok: true, suggestions: [] };
+
+	const result = await requestSuggestions(resolveSuggestUrl(), {
+		query,
+		count: clampCount(options.count),
+		...(options.locations ? { locations: options.locations } : {}),
+		...(options.fromBound ? { from_bound: { value: options.fromBound } } : {}),
+		...(options.toBound ? { to_bound: { value: options.toBound } } : {}),
+	});
+	if (!result.ok) return result;
+
+	const suggestions = result.suggestions
 		.map((item) => mapSuggestion(item as DadataSuggestion))
 		.filter((item): item is AddressSuggestion => item !== null);
 
 	return { ok: true, suggestions };
+}
+
+// ── Организации (suggest/party) ─────────────────────────────────────────────
+//
+// Метод входит во все тарифы DaData, включая бесплатный, и расходует ту же
+// дневную квоту аккаунта, что и адреса (10 000 запросов в сутки на
+// бесплатном). Поля, которые здесь используются — название, адрес, ИНН, КПП,
+// ОГРН, статус и текущий руководитель (`management`), — отдаются на любом
+// тарифе; только на «Максимальном» доступны `managers`/`founders`, и они не
+// нужны.
+
+/** Поля ответа suggest/party, которые реально используются. */
+interface DadataPartyData {
+	inn?: string | null;
+	kpp?: string | null;
+	ogrn?: string | null;
+	hid?: string | null;
+	/** LEGAL — юрлицо, INDIVIDUAL — ИП. */
+	type?: string | null;
+	/** MAIN — головная организация, BRANCH — филиал. */
+	branch_type?: string | null;
+	name?: {
+		full_with_opf?: string | null;
+		short_with_opf?: string | null;
+	} | null;
+	management?: { name?: string | null; post?: string | null } | null;
+	fio?: {
+		surname?: string | null;
+		name?: string | null;
+		patronymic?: string | null;
+	} | null;
+	state?: { status?: string | null } | null;
+	address?: {
+		value?: string | null;
+		unrestricted_value?: string | null;
+		data?: {
+			city_with_type?: string | null;
+			region_with_type?: string | null;
+		} | null;
+	} | null;
+}
+
+interface DadataPartySuggestion {
+	value?: string | null;
+	data?: DadataPartyData | null;
+}
+
+const PARTY_STATUSES: readonly CompanyRegistryStatus[] = [
+	"ACTIVE",
+	"LIQUIDATING",
+	"LIQUIDATED",
+	"BANKRUPT",
+	"REORGANIZING",
+];
+
+function partyStatus(value: string | null | undefined): CompanyRegistryStatus {
+	const status = text(value).toUpperCase() as CompanyRegistryStatus;
+	// Неизвестный статус не должен выглядеть как «действующая»: пусть лучше
+	// пользователь увидит предупреждение, чем выставит счёт ликвидированной.
+	return PARTY_STATUSES.includes(status) ? status : "UNKNOWN";
+}
+
+/**
+ * Преобразует подсказку suggest/party в доменные реквизиты.
+ *
+ * Экспортируется отдельно от сетевого вызова, чтобы маппинг покрывался
+ * тестами без сети и без ключа.
+ */
+export function mapPartySuggestion(
+	suggestion: DadataPartySuggestion,
+): CompanySuggestion | null {
+	if (!suggestion || typeof suggestion !== "object") return null;
+	const data = suggestion.data ?? {};
+	const inn = text(data.inn);
+	const label = text(suggestion.value) || text(data.name?.short_with_opf);
+	// Без ИНН реквизиты бесполезны: счёт без него не выставить.
+	if (!inn || !label) return null;
+
+	const kpp = text(data.kpp);
+	const isIndividual = text(data.type).toUpperCase() === "INDIVIDUAL";
+	// У ИП руководителя в ЕГРИП нет — подписывает сам предприниматель.
+	const director = isIndividual
+		? [data.fio?.surname, data.fio?.name, data.fio?.patronymic]
+				.map(text)
+				.filter(Boolean)
+				.join(" ")
+		: text(data.management?.name);
+	const address =
+		text(data.address?.unrestricted_value) || text(data.address?.value);
+	const city =
+		text(data.address?.data?.city_with_type) ||
+		text(data.address?.data?.region_with_type);
+
+	return {
+		// hid — стабильный идентификатор записи DaData; ИНН+КПП различает
+		// головную организацию и филиалы, у которых ИНН общий.
+		id: text(data.hid) || `${inn}:${kpp}`,
+		label,
+		inn,
+		city,
+		status: partyStatus(data.state?.status),
+		isBranch: text(data.branch_type).toUpperCase() === "BRANCH",
+		isIndividual,
+		requisites: {
+			companyName: text(data.name?.full_with_opf) || label,
+			legalAddress: address,
+			taxNumber: inn,
+			kpp,
+			ogrn: text(data.ogrn),
+			director,
+			directorPost: isIndividual ? "" : text(data.management?.post),
+		},
+	};
+}
+
+/**
+ * Запрашивает подсказки организаций у DaData. Никогда не бросает — см.
+ * requestSuggestions.
+ */
+export async function fetchCompanySuggestions(options: {
+	query: string;
+	count?: number;
+}): Promise<CompanyDadataResult> {
+	if (!isDadataConfigured()) return { ok: false, reason: "not_configured" };
+
+	const query = options.query.trim().slice(0, MAX_QUERY_LENGTH);
+	if (!query) return { ok: true, suggestions: [] };
+
+	const result = await requestSuggestions(resolvePartySuggestUrl(), {
+		query,
+		count: clampCount(options.count),
+	});
+	if (!result.ok) return result;
+
+	const suggestions = result.suggestions
+		.map((item) => mapPartySuggestion(item as DadataPartySuggestion))
+		.filter((item): item is CompanySuggestion => item !== null);
+
+	return { ok: true, suggestions };
+}
+
+/**
+ * Причина отказа клиента → причина деградации в ответе роута. Общая для всех
+ * роутов подсказок: пользователю в каждом из них нужен один и тот же выбор —
+ * повторить или ввести вручную.
+ */
+export function toDegradeReason(
+	reason: DadataFailureReason,
+): "not_configured" | "rate_limited" | "unavailable" {
+	if (reason === "not_configured") return "not_configured";
+	if (reason === "rate_limited") return "rate_limited";
+	// unauthorized у DaData означает и неверный ключ, и исчерпанную квоту:
+	// пользователю в обоих случаях нужен ручной ввод, а не разные тексты.
+	return "unavailable";
 }

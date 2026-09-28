@@ -90,6 +90,59 @@ export interface AddressSuggestResponse {
 	degraded?: AddressSuggestDegradeReason;
 }
 
+// ── Подсказки организаций (контракт /api/company/suggest) ────────────────────
+
+/** Статус организации в ЕГРЮЛ/ЕГРИП. UNKNOWN — провайдер вернул что-то иное. */
+export type CompanyRegistryStatus =
+	| "ACTIVE"
+	| "LIQUIDATING"
+	| "LIQUIDATED"
+	| "BANKRUPT"
+	| "REORGANIZING"
+	| "UNKNOWN";
+
+/**
+ * Реквизиты из реестра. Это ИСХОДНЫЕ значения для полей формы, а не
+ * неизменяемая истина: выписка может отставать от действительности, и
+ * покупатель вправе исправить любое поле перед оформлением.
+ */
+export interface CompanyRequisites {
+	/** Полное наименование с ОПФ. */
+	companyName: string;
+	legalAddress: string;
+	taxNumber: string;
+	/** Пусто у ИП — КПП им не присваивается. */
+	kpp: string;
+	/** ОГРН (13 цифр) или ОГРНИП (15 цифр). */
+	ogrn: string;
+	/** ФИО руководителя; у ИП — сам предприниматель. */
+	director: string;
+	directorPost: string;
+}
+
+export interface CompanySuggestion {
+	/** Стабильный ключ для списка. */
+	id: string;
+	/** Краткое название с ОПФ — основная строка подсказки. */
+	label: string;
+	inn: string;
+	/** Город/регион регистрации — различает тёзок. */
+	city: string;
+	status: CompanyRegistryStatus;
+	/** Филиал: ИНН общий с головной организацией, КПП свой. */
+	isBranch: boolean;
+	isIndividual: boolean;
+	requisites: CompanyRequisites;
+}
+
+/** Та же семантика, что у адресов: `degraded` — предложите ручной ввод. */
+export type CompanySuggestDegradeReason = AddressSuggestDegradeReason;
+
+export interface CompanySuggestResponse {
+	suggestions: CompanySuggestion[];
+	degraded?: CompanySuggestDegradeReason;
+}
+
 // ── Client form state / submission payload ──────────────────────────────────
 
 /** Чей номер выбран для связи менеджера по заказу. */
@@ -144,6 +197,8 @@ export interface CheckoutCompanyInput {
 	legalAddress?: string;
 	companyAddress?: string;
 	taxNumber?: string;
+	kpp?: string;
+	ogrn?: string;
 	contactPerson?: string;
 	saveCompany: boolean;
 }

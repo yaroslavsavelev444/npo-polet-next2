@@ -134,6 +134,8 @@ export interface OrderDetailView extends OrderListItemView {
 	companyInfo?: {
 		name?: string | null;
 		taxNumber?: string | null;
+		kpp?: string | null;
+		ogrn?: string | null;
 		contactPerson?: string | null;
 		legalAddress?: string | null;
 	} | null;

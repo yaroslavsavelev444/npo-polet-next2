@@ -294,6 +294,8 @@ export async function createOrderFromCheckout({
 				legalAddress: form.company.legalAddress,
 				companyAddress: form.company.companyAddress,
 				taxNumber: form.company.taxNumber,
+				kpp: form.company.kpp,
+				ogrn: form.company.ogrn,
 				contactPerson: form.company.contactPerson,
 			}
 		: undefined;

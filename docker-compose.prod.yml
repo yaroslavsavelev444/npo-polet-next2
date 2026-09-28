@@ -211,7 +211,16 @@ services:
     restart: unless-stopped
     logging: *default-logging
     env_file: .env.production
-    command: ["node_modules/.bin/tsx", "src/modules/account-deletion/worker.ts"]
+    # Голый Node, а не tsx: под tsx воркер падал ещё при импорте Payload —
+    # интероп @next/env в payload/dist/bin/loadEnv.js (см. шапку
+    # scripts/payload-cli.mts). Команда — как у restock-worker.
+    command:
+      - node
+      - --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
+      - --experimental-strip-types
+      - --import
+      - ./tests/support/next-subpath-resolver.mjs
+      - src/modules/account-deletion/worker.ts
     <<: *hardening
     mem_limit: 1g
     pids_limit: 256
@@ -222,6 +231,43 @@ services:
         condition: service_healthy
     networks: [internal, data]
     profiles: ["workers"]
+
+  # Уведомления «товар снова в продаже» (src/modules/restock/worker.ts):
+  # подписчикам товара, вернувшегося в продажу, создаются уведомления в
+  # колокольчике на сайте. Отдельный процесс, чтобы рассылка тысячам
+  # подписчиков не держала запрос сохранения товара в админке.
+  #
+  # В отличие от account-deletion-worker, профиля НЕТ: воркер ничего не
+  # удаляет из пользовательских данных, только создаёт внутрисайтовые
+  # уведомления, — а без него кнопка «Сообщить о поступлении» на сайте
+  # обещала бы то, чего никто не выполнит. Поэтому поднимается каждой
+  # выкладкой вместе с app.
+  restock-worker:
+    image: ${IMAGE_TOOLS:?IMAGE_TOOLS не задан — запускать этот compose-файл нужно через deploy/deploy.sh}
+    container_name: polet-next-restock-worker-prod
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: .env.production
+    # Голый Node, а не tsx: под tsx getPayload падает на интеропе @next/env
+    # (см. шапку scripts/payload-cli.mts). Резолвер достраивает расширения и
+    # алиас @/ — тот же, с которым ходят в базу test:reviews и test:restock.
+    command:
+      - node
+      - --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
+      - --experimental-strip-types
+      - --import
+      - ./tests/support/next-subpath-resolver.mjs
+      - src/modules/restock/worker.ts
+    <<: *hardening
+    mem_limit: 512m
+    pids_limit: 256
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Только data: воркеру не нужен выход наружу — ни почты, ни DaData.
+    networks: [data]
 
 volumes:
   postgres_data:

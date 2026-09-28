@@ -99,6 +99,7 @@ export interface Config {
     'product-reviews': ProductReview;
     sessions: Session;
     'trusted-devices': TrustedDevice;
+    'restock-subscriptions': RestockSubscription;
     'user-consents': UserConsent;
     'account-deletion-requests': AccountDeletionRequest;
     'checkout-preferences': CheckoutPreference;
@@ -140,6 +141,7 @@ export interface Config {
     'product-reviews': ProductReviewsSelect<false> | ProductReviewsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     'trusted-devices': TrustedDevicesSelect<false> | TrustedDevicesSelect<true>;
+    'restock-subscriptions': RestockSubscriptionsSelect<false> | RestockSubscriptionsSelect<true>;
     'user-consents': UserConsentsSelect<false> | UserConsentsSelect<true>;
     'account-deletion-requests': AccountDeletionRequestsSelect<false> | AccountDeletionRequestsSelect<true>;
     'checkout-preferences': CheckoutPreferencesSelect<false> | CheckoutPreferencesSelect<true>;
@@ -648,6 +650,8 @@ export interface Order {
     legalAddress?: string | null;
     companyAddress?: string | null;
     taxNumber?: string | null;
+    kpp?: string | null;
+    ogrn?: string | null;
     contactPerson?: string | null;
   };
   notes?: string | null;
@@ -843,6 +847,8 @@ export interface Company {
   legalAddress: string;
   companyAddress?: string | null;
   taxNumber: string;
+  kpp?: string | null;
+  ogrn?: string | null;
   contactPerson?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -935,18 +941,24 @@ export interface Feedback {
   createdAt: string;
 }
 /**
- * Сообщения со страницы «Контакты» и заявки на 3D-печать с главной
+ * Сообщения со страницы «Контакты», заявки на 3D-печать с главной и заявки на недоступные товары
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "contact-requests".
  */
 export interface ContactRequest {
   id: number;
-  topic: 'general' | 'print3d';
+  topic: 'general' | 'print3d' | 'product';
   name: string;
-  email: string;
+  email?: string | null;
   phone?: string | null;
-  message: string;
+  message?: string | null;
+  /**
+   * Товар, по которому оставлена заявка.
+   */
+  product?: (number | null) | Product;
+  quantity?: number | null;
+  user?: (number | null) | User;
   status?: ('new' | 'in_progress' | 'done') | null;
   /**
    * Момент, когда отправитель подтвердил согласие. Проставляется сервером.
@@ -1739,6 +1751,19 @@ export interface TrustedDevice {
   createdAt: string;
 }
 /**
+ * Покупатели, которые попросили сообщить о поступлении товара. Запись удаляется, когда покупатель получил уведомление.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "restock-subscriptions".
+ */
+export interface RestockSubscription {
+  id: number;
+  user: number | User;
+  product: number | Product;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Журнал принятых пользователями соглашений
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1986,6 +2011,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trusted-devices';
         value: number | TrustedDevice;
+      } | null)
+    | ({
+        relationTo: 'restock-subscriptions';
+        value: number | RestockSubscription;
       } | null)
     | ({
         relationTo: 'user-consents';
@@ -2449,6 +2478,8 @@ export interface OrdersSelect<T extends boolean = true> {
         legalAddress?: T;
         companyAddress?: T;
         taxNumber?: T;
+        kpp?: T;
+        ogrn?: T;
         contactPerson?: T;
       };
   notes?: T;
@@ -2525,6 +2556,9 @@ export interface ContactRequestsSelect<T extends boolean = true> {
   email?: T;
   phone?: T;
   message?: T;
+  product?: T;
+  quantity?: T;
+  user?: T;
   status?: T;
   consentAcceptedAt?: T;
   consentDocument?: T;
@@ -2822,6 +2856,8 @@ export interface CompaniesSelect<T extends boolean = true> {
   legalAddress?: T;
   companyAddress?: T;
   taxNumber?: T;
+  kpp?: T;
+  ogrn?: T;
   contactPerson?: T;
   phone?: T;
   email?: T;
@@ -3085,6 +3121,16 @@ export interface TrustedDevicesSelect<T extends boolean = true> {
   expiresAt?: T;
   revoked?: T;
   revokedReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "restock-subscriptions_select".
+ */
+export interface RestockSubscriptionsSelect<T extends boolean = true> {
+  user?: T;
+  product?: T;
   updatedAt?: T;
   createdAt?: T;
 }

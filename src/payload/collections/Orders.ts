@@ -876,6 +876,8 @@ export const Orders: CollectionConfig = {
 				{ name: "legalAddress", type: "text" },
 				{ name: "companyAddress", type: "text" },
 				{ name: "taxNumber", type: "text" },
+				{ name: "kpp", type: "text", label: "КПП" },
+				{ name: "ogrn", type: "text", label: "ОГРН / ОГРНИП" },
 				{ name: "contactPerson", type: "text" },
 			],
 		},

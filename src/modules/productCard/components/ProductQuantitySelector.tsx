@@ -30,9 +30,9 @@ import { cn } from "@/utils/cn";
 import { useAddToCart } from "../hooks/useAddToCart";
 import { useProductQuantity } from "../hooks/useProductQuantity";
 import { useRemoveFromCart } from "../hooks/useRemoveFromCart";
-import { PRODUCT_STATUS_LABELS } from "../lib/status";
 import type { ProductCardData, ProductQuantitySelectorProps } from "../types";
 import styles from "./ProductCard.module.css";
+import { UnavailableProductActions } from "./UnavailableProductActions";
 
 interface Props extends ProductQuantitySelectorProps {
 	product: ProductCardData;
@@ -57,27 +57,14 @@ export function ProductQuantitySelector({
 		product.status === "out_of_stock" || product.status === "discontinued";
 
 	if (isUnavailable) {
+		// Не тупик: подписка на поступление и/или заявка на товар — см.
+		// UnavailableProductActions.
 		return (
-			<button
-				type="button"
-				disabled
-				className={
-					isCompact
-						? cn(styles.cta, styles.ctaUnavailable)
-						: cn(
-								CTA_HEIGHT,
-								"w-full cursor-not-allowed truncate rounded-[var(--radius-sm)] border border-[var(--hairline)]",
-								"px-3 text-[13px] font-medium text-[var(--text-muted)]",
-							)
-				}
-			>
-				{/* В карточке точный статус уже напечатан в служебной строке, и
-				    повторять его на кнопке — значит сказать одно и то же дважды в
-				    одном блоке. Кнопке остаётся назвать только исход. На странице
-				    товара служебной строки нет, поэтому там статус называется
-				    полностью. */}
-				{isCompact ? "Недоступно" : PRODUCT_STATUS_LABELS[product.status]}
-			</button>
+			<UnavailableProductActions
+				product={product}
+				minOrderQuantity={minOrderQuantity}
+				variant={variant}
+			/>
 		);
 	}
 

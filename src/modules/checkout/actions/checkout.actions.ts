@@ -136,6 +136,8 @@ export async function submitOrderAction(
 				legalAddress: companyForm.legalAddress!,
 				companyAddress: companyForm.companyAddress,
 				taxNumber: companyForm.taxNumber!,
+				kpp: companyForm.kpp || undefined,
+				ogrn: companyForm.ogrn || undefined,
 				contactPerson: companyForm.contactPerson,
 			},
 			overrideAccess: true,

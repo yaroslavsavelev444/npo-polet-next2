@@ -3,6 +3,7 @@ import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { normalizeProductForCatalog } from "../hooks/normalizeProductForCatalog.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
+import { scheduleRestockNotifications } from "../hooks/scheduleRestockNotifications.ts";
 import { trackPreviousSlug } from "../hooks/trackPreviousSlug.ts";
 import { generateSlug } from "../utils/generateSlug.ts";
 
@@ -25,7 +26,12 @@ export const Products: CollectionConfig = {
 		beforeChange: [trackPreviousSlug, normalizeProductForCatalog],
 		// getCachedProducts кэширует список/карточки с revalidate:false — без
 		// этого хука изменения товаров не появлялись бы на сайте до редеплоя.
-		afterChange: [createRevalidateCacheHook("products")],
+		// scheduleRestockNotifications — «товар снова в продаже» для тех, кто
+		// просил сообщить о поступлении (ставит задачу в очередь, не ждёт её).
+		afterChange: [
+			createRevalidateCacheHook("products"),
+			scheduleRestockNotifications,
+		],
 		afterDelete: [createRevalidateCacheHook("products")],
 	},
 	fields: [

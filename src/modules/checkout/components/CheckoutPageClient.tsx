@@ -660,6 +660,9 @@ export function CheckoutPageClient({
 								companies={initialView.companies}
 								errors={visibleErrors}
 								onFieldBlur={validation.markTouched}
+								// Один ключ DaData на адреса и организации: настроены
+								// одни — настроены и другие.
+								suggestionsEnabled={initialView.addressSuggestionsEnabled}
 							/>
 						</CheckoutSection>
 

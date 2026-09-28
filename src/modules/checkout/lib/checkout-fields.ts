@@ -57,6 +57,9 @@ export const CHECKOUT_FIELD_IDS = {
 	companyName: `${ID}-company-name`,
 	companyLegalAddress: `${ID}-company-legal-address`,
 	companyTaxNumber: `${ID}-company-tax-number`,
+	companyKpp: `${ID}-company-kpp`,
+	companyOgrn: `${ID}-company-ogrn`,
+	companySearch: `${ID}-company-search`,
 	payment: `${ID}-payment`,
 	// Единственный id, приходящий извне: поле промокода принадлежит своему
 	// модулю, а не форме оформления (см. PROMO_CODE_INPUT_ID).
@@ -83,6 +86,8 @@ export const CHECKOUT_FIELD_ORDER = [
 	"company.companyName",
 	"company.legalAddress",
 	"company.taxNumber",
+	"company.kpp",
+	"company.ogrn",
 	"paymentMethod",
 	// Последним: поле промокода стоит в колонке итога, ниже всех разделов
 	// формы, и ссылка на него не должна уводить пользователя вверх.
@@ -164,6 +169,16 @@ export const CHECKOUT_FIELDS: Record<string, CheckoutFieldMeta> = {
 		label: "ИНН",
 		section: "company",
 		elementId: CHECKOUT_FIELD_IDS.companyTaxNumber,
+	},
+	"company.kpp": {
+		label: "КПП",
+		section: "company",
+		elementId: CHECKOUT_FIELD_IDS.companyKpp,
+	},
+	"company.ogrn": {
+		label: "ОГРН",
+		section: "company",
+		elementId: CHECKOUT_FIELD_IDS.companyOgrn,
 	},
 	paymentMethod: {
 		label: "Способ оплаты",

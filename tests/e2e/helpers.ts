@@ -31,6 +31,9 @@ export const FIELD = {
 	companyName: "#checkout-company-name",
 	companyLegalAddress: "#checkout-company-legal-address",
 	companyTaxNumber: "#checkout-company-tax-number",
+	companyKpp: "#checkout-company-kpp",
+	companyOgrn: "#checkout-company-ogrn",
+	companySearch: "#checkout-company-search",
 	payment: "#checkout-payment",
 } as const;
 
@@ -173,4 +176,26 @@ export function suggestionList(page: Page): Locator {
 
 export function suggestionOption(page: Page, text: string | RegExp): Locator {
 	return suggestionList(page).getByRole("option").filter({ hasText: text });
+}
+
+/**
+ * Вводит запрос в поиск организации и дожидается ответа роута — по той же
+ * причине, что и typeAddress: фиксированная пауза делала бы тест нестабильным.
+ */
+export async function searchCompany(page: Page, query: string): Promise<void> {
+	const response = page.waitForResponse(
+		(res) => res.url().includes("/api/company/suggest") && res.status() === 200,
+		{ timeout: 20_000 },
+	);
+	await page.locator(FIELD.companySearch).click();
+	await page.locator(FIELD.companySearch).fill(query);
+	await response;
+}
+
+export function companyList(page: Page): Locator {
+	return page.getByRole("listbox", { name: "Найденные организации" });
+}
+
+export function companyOption(page: Page, text: string | RegExp): Locator {
+	return companyList(page).getByRole("option").filter({ hasText: text });
 }

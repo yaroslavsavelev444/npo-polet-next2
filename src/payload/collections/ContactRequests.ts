@@ -3,10 +3,11 @@ import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
 /**
- * Обращения с сайта: форма на странице контактов (/contacts) и заявки на
- * 3D-печать из блока на главной.
+ * Обращения с сайта: форма на странице контактов (/contacts), заявки на
+ * 3D-печать из блока на главной и заявки на товар, который сейчас нельзя
+ * купить (карточка товара — «Оставить заявку»).
  *
- * Оба потока — одна очередь: их разбирает отдел продаж, и заявка на печать в
+ * Все потоки — одна очередь: их разбирает отдел продаж, и заявка на печать в
  * отдельной таблице лежала бы там, куда реже заглядывают. Различает их поле
  * «Тема» — по нему в админке фильтруется список и выбирается заголовок
  * письма-уведомления.
@@ -24,8 +25,12 @@ import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
  * бы, что письмо от заказчика лежит в админке между двумя отчётами о
  * съехавшей вёрстке — и рано или поздно потеряется.
  *
- * Набор полей повторяет форму на странице ровно один в один (имя, email,
- * сообщение) — см. modules/contact/schemas/contact-request.schema.ts.
+ * Набор полей повторяет формы один в один — см.
+ * modules/contact/schemas/contact-request.schema.ts. У заявки на товар другой
+ * состав: имя, телефон и количество, а связь с товаром — отдельным полем, а не
+ * текстом в сообщении: менеджер должен открыть именно тот товар, а не искать
+ * его по названию. Поэтому email и сообщение обязательны только для тем
+ * «Обращение» и «3D-печать» (см. validate у полей).
  *
  * ────────────────────────────────────────────────────────────────────────────
  * СОГЛАСИЕ НА ОБРАБОТКУ ПЕРСОНАЛЬНЫХ ДАННЫХ
@@ -47,16 +52,29 @@ import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
  * на /api/contact-requests невозможен, и подделать userAgent или дату согласия
  * с клиента нельзя.
  */
+/** Тема из соседних полей документа — для условной обязательности полей. */
+function topicOf(siblingData: unknown): string | undefined {
+	return (siblingData as { topic?: string } | undefined)?.topic;
+}
+
 export const ContactRequests: CollectionConfig = {
 	slug: "contact-requests",
 	labels: { singular: "Обращение", plural: "Обращения" },
 
 	admin: {
 		useAsTitle: "name",
-		defaultColumns: ["name", "topic", "email", "phone", "status", "createdAt"],
+		defaultColumns: [
+			"name",
+			"topic",
+			"product",
+			"email",
+			"phone",
+			"status",
+			"createdAt",
+		],
 		group: "Поддержка",
 		description:
-			"Сообщения со страницы «Контакты» и заявки на 3D-печать с главной",
+			"Сообщения со страницы «Контакты», заявки на 3D-печать с главной и заявки на недоступные товары",
 	},
 
 	access: {
@@ -82,6 +100,7 @@ export const ContactRequests: CollectionConfig = {
 			options: [
 				{ label: "Обращение", value: "general" },
 				{ label: "3D-печать", value: "print3d" },
+				{ label: "Заявка на товар", value: "product" },
 			],
 			admin: { position: "sidebar" },
 		},
@@ -94,11 +113,20 @@ export const ContactRequests: CollectionConfig = {
 			label: "Имя",
 		},
 		{
+			// Не `required`: заявка на товар спрашивает телефон, а не почту.
+			// Для остальных тем обязательность проверяет validate.
 			name: "email",
 			type: "email",
-			required: true,
 			index: true,
 			label: "Email",
+			validate: (value, { siblingData }) => {
+				if (!value) {
+					return topicOf(siblingData) === "product" ? true : "Укажите email";
+				}
+				return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+					? true
+					: "Некорректный email";
+			},
 		},
 		{
 			// Необязателен: форма на контактах его не спрашивает, в заявке на
@@ -108,12 +136,50 @@ export const ContactRequests: CollectionConfig = {
 			label: "Телефон",
 		},
 		{
+			// В заявке на товар сообщение — необязательный комментарий, для
+			// остальных тем — суть обращения (минимум 10 символов).
 			name: "message",
 			type: "textarea",
-			required: true,
-			minLength: 10,
 			maxLength: 4000,
 			label: "Сообщение",
+			validate: (value: string | null | undefined, { siblingData }) => {
+				const text = value?.trim() ?? "";
+				if (topicOf(siblingData) === "product") return true;
+				return text.length >= 10 ? true : "Минимум 10 символов";
+			},
+		},
+
+		// ── Заявка на товар ──────────────────────────────────────────────────
+		{
+			name: "product",
+			type: "relationship",
+			relationTo: "products",
+			index: true,
+			label: "Товар",
+			admin: {
+				condition: (data) => data?.topic === "product",
+				description: "Товар, по которому оставлена заявка.",
+			},
+		},
+		{
+			name: "quantity",
+			type: "number",
+			min: 1,
+			label: "Количество, шт.",
+			admin: {
+				condition: (data) => data?.topic === "product",
+			},
+		},
+		{
+			// Аккаунт отправителя, если он был авторизован. Анонимная заявка
+			// тоже принимается — связь нужна менеджеру, чтобы видеть историю
+			// заказов покупателя, а не для доступа.
+			name: "user",
+			type: "relationship",
+			relationTo: "users",
+			index: true,
+			label: "Аккаунт",
+			admin: { position: "sidebar", readOnly: true },
 		},
 
 		// ── Обработка ────────────────────────────────────────────────────────

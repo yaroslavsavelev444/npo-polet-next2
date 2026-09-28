@@ -33,6 +33,7 @@ import PickupPoints from "./src/payload/collections/PickupPoint.ts";
 import { Products } from "./src/payload/collections/Products.ts";
 import { PromoCodeRedemptions } from "./src/payload/collections/PromoCodeRedemptions.ts";
 import { PromoCodes } from "./src/payload/collections/PromoCodes.ts";
+import { RestockSubscriptions } from "./src/payload/collections/RestockSubscriptions.ts";
 import { ProductReviews } from "./src/payload/collections/Reviews.ts"; // добавили (если экспортируется как ProductReviews)
 import { Sessions } from "./src/payload/collections/Sessions.ts"; // добавили
 import TransportCompanies from "./src/payload/collections/TransportCompanies.ts";
@@ -145,6 +146,7 @@ export default buildConfig({
 		// аккаунт», здесь «какому браузеру разрешено входить без кода». Сроки
 		// жизни у них разные, поэтому и коллекции разные (см. шапку).
 		TrustedDevices,
+		RestockSubscriptions,
 		UserConsents, // добавили
 		AccountDeletionRequests,
 		CheckoutPreferences,

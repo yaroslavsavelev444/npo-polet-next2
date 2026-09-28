@@ -38,7 +38,10 @@
  * относительными путями (весь modules/banners, например), поэтому без
  * разворачивания алиаса тест до них просто не доходит.
  *
- * Подключается флагом --import, см. скрипт test:reviews в package.json.
+ * Подключается флагом --import, см. скрипты test:reviews и test:restock в
+ * package.json. Тем же способом запускаются воркеры (worker:restock,
+ * worker:account-deletion и одноимённые сервисы в docker-compose.prod.yml):
+ * им нужен тот же Payload вне Next, а tsx для этого не годится (см. выше).
  */
 
 import { registerHooks } from "node:module";

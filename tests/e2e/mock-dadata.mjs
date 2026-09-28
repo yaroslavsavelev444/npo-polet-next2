@@ -13,6 +13,10 @@
  *   «медленно» → ответ дольше клиентского таймаута
  *   «пусто»    → 200 с пустым списком
  *   иначе      → подсказки по префиксу из фикстур ниже
+ *
+ * Путь, оканчивающийся на /party, — подсказки организаций (suggest/party,
+ * см. DADATA_PARTY_SUGGEST_URL в playwright.config.ts); управляющие слова
+ * те же. Остальные пути — адреса, как и раньше.
  */
 import { createServer } from "node:http";
 
@@ -104,6 +108,95 @@ const NO_POSTAL_CODE = {
 	},
 };
 
+// ── Организации ─────────────────────────────────────────────────────────────
+// ИНН и ОГРН — с корректными контрольными цифрами: форма их проверяет.
+
+const ROMASHKA = {
+	value: "ООО «РОМАШКА»",
+	data: {
+		inn: "7707083893",
+		kpp: "773601001",
+		ogrn: "1027700132195",
+		hid: "e2e-hid-romashka",
+		type: "LEGAL",
+		branch_type: "MAIN",
+		name: {
+			full_with_opf: "ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ «РОМАШКА»",
+			short_with_opf: "ООО «РОМАШКА»",
+		},
+		management: { name: "Петров Пётр Петрович", post: "ГЕНЕРАЛЬНЫЙ ДИРЕКТОР" },
+		state: { status: "ACTIVE" },
+		address: {
+			value: "г Москва, ул Вавилова, д 19",
+			unrestricted_value: "117312, г Москва, ул Вавилова, д 19",
+			data: { city_with_type: "г Москва", region_with_type: "г Москва" },
+		},
+	},
+};
+
+/** Филиал: ИНН тот же, КПП свой — подсказки обязаны различаться. */
+const ROMASHKA_BRANCH = {
+	value: "ООО «РОМАШКА»",
+	data: {
+		...ROMASHKA.data,
+		kpp: "784243001",
+		hid: "e2e-hid-romashka-spb",
+		branch_type: "BRANCH",
+		address: {
+			value: "г Санкт-Петербург, Невский пр-кт, д 1",
+			unrestricted_value: "191186, г Санкт-Петербург, Невский пр-кт, д 1",
+			data: {
+				city_with_type: "г Санкт-Петербург",
+				region_with_type: "г Санкт-Петербург",
+			},
+		},
+	},
+};
+
+const LIQUIDATED = {
+	value: "ООО «ЗАКРЫТО»",
+	data: {
+		inn: "7736050003",
+		kpp: "772801001",
+		ogrn: "1027700070518",
+		hid: "e2e-hid-closed",
+		type: "LEGAL",
+		branch_type: "MAIN",
+		name: {
+			full_with_opf: "ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ «ЗАКРЫТО»",
+		},
+		management: { name: "Сидоров Сидор Сидорович", post: "ЛИКВИДАТОР" },
+		state: { status: "LIQUIDATED" },
+		address: { value: "г Москва, ул Намёткина, д 16" },
+	},
+};
+
+/** ИП: КПП нет, руководителя нет — есть ФИО предпринимателя. */
+const INDIVIDUAL = {
+	value: "ИП Иванов Иван Иванович",
+	data: {
+		inn: "500100732259",
+		ogrn: "304500116000157",
+		hid: "e2e-hid-ip",
+		type: "INDIVIDUAL",
+		fio: { surname: "Иванов", name: "Иван", patronymic: "Иванович" },
+		name: {
+			full_with_opf: "Индивидуальный предприниматель Иванов Иван Иванович",
+		},
+		state: { status: "ACTIVE" },
+		address: { value: "Московская обл, г Химки" },
+	},
+};
+
+function partySuggestionsFor(query) {
+	const q = query.toLowerCase();
+	if (q.includes("закрыто")) return [LIQUIDATED];
+	if (q.includes("иванов") || q === "500100732259") return [INDIVIDUAL];
+	if (q.includes("ромашка") || q === "7707083893")
+		return [ROMASHKA, ROMASHKA_BRANCH];
+	return [];
+}
+
 function suggestionsFor(query) {
 	const q = query.toLowerCase();
 	if (q.includes("юдино") || q.includes("одинцов")) return [VILLAGE];
@@ -154,8 +247,11 @@ const server = createServer((req, res) => {
 			return;
 		}
 
+		const suggestions = req.url?.endsWith("/party")
+			? partySuggestionsFor(query)
+			: suggestionsFor(query);
 		res.writeHead(200, { "Content-Type": "application/json" });
-		res.end(JSON.stringify({ suggestions: suggestionsFor(query) }));
+		res.end(JSON.stringify({ suggestions }));
 	});
 });
 
