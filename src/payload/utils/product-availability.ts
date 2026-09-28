@@ -1,5 +1,5 @@
 // src/payload/utils/product-availability.ts
-import type { Product } from "@/payload-types";
+import type { Product } from "../../../payload-types.ts";
 
 /**
  * ЕДИНСТВЕННОЕ определение «этот товар сейчас можно заказать».
