@@ -6,6 +6,7 @@ import { buildCartView } from "@/modules/cart/lib/build-cart-view";
 import { calculateCheckoutPricing } from "@/modules/checkout/lib/checkout-pricing";
 import { getCartByUserId } from "@/payload/services/carts.service";
 import { loadPromoCodeLookup } from "@/payload/services/promo-codes.service";
+import { captureError } from "@/services/observability/capture";
 import { isValidPromoCodeFormat, normalizePromoCode } from "../lib/promo-code";
 import type { PromoApplyResult } from "../types";
 
@@ -107,7 +108,11 @@ export async function applyPromoCodeAction(
 		// Сбой базы не должен уносить в error boundary всю заполненную форму
 		// оформления: промокод — необязательная часть заказа, и его отказ
 		// обязан оставаться локальной ошибкой поля.
-		console.error("[promo] apply failed:", error);
+		const errorId = captureError(error, {
+			source: "action",
+			module: "promo/apply",
+		});
+		console.error("[promo] apply failed:", error, { errorId });
 		return {
 			success: false,
 			reason: "unknown",

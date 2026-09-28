@@ -113,6 +113,14 @@ RUN set -e; \
     export PAYLOAD_SECRET=build-time-placeholder-not-a-secret; \
     pnpm payload:types && pnpm build
 
+# Карты кода серверных бандлов — в standalone, без вшитых исходников. Без
+# этого стеки в журнале ошибок указывают внутрь .next/server/chunks (см.
+# scripts/prepare-source-maps.ts). Проверка следом — потому что молчаливая
+# потеря карт означала бы, что за них заплачено временем сборки впустую.
+RUN node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/prepare-source-maps.ts \
+    && test -n "$(find .next/standalone/.next/server -name '*.js.map' -print -quit)" \
+    || { echo 'ОШИБКА: карты кода не попали в .next/standalone — см. scripts/prepare-source-maps.ts'; exit 1; }
+
 # ── tools: миграции Payload и фоновые воркеры ──────────────────────────────
 #
 # Тот же контент, что и base-builder (нужен payload.config.ts и весь src/), но

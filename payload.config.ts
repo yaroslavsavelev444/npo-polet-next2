@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { env } from "./src/env.ts";
 import { migrations } from "./src/migrations/index.ts";
 import { AccountDeletionRequests } from "./src/payload/collections/AccountDeletionRequests.ts";
+import { ErrorEvents } from "./src/payload/collections/ErrorEvents.ts";
 import { Admins } from "./src/payload/collections/Admins.ts";
 import { BannerEvents } from "./src/payload/collections/BannerEvents.ts";
 import { Banners } from "./src/payload/collections/Banners.ts";
@@ -42,7 +43,9 @@ import { Users } from "./src/payload/collections/User.ts";
 import { UserConsents } from "./src/payload/collections/UserConsents.ts"; // добавили
 import { Wishlists } from "./src/payload/collections/Wishlists.ts";
 import { projectEmailAdapter } from "./src/payload/email/adapter.ts";
+import { AlertingSettings } from "./src/payload/globals/AlertingSettings.ts";
 import { Settings } from "./src/payload/globals/Settings.ts";
+import { captureAfterError } from "./src/payload/hooks/captureAfterError.ts";
 
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET!,
@@ -97,7 +100,13 @@ export default buildConfig({
 	// (src/payload/lexical/knowledgeEditor.ts).
 	editor: lexicalEditor(),
 
-	globals: [Settings],
+	globals: [Settings, AlertingSettings],
+
+	// Ошибки 5xx эндпоинтов Payload — в журнал ошибок и письмом дежурному
+	// (src/services/observability/README.md).
+	hooks: {
+		afterError: [captureAfterError],
+	},
 	localization: {
 		locales: ["ru", "en"],
 		defaultLocale: "ru",
@@ -150,6 +159,9 @@ export default buildConfig({
 		UserConsents, // добавили
 		AccountDeletionRequests,
 		CheckoutPreferences,
+		// Журнал серверных ошибок. Только суперадминистратору; персональные
+		// данные — только в карточке записи (см. шапку коллекции).
+		ErrorEvents,
 	],
 
 	db: postgresAdapter({

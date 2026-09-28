@@ -10,6 +10,7 @@ import {
 } from "@/payload/services/restock-subscriptions.db";
 import { getProductUnavailableReason } from "@/payload/utils/product-availability";
 import type { Product } from "@/payload-types";
+import { captureError } from "@/services/observability/capture";
 
 export type RestockActionErrorCode =
 	| "AUTH_REQUIRED"
@@ -135,7 +136,11 @@ export async function setRestockSubscriptionAction(
 		await insertRestockSubscription(payload, Number(user.id), numericId);
 		return { success: true, data: { subscribed: true } };
 	} catch (error) {
-		console.error("[restock] subscription failed", error);
+		const errorId = captureError(error, {
+			source: "action",
+			module: "restock/subscribe",
+		});
+		console.error("[restock] subscription failed", error, { errorId });
 		return failure("UNKNOWN", "Не удалось сохранить. Попробуйте ещё раз.");
 	}
 }

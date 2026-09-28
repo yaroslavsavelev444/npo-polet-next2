@@ -5,6 +5,7 @@ import { getRequestMeta } from "@/modules/auth/lib/utils";
 import { createContactRequest } from "@/payload/services/contact-requests.service";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyNewContactRequest } from "@/services/notifications/notifyNewContactRequest";
+import { captureError } from "@/services/observability/capture";
 import {
 	contactRequestSchema,
 	PERSONAL_DATA_CONSENT_SLUG,
@@ -79,7 +80,11 @@ export async function submitContactRequestAction(
 		});
 		requestId = created.id;
 	} catch (error) {
-		console.error("[contact-request] create failed", error);
+		const errorId = captureError(error, {
+			source: "action",
+			module: "contact/submit-contact-request",
+		});
+		console.error("[contact-request] create failed", error, { errorId });
 		return {
 			success: false,
 			error:

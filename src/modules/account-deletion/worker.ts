@@ -4,6 +4,12 @@
 import "dotenv/config";
 import { Worker } from "bullmq";
 import { redisConfig } from "@/modules/auth/lib/redis-config";
+import { captureError } from "@/services/observability/capture";
+import {
+	closeObservability,
+	flushCaptures,
+	installWorkerProcessCapture,
+} from "@/services/observability/process";
 import {
 	ACCOUNT_DELETION_JOB_NAME,
 	ACCOUNT_DELETION_QUEUE,
@@ -11,6 +17,8 @@ import {
 import { accountDeletionLogger } from "./lib/logger";
 import type { AccountDeletionJob } from "./lib/queue";
 import { getAccountDeletionService } from "./lib/service";
+
+installWorkerProcessCapture("account-deletion/worker");
 
 const worker = new Worker<AccountDeletionJob>(
 	ACCOUNT_DELETION_QUEUE,
@@ -36,6 +44,20 @@ worker.on("failed", (job, error) => {
 		code: error?.name ?? "UNKNOWN",
 	});
 	if (!job || job.attemptsMade < (job.opts.attempts ?? 1)) return;
+	// Окончательный провал: заявка на удаление аккаунта не исполнена, а срок
+	// по ней уже истёк. Это требует человека.
+	captureError(error, {
+		source: "job",
+		module: "account-deletion/worker",
+		job: {
+			queue: ACCOUNT_DELETION_QUEUE,
+			name: job.name,
+			id: job.id,
+			attempt: job.attemptsMade,
+			maxAttempts: job.opts.attempts,
+		},
+		extra: { requestId: job.data.requestId },
+	});
 	void getAccountDeletionService()
 		.then((service) => service.markExecutionFailed(job.data.requestId, error))
 		.catch(() => {
@@ -47,6 +69,8 @@ worker.on("failed", (job, error) => {
 
 async function shutdown() {
 	await worker.close();
+	await flushCaptures();
+	await closeObservability();
 	process.exit(0);
 }
 

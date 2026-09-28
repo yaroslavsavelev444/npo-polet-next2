@@ -13,6 +13,7 @@ import type {
 	ProductCatalogResult,
 	SortField,
 } from "../../modules/productCatalog/types/filters";
+import { ORDERABLE_PRODUCT_STATUSES } from "../utils/product-availability";
 import {
 	type CatalogQueryContext,
 	type CategoryFacetDefinitions,
@@ -300,6 +301,62 @@ async function fetchProductsByIds(ids: number[]): Promise<Product[]> {
  * сортировка по рейтингу обязана выполняться ДО пагинации. Документы затем
  * подтягиваются обычным payload.find по id страницы.
  */
+/**
+ * Карточки для блока «Продукция» на главной.
+ *
+ * Отдельная выборка, а не getCatalogData: тот работает только внутри раздела
+ * каталога (фасеты, счётчики) и без categoryId отдаёт пустой результат —
+ * именно так блок на главной опустел после перевода каталога на фасеты.
+ *
+ * Порядок:
+ *  1. товары с флагом «Показывать на главной» (inventory.showOnMainPage) —
+ *     выбор администратора, новые первыми;
+ *  2. если их меньше `limit`, блок добирается самыми новыми товарами, которые
+ *     можно заказать прямо сейчас. Раньше флаг молча не учитывался вовсе, и
+ *     главная показывала просто новинки; без добора блок снова опустел бы
+ *     там, где флаг ещё никому не проставлен.
+ *
+ * Обе выборки — через getCachedProducts: кэш с тегом `products`, сбрасывается
+ * хуком коллекции, как и раньше.
+ */
+export async function getHomeShowcaseProducts(
+	limit = 10,
+): Promise<ProductCardData[]> {
+	const featured = await getCachedProducts({
+		showOnMainPage: true,
+		isVisible: true,
+		sort: "-createdAt",
+		limit,
+		depth: 1,
+	});
+	const docs = [...featured.docs];
+
+	// Добор — сначала «в наличии», затем «предзаказ»: в витрине первыми
+	// должны стоять товары, которые можно получить сразу.
+	if (docs.length < limit) {
+		const seen = new Set(docs.map((doc) => String(doc.id)));
+		for (const status of ORDERABLE_PRODUCT_STATUSES) {
+			if (docs.length >= limit) break;
+			const fill = await getCachedProducts({
+				status,
+				isVisible: true,
+				sort: "-createdAt",
+				// С запасом на уже взятые избранные — они могут попасть и сюда.
+				limit: limit + seen.size,
+				depth: 1,
+			});
+			for (const doc of fill.docs) {
+				if (docs.length >= limit) break;
+				if (seen.has(String(doc.id))) continue;
+				seen.add(String(doc.id));
+				docs.push(doc);
+			}
+		}
+	}
+
+	return mapProductsToCardsWithRating(docs);
+}
+
 export async function getCatalogData(
 	query: ProductQuery,
 ): Promise<ProductCatalogResult> {

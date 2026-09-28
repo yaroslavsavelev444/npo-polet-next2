@@ -3,6 +3,7 @@ import { getAuthenticatedUserFromHeaders } from "@/modules/auth/lib/getCurrentUs
 import { nextBannerQuerySchema } from "@/modules/banners/schemas";
 import { deliverNextBanner } from "@/modules/banners/server/delivery";
 import type { NextBannerResponse } from "@/modules/banners/types";
+import { captureError } from "@/services/observability/capture";
 
 // Payload Local API требует Node.js runtime
 export const runtime = "nodejs";
@@ -70,7 +71,13 @@ export async function GET(
 			pageBlocked: outcome.pageBlocked,
 		});
 	} catch (error) {
-		console.error("[api/banners/next] Unexpected error:", error);
+		const errorId = captureError(error, {
+			source: "http",
+			module: "api/banners/next",
+			http: { method: "GET", route: "/api/banners/next", status: 500 },
+			userId: user.id,
+		});
+		console.error("[api/banners/next] Unexpected error:", error, { errorId });
 		return NextResponse.json(
 			{ error: "Не удалось получить баннер" },
 			{ status: 500 },

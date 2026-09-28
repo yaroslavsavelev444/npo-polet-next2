@@ -20,7 +20,7 @@ import { TrustSection } from "@/modules/home/components/TrustSection";
 import { faq as faqCopy } from "@/modules/home/content/home-content";
 import { getHomeDocuments } from "@/modules/home/lib/documents";
 import { getCachedFaqTopics } from "@/payload/services/faq.service";
-import { getCatalogData } from "@/payload/services/products.service";
+import { getHomeShowcaseProducts } from "@/payload/services/products.service";
 import { getLatestApprovedReviews } from "@/payload/services/reviews.service";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import { baseURL } from "@/resources/content";
@@ -67,17 +67,13 @@ export const metadata: Metadata = {
  * что страница остаётся статической между правками в админке.
  */
 export default async function Home() {
-	const [catalog, faqTopics, reviews, settings] = await Promise.all([
+	const [showcaseProducts, faqTopics, reviews, settings] = await Promise.all([
 		// Отбор для главной — существующий флаг товара
-		// (inventory.showOnMainPage), а не отдельный список: администратор уже
-		// умеет им пользоваться. Десять карточек — максимум, который может
+		// (inventory.showOnMainPage) с добором новинками в продаже, см.
+		// getHomeShowcaseProducts. Десять карточек — максимум, который может
 		// понадобиться самой широкой раскладке (5 колонок × 2 ряда); лишние
 		// на узких экранах прячет CSS, см. ProductsShowcase.
-		getCatalogData({
-			showOnMainPage: true,
-			isVisible: true,
-			limit: 10,
-		}),
+		getHomeShowcaseProducts(10),
 		getCachedFaqTopics(),
 		getLatestApprovedReviews(3),
 		getCachedSettings(),
@@ -118,7 +114,7 @@ export default async function Home() {
 
 			<ManifestoSection />
 			<DirectionsSection />
-			<ProductsShowcase products={catalog.products} />
+			<ProductsShowcase products={showcaseProducts} />
 			<OffersSection />
 			<PrincipleSection />
 			<AudienceSection />

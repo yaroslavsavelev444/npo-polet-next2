@@ -116,6 +116,14 @@ const nextConfig: NextConfig = {
     // видео-фона Hero через /api/media (Payload REST) легко превышает это,
     // поэтому лимит поднят под короткие сжатые ролики.
     proxyClientMaxBodySize: "30mb",
+
+    // Карты кода серверных бандлов — для журнала ошибок: без них кадры стека
+    // веб-процесса указывают внутрь .next/server/chunks и не говорят, где
+    // ошибка (src/services/observability/source-maps.ts). В образ их
+    // переносит scripts/prepare-source-maps.ts. Цена — память и время сборки;
+    // если сборка начнёт падать по памяти, выключать нужно этот флаг —
+    // остальное тогда просто ничего не делает (см. memory-usage.md в доках Next).
+    serverSourceMaps: true,
   },
 
   serverExternalPackages: [

@@ -5,6 +5,12 @@ import "dotenv/config";
 import { Worker } from "bullmq";
 import { redisConfig } from "@/modules/auth/lib/redis-config";
 import { getPayloadInstance } from "@/payload/services/getPayload";
+import { captureError } from "@/services/observability/capture";
+import {
+	closeObservability,
+	flushCaptures,
+	installWorkerProcessCapture,
+} from "@/services/observability/process";
 import {
 	RESTOCK_PRODUCT_JOB,
 	RESTOCK_QUEUE,
@@ -30,6 +36,10 @@ import {
  * tests/support/next-subpath-resolver.mjs, а не через tsx: под tsx
  * getPayload падает на интеропе @next/env (см. scripts/payload-cli.mts).
  */
+
+// Необработанное исключение — в журнал ошибок и письмом, затем падение, как
+// и раньше (Docker поднимет процесс заново).
+installWorkerProcessCapture("restock/worker");
 
 const worker = new Worker<RestockJob>(
 	RESTOCK_QUEUE,
@@ -65,21 +75,46 @@ worker.on("completed", (job, result) => {
 	});
 });
 worker.on("failed", (job, error) => {
+	// В журнал — только окончательный провал: промежуточные попытки BullMQ
+	// повторит сам, и письмо о каждой было бы шумом.
+	const final = !job || job.attemptsMade >= (job.opts.attempts ?? 1);
+	const errorId = final
+		? captureError(error, {
+				source: "job",
+				module: "restock/worker",
+				job: {
+					queue: RESTOCK_QUEUE,
+					name: job?.name,
+					id: job?.id,
+					attempt: job?.attemptsMade,
+					maxAttempts: job?.opts.attempts,
+				},
+				extra: { productId: job?.data.productId },
+			})
+		: undefined;
 	console.error("[restock] job failed", {
 		name: job?.name,
 		productId: job?.data.productId,
 		attemptsMade: job?.attemptsMade,
 		error: error?.message,
+		errorId,
 	});
 });
 
 void ensureRestockSweepScheduled().catch((error) => {
-	console.error("[restock] could not schedule sweep", error);
+	const errorId = captureError(error, {
+		source: "job",
+		module: "restock/worker",
+		job: { queue: RESTOCK_QUEUE, name: "schedule-sweep" },
+	});
+	console.error("[restock] could not schedule sweep", error, { errorId });
 });
 
 async function shutdown() {
 	await worker.close();
 	await closeRestockQueue();
+	await flushCaptures();
+	await closeObservability();
 	process.exit(0);
 }
 

@@ -179,14 +179,14 @@ function DesktopSearch() {
         }}
       />
 
-      {/* Панель выносится порталом в body. Вся шапка живёт в своём
-          контексте наложения (fixed, z-index 20), и всё, что в ней, рисуется
-          НИЖЕ липких полос страниц — например, панели фильтров каталога
-          (z-index 30). Высокая выдача уходила бы под них. */}
+      {/* Панель выносится порталом в body: так она не обрезается шапкой и
+          ложится поверх шторки меню. Шапка — fixed, z-index 45, см. шкалу
+          слоёв в StickyHeader.tsx; панель — 47, над шапкой и полосой
+          прогресса главной. */}
       {showPanel &&
         panelStyle &&
         createPortal(
-          <div ref={panelRef} className="fixed z-[45]" style={panelStyle}>
+          <div ref={panelRef} className="fixed z-[47]" style={panelStyle}>
             <SearchPanel
               id={RESULTS_ID}
               variant="dropdown"

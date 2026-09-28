@@ -1,4 +1,5 @@
 import type { BasePayload } from "payload";
+import { captureError } from "@/services/observability/capture";
 import { createOtp } from "./OtpStore";
 import type { AuthErrorCode } from "../types";
 import type { OtpType } from "../types";
@@ -56,11 +57,12 @@ export function isFieldTakenError(err: unknown, fieldName: string): boolean {
 
 /**
  * Логирует неожиданную (не бизнес-) ошибку с контекстом — чтобы «тихий»
- * catch никогда не проглатывал причину молча, и её можно было найти в
- * логах сервера при разборе инцидента.
+ * catch никогда не проглатывал причину молча, — и фиксирует её в журнале
+ * ошибок (письмом дежурному, см. services/observability).
  */
 export function logUnexpectedAuthError(scope: string, err: unknown): void {
-  console.error(`[auth:${scope}]`, err);
+  const errorId = captureError(err, { source: "action", module: `auth/${scope}` });
+  console.error(`[auth:${scope}]`, err, { errorId });
 }
 
 /**

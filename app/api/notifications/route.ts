@@ -9,6 +9,7 @@ import {
 	listNotificationsPage,
 	markNotificationsReadForUser,
 } from "@/payload/services/notifications.service";
+import { captureError } from "@/services/observability/capture";
 import type { Notification } from "../../../payload-types";
 
 // Payload Local API требует Node.js runtime
@@ -87,7 +88,13 @@ export async function GET(
 			unreadCount,
 		});
 	} catch (error) {
-		console.error("[api/notifications] Unexpected error:", error);
+		const errorId = captureError(error, {
+			source: "http",
+			module: "api/notifications",
+			http: { method: "GET", route: "/api/notifications", status: 500 },
+			userId: user.id,
+		});
+		console.error("[api/notifications] Unexpected error:", error, { errorId });
 		return NextResponse.json(
 			{ error: "Не удалось загрузить уведомления" },
 			{ status: 500 },

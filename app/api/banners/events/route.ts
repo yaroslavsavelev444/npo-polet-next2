@@ -3,6 +3,7 @@ import { getAuthenticatedUserFromHeaders } from "@/modules/auth/lib/getCurrentUs
 import { bannerEventSchema } from "@/modules/banners/schemas";
 import { recordInteraction } from "@/modules/banners/server/events";
 import type { BannerEventAck } from "@/modules/banners/types";
+import { captureError } from "@/services/observability/capture";
 
 // Payload Local API требует Node.js runtime
 export const runtime = "nodejs";
@@ -78,7 +79,13 @@ export async function POST(
 
 		return NextResponse.json(result);
 	} catch (error) {
-		console.error("[api/banners/events] Unexpected error:", error);
+		const errorId = captureError(error, {
+			source: "http",
+			module: "api/banners/events",
+			http: { method: "POST", route: "/api/banners/events", status: 500 },
+			userId: user.id,
+		});
+		console.error("[api/banners/events] Unexpected error:", error, { errorId });
 		return NextResponse.json(
 			{ error: "Не удалось записать событие баннера" },
 			{ status: 500 },

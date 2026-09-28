@@ -7,6 +7,7 @@
 // getCachedYandexFeed (feed.service.ts). Здесь только HTTP-обвязка.
 
 import { getCachedYandexFeed } from "@/payload/services/feed.service";
+import { captureError } from "@/services/observability/capture";
 
 // Payload Local API требует Node.js runtime. dynamic: сам ответ не кэшируется
 // на уровне маршрута — за кэш отвечает unstable_cache внутри сервиса, что даёт
@@ -33,7 +34,12 @@ export async function GET(): Promise<Response> {
 		// сюда долетают в том числе ошибки Postgres/Payload с именами таблиц,
 		// параметрами подключения и фрагментами запросов, а фид публичен и
 		// индексируется. Клиенту достаточно кода 500.
-		console.error("[feed/yandex.xml] generation failed:", error);
+		const errorId = captureError(error, {
+			source: "http",
+			module: "feed/yandex",
+			http: { method: "GET", route: "/feed/yandex.xml", status: 500 },
+		});
+		console.error("[feed/yandex.xml] generation failed:", error, { errorId });
 		return new Response(
 			`<?xml version="1.0" encoding="UTF-8"?>\n<!-- feed generation error -->`,
 			{

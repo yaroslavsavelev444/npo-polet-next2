@@ -7,6 +7,7 @@ import {
 	markAllNotificationsReadForUser,
 	markNotificationsReadForUser,
 } from "@/payload/services/notifications.service";
+import { captureError } from "@/services/observability/capture";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +55,19 @@ export async function POST(
 
 		return NextResponse.json({ updated, unreadCount });
 	} catch (error) {
-		console.error("[api/notifications/mark-read] Unexpected error:", error);
+		const errorId = captureError(error, {
+			source: "http",
+			module: "api/notifications/mark-read",
+			http: {
+				method: "POST",
+				route: "/api/notifications/mark-read",
+				status: 500,
+			},
+			userId: user.id,
+		});
+		console.error("[api/notifications/mark-read] Unexpected error:", error, {
+			errorId,
+		});
 		return NextResponse.json(
 			{ error: "Не удалось отметить уведомления прочитанными" },
 			{ status: 500 },

@@ -5,6 +5,7 @@ import { getRequestMeta } from "@/modules/auth/lib/utils";
 import { createFeedback } from "@/payload/services/feedbacks.service";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notifyNewFeedback } from "@/services/notifications/notifyNewFeedback";
+import { captureError } from "@/services/observability/capture";
 import { feedbackFormSchema } from "../schemas/feedback.schema";
 
 export type FeedbackActionResult =
@@ -62,7 +63,11 @@ export async function submitFeedbackAction(
 		});
 		feedbackId = feedback.id;
 	} catch (error) {
-		console.error("[feedback] create failed", error);
+		const errorId = captureError(error, {
+			source: "action",
+			module: "feedback/submit",
+		});
+		console.error("[feedback] create failed", error, { errorId });
 		return {
 			success: false,
 			error: "Не удалось отправить обращение. Попробуйте позже.",

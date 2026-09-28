@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { SEARCH_CANDIDATE_LIMIT, SEARCH_MORE_LIMIT } from '@/modules/search/constants'
 import type { SearchResultType } from '@/modules/search/types'
 import { searchSite, searchSiteSection } from '@/payload/services/search.service'
+import { captureError } from '@/services/observability/capture'
 
 // Payload Local API требует Node.js runtime
 export const runtime = 'nodejs'
@@ -54,7 +55,12 @@ export async function GET(request: NextRequest) {
     )
     return NextResponse.json({ section }, { headers: HEADERS })
   } catch (error) {
-    console.error('[api/search] Unexpected error:', error)
+    const errorId = captureError(error, {
+      source: 'http',
+      module: 'api/search',
+      http: { method: 'GET', route: '/api/search', status: 500 },
+    })
+    console.error('[api/search] Unexpected error:', error, { errorId })
     return NextResponse.json({ error: 'Search failed' }, { status: 500 })
   }
 }

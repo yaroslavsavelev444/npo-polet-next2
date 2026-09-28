@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserFromHeaders } from "@/modules/auth/lib/getCurrentUser";
 import { getUnreadNotificationCount } from "@/payload/services/notifications.service";
+import { captureError } from "@/services/observability/capture";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,19 @@ export async function GET(
 		const count = await getUnreadNotificationCount(user.id);
 		return NextResponse.json({ count });
 	} catch (error) {
-		console.error("[api/notifications/unread-count] Unexpected error:", error);
+		const errorId = captureError(error, {
+			source: "http",
+			module: "api/notifications/unread-count",
+			http: {
+				method: "GET",
+				route: "/api/notifications/unread-count",
+				status: 500,
+			},
+			userId: user.id,
+		});
+		console.error("[api/notifications/unread-count] Unexpected error:", error, {
+			errorId,
+		});
 		return NextResponse.json(
 			{ error: "Не удалось получить счётчик уведомлений" },
 			{ status: 500 },

@@ -60,6 +60,16 @@ const serverSchema = z.object({
   // proxy.ts для маршрутизации и ниже — чтобы на старте процесса проверить,
   // что соответствующий https-origin присутствует в ALLOWED_ORIGINS.
   ADMIN_HOSTNAME: z.string().optional(),
+
+  // ── Оповещения об ошибках (src/services/observability/README.md) ─────────
+  // Куда слать письма о серверных ошибках и суточную сводку. Несколько
+  // адресов — через запятую. Не задан — ошибки пишутся в журнал (админка →
+  // «Журнал ошибок»), но письмом не приходят. Намеренно окружение, а не
+  // настройка в админке: адрес нужен именно тогда, когда база недоступна.
+  ERROR_ALERT_EMAIL: z.string().optional(),
+  // Сколько дней хранить журнал ошибок (по умолчанию 90). Старые записи
+  // удаляет суточная задача.
+  ERROR_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(400).optional(),
 });
 
 /**
@@ -97,6 +107,8 @@ function buildEnv() {
     ADMIN_HOSTNAME: process.env.ADMIN_HOSTNAME,
     DADATA_API_KEY: process.env.DADATA_API_KEY,
     DADATA_SUGGEST_URL: process.env.DADATA_SUGGEST_URL,
+    ERROR_ALERT_EMAIL: process.env.ERROR_ALERT_EMAIL,
+    ERROR_LOG_RETENTION_DAYS: process.env.ERROR_LOG_RETENTION_DAYS,
   };
 
   const clientEnv = {

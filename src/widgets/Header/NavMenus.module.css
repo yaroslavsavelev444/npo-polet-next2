@@ -136,7 +136,10 @@
 	left: 0;
 	right: 0;
 	bottom: 0;
-	z-index: 18;
+	/* Выше липких полос страниц (до 40), ниже шторки и шапки — см. шкалу
+	   слоёв в StickyHeader.tsx. При 18 панель фильтров каталога (30)
+	   оставалась над затемнением и над открытым меню. */
+	z-index: 43;
 	background: color-mix(in srgb, var(--void-deep) 38%, transparent);
 	backdrop-filter: blur(3px);
 	pointer-events: none;
@@ -163,8 +166,8 @@
 	position: fixed;
 	left: 0;
 	right: 0;
-	/* Под шапкой (z-index 20): шторка выезжает из-под её края. */
-	z-index: 19;
+	/* Под шапкой (z-index 45): шторка выезжает из-под её края. */
+	z-index: 44;
 	height: var(--sheet-h, 0px);
 	overflow: hidden;
 	contain: layout paint;

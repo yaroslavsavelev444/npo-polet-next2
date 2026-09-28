@@ -103,6 +103,7 @@ export interface Config {
     'user-consents': UserConsent;
     'account-deletion-requests': AccountDeletionRequest;
     'checkout-preferences': CheckoutPreference;
+    'error-events': ErrorEvent;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -145,6 +146,7 @@ export interface Config {
     'user-consents': UserConsentsSelect<false> | UserConsentsSelect<true>;
     'account-deletion-requests': AccountDeletionRequestsSelect<false> | AccountDeletionRequestsSelect<true>;
     'checkout-preferences': CheckoutPreferencesSelect<false> | CheckoutPreferencesSelect<true>;
+    'error-events': ErrorEventsSelect<false> | ErrorEventsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -156,9 +158,11 @@ export interface Config {
   fallbackLocale: ('false' | 'none' | 'null') | false | null | ('ru' | 'en') | ('ru' | 'en')[];
   globals: {
     settings: Setting;
+    'alerting-settings': AlertingSetting;
   };
   globalsSelect: {
     settings: SettingsSelect<false> | SettingsSelect<true>;
+    'alerting-settings': AlertingSettingsSelect<false> | AlertingSettingsSelect<true>;
   };
   locale: 'ru' | 'en';
   widgets: {
@@ -1865,6 +1869,67 @@ export interface CheckoutPreference {
   createdAt: string;
 }
 /**
+ * Серверные ошибки сайта и воркеров. В списке — только очищенные данные; исходный текст, пользователь и IP — в карточке записи. Все случаи одной ошибки: фильтр по полю «Отпечаток».
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "error-events".
+ */
+export interface ErrorEvent {
+  id: number;
+  occurredAt: string;
+  severity: 'fatal' | 'error' | 'warning';
+  errorName: string;
+  /**
+   * То же, что ушло письмом: значения заменены плейсхолдерами.
+   */
+  message: string;
+  code?: string | null;
+  source: string;
+  module?: string | null;
+  frames?: string | null;
+  causes?: string | null;
+  httpMethod?: string | null;
+  httpRoute?: string | null;
+  httpStatus?: number | null;
+  jobQueue?: string | null;
+  jobName?: string | null;
+  jobAttempt?: string | null;
+  /**
+   * HMAC от идентификатора — «тот же или другой», без раскрытия, кто.
+   */
+  userRef?: string | null;
+  processName: string;
+  hostname: string;
+  environment: string;
+  errorId: string;
+  fingerprint: string;
+  notifiedSent?: boolean | null;
+  notifiedReason?: string | null;
+  /**
+   * Может содержать персональные данные покупателей. Видна только в карточке, в письмо и в список не попадает.
+   */
+  raw?: {
+    message?: string | null;
+    causes?: string | null;
+    stack?: string | null;
+    path?: string | null;
+    userId?: string | null;
+    ip?: string | null;
+    userAgent?: string | null;
+    extra?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -2027,6 +2092,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'checkout-preferences';
         value: number | CheckoutPreference;
+      } | null)
+    | ({
+        relationTo: 'error-events';
+        value: number | ErrorEvent;
       } | null);
   globalSlug?: string | null;
   user:
@@ -3219,6 +3288,49 @@ export interface CheckoutPreferencesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "error-events_select".
+ */
+export interface ErrorEventsSelect<T extends boolean = true> {
+  occurredAt?: T;
+  severity?: T;
+  errorName?: T;
+  message?: T;
+  code?: T;
+  source?: T;
+  module?: T;
+  frames?: T;
+  causes?: T;
+  httpMethod?: T;
+  httpRoute?: T;
+  httpStatus?: T;
+  jobQueue?: T;
+  jobName?: T;
+  jobAttempt?: T;
+  userRef?: T;
+  processName?: T;
+  hostname?: T;
+  environment?: T;
+  errorId?: T;
+  fingerprint?: T;
+  notifiedSent?: T;
+  notifiedReason?: T;
+  raw?:
+    | T
+    | {
+        message?: T;
+        causes?: T;
+        stack?: T;
+        path?: T;
+        userId?: T;
+        ip?: T;
+        userAgent?: T;
+        extra?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -3380,6 +3492,51 @@ export interface Setting {
   createdAt?: string | null;
 }
 /**
+ * Журнал ошибок пишется всегда и этими настройками не управляется. Здесь — только то, какие ошибки приходят письмом на адрес из переменной ERROR_ALERT_EMAIL.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "alerting-settings".
+ */
+export interface AlertingSetting {
+  id: number;
+  /**
+   * Если переменная ERROR_ALERT_EMAIL пуста, письма не уходят независимо от этого флага.
+   */
+  emailEnabled?: boolean | null;
+  severityThreshold?: ('fatal' | 'error' | 'warning') | null;
+  /**
+   * Письмо раз в сутки (09:00 МСК): сколько ошибок, какие, есть ли упавшие фоновые задачи. Приходит и когда ошибок нет — его отсутствие само по себе сигнал, что сайт не работает.
+   */
+  dailyDigest?: boolean | null;
+  /**
+   * По умолчанию выключено: предупреждения обычно штатные и реакции не требуют. В журнал они пишутся в любом случае. Работает вместе с уровнем «Всё, включая предупреждения».
+   */
+  warningsEnabled?: boolean | null;
+  /**
+   * По одному префиксу на строку, например restock. Пустой список означает «из любых».
+   */
+  warningsModules?: string | null;
+  /**
+   * Первое письмо по новой ошибке уходит сразу. Дальше пауза удваивается с каждым письмом — до потолка ниже.
+   */
+  cooldownBaseSeconds?: number | null;
+  /**
+   * 6 часов по умолчанию — четыре напоминания в сутки о давней проблеме.
+   */
+  cooldownMaxSeconds?: number | null;
+  cooldownResetSeconds?: number | null;
+  /**
+   * Общий потолок по всем ошибкам. Последнее письмо в пределах лимита сообщает, что лимит исчерпан, — иначе тишину не отличить от починки.
+   */
+  maxMessagesPerHour?: number | null;
+  /**
+   * 100-й, 1000-й и 10000-й повтор ошибки приходят письмом, даже если по ней идёт пауза.
+   */
+  burstEscalation?: boolean | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "settings_select".
  */
@@ -3471,6 +3628,25 @@ export interface SettingsSelect<T extends boolean = true> {
         description?: T;
         keywords?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "alerting-settings_select".
+ */
+export interface AlertingSettingsSelect<T extends boolean = true> {
+  emailEnabled?: T;
+  severityThreshold?: T;
+  dailyDigest?: T;
+  warningsEnabled?: T;
+  warningsModules?: T;
+  cooldownBaseSeconds?: T;
+  cooldownMaxSeconds?: T;
+  cooldownResetSeconds?: T;
+  maxMessagesPerHour?: T;
+  burstEscalation?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

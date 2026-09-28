@@ -10,6 +10,7 @@ import { createContactRequest } from "@/payload/services/contact-requests.servic
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import type { Product } from "@/payload-types";
 import { notifyNewContactRequest } from "@/services/notifications/notifyNewContactRequest";
+import { captureError } from "@/services/observability/capture";
 import { PERSONAL_DATA_CONSENT_SLUG } from "../schemas/contact-request.schema";
 import { productRequestSchema } from "../schemas/product-request.schema";
 
@@ -142,7 +143,11 @@ export async function submitProductRequestAction(
 
 		return { success: true };
 	} catch (error) {
-		console.error("[product-request] create failed", error);
+		const errorId = captureError(error, {
+			source: "action",
+			module: "contact/submit-product-request",
+		});
+		console.error("[product-request] create failed", error, { errorId });
 		return {
 			success: false,
 			error: "Не удалось отправить заявку. Попробуйте ещё раз или позвоните.",
@@ -246,6 +251,12 @@ async function recordUserConsent(
 			overrideAccess: true,
 		});
 	} catch (error) {
-		console.error("[product-request] could not record user consent", error);
+		const errorId = captureError(error, {
+			source: "action",
+			module: "contact/record-consent",
+		});
+		console.error("[product-request] could not record user consent", error, {
+			errorId,
+		});
 	}
 }

@@ -3,6 +3,7 @@ import type { ProductQuery } from "@/modules/productCard/types/query";
 import { readFacetSelection } from "@/modules/productCatalog/lib/facetParams";
 import type { ProductsPageResponse } from "@/modules/productCatalog/types/filters";
 import { getCatalogData } from "@/payload/services/products.service";
+import { captureError } from "@/services/observability/capture";
 
 // Payload Local API требует Node.js runtime
 export const runtime = "nodejs";
@@ -119,7 +120,12 @@ export async function GET(
 			nextCursor: result.pagination.hasNextPage ? page + 1 : null,
 		});
 	} catch (error) {
-		console.error("[api/products] Unexpected error:", error);
+		const errorId = captureError(error, {
+			source: "http",
+			module: "api/catalog/products",
+			http: { method: "GET", route: "/api/catalog/products", status: 500 },
+		});
+		console.error("[api/products] Unexpected error:", error, { errorId });
 		return NextResponse.json(
 			{ error: "Не удалось загрузить товары" },
 			{ status: 500 },

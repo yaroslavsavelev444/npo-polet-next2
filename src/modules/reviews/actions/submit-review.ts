@@ -8,6 +8,7 @@ import {
 	getUserReviewForProduct,
 	hasUserPurchasedProduct,
 } from "@/payload/services/reviews.service";
+import { captureError } from "@/services/observability/capture";
 import { reviewFormSchema } from "../schemas/review.schema";
 import type { ReviewActionResult } from "../types";
 
@@ -98,7 +99,11 @@ export async function submitReviewAction(
 				code: "already_reviewed",
 			};
 		}
-		console.error("[reviews] create failed", error);
+		const errorId = captureError(error, {
+			source: "action",
+			module: "reviews/submit",
+		});
+		console.error("[reviews] create failed", error, { errorId });
 		return {
 			success: false,
 			error: "Не удалось отправить отзыв. Попробуйте позже.",

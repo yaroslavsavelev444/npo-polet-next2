@@ -5,6 +5,8 @@ import { passwordChangedEmailTemplate } from "./auth/password-changed.template.t
 import { passwordResetEmailTemplate } from "./auth/password-reset.template.ts";
 import { contactRequestAdminEmailTemplate } from "./contact/contact-request-admin.template.ts";
 import { feedbackCreatedAdminEmailTemplate } from "./feedback/feedback-created-admin.template.ts";
+import { errorAlertEmailTemplate } from "./ops/error-alert.template.ts";
+import { errorDigestEmailTemplate } from "./ops/error-digest.template.ts";
 import { orderCancelledEmailTemplate } from "./orders/order-cancelled.template.ts";
 import { orderCreatedAdminEmailTemplate } from "./orders/order-created-admin.template.ts";
 import { orderCreatedUserEmailTemplate } from "./orders/order-created-user.template.ts";
@@ -24,4 +26,6 @@ export const emailTemplates = {
 	reviewStatusChanged: reviewStatusChangedEmailTemplate,
 	feedbackCreatedAdmin: feedbackCreatedAdminEmailTemplate,
 	contactRequestAdmin: contactRequestAdminEmailTemplate,
+	errorAlert: errorAlertEmailTemplate,
+	errorDigest: errorDigestEmailTemplate,
 } as const;

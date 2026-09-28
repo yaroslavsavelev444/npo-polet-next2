@@ -191,7 +191,7 @@ export function ReadingProgress() {
 			// навигации выше: такие варианты Tailwind здесь не генерирует, и
 			// полоса прогресса осталась бы невидимой навсегда.
 			className={cn(
-				"pointer-events-none fixed inset-x-0 top-0 z-40 h-px",
+				"pointer-events-none fixed inset-x-0 top-0 z-[46] h-px",
 				ready ? "opacity-100" : "opacity-0",
 			)}
 		>
