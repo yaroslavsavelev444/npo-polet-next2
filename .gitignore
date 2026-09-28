@@ -49,3 +49,7 @@ next-env.d.ts
 /tests/e2e/.auth
 /tests/e2e/.output
 /tests/e2e/.report
+
+# mutation testing
+/reports/mutation
+.stryker-tmp

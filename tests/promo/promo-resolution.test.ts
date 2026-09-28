@@ -102,6 +102,8 @@ test("без промокода центральная скидка примен
 
 	assert.equal(pricing.promo, null);
 	assert.equal(pricing.centralDiscountAmount, 500);
+	assert.equal(pricing.centralDiscountPercent, 5);
+	assert.equal(pricing.centralDiscountSuppressed, false);
 	assert.equal(pricing.promoDiscountAmount, 0);
 	assert.equal(pricing.total, 9500);
 	assert.equal(pricing.totalDiscount, 2500);
@@ -118,6 +120,22 @@ test("центральная скидка больше суммы корзины
 	assert.equal(pricing.centralDiscountAmount, 10000);
 	assert.equal(pricing.total, 0);
 	assertConsistent(pricing, 10000);
+});
+
+test("нулевая или некорректная центральная скидка не попадает в заказ", () => {
+	// Процент без суммы записался бы в снимок заказа как «скидка 5 %» при
+	// нулевой скидке; отрицательная или NaN-сумма из чужой системы увеличила
+	// бы итог вместо уменьшения.
+	for (const amount of [0, -300, Number.NaN]) {
+		const pricing = resolveCheckoutPricing(
+			input({ centralDiscount: { amount, percent: 5 } }),
+		);
+
+		assert.equal(pricing.centralDiscountAmount, 0, `amount=${amount}`);
+		assert.equal(pricing.centralDiscountPercent, 0, `amount=${amount}`);
+		assert.equal(pricing.total, 10000, `amount=${amount}`);
+		assertConsistent(pricing, 10000);
+	}
 });
 
 // ── Взаимоисключение (combinable = false) ───────────────────────────────────
@@ -292,6 +310,7 @@ test("центральная скидка покрыла заказ целико
 
 	assert.equal(pricing.promoDiscountAmount, 0);
 	assert.equal(pricing.total, 0);
+	assert.equal(pricing.centralDiscountSuppressed, false);
 	assert.equal(pricing.promo?.applied, false);
 	if (!pricing.promo || pricing.promo.applied) return;
 	// Причина именно «скидка выгоднее», а не «нет подходящих товаров»:

@@ -67,3 +67,25 @@ test("схемы вроде javascript: не проходят", () => {
 	assert.equal(resolve("javascript:alert(1)"), "/profile");
 	assert.equal(resolve("data:text/html,<script>alert(1)</script>"), "/profile");
 });
+
+test("принимается только относительный путь, даже на свой домен", () => {
+	// Абсолютный адрес своего же сайта безопасен сам по себе, но контракт —
+	// «только путь»: проверку origin не должна подпирать одна-единственная
+	// ветка.
+	assert.equal(resolve("https://npo-polet.ru/orders"), "/profile");
+	assert.equal(resolve("orders"), "/profile");
+});
+
+test("запрещённый путь ловится и после нормализации URL", () => {
+	// Строка не совпадает с гостевым путём буквально, но разбирается в него.
+	assert.equal(resolve("/auth/login?next=/orders"), "/profile");
+	assert.equal(resolve("/auth/./login"), "/profile");
+	assert.equal(resolve("/orders/../auth/login"), "/profile");
+});
+
+test("без списка запрещённых путей работает как обычная проверка", () => {
+	const plain = (from: string) =>
+		resolveSafeRedirect(from, { origin: ORIGIN, fallback: "/profile" });
+	assert.equal(plain("/auth/login"), "/auth/login");
+	assert.equal(plain("//evil.com"), "/profile");
+});

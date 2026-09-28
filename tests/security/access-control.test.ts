@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PayloadRequest } from "payload";
+import { isAdmin } from "../../src/payload/access/isAdmin.ts";
+import {
+	isAdminOrSuperAdmin,
+	isStaffRole,
+} from "../../src/payload/access/isAdminOrSuperAdmin.ts";
+import {
+	isSuperAdmin,
+	isSuperAdminUser,
+} from "../../src/payload/access/isSuperAdmin.ts";
 import {
 	isStaffUser,
 	ownedByUserOrStaff,
@@ -30,6 +39,10 @@ const superStaff = { id: 2, collection: "admins", role: "superadmin" };
 const customer = { id: 10, collection: "users", role: "user" };
 // Покупатель, которому удалось выставить себе role персонала.
 const impostor = { id: 11, collection: "users", role: "superadmin" };
+const impostorAdmin = { id: 12, collection: "users", role: "admin" };
+// Аккаунт персонала без роли (или с чужой ролью) — доступа не даёт.
+const roleless = { id: 3, collection: "admins" };
+const staffWithUserRole = { id: 4, collection: "admins", role: "user" };
 
 test("персоналом считается только аккаунт коллекции admins", () => {
 	assert.equal(isStaffUser(staff as never), true);
@@ -65,4 +78,54 @@ test("staffOnlyField: служебные поля пишет только пер
 	assert.equal(staffOnlyField({ req: req(customer) } as never), false);
 	assert.equal(staffOnlyField({ req: req(impostor) } as never), false);
 	assert.equal(staffOnlyField({ req: req(null) } as never), false);
+});
+
+test("ownedByUserOrStaff: аккаунт неизвестной коллекции не получает ничего", () => {
+	// Фильтр { user: id } для чужой коллекции совпал бы с документами
+	// покупателя с тем же числовым id.
+	const stranger = { id: 10, collection: "partners", role: "user" };
+	assert.equal(ownedByUserOrStaff({ req: req(stranger) } as never), false);
+});
+
+// ── Гейты коллекций: isAdmin / isAdminOrSuperAdmin / isSuperAdmin ──────────
+
+const access = (fn: (args: never) => unknown, user: TestUser | null) =>
+	fn({ req: req(user) } as never);
+
+test("isStaffRole: только роли персонала и только строки", () => {
+	assert.equal(isStaffRole("admin"), true);
+	assert.equal(isStaffRole("superadmin"), true);
+	assert.equal(isStaffRole("user"), false);
+	assert.equal(isStaffRole(""), false);
+	assert.equal(isStaffRole(undefined), false);
+	assert.equal(isStaffRole(["admin"]), false);
+});
+
+test("isAdminOrSuperAdmin: персонал коллекции admins с ролью персонала", () => {
+	assert.equal(access(isAdminOrSuperAdmin, staff), true);
+	assert.equal(access(isAdminOrSuperAdmin, superStaff), true);
+	assert.equal(access(isAdminOrSuperAdmin, impostor), false);
+	assert.equal(access(isAdminOrSuperAdmin, impostorAdmin), false);
+	assert.equal(access(isAdminOrSuperAdmin, customer), false);
+	assert.equal(access(isAdminOrSuperAdmin, roleless), false);
+	assert.equal(access(isAdminOrSuperAdmin, staffWithUserRole), false);
+	assert.equal(access(isAdminOrSuperAdmin, null), false);
+});
+
+test("isAdmin: только роль admin в коллекции admins", () => {
+	assert.equal(access(isAdmin, staff), true);
+	assert.equal(access(isAdmin, superStaff), false);
+	assert.equal(access(isAdmin, impostorAdmin), false);
+	assert.equal(access(isAdmin, roleless), false);
+	assert.equal(access(isAdmin, null), false);
+});
+
+test("isSuperAdmin: только superadmin в коллекции admins", () => {
+	assert.equal(access(isSuperAdmin, superStaff), true);
+	assert.equal(access(isSuperAdmin, staff), false);
+	assert.equal(access(isSuperAdmin, impostor), false);
+	assert.equal(access(isSuperAdmin, null), false);
+	assert.equal(isSuperAdminUser(superStaff), true);
+	assert.equal(isSuperAdminUser(impostor), false);
+	assert.equal(isSuperAdminUser(undefined), false);
 });

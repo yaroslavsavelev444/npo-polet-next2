@@ -147,6 +147,27 @@ test("категории товаров доходят до правил адр�
 	assert.equal(pricing.promoDiscountAmount, 500);
 });
 
+test("товар без категории не ломает расчёт адресного кода", () => {
+	// Категория у товара необязательна: такая позиция просто не подходит под
+	// категорийный код, а не роняет оформление заказа.
+	const view = cart();
+	view.items[1].product = product("p2", null);
+	const pricing = calculateCheckoutPricing(
+		view,
+		{
+			rule: rule({
+				discountPercent: 10,
+				appliesToAllProducts: false,
+				applicableCategoryIds: ["c1"],
+			}),
+			userRedemptions: 0,
+		},
+		NOW,
+	);
+
+	assert.equal(pricing.promoDiscountAmount, 500);
+});
+
 test("идентификаторы товаров доходят до правил адресного кода", () => {
 	const pricing = calculateCheckoutPricing(
 		cart(),

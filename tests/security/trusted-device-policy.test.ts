@@ -112,6 +112,16 @@ test("устройство без записанной подсети довер
 	assert.deepEqual(verdict, { trusted: false, reason: "network_changed" });
 });
 
+test("неизвестный адрес при устройстве без подсети — тоже отказ", () => {
+	// Два «не знаю» не равны друг другу: null-префикс не должен совпасть с
+	// null-подсетью записи.
+	const verdict = decideTrust(
+		device({ ipPrefix: null }),
+		attempt({ ip: "unknown" }),
+	);
+	assert.deepEqual(verdict, { trusted: false, reason: "network_changed" });
+});
+
 // ─── Требование: смена пароля и отзыв ───────────────────────────────────────
 
 test("отозванное доверие (смена пароля, выход со всех устройств) — код нужен", () => {
@@ -133,6 +143,15 @@ test("истёкшее доверие — код нужен", () => {
 		reason: "expired",
 		dropCookie: true,
 	});
+});
+
+test("доверие, истекающее ровно сейчас, уже не действует", () => {
+	const verdict = decideTrust(
+		device({ expiresAt: NOW.toISOString() }),
+		attempt(),
+	);
+	assert.equal(verdict.trusted, false);
+	assert.ok(!verdict.trusted && verdict.reason === "expired");
 });
 
 // ─── Чужой аккаунт ──────────────────────────────────────────────────────────
@@ -213,6 +232,33 @@ test("отзыв проверяется раньше всего остально
 	assert.equal(verdict.trusted, false);
 	assert.equal("reason" in verdict ? verdict.reason : null, "revoked");
 	assert.ok(!("revokeAll" in verdict && verdict.revokeAll));
+});
+
+test("прошлый секрет ровно на границе окна ротации ещё принимается", () => {
+	const verdict = decideTrust(
+		device({
+			rotatedAt: new Date(
+				NOW.getTime() - TRUSTED_DEVICE_ROTATION_GRACE_MS,
+			).toISOString(),
+		}),
+		attempt({ presentedTokenHash: HASH_PREVIOUS }),
+	);
+	assert.deepEqual(verdict, { trusted: true });
+});
+
+test("прошлый секрет без известного времени ротации — подозрение на кражу", () => {
+	// Отказ закрытый: окно без точки отсчёта не считается открытым.
+	for (const rotatedAt of [null, "не дата"]) {
+		const verdict = decideTrust(
+			device({ rotatedAt }),
+			attempt({ presentedTokenHash: HASH_PREVIOUS }),
+		);
+		assert.equal(verdict.trusted, false, `rotatedAt=${rotatedAt}`);
+		assert.ok(
+			!verdict.trusted && verdict.reason === "secret_reused",
+			`rotatedAt=${rotatedAt}`,
+		);
+	}
 });
 
 // ─── Отсутствие ротации ─────────────────────────────────────────────────────

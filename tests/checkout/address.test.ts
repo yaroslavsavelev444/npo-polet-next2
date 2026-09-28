@@ -168,3 +168,25 @@ test("hasHouseLevelPrecision ориентируется на дом, а не н�
 	assert.equal(hasHouseLevelPrecision({ house: "  " }), false);
 	assert.equal(hasHouseLevelPrecision({ street: "ул Ленина" }), false);
 });
+
+test("пустой адрес — пустые поля, ничего не выводится", () => {
+	const empty = createEmptyAddress();
+	const { country, source, ...rest } = empty;
+	assert.equal(country, "Россия");
+	assert.equal(source, "manual");
+	for (const [key, value] of Object.entries(rest)) {
+		assert.equal(value, "", key);
+	}
+	assert.equal(formatAddress(empty), "");
+	assert.equal(formatAddress(null), "");
+});
+
+test("formatAddress: без квартиры сегмент «кв./офис» не появляется", () => {
+	assert.equal(
+		formatAddress(
+			{ fullAddress: "г Москва, ул Ленина, д 10", floor: "3" },
+			{ withUnitDetails: true },
+		),
+		"г Москва, ул Ленина, д 10, этаж 3",
+	);
+});

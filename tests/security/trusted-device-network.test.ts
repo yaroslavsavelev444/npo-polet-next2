@@ -74,6 +74,41 @@ test("зона интерфейса на адресацию не влияет", 
 	assert.equal(networkPrefix("fe80::1%eth0"), networkPrefix("fe80::1"));
 });
 
+test("сжатие :: в начале, в конце и внутри первых 64 бит", () => {
+	assert.equal(networkPrefix("::1"), "v6:0:0:0:0::/64");
+	assert.equal(networkPrefix("2001:db8::"), "v6:2001:db8:0:0::/64");
+	// Хвост после :: достаёт до четвёртой группы — она входит в префикс.
+	assert.equal(networkPrefix("2001:db8::42:0:0:0:1"), "v6:2001:db8:0:42::/64");
+	// :: может заменять и одну-единственную группу.
+	assert.equal(networkPrefix("1:2:3::5:6:7:8"), "v6:1:2:3:0::/64");
+});
+
+test("искажённый адрес не считается сетью", () => {
+	// Мусор, разобранный «как-нибудь», мог бы совпасть с другим мусором и
+	// дать вход без кода. Любой неразобранный адрес обязан давать null.
+	const malformed = [
+		"1.2.3.4.5",
+		"1.2.3",
+		"256.1.1.1",
+		"1.2.3.+4",
+		"x::ffff:192.0.2.1",
+		"::ffff:192.0.2.1x",
+		"1:2:3",
+		"1:2:3:4:5:6:7:8:9",
+		"1:2:3:4::5:6:7:8",
+		"1::2::3",
+		"gggg::1",
+		"12345::1",
+		"zz12::1",
+		"2001::zz",
+	];
+	for (const ip of malformed) {
+		assert.equal(networkPrefix(ip), null, ip);
+	}
+	assert.equal(networkPrefix("255.255.255.255"), "v4:255.255.255.0/24");
+	assert.equal(networkPrefix(undefined as unknown as string), null);
+});
+
 // ─── Неизвестный адрес ──────────────────────────────────────────────────────
 
 test("неизвестный или неразобранный адрес не совпадает ни с чем", () => {
@@ -98,6 +133,7 @@ const EDGE = `${CHROME} Edg/141.0.0.0`;
 const YANDEX = `${CHROME} YaBrowser/25.6.0.0 Safari/537.36`;
 const FIREFOX =
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0";
+const OPERA = `${CHROME} OPR/115.0.0.0`;
 const SAFARI_IPHONE =
 	"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -109,6 +145,13 @@ test("производные Chromium не опознаются как Chrome", 
 	assert.equal(browserFamily(CHROME), "Chrome");
 	assert.equal(browserFamily(FIREFOX), "Firefox");
 	assert.equal(browserFamily(SAFARI_IPHONE), "Safari");
+	assert.equal(browserFamily(OPERA), "Opera");
+});
+
+test("неопознанный или отсутствующий User-Agent — «Other»", () => {
+	assert.equal(browserFamily("curl/8.7.1"), "Other");
+	assert.equal(browserFamily(""), "Other");
+	assert.equal(browserFamily(undefined as unknown as string), "Other");
 });
 
 test("обновление браузера отпечаток не меняет", () => {

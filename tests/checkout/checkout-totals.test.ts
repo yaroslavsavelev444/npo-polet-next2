@@ -261,3 +261,33 @@ test("количество и число позиций берутся из ко
 	assert.equal(totals.itemsQuantity, 10);
 	assert.equal(totals.positions, 1);
 });
+
+test("нулевые скидки не выводятся строками разбора", () => {
+	// Товары без скидки и код, не давший экономии: строка «−0 ₽» выглядела
+	// бы как обещанная, но не полученная скидка.
+	const view = cart();
+	view.summary.productDiscountAmount = 0;
+	view.summary.priceWithoutDiscount = 10000;
+	const totals = buildCheckoutTotals(
+		view,
+		preview({ discountAmount: 0, totalDiscount: 0, total: 10000 }),
+	);
+
+	assert.deepEqual(totals.discounts, []);
+	assert.equal(totals.promoApplied, true);
+	assert.equal(totals.breakdownIsExact, true);
+});
+
+test("акция без имени и процента — нейтральная подпись без значка", () => {
+	// Фиксированная скидка в рублях: процента нет, и «−0%» рядом с суммой
+	// противоречил бы ей.
+	const totals = buildCheckoutTotals(
+		cart({ centralAmount: 500, centralPercent: 0, centralName: "   " }),
+		null,
+	);
+
+	const central = totals.discounts[1];
+	assert.equal(central.kind, "central");
+	assert.equal(central.label, "Скидка на заказ");
+	assert.equal(central.percent, null);
+});

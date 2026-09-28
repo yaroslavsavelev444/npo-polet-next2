@@ -34,6 +34,7 @@
 		"test:observability": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/observability/*.test.ts",
 		"test:restock": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit tests/restock/*.test.ts",
 		"test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/security/*.test.ts tests/checkout/*.test.ts tests/contact/*.test.ts tests/promo/*.test.ts tests/banners/*.test.ts tests/cart/*.test.ts tests/search/*.test.ts tests/catalog/*.test.ts tests/observability/*.test.ts",
+		"test:mutation": "stryker run",
 		"seed:e2e": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/seed-checkout-e2e.ts",
 		"reset:e2e-cart": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/reset-e2e-cart.ts",
 		"test:e2e": "tests/e2e/.runner/node_modules/.bin/playwright test --config tests/e2e/playwright.config.ts",
@@ -80,6 +81,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.2",
+		"@stryker-mutator/core": "^10.0.0",
 		"@tailwindcss/postcss": "^4",
 		"@types/lodash": "^4.17.24",
 		"@types/node": "^20",

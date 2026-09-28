@@ -76,6 +76,7 @@ test("процентный код: скидка считается от сумм
 	assert.equal(result.discountAmount, 1000);
 	assert.equal(result.discountPercent, 10);
 	assert.equal(result.eligibleAmount, 10000);
+	assert.equal(result.discountType, "percentage");
 	assert.equal(result.cappedByMax, false);
 });
 
@@ -105,6 +106,20 @@ test("потолок не срабатывает, пока скидка его �
 	assert.equal(result.cappedByMax, false);
 });
 
+test("скидка ровно на потолке — потолок не считается сработавшим", () => {
+	// cappedByMax управляет текстом «но не более …»: при скидке, ровно равной
+	// потолку, обещание «−20%» выполнено полностью, оговорка была бы ложной.
+	const result = evaluatePromoCode(
+		rule({ discountPercent: 20, maxDiscountAmount: 2000 }),
+		context({ items: [item({ subtotal: 10000 })] }),
+	);
+
+	assert.equal(result.applied, true);
+	if (!result.applied) return;
+	assert.equal(result.discountAmount, 2000);
+	assert.equal(result.cappedByMax, false);
+});
+
 test("фиксированный код: скидка равна заданной сумме", () => {
 	const result = evaluatePromoCode(
 		rule({ discountType: "fixed", discountPercent: null, fixedAmount: 1500 }),
@@ -115,6 +130,8 @@ test("фиксированный код: скидка равна заданно�
 	if (!result.applied) return;
 	assert.equal(result.discountAmount, 1500);
 	assert.equal(result.discountPercent, null);
+	assert.equal(result.discountType, "fixed");
+	assert.equal(result.cappedByMax, false);
 });
 
 test("фиксированный код больше корзины: скидка не превышает сумму заказа", () => {
@@ -164,6 +181,19 @@ test("срок действия истёк", () => {
 	assert.equal(result.applied, false);
 	if (result.applied) return;
 	assert.equal(result.reason, "expired");
+});
+
+test("границы срока включительны до мгновения", () => {
+	// Код, начавшийся ровно сейчас или истекающий ровно сейчас, ещё действует.
+	const exact = NOW.toISOString();
+	assert.equal(
+		evaluatePromoCode(rule({ startAt: exact }), context()).applied,
+		true,
+	);
+	assert.equal(
+		evaluatePromoCode(rule({ endAt: exact }), context()).applied,
+		true,
+	);
 });
 
 test("код действует в последний день срока", () => {
@@ -359,6 +389,17 @@ test("пустая корзина важнее любых свойств код�
 	const result = evaluatePromoCode(
 		rule({ isActive: false, maxUses: 1, totalUses: 1 }),
 		context({ items: [], orderAmount: 0 }),
+	);
+
+	assert.equal(result.applied, false);
+	if (result.applied) return;
+	assert.equal(result.reason, "empty_cart");
+});
+
+test("корзина из позиций на 0 ₽ считается пустой", () => {
+	const result = evaluatePromoCode(
+		rule(),
+		context({ items: [item({ subtotal: 0 })] }),
 	);
 
 	assert.equal(result.applied, false);
