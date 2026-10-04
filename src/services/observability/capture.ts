@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { hostname as osHostname } from "node:os";
 import { deliverAlert, getAlertRecipients } from "./delivery.ts";
 import { computeFingerprint } from "./fingerprint.ts";
-import { normalizeError } from "./normalize.ts";
+import { isClientFault, normalizeError } from "./normalize.ts";
 import { evaluate } from "./policy.ts";
 import { enqueueAlert } from "./queue.ts";
 import { markNotified, recordErrorEvent } from "./raw-store.ts";
@@ -57,16 +57,6 @@ function adminUrlFor(id: string | number): string {
 	return `${base}/admin/collections/error-events/${id}`;
 }
 
-/**
- * Ошибка Payload со статусом 4xx (ValidationError, Forbidden, NotFound),
- * долетевшая до общего catch. Это отказ в запросе, а не сбой сайта: в журнал
- * она пишется, но письмом по умолчанию не идёт.
- */
-function hasClientStatus(error: unknown): boolean {
-	const status = (error as { status?: unknown } | null)?.status;
-	return typeof status === "number" && status >= 400 && status < 500;
-}
-
 const inFlight = new Set<Promise<void>>();
 
 /**
@@ -118,7 +108,7 @@ async function handle(
 		const normalized = normalizeError(error);
 		const severity =
 			context.severity ??
-			(hasClientStatus(error) ? "warning" : defaultSeverity(context.source));
+			(isClientFault(error) ? "warning" : defaultSeverity(context.source));
 
 		const event: ErrorEvent = {
 			errorId,

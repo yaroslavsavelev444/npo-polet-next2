@@ -92,8 +92,54 @@ function buildCsp(nonce: string, isDev: boolean): string {
   return directives.join("; ");
 }
 
+/**
+ * POST страницы с multipart-телом, которое не разбирается как форма.
+ *
+ * Next считает любой multipart POST на страницу возможной отправкой формы
+ * Server Action без JS (у нас так работают вход, регистрация, выход — см.
+ * `<form action={…}>` в modules/auth) и пытается разобрать тело. Битое тело —
+ * а его шлют сканеры и боты на `/` — роняет разбор внутри Next
+ * («TypeError: Failed to parse body as FormData», action-handler.js), и
+ * запрос получает 500 вместо 400, а дежурный — письмо о «сбое сайта».
+ * То же с корректной формой без полей `$ACTION_*`: это не Server Action, но
+ * Next всё равно отвечает 500 («Failed to find Server Action»).
+ *
+ * Отсекаем только то, что Next всё равно не смог бы обработать: тело читается
+ * из копии, которую Next и так буферизует для proxy (proxyClientMaxBodySize),
+ * поэтому настоящая форма (у неё поля `$ACTION_ID_…`/`$ACTION_REF_…` есть
+ * всегда) проходит дальше без изменений. Fetch-вызовы Server
+ * Actions (заголовок Next-Action) и маршруты /api сюда не попадают: у первых
+ * свой разбор, вторые форм Server Actions не принимают вовсе.
+ */
+async function isMalformedFormPost(req: NextRequest): Promise<boolean> {
+  if (req.method !== "POST") return false;
+  if (req.nextUrl.pathname.startsWith("/api")) return false;
+  if (req.headers.has("next-action")) return false;
+  const contentType = req.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    return false;
+  }
+
+  try {
+    const form = await req.clone().formData();
+    for (const key of form.keys()) {
+      if (key.startsWith("$ACTION_")) return false;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (await isMalformedFormPost(req)) {
+    return new NextResponse("Bad Request", {
+      status: 400,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
   const host = req.headers.get("host")?.split(":")[0] ?? "";
   const adminHost = process.env.ADMIN_HOSTNAME; // напр. admin.npo-polet.ru
 

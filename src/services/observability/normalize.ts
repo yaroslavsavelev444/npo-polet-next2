@@ -306,3 +306,35 @@ export function normalizeError(error: unknown): NormalizedError {
 		rawCauses: causes.raw,
 	};
 }
+
+/**
+ * Тело запроса, которое не разбирается: битый multipart/JSON от сканера или
+ * сломанного клиента. Next пытается разобрать его сам (например, как форму
+ * Server Action) и бросает до того, как дойдёт до нашего кода.
+ */
+const MALFORMED_BODY =
+	/^Failed to parse body as (?:FormData|JSON)|^Unexpected end of form|^Malformed part header|^Multipart: Boundary not found/i;
+
+/**
+ * Форма Server Action с идентификатором, которого нет в текущей сборке:
+ * вкладка, открытая до выкладки, или подделанный запрос. Рассинхрон версий,
+ * а не поломка сайта (nextjs.org/docs/messages/failed-to-find-server-action).
+ */
+const STALE_ACTION = /^Failed to find Server Action/;
+
+/**
+ * Ошибка по вине запроса, а не сайта: статус 4xx у ошибки Payload
+ * (ValidationError, Forbidden, NotFound), долетевшей до общего catch, или
+ * неразбираемое тело запроса, или форма устаревшей версии сайта. В журнал
+ * она пишется, но письмом по умолчанию не идёт.
+ */
+export function isClientFault(error: unknown): boolean {
+	const status = (error as { status?: unknown } | null)?.status;
+	if (typeof status === "number" && status >= 400 && status < 500) return true;
+
+	const message = (error as { message?: unknown } | null)?.message;
+	return (
+		typeof message === "string" &&
+		(MALFORMED_BODY.test(message) || STALE_ACTION.test(message))
+	);
+}

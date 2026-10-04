@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { computeFingerprint } from "../../src/services/observability/fingerprint.ts";
 import {
+	isClientFault,
 	normalizeError,
 	parseStack,
 	scrubMessage,
@@ -144,4 +145,35 @@ test("URL-кодированный путь из карты Turbopack укора
 		"Error: x\n    at Page (/srv/app/%28frontend%29/orders/%5BorderNumber%5D/page.tsx:4:9)",
 	);
 	assert.equal(frame?.file, "app/(frontend)/orders/[orderNumber]/page.tsx");
+});
+
+test("битое тело запроса и 4xx — вина клиента, а не сбой сайта", () => {
+	// Ровно та ошибка, что пришла с прода на POST / от сканера.
+	assert.equal(
+		isClientFault(new TypeError("Failed to parse body as FormData.")),
+		true,
+	);
+	assert.equal(
+		isClientFault(Object.assign(new Error("x"), { status: 403 })),
+		true,
+	);
+	assert.equal(
+		isClientFault(Object.assign(new Error("x"), { status: 500 })),
+		false,
+	);
+	assert.equal(
+		isClientFault(new TypeError("Cannot read properties of undefined")),
+		false,
+	);
+});
+
+test("форма устаревшей версии сайта — не сбой", () => {
+	assert.equal(
+		isClientFault(
+			new Error(
+				"Failed to find Server Action. This request might be from an older or newer deployment.",
+			),
+		),
+		true,
+	);
 });
