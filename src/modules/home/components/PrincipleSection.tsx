@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { useScrollProgress } from "@/shared/components/motion/useScrollProgress";
 import { cn } from "@/utils/cn";
 import { principle } from "../content/home-content";
+import {
+	createInterceptScene,
+	type InterceptScene,
+} from "../lib/intercept-scene";
 import { Container, Section, Value } from "./primitives";
 
 /**
@@ -12,13 +22,13 @@ import { Container, Section, Value } from "./primitives";
  * ────────────────────────────────────────────────────────────────────────────
  * КАК ЭТО ДВИЖЕТСЯ
  * ────────────────────────────────────────────────────────────────────────────
- * Хук useScrollProgress пишет в секцию переменную --p (0..1) — долю пути,
- * пройденную липким блоком. Дальше вся анимация схемы описана в CSS через
- * calc() от этой переменной: React не участвует ни в одном кадре.
+ * Хук useScrollProgress считает долю пути (0..1), пройденную липким блоком,
+ * и отдаёт её сцене напрямую (onProgress), минуя React: ни один кадр
+ * анимации не вызывает ре-рендер.
  *
- * Три такта получаются нарезкой --p на отрезки прямо в CSS (--p1/--p2/--p3),
- * поэтому «где мы в анимации» — производная от положения страницы, а не
- * отдельное состояние, которое может с ним разъехаться.
+ * Три такта получаются нарезкой прогресса на отрезки внутри сцены, поэтому
+ * «где мы в анимации» — производная от положения страницы, а не отдельное
+ * состояние, которое может с ним разъехаться.
  *
  * Подсветка активного такта в тексте живёт отдельно, на IntersectionObserver:
  * она должна следовать за ЧТЕНИЕМ (какой абзац сейчас в середине экрана), а
@@ -29,10 +39,17 @@ import { Container, Section, Value } from "./primitives";
  * ────────────────────────────────────────────────────────────────────────────
  * Схема — иллюстрация к тексту, а не носитель информации: всё, что она
  * показывает, написано словами в тактах рядом. Поэтому у неё aria-hidden, и
- * ни один факт не заперт внутри SVG.
+ * ни один факт не заперт внутри canvas.
  */
 export function PrincipleSection() {
-	const sectionRef = useScrollProgress<HTMLDivElement>({ mode: "sticky" });
+	const sceneRef = useRef<InterceptScene | null>(null);
+	const onProgress = useCallback((progress: number) => {
+		sceneRef.current?.setProgress(progress);
+	}, []);
+	const sectionRef = useScrollProgress<HTMLDivElement>({
+		mode: "sticky",
+		onProgress,
+	});
 	const [activeStep, setActiveStep] = useState(0);
 	const stepsRef = useRef<Array<HTMLLIElement | null>>([]);
 
@@ -77,7 +94,7 @@ export function PrincipleSection() {
 					    верхнюю треть экрана, а такты идут под ней. */}
 					<div className="sticky top-[calc(var(--sticky-header-height)+1rem)] z-10 self-start">
 						<div className="reticle relative overflow-hidden rounded-[var(--radius-md)] border border-[var(--rule)] bg-[var(--void-deep)]">
-							<InterceptDiagram activeStep={activeStep} />
+							<InterceptDiagram activeStep={activeStep} sceneRef={sceneRef} />
 						</div>
 					</div>
 
@@ -164,14 +181,38 @@ export function PrincipleSection() {
 /**
  * Схема перехвата.
  *
- * Чистая геометрия: линия горизонта, позиция расчёта, аппарат, траектория и
- * раскрытие сети. Ничего не имитирует фотографию и не притворяется
- * иллюстрацией — это чертёж, и он честно выглядит чертежом.
+ * Трёхмерная сцена на canvas: позиция расчёта, пусковое устройство,
+ * аппарат, полёт и раскрытие сети, захват и падение в прогнозируемую зону.
+ * Вся геометрия, физика и отрисовка — в lib/intercept-scene.ts; здесь только
+ * монтирование и подпись такта.
  *
- * Все анимируемые величины — производные от --p (см. .principle-diagram в
- * home.css). Здесь только разметка.
+ * Прогресс приходит снаружи (onProgress хука прокрутки секции) через
+ * sceneRef, поэтому React по-прежнему не участвует ни в одном кадре.
  */
-function InterceptDiagram({ activeStep }: { activeStep: number }) {
+function InterceptDiagram({
+	activeStep,
+	sceneRef,
+}: {
+	activeStep: number;
+	sceneRef: RefObject<InterceptScene | null>;
+}) {
+	const canvasRef = useRef<HTMLCanvasElement | null>(null);
+	const probeRef = useRef<HTMLSpanElement | null>(null);
+	const fontRef = useRef<HTMLSpanElement | null>(null);
+
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		const probe = probeRef.current;
+		const fontSource = fontRef.current;
+		if (!canvas || !probe || !fontSource) return;
+		const scene = createInterceptScene(canvas, { probe, fontSource });
+		sceneRef.current = scene;
+		return () => {
+			scene.destroy();
+			sceneRef.current = null;
+		};
+	}, [sceneRef]);
+
 	return (
 		// Высота схемы на узких экранах задана в долях окна, а не соотношением
 		// сторон. Схема здесь ЛИПКАЯ: при аспекте 4/3 она занимала почти весь
@@ -181,127 +222,26 @@ function InterceptDiagram({ activeStep }: { activeStep: number }) {
 		//
 		// С lg работает двухколоночная раскладка, там схема стоит рядом с
 		// текстом и может занимать столько, сколько ей нужно.
-		<div className="principle-diagram relative h-[32vh] w-full lg:h-auto lg:aspect-[16/10]">
-			<svg
-				viewBox="0 0 400 300"
+		<div className="principle-diagram relative h-[32vh] min-h-[220px] w-full lg:h-auto lg:aspect-[16/10]">
+			<canvas
+				ref={canvasRef}
 				className="absolute inset-0 h-full w-full"
 				aria-hidden="true"
-				focusable="false"
-			>
-				{/* Земля и разметка дистанции */}
-				<line
-					x1="0"
-					y1="252"
-					x2="400"
-					y2="252"
-					stroke="var(--rule)"
-					strokeWidth="1"
-				/>
-				<g stroke="var(--rule)" strokeWidth="1">
-					{Array.from({ length: 9 }, (_, i) => (
-						<line key={i} x1={40 + i * 40} y1="252" x2={40 + i * 40} y2="258" />
-					))}
-				</g>
-
-				{/* Позиция расчёта */}
-				<g className="pd-launcher">
-					<circle cx="60" cy="240" r="4" fill="var(--primary)" />
-					<circle
-						cx="60"
-						cy="240"
-						r="11"
-						fill="none"
-						stroke="var(--primary)"
-						strokeWidth="1"
-						opacity="0.4"
-					/>
-					<line
-						x1="60"
-						y1="240"
-						x2="86"
-						y2="222"
-						stroke="var(--text-secondary)"
-						strokeWidth="2"
-						strokeLinecap="round"
-					/>
-				</g>
-
-				{/* Линия визирования: появляется на первом такте */}
-				<line
-					className="pd-sightline"
-					x1="60"
-					y1="240"
-					x2="308"
-					y2="72"
-					stroke="var(--accent)"
-					strokeWidth="1"
-					strokeDasharray="3 5"
-				/>
-
-				{/* Траектория: прочерчивается на втором такте.
-				    pathLength="1" нормирует длину, поэтому dashoffset
-				    считается прямо от прогресса, без измерения пути в JS. */}
-				<path
-					className="pd-trajectory"
-					d="M 66 236 Q 150 96 304 74"
-					fill="none"
-					stroke="var(--primary)"
-					strokeWidth="1.5"
-					pathLength="1"
-					strokeDasharray="1"
-				/>
-
-				{/* Аппарат */}
-				<g className="pd-drone">
-					<g stroke="var(--text-secondary)" strokeWidth="1.5" fill="none">
-						<line x1="-13" y1="-9" x2="13" y2="9" />
-						<line x1="13" y1="-9" x2="-13" y2="9" />
-						<circle cx="-13" cy="-9" r="5.5" />
-						<circle cx="13" cy="-9" r="5.5" />
-						<circle cx="-13" cy="9" r="5.5" />
-						<circle cx="13" cy="9" r="5.5" />
-					</g>
-					<rect
-						x="-6"
-						y="-4"
-						width="12"
-						height="8"
-						rx="2"
-						fill="var(--text-secondary)"
-					/>
-				</g>
-
-				{/* Сеть: раскрывается на третьем такте */}
-				<g className="pd-net">
-					<circle
-						r="34"
-						fill="none"
-						stroke="var(--primary)"
-						strokeWidth="1"
-						strokeDasharray="4 4"
-					/>
-					<circle
-						r="34"
-						fill="color-mix(in srgb, var(--primary) 12%, transparent)"
-					/>
-					{/* Ячейки сети — четыре хорды, а не растровая текстура. */}
-					<g stroke="var(--primary)" strokeWidth="0.75" opacity="0.65">
-						<line x1="-34" y1="0" x2="34" y2="0" />
-						<line x1="0" y1="-34" x2="0" y2="34" />
-						<line x1="-24" y1="-24" x2="24" y2="24" />
-						<line x1="24" y1="-24" x2="-24" y2="24" />
-					</g>
-				</g>
-			</svg>
+			/>
+			{/* Проба цветов темы: сцена читает через неё разрешённые токены. */}
+			<span ref={probeRef} className="hidden" aria-hidden="true" />
 
 			{/* Служебная строка под схемой: подпись текущего такта. Дублирует
 			    заголовок активного шага — это подпись к рисунку, а не новая
 			    информация, поэтому она скрыта от скринридера. */}
 			<div
-				className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-[var(--rule)] px-4 py-2.5"
+				className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-[var(--rule)] bg-[color-mix(in_srgb,var(--void-deep)_82%,transparent)] px-4 py-2.5 backdrop-blur-sm"
 				aria-hidden="true"
 			>
-				<span className="u-mono text-[0.625rem] text-[var(--text-muted)]">
+				<span
+					ref={fontRef}
+					className="u-mono text-[0.625rem] text-[var(--text-muted)]"
+				>
 					{principle.steps[activeStep]?.index} /{" "}
 					{String(principle.steps.length).padStart(2, "0")}
 				</span>

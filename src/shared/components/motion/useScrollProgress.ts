@@ -37,12 +37,18 @@ interface Options {
 	 * трек).
 	 */
 	targetRef?: RefObject<HTMLElement | null>;
+	/**
+	 * Тот же прогресс числом — для потребителей, которые рисуют сами (canvas)
+	 * и не могут прочитать его из CSS. Должен быть стабильной ссылкой:
+	 * смена функции переподписывает обработчики прокрутки.
+	 */
+	onProgress?: (progress: number) => void;
 }
 
 export function useScrollProgress<T extends HTMLElement = HTMLDivElement>(
 	options: Options = {},
 ) {
-	const { mode = "cover", property = "--p", targetRef } = options;
+	const { mode = "cover", property = "--p", targetRef, onProgress } = options;
 	const ref = useRef<T | null>(null);
 	// Последнее записанное значение: запись в style дорогая, а прогресс между
 	// соседними кадрами часто не меняется в третьем знаке. Пропуск таких
@@ -89,6 +95,7 @@ export function useScrollProgress<T extends HTMLElement = HTMLDivElement>(
 			if (rounded === lastRef.current) return;
 			lastRef.current = rounded;
 			target.style.setProperty(property, String(rounded));
+			onProgress?.(rounded);
 		};
 
 		const schedule = () => {
@@ -117,7 +124,7 @@ export function useScrollProgress<T extends HTMLElement = HTMLDivElement>(
 			window.removeEventListener("resize", schedule);
 			if (frame) cancelAnimationFrame(frame);
 		};
-	}, [mode, property, targetRef]);
+	}, [mode, property, targetRef, onProgress]);
 
 	return ref;
 }
