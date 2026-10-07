@@ -36,7 +36,9 @@ const BOT_UA =
  */
 export async function POST(
 	req: NextRequest,
-	ctx: RouteContext<"/api/catalog/products/[id]/view">,
+	// Тип параметров — явно, а не RouteContext: тот генерирует `next dev` /
+	// `next typegen`, а type-check в CI идёт на чистом checkout без .next.
+	ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
 	const { id } = await ctx.params;
 	const productId = /^\d{1,10}$/.test(id) ? Number(id) : null;
