@@ -4,6 +4,7 @@ import {
 	manufacturerKey,
 	normalizeSpec,
 } from "../../modules/productCatalog/lib/specNormalization.ts";
+import { readProductCounters } from "../services/product-counters.db.ts";
 import { readProductRating } from "../services/product-rating.db.ts";
 
 type SpecRow = {
@@ -51,7 +52,17 @@ export const normalizeProductForCatalog: CollectionBeforeChangeHook = async ({
 	const rating = productId
 		? await readProductRating(req.payload, productId, req)
 		: { ratingAverage: null, reviewsCount: 0 };
-	data.analytics = { ...(data.analytics ?? {}), ...rating };
+	// Счётчики растут прямым UPDATE мимо Payload, и в форме админки лежит
+	// значение на момент её открытия — без перечитывания сохранение товара
+	// откатывало бы накопленные просмотры и покупки.
+	const counters = productId
+		? await readProductCounters(req.payload, productId, req)
+		: null;
+	data.analytics = {
+		...(data.analytics ?? {}),
+		...rating,
+		...(counters ?? {}),
+	};
 
 	return data;
 };

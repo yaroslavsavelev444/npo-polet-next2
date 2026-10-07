@@ -6,8 +6,8 @@ import { FaqSection } from "@/modules/home/components/FaqSection";
 import { FinalCta } from "@/modules/home/components/FinalCta";
 import { HomeHero } from "@/modules/home/components/HomeHero";
 import { ManifestoSection } from "@/modules/home/components/ManifestoSection";
+import { MotionShowcase } from "@/modules/home/components/MotionShowcase";
 import { OffersSection } from "@/modules/home/components/OffersSection";
-import { PrincipleSection } from "@/modules/home/components/PrincipleSection";
 import { PrintServiceSection } from "@/modules/home/components/PrintServiceSection";
 import { ProductionSection } from "@/modules/home/components/ProductionSection";
 import { ProductsShowcase } from "@/modules/home/components/ProductsShowcase";
@@ -41,19 +41,24 @@ export const metadata: Metadata = {
  * СТРУКТУРА
  * ────────────────────────────────────────────────────────────────────────────
  * Порядок секций отвечает на вопросы в том порядке, в каком они возникают:
- * что это → почему именно так → что бывает → что купить → на каких условиях →
- * как это работает → подойдёт ли мне → кто это делает → давно ли → чем
+ * что это → почему именно так → что бывает → как это работает → что купить →
+ * на каких условиях → подойдёт ли мне → кто это делает → давно ли → чем
  * подтверждается → что ещё спрашивают → действие.
+ *
+ * «Как это работает» (моушн-витрина) стоит прямо перед карточками: ролик
+ * показывает каждое изделие в деле, и к карточкам посетитель приходит, уже
+ * понимая, чем они отличаются.
  *
  * «Скидки» стоят сразу за карточками, а не в конце: вопрос о цене возникает
  * у того, кто уже посмотрел изделия, и ответ на него не должен ждать пяти
  * экранов рассказа о компании.
  *
- * Продукция стоит четвёртой, а не в конце: сюда приходят по запросам вида
+ * Продукция стоит пятой, а не в конце: сюда приходят по запросам вида
  * «сеткомет купить», то есть с уже готовым намерением, и заставлять такого
  * посетителя пролистать пять экранов рассказа о компании — верный способ его
- * потерять. Всё, что объясняет и убеждает, идёт ПОСЛЕ карточек, для тех, кому
- * этого оказалось мало.
+ * потерять. Всё, что объясняет и убеждает (кроме ролика, который и есть
+ * короткий показ изделий), идёт ПОСЛЕ карточек, для тех, кому этого
+ * оказалось мало.
  *
  * Порядок обязан совпадать с sectionIndex в home-content.ts — по нему строится
  * липкий указатель слева.
@@ -114,9 +119,9 @@ export default async function Home() {
 
 			<ManifestoSection />
 			<DirectionsSection />
+			<MotionShowcase />
 			<ProductsShowcase products={showcaseProducts} />
 			<OffersSection />
-			<PrincipleSection />
 			<AudienceSection />
 			<ProductionSection />
 			<TimelineSection />

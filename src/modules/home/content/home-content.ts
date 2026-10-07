@@ -622,9 +622,9 @@ export const printService = {
 export const sectionIndex = [
   { id: "about", label: manifesto.navLabel },
   { id: "directions", label: directions.navLabel },
+  { id: "principle", label: principle.navLabel },
   { id: "products", label: products.navLabel },
   { id: "offers", label: offers.navLabel },
-  { id: "principle", label: principle.navLabel },
   { id: "audience", label: audience.navLabel },
   { id: "production", label: production.navLabel },
   { id: "history", label: timeline.navLabel },

@@ -17,6 +17,7 @@ import {
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { ownedByUserOrStaff } from "../access/ownership.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
+import { shiftProductPurchases } from "../services/product-counters.db.ts";
 import { revokeRedemptionsForOrder } from "../services/promo-redemptions.db.ts";
 import { inviteToReviewDeliveredOrder } from "../services/review-invitation.notify.ts";
 
@@ -28,6 +29,20 @@ function getOrderUserId(doc: { user?: unknown }): number | null {
 		return Number((user as { id: unknown }).id);
 	}
 	return null;
+}
+
+/** id связи вне зависимости от глубины чтения (число или документ). */
+function getRelationId(value: unknown): number | null {
+	if (typeof value === "number") return value;
+	if (value && typeof value === "object" && "id" in value) {
+		return Number((value as { id: unknown }).id);
+	}
+	return null;
+}
+
+/** Отменённый и возвращённый заказ покупкой не считается. */
+function isVoidOrderStatus(status: unknown): boolean {
+	return status === "cancelled" || status === "refunded";
 }
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
@@ -347,6 +362,53 @@ export const Orders: CollectionConfig = {
 					);
 				}
 
+				return doc;
+			},
+			/**
+			 * Счётчик покупок товаров (products.analytics.purchasesCount).
+			 *
+			 * Покупка — это заказ, в котором есть товар, и он не отменён: как и
+			 * в отборе баннеров (modules/banners/server/facts.ts), отменённый и
+			 * возвращённый заказ «сделкой не был». Поэтому +1 при создании и ±1
+			 * при переходе в отмену/возврат и обратно — счётчик держит число
+			 * действующих заказов с товаром, а не число нажатий «Оформить».
+			 *
+			 * Хуком коллекции, а не в submitOrderAction, по той же причине, что и
+			 * возврат промокода выше: отменяют заказ из трёх разных мест.
+			 * Перенос истории (isMigration) пропускается — значения старой
+			 * системы уже лежат в счётчике, перенесённые заказы посчитали бы
+			 * себя второй раз.
+			 */
+			async ({ doc, previousDoc, operation, req }) => {
+				if (req.context?.isMigration) return doc;
+
+				let delta: 1 | -1 | 0 = 0;
+				if (operation === "create") {
+					delta = isVoidOrderStatus(doc.status) ? 0 : 1;
+				} else if (previousDoc?.status !== doc.status) {
+					const wasVoid = isVoidOrderStatus(previousDoc?.status);
+					const isVoid = isVoidOrderStatus(doc.status);
+					if (!wasVoid && isVoid) delta = -1;
+					if (wasVoid && !isVoid) delta = 1;
+				}
+				if (delta === 0) return doc;
+
+				try {
+					await shiftProductPurchases(
+						req.payload,
+						(doc.items ?? []).map((item: { product?: unknown }) =>
+							getRelationId(item.product),
+						),
+						delta,
+					);
+				} catch (err) {
+					// Заказ важнее сортировки каталога: сбой счётчика не должен
+					// ронять ни оформление, ни отмену.
+					req.payload.logger.error(
+						{ err, orderId: doc.id },
+						"[analytics] не удалось обновить счётчик покупок",
+					);
+				}
 				return doc;
 			},
 			async ({ doc, previousDoc, operation, req }) => {

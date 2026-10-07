@@ -1,3 +1,4 @@
+import type { ShowcaseProductId } from "@/modules/home/content/showcase-content";
 import type { ProductAvailabilityStatus } from "@/modules/productCard";
 
 export interface ProductDetailImage {
@@ -60,4 +61,9 @@ export interface ProductDetailData {
 	dimensions: ProductDimensionsInfo;
 	instruction: ProductInstructionData | null;
 	upsellProducts: ProductUpsellRef[];
+	/**
+	 * Моушн-ролик «Как это работает» под характеристиками — id изделия из
+	 * витрины главной; null — ролик не показывается.
+	 */
+	motion: ShowcaseProductId | null;
 }

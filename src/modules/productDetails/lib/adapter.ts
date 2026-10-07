@@ -1,3 +1,7 @@
+import {
+	type ShowcaseProductId,
+	showcaseProducts,
+} from "@/modules/home/content/showcase-content";
 import type { ProductAvailabilityStatus } from "@/modules/productCard";
 import {
 	calculatePriceBreakdown,
@@ -155,5 +159,17 @@ export function mapProductToDetailData(product: Product): ProductDetailData {
 
 		dimensions,
 		instruction: mapInstruction(product.instruction),
+		motion: mapMotion(product.motion),
 	};
+}
+
+/**
+ * Ролик показывается, только если он включён И выбран, и только из тех,
+ * что есть в витрине: значение из базы, которого витрина не знает (ролик
+ * убрали из showcase-content), просто не выводится.
+ */
+function mapMotion(motion: Product["motion"]): ShowcaseProductId | null {
+	const id = motion?.enabled ? motion.product : null;
+	if (!id) return null;
+	return showcaseProducts.some((item) => item.id === id) ? id : null;
 }

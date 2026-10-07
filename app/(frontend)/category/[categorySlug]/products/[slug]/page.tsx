@@ -4,7 +4,9 @@ export const revalidate = 0;
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
+import { ProductViewTracker } from "@/modules/analytics/components/ProductViewTracker";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
+import { MotionShowcase } from "@/modules/home/components/MotionShowcase";
 import {
 	buildProductJsonLd,
 	buildProductMetadata,
@@ -152,6 +154,7 @@ export default async function ProductDetailPage({ params }: Props) {
 		<main className="w-full min-h-screen pb-[7rem]">
 			<JsonLd data={jsonLd} />
 			<JsonLd data={buildBreadcrumbSchema(breadcrumbItems)} />
+			<ProductViewTracker product={cardData} />
 
 			<PageContainer className="pt-6 sm:pt-[2rem]">
 				<Breadcrumbs items={breadcrumbItems} />
@@ -206,6 +209,15 @@ export default async function ProductDetailPage({ params }: Props) {
 					product={detailData}
 					reviewsData={reviewsData}
 					className="min-w-0"
+					afterSpecs={
+						detailData.motion ? (
+							// Ролик раскрывается на весь экран, поэтому выходит из
+							// колонки страницы (.full-bleed), как секции главной.
+							<div className="full-bleed my-[clamp(2.5rem,5vw,4.5rem)]">
+								<MotionShowcase only={detailData.motion} id="how-it-works" />
+							</div>
+						) : null
+					}
 				/>
 
 				<ProductRelated products={relatedProducts} />

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
 	pluralizeReviews,
 	ReviewsSection,
@@ -14,6 +15,8 @@ interface Props {
 	product: ProductDetailData;
 	reviewsData: ReviewsSectionData;
 	className?: string;
+	/** Слот сразу под характеристиками — моушн-ролик «Как это работает». */
+	afterSpecs?: ReactNode;
 }
 
 /**
@@ -33,7 +36,12 @@ interface Props {
  * открывать. На странице товара нечего скрывать — описание и характеристики
  * ровно то, за чем сюда приходят.
  */
-export function ProductInformation({ product, reviewsData, className }: Props) {
+export function ProductInformation({
+	product,
+	reviewsData,
+	className,
+	afterSpecs,
+}: Props) {
 	const description = product.description?.trim();
 	const specGroups = buildSpecGroups(product);
 	const specCount = specGroups.reduce(
@@ -55,6 +63,8 @@ export function ProductInformation({ product, reviewsData, className }: Props) {
 					<ProductSpecs groups={specGroups} />
 				</ProductSection>
 			)}
+
+			{afterSpecs}
 
 			<ProductSection
 				id={PRODUCT_REVIEWS_ANCHOR_ID}

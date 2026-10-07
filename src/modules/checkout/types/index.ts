@@ -1,3 +1,4 @@
+import type { EcommercePurchase } from "@/modules/analytics/lib/ecommerce-product";
 import type { CartView } from "@/modules/cart";
 import type { Company } from "@/payload-types";
 import type { CheckoutAddress } from "../lib/address";
@@ -247,7 +248,18 @@ export type CheckoutActionErrorCode =
 	| "UNKNOWN";
 
 export type CheckoutActionResult =
-	| { success: true; data: { orderNumber: string } }
+	| {
+			success: true;
+			data: {
+				orderNumber: string;
+				/**
+				 * Состав покупки для электронной коммерции Метрики. Собирается на
+				 * сервере из того же расчёта, что лёг в заказ; отправит ли его
+				 * браузер, решает согласие на аналитику (modules/analytics).
+				 */
+				purchase: EcommercePurchase;
+			};
+	  }
 	| {
 			success: false;
 			error: CheckoutActionErrorCode;

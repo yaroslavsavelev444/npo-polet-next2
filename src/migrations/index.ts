@@ -28,6 +28,7 @@ import * as migration_20260927_180000_catalog_facets from "./20260927_180000_cat
 import * as migration_20260928_120000_company_kpp_ogrn from "./20260928_120000_company_kpp_ogrn.ts";
 import * as migration_20260928_140000_restock_and_product_requests from "./20260928_140000_restock_and_product_requests.ts";
 import * as migration_20260928_180000_error_events from "./20260928_180000_error_events.ts";
+import * as migration_20261006_120000_product_motion from "./20261006_120000_product_motion.ts";
 
 export const migrations = [
 	{
@@ -179,5 +180,10 @@ export const migrations = [
 		up: migration_20260928_180000_error_events.up,
 		down: migration_20260928_180000_error_events.down,
 		name: "20260928_180000_error_events",
+	},
+	{
+		up: migration_20261006_120000_product_motion.up,
+		down: migration_20261006_120000_product_motion.down,
+		name: "20261006_120000_product_motion",
 	},
 ];

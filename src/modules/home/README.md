@@ -240,7 +240,7 @@ components/
   ManifestoSection.tsx
   DirectionsSection.tsx
   ProductsShowcase.tsx  два ряда товаров из каталога
-  PrincipleSection.tsx  липкая схема перехвата
+  MotionShowcase.tsx    моушн-витрина «Как это работает» (3D на three.js, src/modules/home/showcase)
   AudienceSection.tsx
   ProductionSection.tsx
   TimelineSection.tsx   горизонтальная хронология

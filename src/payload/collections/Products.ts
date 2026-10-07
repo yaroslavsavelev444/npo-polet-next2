@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { showcaseProducts } from "../../modules/home/content/showcase-content.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
 import { normalizeProductForCatalog } from "../hooks/normalizeProductForCatalog.ts";
@@ -294,6 +295,51 @@ export const Products: CollectionConfig = {
 				{ name: "valueKey", type: "text", admin: { hidden: true } },
 				{ name: "valueNum", type: "number", admin: { hidden: true } },
 				{ name: "unitKey", type: "text", admin: { hidden: true } },
+			],
+		},
+
+		// ─── Моушн-ролик ───────────────────────────────────────────────────────
+		// Ролик «Как это работает» из витрины главной страницы. На странице
+		// товара показывается под характеристиками — только выбранный, без
+		// переключения на другие изделия. Варианты берутся из того же списка,
+		// что и на главной (showcase-content.ts), поэтому ролика, которого
+		// нет на главной, здесь выбрать нельзя.
+		{
+			name: "motion",
+			type: "group",
+			label: "Моушн-ролик «Как это работает»",
+			admin: {
+				description:
+					"Ролик из блока «Как это работает» на главной. Показывается на " +
+					"странице товара под характеристиками.",
+			},
+			fields: [
+				{
+					name: "enabled",
+					type: "checkbox",
+					defaultValue: false,
+					label: "Показывать ролик на странице товара",
+				},
+				{
+					name: "product",
+					type: "select",
+					label: "Ролик",
+					enumName: "product_motion_enum",
+					options: showcaseProducts.map((item) => ({
+						label: item.name,
+						value: item.id,
+					})),
+					admin: {
+						condition: (_, siblingData) => Boolean(siblingData?.enabled),
+					},
+					validate: (
+						value: unknown,
+						{ siblingData }: { siblingData?: { enabled?: boolean } },
+					) =>
+						siblingData?.enabled && !value
+							? "Выберите, какой ролик показывать"
+							: true,
+				},
 			],
 		},
 

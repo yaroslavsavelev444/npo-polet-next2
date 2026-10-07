@@ -46,6 +46,7 @@ import { projectEmailAdapter } from "./src/payload/email/adapter.ts";
 import { AlertingSettings } from "./src/payload/globals/AlertingSettings.ts";
 import { Settings } from "./src/payload/globals/Settings.ts";
 import { captureAfterError } from "./src/payload/hooks/captureAfterError.ts";
+import { rejectMalformedID } from "./src/payload/hooks/rejectMalformedID.ts";
 
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET!,
@@ -112,6 +113,7 @@ export default buildConfig({
 		defaultLocale: "ru",
 	},
 
+	// Нечисловой id в адресе — 404 до запроса в базу (см. шапку хука).
 	collections: [
 		Admins,
 		Users,
@@ -162,7 +164,16 @@ export default buildConfig({
 		// Журнал серверных ошибок. Только суперадминистратору; персональные
 		// данные — только в карточке записи (см. шапку коллекции).
 		ErrorEvents,
-	],
+	].map((collection) => ({
+		...collection,
+		hooks: {
+			...collection.hooks,
+			beforeOperation: [
+				rejectMalformedID,
+				...(collection.hooks?.beforeOperation ?? []),
+			],
+		},
+	})),
 
 	db: postgresAdapter({
 		pool: {

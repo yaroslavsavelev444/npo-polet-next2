@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { trackPurchase } from "@/modules/analytics/ecommerce";
 import { openAuthOverlay } from "@/modules/auth/store/auth-overlay.store";
 import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
 import { markOrderJustCreated } from "@/modules/orders/lib/celebrate-order";
@@ -388,6 +389,10 @@ export function CheckoutPageClient({
 				const result = await submitOrderAction(submitted);
 
 				if (result.success) {
+					// Ровно здесь, а не на странице заказа: эта ветка выполняется
+					// один раз на оформленный заказ, а страницу заказа можно
+					// перезагрузить или открыть из списка.
+					trackPurchase(result.data.purchase);
 					appToast.success(`Заказ №${result.data.orderNumber} оформлен`);
 					// Отметка для страницы заказа: конфетти взлетает только в этот
 					// переход. Она живёт в sessionStorage, а не в адресе, поэтому

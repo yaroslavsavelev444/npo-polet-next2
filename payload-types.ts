@@ -415,6 +415,13 @@ export interface Product {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Ролик из блока «Как это работает» на главной. Показывается на странице товара под характеристиками.
+   */
+  motion?: {
+    enabled?: boolean | null;
+    product?: ('pauk-30bn' | 'pauk-duplet' | 'setkomet-fpv' | 'setkomet-mavic' | 'vultur-r10' | 'triple') | null;
+  };
   relations?: {
     upsellProducts?: (number | Product)[] | null;
   };
@@ -2346,6 +2353,12 @@ export interface ProductsSelect<T extends boolean = true> {
         valueNum?: T;
         unitKey?: T;
         id?: T;
+      };
+  motion?:
+    | T
+    | {
+        enabled?: T;
+        product?: T;
       };
   relations?:
     | T

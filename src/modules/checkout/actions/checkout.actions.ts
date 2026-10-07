@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { toEcommerceProduct } from "@/modules/analytics/lib/ecommerce-product";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { getRequestMeta } from "@/modules/auth/lib/utils";
 import { buildCartView } from "@/modules/cart/lib/build-cart-view";
@@ -263,7 +264,22 @@ export async function submitOrderAction(
 	revalidatePath("/checkout");
 	revalidatePath("/orders");
 
-	return { success: true, data: { orderNumber: order.orderNumber as string } };
+	const orderNumber = order.orderNumber as string;
+	return {
+		success: true,
+		data: {
+			orderNumber,
+			purchase: {
+				id: orderNumber,
+				revenue: pricing.total,
+				coupon: appliedPromo?.code,
+				products: cartView.items.map((item) => ({
+					...toEcommerceProduct(item.product, item.quantity),
+					price: item.unitFinalPrice,
+				})),
+			},
+		},
+	};
 }
 
 /**

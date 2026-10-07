@@ -253,6 +253,19 @@ const SORT_FIELDS: SortField[] = [
 	"rating",
 ];
 
+/**
+ * Сортировки по счётчикам популярности. Счётчики растут прямым UPDATE мимо
+ * хуков (см. product-counters.db.ts) и тег `products` не сбрасывают — иначе
+ * каждый просмотр стирал бы весь кэш каталога. Поэтому такая выдача
+ * обновляется по таймеру: порядок «популярных» отстаёт от счётчика не больше
+ * чем на этот срок, а прочие сортировки остаются вечными до правки товара.
+ */
+const COUNTER_SORT_FIELDS: ReadonlySet<SortField> = new Set([
+	"viewsCount",
+	"purchasesCount",
+]);
+const COUNTER_SORT_REVALIDATE_SECONDS = 15 * 60;
+
 /** Контекст выдачи раздела: фасеты сверены с разделом (sanitize). */
 function buildCatalogContext(
 	query: ProductQuery,
@@ -422,7 +435,12 @@ export async function getCatalogData(
 		[
 			`catalog-page-${categoryId}-st-${ctx.status ?? "any"}-${field}-${order}-l-${limit}-p-${page}`,
 		],
-		{ tags: ["products", "catalog-facets"], revalidate: false },
+		{
+			tags: ["products", "catalog-facets"],
+			revalidate: COUNTER_SORT_FIELDS.has(field)
+				? COUNTER_SORT_REVALIDATE_SECONDS
+				: false,
+		},
 	)();
 }
 

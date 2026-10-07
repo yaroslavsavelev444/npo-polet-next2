@@ -1,5 +1,10 @@
 // src/modules/cart/store/cart-panel.store.ts
 import { create } from "zustand";
+import {
+	trackCartAdd,
+	trackCartDiff,
+	trackCartRemove,
+} from "@/modules/analytics/ecommerce";
 import type { ProductCardData } from "@/modules/productCard";
 import { useCartStore } from "@/shared/store/cart.store";
 import { useCartItemsStore } from "@/shared/store/cartItems.store";
@@ -431,6 +436,7 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 				if (result.success) {
 					set({ view: result.data, status: "ready", error: null });
 					syncDerivedStores(result.data);
+					trackCartAdd(product, quantity, result.data);
 				}
 			} catch {
 				set({ error: NETWORK_MESSAGE });
@@ -457,6 +463,7 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 
 			set({ view: result.data, status: "ready", error: null });
 			syncDerivedStores(result.data);
+			trackCartAdd(product, quantity, result.data);
 
 			// Первое в жизни аккаунта успешное добавление открывает панель само и
 			// приводит с собой объяснение. Дальше — только по нажатию на иконку.
@@ -512,6 +519,7 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 
 			set({ view: result.data, status: "ready" });
 			syncDerivedStores(result.data);
+			trackCartDiff(previousView, result.data);
 		} catch {
 			set({ view: previousView, error: NETWORK_MESSAGE });
 		} finally {
@@ -558,6 +566,7 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 
 			set({ view: result.data, status: "ready" });
 			syncDerivedStores(result.data);
+			trackCartRemove(productId, previousView);
 			return { ok: true };
 		} catch {
 			set({ view: previousView, error: NETWORK_MESSAGE });
@@ -593,6 +602,7 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 			}
 			set({ view: result.data, status: "ready" });
 			syncDerivedStores(result.data);
+			if (previousView) trackCartDiff(previousView, result.data);
 		} catch {
 			set({ view: previousView, error: NETWORK_MESSAGE });
 		} finally {
@@ -609,10 +619,14 @@ export const useCartPanel = create<CartPanelState>((set, get) => ({
 	repeatOrder: async (orderId) => {
 		set({ isMutating: true });
 		try {
+			const previousView = get().view;
 			const result = await enqueue(() => repeatOrderAction(orderId));
 			if (result.success) {
 				set({ view: result.data, status: "ready", error: null });
 				syncDerivedStores(result.data);
+				// Без загруженного прежнего состава прирост не вычислить: в
+				// новом могут быть и позиции, лежавшие в корзине до повтора.
+				if (previousView) trackCartDiff(previousView, result.data);
 			}
 			return result;
 		} catch {
