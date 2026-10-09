@@ -1,0 +1,37 @@
+/* Знак под тему: чёрный на светлой, белый на тёмной.
+
+   Вариант выбирает CSS, а не React: сервер не знает тему системы, и в режиме
+   «Авто» вычисленный на клиенте вариант сначала рисовался бы неверным, а
+   после гидратации перещёлкивался. Правила записаны трижды — явный выбор
+   (data-scheme), «Авто» при тёмной системе и участки .scheme-dark, которые
+   тёмные при любой теме (см. app/(frontend)/theme.css). */
+
+.logo {
+	display: block;
+	height: 100%;
+	width: auto;
+}
+
+.onDark {
+	display: none;
+}
+
+:global(:root[data-scheme="dark"]) .onLight,
+:global(.scheme-dark) .onLight {
+	display: none;
+}
+
+:global(:root[data-scheme="dark"]) .onDark,
+:global(.scheme-dark) .onDark {
+	display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+	:global(:root:not([data-scheme="light"])) .onLight {
+		display: none;
+	}
+
+	:global(:root:not([data-scheme="light"])) .onDark {
+		display: block;
+	}
+}

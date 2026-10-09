@@ -1,6 +1,5 @@
 import { Mail, Phone } from "lucide-react";
 import { cookies } from "next/headers";
-import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
@@ -15,12 +14,12 @@ import { getCachedCategories } from "@/payload/services/categories.service";
 import { getCachedConsents } from "@/payload/services/consents.service";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import type { Consent } from "@/payload-types";
+import { BrandLogo } from "@/shared/components/BrandLogo";
 import { DrawnRule } from "@/shared/components/motion/DrawnRule";
 import { cn } from "@/utils/cn";
 import {
 	getCompanyName,
 	getLegalAddress,
-	getLogoUrl,
 	getPrimaryEmail,
 	getPrimaryPhone,
 	getSocialLinks,
@@ -88,7 +87,6 @@ export default async function Footer({ className }: FooterProps = {}) {
 	);
 
 	const companyName = getCompanyName(settings) || "НПО «Полёт»";
-	const logoUrl = getLogoUrl(settings);
 	const phone = getPrimaryPhone(settings);
 	const email = getPrimaryEmail(settings);
 	const workingHours = getWorkingHours(settings);
@@ -162,19 +160,7 @@ export default async function Footer({ className }: FooterProps = {}) {
 					style={{ "--i": order++ } as CSSProperties}
 				>
 					<Link href="/" className={styles.mark} aria-label="На главную">
-						{logoUrl ? (
-							<Image
-								src={logoUrl}
-								alt={companyName}
-								width={280}
-								height={80}
-								className={styles.logo}
-							/>
-						) : (
-							<span className={cn("u-display", styles.wordmark)}>
-								{companyName}
-							</span>
-						)}
+						<BrandLogo alt={companyName} className={styles.logo} />
 					</Link>
 
 					<p className={cn("u-display", styles.strap)}>{STRAPLINE}</p>
