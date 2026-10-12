@@ -1176,6 +1176,28 @@ export async function customerUnreadCount(
 	return Number(row?.n ?? 0);
 }
 
+/**
+ * Диалоги покупателя с непрочитанным ответом менеджера — для отметки «Новый
+ * ответ» в «Моих обращениях». Только ответы людей: системные строки («диалог
+ * закрыт», автоответ ночью) ответом не считаются.
+ */
+export async function customerUnreadConversationIds(
+	deps: SupportDeps,
+	actor: CustomerActor,
+): Promise<number[]> {
+	const rows = await query(
+		drizzleOf(deps.payload),
+		sql`SELECT DISTINCT c.id
+			FROM support_messages m
+			JOIN support_conversations c ON c.id = m.conversation_id
+			WHERE c.user_id = ${actor.userId}
+				AND m.author_type = 'staff'
+				AND m.kind = 'text'
+				AND m.seq > c.customer_last_read_seq`,
+	);
+	return rows.map((row) => Number(row.id));
+}
+
 export interface StaffSummaryDTO {
 	/** В общей очереди без менеджера. */
 	queue: number;
