@@ -53,3 +53,6 @@ next-env.d.ts
 # mutation testing
 /reports/mutation
 .stryker-tmp
+
+# Вложения чата поддержки: зашифрованная переписка покупателей — в репозиторий никогда
+/media/support-attachments/

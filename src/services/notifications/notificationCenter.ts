@@ -34,6 +34,7 @@ export type NotificationScenario =
   | "review_rejected"
   | "review_invitation"
   | "product_back_in_stock"
+  | "support_reply"
   | "welcome";
 
 interface ScenarioDataMap {
@@ -60,6 +61,7 @@ interface ScenarioDataMap {
     productTitle: string;
     productUrl: string;
   };
+  support_reply: { conversationId: number };
   welcome: Record<string, never>;
 }
 
@@ -246,6 +248,21 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
       title: "Товар снова в продаже",
       body: `«${productTitle}», о поступлении которого вы просили сообщить, снова можно заказать.`,
       link: productUrl,
+    }),
+  },
+  /**
+   * Менеджер ответил в чате, а покупатель не на сайте (нет открытого сокета).
+   *
+   * Текста ответа в уведомлении НЕТ: уведомления хранятся в базе открыто, а
+   * переписка — зашифрованной (modules/support-chat/server/crypto.ts).
+   * Ссылка открывает виджет чата поверх страницы истории.
+   */
+  support_reply: {
+    type: "chat",
+    build: () => ({
+      title: "Ответ в чате поддержки",
+      body: "Менеджер ответил на ваше сообщение. Откройте чат, чтобы прочитать.",
+      link: "/profile/support?chat=open",
     }),
   },
   welcome: {

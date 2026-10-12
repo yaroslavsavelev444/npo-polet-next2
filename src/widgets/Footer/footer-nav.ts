@@ -64,5 +64,6 @@ export const ACCOUNT_LINKS: FooterLink[] = [
 	{ label: "Заказы", href: "/orders" },
 	{ label: "Избранное", href: "/wishlist" },
 	{ label: "Мои отзывы", href: "/profile/reviews" },
+	{ label: "Мои обращения", href: "/profile/support" },
 	{ label: "Корзина", href: "/cart" },
 ];

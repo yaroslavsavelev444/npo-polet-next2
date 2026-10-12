@@ -404,6 +404,90 @@ IMAGE_TOOLS="ghcr.io/<owner>/<repo>-tools:$(cat ../.deploy-state/last_successful
 
 ---
 
+## Чат поддержки
+
+Модуль — `src/modules/support-chat` (подробно — его `CHECKLIST.md`). На сервере
+это сервис `support-gateway` в `docker-compose.prod.yml` (Socket.IO-шлюз и
+периодические задачи чата) и маршрут `/realtime/` в nginx обоих хостов.
+
+### Чат поддержки: ключ шифрования (до первой выкладки с чатом)
+
+Переписка хранится в базе и на диске **зашифрованной**. Мастер-ключ — только в
+`.env.production`; без него выкладка остановится сразу (`require_support_key`
+в `deploy.sh`), а шлюз не стартует.
+
+```
+[VPS]
+openssl rand -base64 32
+```
+
+В `/home/y4s/polet-next/.env.production`:
+
+```
+SUPPORT_ENCRYPTION_KEYS=v1:<вывод openssl>
+```
+
+⚠ **Сохраните ключ офлайн, ОТДЕЛЬНО от бэкапов базы** (менеджер паролей
+владельца, бумага в сейфе). Обе крайности фатальны:
+
+- ключ потерян — вся переписка и все вложения невосстановимы, бэкап базы не
+  поможет;
+- ключ лежит рядом с бэкапом базы — утёкший бэкап читается целиком, и
+  шифрование ничего не дало.
+
+`SUPPORT_GATEWAY_PUBLIC_URL` в проде **не задавать**: шлюз на том же хосте за
+nginx, браузер ходит на `/realtime/` своего хоста.
+
+**Смена ключа** (плановая или при подозрении на утечку): новый ключ —
+первым, старый — вторым: `SUPPORT_ENCRYPTION_KEYS=v2:<новый>,v1:<старый>`,
+затем `deploy.sh --restart`, затем переобернуть ключи диалогов:
+
+```
+[VPS]
+docker exec polet-next-support-gateway-prod node \
+  --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types \
+  --import ./tests/support/next-subpath-resolver.mjs scripts/support-rotate-keys.ts
+```
+
+Когда скрипт напишет «осталось 0», убрать `v1:…` из переменной и снова
+`--restart`. Сообщения и файлы при этом не перешифровываются — только
+короткие ключи диалогов.
+
+### Чат поддержки: nginx
+
+- **npo-polet.ru** — `upstream polet_support_main`, `limit_conn_zone` и
+  `location /realtime/` уже в `nginx.txt` (эталон конфига витрины);
+- **admin.npo-polet.ru** — добавить `location /realtime/` из
+  `deploy/nginx-support-chat.conf` в server{} админки: консоль менеджеров
+  подключается со своего хоста (cookie менеджера на хост витрины не уходит).
+
+`sudo nginx -t` → `sudo systemctl reload nginx`.
+
+### Чат поддержки: проверка после выкладки
+
+```
+[VPS]
+curl -s http://127.0.0.1:3005/realtime/health
+curl -s https://npo-polet.ru/realtime/health
+curl -s https://admin.npo-polet.ru/realtime/health
+```
+
+Все три — `{"ok":true,...}`. Если первый отвечает, а остальные нет — дело в
+nginx, а не в шлюзе. В ответе есть `connections` (открытые сокеты) и `rssMb`
+(память шлюза): на 300 сокетах локальный прогон держит ~280 МБ, рост без
+роста `connections` — повод посмотреть логи.
+
+Нагрузочный прогон (`pnpm test:support-chat:load`) и E2E
+(`pnpm test:e2e:support`) **на проде не запускать**: они создают тестовых
+покупателей и менеджеров в базе, к которой подключены.
+
+Выкладка чат **не включает**: пока в админке «Чат поддержки → Чат включён для
+всех покупателей» выключен, кнопки на витрине нет ни у кого, кроме покупателей
+из пилотной группы (там же). Консоль менеджеров (`/admin/support`) работает
+сразу.
+
+---
+
 ## Уборка после перехода (необязательно, но полезно)
 
 Старый процесс оставил на сервере мусор, который больше не пополняется:

@@ -64,6 +64,9 @@ export function ProductStickyBar({ product, cardData, watchId }: Props) {
 	return (
 		<div
 			data-shown={shown || undefined}
+			// Кнопка чата поддержки поднимается над показанной панелью
+			// (support-chat/widget/widget.module.css).
+			data-bottom-bar={shown ? "visible" : "hidden"}
 			// Панель остаётся в разметке скрытой, иначе оборвётся анимация ухода.
 			// Но «присутствует» и «доступна» — разные вещи: inert убирает её из
 			// обхода табом и из дерева доступности, пока она не показана.

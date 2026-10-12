@@ -29,6 +29,8 @@ import * as migration_20260928_120000_company_kpp_ogrn from "./20260928_120000_c
 import * as migration_20260928_140000_restock_and_product_requests from "./20260928_140000_restock_and_product_requests.ts";
 import * as migration_20260928_180000_error_events from "./20260928_180000_error_events.ts";
 import * as migration_20261006_120000_product_motion from "./20261006_120000_product_motion.ts";
+import * as migration_20261011_120000_support_chat from "./20261011_120000_support_chat.ts";
+import * as migration_20261012_120000_support_chat_ban from "./20261012_120000_support_chat_ban.ts";
 
 export const migrations = [
 	{
@@ -185,5 +187,15 @@ export const migrations = [
 		up: migration_20261006_120000_product_motion.up,
 		down: migration_20261006_120000_product_motion.down,
 		name: "20261006_120000_product_motion",
+	},
+	{
+		up: migration_20261011_120000_support_chat.up,
+		down: migration_20261011_120000_support_chat.down,
+		name: "20261011_120000_support_chat",
+	},
+	{
+		up: migration_20261012_120000_support_chat_ban.up,
+		down: migration_20261012_120000_support_chat_ban.down,
+		name: "20261012_120000_support_chat_ban",
 	},
 ];

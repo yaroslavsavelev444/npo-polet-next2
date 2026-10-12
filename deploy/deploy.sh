@@ -218,6 +218,23 @@ read_env_var() {
     printf '%s' "$line"
 }
 
+### ── Ключ шифрования чата поддержки ─────────────────────────────────────────
+#
+# Переписка поддержки хранится зашифрованной (src/modules/support-chat/
+# server/crypto.ts), мастер-ключ — только в .env.production. Без него шлюз
+# чата не стартует, а приложение не может ни записать, ни показать ни одного
+# сообщения. Проверка — ДО скачивания образов и бэкапа: выкладка без ключа
+# не должна начинаться вовсе.
+#
+# Сам ключ сюда не печатается и никуда не копируется: его место — в
+# .env.production и в офлайн-копии ОТДЕЛЬНО от бэкапов базы (deploy/README.md).
+require_support_key() {
+    local keys
+    keys=$(read_env_var SUPPORT_ENCRYPTION_KEYS)
+    [[ -n "$keys" ]] || fail "SUPPORT_ENCRYPTION_KEYS не задан в $ENV_FILE — см. deploy/README.md, «Чат поддержки: ключ шифрования»"
+    [[ "$keys" == *:* ]] || fail "SUPPORT_ENCRYPTION_KEYS в $ENV_FILE: ожидается формат id:base64 — см. deploy/README.md"
+}
+
 ### ── Проверка со стороны хоста ────────────────────────────────────────────
 #
 # ⚠ Дополняет health-gate, а не дублирует его. `--wait` смотрит на HEALTHCHECK
@@ -400,6 +417,7 @@ running_image() {
 
 cmd_restart() {
     [[ -f "$ENV_FILE" ]] || fail "$ENV_FILE отсутствует"
+    require_support_key
     local app_image tools_image before_app
     app_image=$(running_image app) \
         || fail "Контейнер app не запущен — перезапускать нечего, нужна выкладка"
@@ -450,6 +468,7 @@ cmd_deploy() {
 
     [[ -f "$ENV_FILE" ]] || fail "$ENV_FILE отсутствует"
     [[ -f "$COMPOSE_FILE" ]] || fail "$COMPOSE_FILE отсутствует"
+    require_support_key
 
     log "=== 🚀 Выкладка $GIT_SHA ==="
     log "Конфигурация: $RELEASE_DIR"

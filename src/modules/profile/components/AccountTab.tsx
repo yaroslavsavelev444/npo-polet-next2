@@ -6,6 +6,7 @@ import {
 	CheckCircle2,
 	Heart,
 	Mail,
+	MessageCircle,
 	MessageSquareText,
 	Package,
 } from "lucide-react";
@@ -60,6 +61,12 @@ const CABINET_LINKS: CabinetLink[] = [
 		title: "Мои отзывы",
 		hint: "Оставленные оценки и комментарии",
 		icon: <MessageSquareText size={18} aria-hidden />,
+	},
+	{
+		href: "/profile/support",
+		title: "Мои обращения",
+		hint: "Переписка с менеджерами",
+		icon: <MessageCircle size={18} aria-hidden />,
 	},
 ];
 

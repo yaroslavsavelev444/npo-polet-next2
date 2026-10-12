@@ -27,6 +27,9 @@ import { RelationshipFeatureClient as RelationshipFeatureClient_e70f5e05f09f93e0
 import { ChecklistFeatureClient as ChecklistFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { FaqQuestionRowLabel as FaqQuestionRowLabel_8d8e10dfc01b708570170de9cd7be6b7 } from '@/payload/collections/FaqQuestionRowLabel'
 import { HomeDocumentRowLabel as HomeDocumentRowLabel_9ed9fe4ea83c1de3edb3f090bf40a96a } from '@/payload/fields/HomeDocumentRowLabel'
+import { SupportNavLink as SupportNavLink_441788eb9cd3ca7bc2ab2f9ea35a3165 } from '@/modules/support-chat/admin/SupportNavLink'
+import { SupportConsoleView as SupportConsoleView_6108a700fbd4d9109653cdf079bcb0db } from '@/modules/support-chat/admin/SupportConsoleView'
+import { SupportReportsView as SupportReportsView_559f2e3ad903d106688a50fc545caaf6 } from '@/modules/support-chat/admin/SupportReportsView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -60,5 +63,8 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#ChecklistFeatureClient": ChecklistFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@/payload/collections/FaqQuestionRowLabel#FaqQuestionRowLabel": FaqQuestionRowLabel_8d8e10dfc01b708570170de9cd7be6b7,
   "@/payload/fields/HomeDocumentRowLabel#HomeDocumentRowLabel": HomeDocumentRowLabel_9ed9fe4ea83c1de3edb3f090bf40a96a,
+  "@/modules/support-chat/admin/SupportNavLink#SupportNavLink": SupportNavLink_441788eb9cd3ca7bc2ab2f9ea35a3165,
+  "@/modules/support-chat/admin/SupportConsoleView#SupportConsoleView": SupportConsoleView_6108a700fbd4d9109653cdf079bcb0db,
+  "@/modules/support-chat/admin/SupportReportsView#SupportReportsView": SupportReportsView_559f2e3ad903d106688a50fc545caaf6,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

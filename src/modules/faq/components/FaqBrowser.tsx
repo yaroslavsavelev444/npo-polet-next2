@@ -2,6 +2,7 @@
 
 import { Search, X } from "lucide-react";
 import { useDeferredValue, useId, useMemo, useState } from "react";
+import { AskManagerButton } from "@/modules/support-chat/widget/AskManagerButton";
 import { countQuestions, filterFaqTopics } from "../lib/filterFaq";
 import type { FaqTopicView } from "../types";
 import { FaqAccordion } from "./FaqAccordion";
@@ -99,6 +100,12 @@ export function FaqBrowser({ topics }: { topics: FaqTopicView[] }) {
 						</a>
 						.
 					</p>
+					<AskManagerButton
+						topic="other"
+						className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] px-4 py-2 text-[0.9375rem] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-hover)]"
+					>
+						Спросить менеджера в чате
+					</AskManagerButton>
 				</div>
 			) : (
 				<div className="flex flex-col gap-[clamp(2.5rem,5vw,4.5rem)]">

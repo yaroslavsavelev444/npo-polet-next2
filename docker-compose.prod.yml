@@ -269,6 +269,62 @@ services:
     # Только data: воркеру не нужен выход наружу — ни почты, ни DaData.
     networks: [data]
 
+  # Чат поддержки: Socket.IO-шлюз (src/modules/support-chat/gateway.ts) и его
+  # периодические задачи — переназначение по сроку, статистика ответа,
+  # автозакрытие, срок хранения, уборка вложений (server/periodic.ts).
+  #
+  # Отдельный процесс, а не часть app: standalone-сервер Next не держит
+  # WebSocket, а выкладка приложения не должна рвать открытые переписки.
+  # Наружу — только через nginx: location /realtime/ обоих хостов
+  # (витрины и админки) → 127.0.0.1:3005 (nginx.txt, deploy/README.md).
+  #
+  # Без профиля: без шлюза кнопка чата на витрине и консоль менеджеров не
+  # работают. Пока чат не запущен (support-settings.enabled = false), шлюз
+  # пускает только менеджеров и пилотную группу — выкладка его не «включает».
+  support-gateway:
+    image: ${IMAGE_TOOLS:?IMAGE_TOOLS не задан — запускать этот compose-файл нужно через deploy/deploy.sh}
+    container_name: polet-next-support-gateway-prod
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: .env.production
+    # Голый Node с резолвером — как у воркеров (см. restock-worker).
+    command:
+      - node
+      - --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
+      - --experimental-strip-types
+      - --import
+      - ./tests/support/next-subpath-resolver.mjs
+      - src/modules/support-chat/gateway.ts
+    <<: *hardening
+    mem_limit: 512m
+    pids_limit: 256
+    ports:
+      # Наружу не публикуется: перед шлюзом nginx на хосте.
+      - "127.0.0.1:3005:3005"
+    # Том медиа — ради уборки зашифрованных вложений без записи в базе
+    # (server/maintenance.ts: purgeOrphanFiles). Пишет туда только app.
+    volumes:
+      - media_data:/app/media
+    # В образе tools нет curl; проверка — тем же node.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3005/realtime/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # internal — письма менеджерам (SMTP) и публикация порта: на сети только
+    # с internal: true опубликованный порт не работает. data — база и Redis.
+    networks: [internal, data]
+
 volumes:
   postgres_data:
     name: polet-next_postgres_data

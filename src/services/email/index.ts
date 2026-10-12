@@ -27,6 +27,8 @@ export { orderCreatedUserEmailTemplate } from "./templates/orders/order-created-
 export { orderStatusChangedEmailTemplate } from "./templates/orders/order-status-changed.template.ts";
 export { emailTemplates } from "./templates/registry.ts";
 export { reviewStatusChangedEmailTemplate } from "./templates/reviews/review-status-changed.template.ts";
+export type { SupportStaffAlertEmailData } from "./templates/support/support-staff-alert.template.ts";
+export { supportStaffAlertEmailTemplate } from "./templates/support/support-staff-alert.template.ts";
 
 export type {
 	EmailAddress,

@@ -4,15 +4,29 @@
 		{
 			"name": "npo-polet-dev",
 			"runtimeExecutable": "npx",
-			"runtimeArgs": ["next", "dev"],
+			"runtimeArgs": [
+				"next",
+				"dev"
+			],
 			"port": 3000,
 			"autoPort": true
 		},
 		{
 			"name": "npo-polet-prod",
 			"runtimeExecutable": "sh",
-			"runtimeArgs": ["-c", "PAYLOAD_SECRET=\"$(awk -F= '/^PAYLOAD_SECRET/{print $2}' .env)\" DATABASE_URI=\"$(awk -F= '/^DATABASE_URI=/{sub(/^DATABASE_URI=/,\"\");print}' .env)\" EMAIL_ENABLED=false REDIS_HOST=localhost npx next start -p 3001"],
+			"runtimeArgs": [
+				"-c",
+				"PAYLOAD_SECRET=\"$(awk -F= '/^PAYLOAD_SECRET/{print $2}' .env)\" DATABASE_URI=\"$(awk -F= '/^DATABASE_URI=/{sub(/^DATABASE_URI=/,\"\");print}' .env)\" EMAIL_ENABLED=false REDIS_HOST=localhost npx next start -p 3001"
+			],
 			"port": 3001
+		},
+		{
+			"name": "support-gateway",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": [
+				"support:gateway"
+			],
+			"port": 3005
 		}
 	]
 }

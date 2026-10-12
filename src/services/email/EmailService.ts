@@ -1,7 +1,7 @@
 import { getEmailConfig } from "./config.ts";
 import { EmailDeliveryError, EmailTemplateError } from "./errors.ts";
 import { emailLogger } from "./logger.ts";
-import { getEmailTransporter } from "./transport.ts";
+import { sendMailWithFailover } from "./transport.ts";
 import type {
 	EmailAddress,
 	EmailTemplate,
@@ -134,18 +134,14 @@ export class EmailService {
 		error?: unknown;
 	}> {
 		const config = getEmailConfig();
-		const transporter = getEmailTransporter();
-		const from = formatAddress({
-			email: config.EMAIL_FROM_ADDRESS,
-			name: config.EMAIL_FROM_NAME,
-		});
 		const maxAttempts = config.EMAIL_MAX_RETRIES + 1;
 
 		let lastError: unknown;
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
-				const info = await transporter.sendMail({
-					from,
+				// Отправитель подставляет транспорт: у основного и запасного
+				// SMTP он свой (см. failover.ts).
+				const info = await sendMailWithFailover({
 					to: formatAddress(recipient),
 					replyTo,
 					subject: rendered.subject,

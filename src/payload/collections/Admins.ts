@@ -1,5 +1,6 @@
 // src/payload/collections/Admins.ts
 import type { CollectionConfig } from "payload";
+import { SUPPORT_TOPICS } from "../../modules/support-chat/lib/constants.ts";
 
 export const Admins: CollectionConfig = {
   slug: "admins",
@@ -62,6 +63,42 @@ export const Admins: CollectionConfig = {
       options: [
         { label: "Администратор", value: "admin" },
         { label: "Суперадминистратор", value: "superadmin" },
+      ],
+    },
+    // Чат поддержки. Менеджер = любой сотрудник с доступом в админку:
+    // новый администратор сразу получает диалоги, отдельной роли или
+    // отметки нет (решение владельца, 11.10.2026). Здесь — только то, как
+    // его видит покупатель, и на каких темах он специализируется.
+    {
+      name: "support",
+      type: "group",
+      label: "Чат поддержки",
+      fields: [
+        {
+          name: "displayName",
+          type: "text",
+          label: "Имя для покупателей",
+          admin: {
+            description: "Только имя, например «Анна». Пусто — берётся поле «Имя».",
+          },
+        },
+        {
+          name: "avatar",
+          type: "upload",
+          relationTo: "media",
+          label: "Фото для покупателей",
+        },
+        {
+          name: "topics",
+          type: "select",
+          hasMany: true,
+          label: "Темы",
+          options: SUPPORT_TOPICS.map(({ value, label }) => ({ value, label })),
+          admin: {
+            description:
+              "При автоматическом распределении диалоги этих тем достаются в первую очередь. Пусто — любые.",
+          },
+        },
       ],
     },
   ],

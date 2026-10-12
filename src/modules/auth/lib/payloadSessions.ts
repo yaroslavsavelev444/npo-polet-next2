@@ -1,5 +1,6 @@
 import { sql } from "@payloadcms/db-postgres";
 import type { BasePayload } from "payload";
+import { kickUserSockets } from "../../support-chat/server/kick.ts";
 
 /**
  * Отзыв сессий на уровне САМОГО Payload.
@@ -63,6 +64,9 @@ export async function revokePayloadSession(
 		DELETE FROM users_sessions
 		WHERE _parent_id = ${Number(userId)} AND id = ${sid}
 	`);
+	// Чат поддержки держит открытый сокет — отозванная сессия не должна
+	// продолжать получать переписку до перепроверки шлюзом.
+	void kickUserSockets(userId);
 }
 
 /**
@@ -83,12 +87,14 @@ export async function revokeAllPayloadSessions(
 			DELETE FROM users_sessions
 			WHERE _parent_id = ${Number(userId)} AND id <> ${exceptSid}
 		`);
+		void kickUserSockets(userId);
 		return;
 	}
 
 	await payload.db.drizzle.execute(sql`
 		DELETE FROM users_sessions WHERE _parent_id = ${Number(userId)}
 	`);
+	void kickUserSockets(userId);
 }
 
 /**

@@ -7,11 +7,10 @@ import sharp from "sharp";
 import { env } from "./src/env.ts";
 import { migrations } from "./src/migrations/index.ts";
 import { AccountDeletionRequests } from "./src/payload/collections/AccountDeletionRequests.ts";
-import { ErrorEvents } from "./src/payload/collections/ErrorEvents.ts";
 import { Admins } from "./src/payload/collections/Admins.ts";
 import { BannerEvents } from "./src/payload/collections/BannerEvents.ts";
-import { Banners } from "./src/payload/collections/Banners.ts";
 import { BannerStates } from "./src/payload/collections/BannerStates.ts";
+import { Banners } from "./src/payload/collections/Banners.ts";
 import { Carts } from "./src/payload/collections/Carts.ts";
 import { CatalogFacets } from "./src/payload/collections/CatalogFacets.ts";
 import { Categories } from "./src/payload/collections/Categories.ts";
@@ -21,6 +20,7 @@ import { Consents } from "./src/payload/collections/Consents.ts";
 import { ContactRequests } from "./src/payload/collections/ContactRequests.ts";
 import { ContentBlocks } from "./src/payload/collections/ContentBlocks.ts";
 import { Discounts } from "./src/payload/collections/Discounts.ts";
+import { ErrorEvents } from "./src/payload/collections/ErrorEvents.ts";
 import { Faq } from "./src/payload/collections/Faq.ts";
 import { Feedbacks } from "./src/payload/collections/Feedbacks.ts";
 import { KnowledgeCategories } from "./src/payload/collections/KnowledgeCategories.ts";
@@ -37,6 +37,10 @@ import { PromoCodes } from "./src/payload/collections/PromoCodes.ts";
 import { RestockSubscriptions } from "./src/payload/collections/RestockSubscriptions.ts";
 import { ProductReviews } from "./src/payload/collections/Reviews.ts"; // добавили (если экспортируется как ProductReviews)
 import { Sessions } from "./src/payload/collections/Sessions.ts"; // добавили
+import { SupportAttachments } from "./src/payload/collections/SupportAttachments.ts";
+import { SupportCannedResponses } from "./src/payload/collections/SupportCannedResponses.ts";
+import { SupportConversations } from "./src/payload/collections/SupportConversations.ts";
+import { SupportMessages } from "./src/payload/collections/SupportMessages.ts";
 import TransportCompanies from "./src/payload/collections/TransportCompanies.ts";
 import { TrustedDevices } from "./src/payload/collections/TrustedDevices.ts";
 import { Users } from "./src/payload/collections/User.ts";
@@ -45,6 +49,7 @@ import { Wishlists } from "./src/payload/collections/Wishlists.ts";
 import { projectEmailAdapter } from "./src/payload/email/adapter.ts";
 import { AlertingSettings } from "./src/payload/globals/AlertingSettings.ts";
 import { Settings } from "./src/payload/globals/Settings.ts";
+import { SupportSettings } from "./src/payload/globals/SupportSettings.ts";
 import { captureAfterError } from "./src/payload/hooks/captureAfterError.ts";
 import { rejectMalformedID } from "./src/payload/hooks/rejectMalformedID.ts";
 
@@ -60,6 +65,30 @@ export default buildConfig({
 	},
 	admin: {
 		user: Admins.slug,
+		// Чат поддержки: консоль менеджеров и пункт меню со счётчиком
+		// (src/modules/support-chat/admin). Пути — строками: компоненты грузит
+		// админка через importMap, в граф импортов конфигурации они не входят.
+		components: {
+			views: {
+				support: {
+					Component:
+						"@/modules/support-chat/admin/SupportConsoleView#SupportConsoleView",
+					path: "/support",
+					exact: true,
+					meta: { title: "Чат поддержки" },
+				},
+				supportReports: {
+					Component:
+						"@/modules/support-chat/admin/SupportReportsView#SupportReportsView",
+					path: "/support/reports",
+					exact: true,
+					meta: { title: "Отчёты чата поддержки" },
+				},
+			},
+			afterNavLinks: [
+				"@/modules/support-chat/admin/SupportNavLink#SupportNavLink",
+			],
+		},
 	},
 
 	// ALLOWED_ORIGINS теперь проходит через src/env.ts: там же на старте
@@ -101,7 +130,7 @@ export default buildConfig({
 	// (src/payload/lexical/knowledgeEditor.ts).
 	editor: lexicalEditor(),
 
-	globals: [Settings, AlertingSettings],
+	globals: [Settings, AlertingSettings, SupportSettings],
 
 	// Ошибки 5xx эндпоинтов Payload — в журнал ошибок и письмом дежурному
 	// (src/services/observability/README.md).
@@ -164,6 +193,12 @@ export default buildConfig({
 		// Журнал серверных ошибок. Только суперадминистратору; персональные
 		// данные — только в карточке записи (см. шапку коллекции).
 		ErrorEvents,
+		// Чат с менеджером (src/modules/support-chat). Запись — только
+		// сервисом модуля; REST закрыт на запись у всех четырёх.
+		SupportConversations,
+		SupportMessages,
+		SupportAttachments,
+		SupportCannedResponses,
 	].map((collection) => ({
 		...collection,
 		hooks: {

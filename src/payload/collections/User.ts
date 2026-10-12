@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook, CollectionConfig } from "payload";
+import { kickUserSockets } from "../../modules/support-chat/server/kick.ts";
 import { notify } from "../../services/notifications/notificationCenter.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { isStaffUser, staffOnlyField } from "../access/ownership.ts";
@@ -21,6 +22,15 @@ const notifyOnStatusChange: CollectionAfterChangeHook = async ({
 	req,
 }) => {
 	if (operation !== "update" || req.context?.isMigration) return doc;
+
+	// Чат поддержки: открытый сокет заблокированного или лишённого чата
+	// покупателя закрывается сразу (переподключиться шлюз уже не даст).
+	const lostAccess =
+		(doc.status !== previousDoc?.status &&
+			(doc.status === "blocked" || doc.status === "suspended")) ||
+		(doc.supportChatBanned === true && previousDoc?.supportChatBanned !== true);
+	if (lostAccess) void kickUserSockets(doc.id);
+
 	if (previousDoc?.status === doc.status) return doc;
 
 	if (doc.status === "blocked") {
@@ -217,6 +227,19 @@ export const Users: CollectionConfig = {
 			admin: { position: "sidebar", readOnly: true },
 			// Пишется только Server Action'ом (markCartOnboardingSeenAction) через
 			// overrideAccess: true — как и остальные служебные отметки профиля.
+			access: { create: staffOnlyField, update: staffOnlyField },
+		},
+
+		// ── Чат поддержки ────────────────────────────────────────────────────────
+		// Запрет писать менеджерам — точечная мера против спама и оскорблений,
+		// не трогающая остальной аккаунт (заказы, кабинет). Ставит персонал из
+		// консоли поддержки или здесь; покупатель изменить не может.
+		{
+			name: "supportChatBanned",
+			type: "checkbox",
+			defaultValue: false,
+			label: "Запрещено писать в чат поддержки",
+			admin: { position: "sidebar" },
 			access: { create: staffOnlyField, update: staffOnlyField },
 		},
 

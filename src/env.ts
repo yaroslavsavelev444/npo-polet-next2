@@ -70,6 +70,24 @@ const serverSchema = z.object({
   // Сколько дней хранить журнал ошибок (по умолчанию 90). Старые записи
   // удаляет суточная задача.
   ERROR_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(400).optional(),
+
+  // ── Чат поддержки (src/modules/support-chat) ─────────────────────────────
+  // Порт Socket.IO-шлюза. Снаружи он не виден: nginx проксирует на него
+  // /realtime/ обоих хостов (витрины и админки).
+  SUPPORT_GATEWAY_PORT: z.coerce.number().int().min(1).max(65535).default(3005),
+  // Мастер-ключи шифрования переписки: "id:base64[,id:base64…]", первый —
+  // действующий. Формат проверяет modules/support-chat/server/crypto.ts при
+  // первом использовании (здесь он необязателен, чтобы сборка и миграции
+  // обходились без ключа). ⚠ Хранить ОТДЕЛЬНО от бэкапов базы и резервировать
+  // офлайн: потеря ключа = потеря всей переписки.
+  SUPPORT_ENCRYPTION_KEYS: z.string().optional(),
+  // Каталог зашифрованных вложений чата. По умолчанию — media/support-attachments
+  // (тот же том, что и Media, но файлы в нём без ключа нечитаемы).
+  SUPPORT_ATTACHMENTS_DIR: z.string().optional(),
+  // Адрес шлюза для браузера. В проде НЕ задаётся: шлюз на том же хосте
+  // (/realtime/ проксирует nginx). В разработке — http://localhost:3005,
+  // потому что Next и шлюз — разные процессы на разных портах.
+  SUPPORT_GATEWAY_PUBLIC_URL: z.string().url().optional(),
 });
 
 /**
@@ -109,6 +127,10 @@ function buildEnv() {
     DADATA_SUGGEST_URL: process.env.DADATA_SUGGEST_URL,
     ERROR_ALERT_EMAIL: process.env.ERROR_ALERT_EMAIL,
     ERROR_LOG_RETENTION_DAYS: process.env.ERROR_LOG_RETENTION_DAYS,
+    SUPPORT_GATEWAY_PORT: process.env.SUPPORT_GATEWAY_PORT,
+    SUPPORT_ENCRYPTION_KEYS: process.env.SUPPORT_ENCRYPTION_KEYS,
+    SUPPORT_ATTACHMENTS_DIR: process.env.SUPPORT_ATTACHMENTS_DIR,
+    SUPPORT_GATEWAY_PUBLIC_URL: process.env.SUPPORT_GATEWAY_PUBLIC_URL,
   };
 
   const clientEnv = {

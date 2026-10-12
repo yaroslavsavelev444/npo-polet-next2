@@ -104,12 +104,20 @@ export interface Config {
     'account-deletion-requests': AccountDeletionRequest;
     'checkout-preferences': CheckoutPreference;
     'error-events': ErrorEvent;
+    'support-conversations': SupportConversation;
+    'support-messages': SupportMessage;
+    'support-attachments': SupportAttachment;
+    'support-canned-responses': SupportCannedResponse;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
   };
-  collectionsJoins: {};
+  collectionsJoins: {
+    'support-messages': {
+      attachments: 'support-attachments';
+    };
+  };
   collectionsSelect: {
     admins: AdminsSelect<false> | AdminsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
@@ -147,6 +155,10 @@ export interface Config {
     'account-deletion-requests': AccountDeletionRequestsSelect<false> | AccountDeletionRequestsSelect<true>;
     'checkout-preferences': CheckoutPreferencesSelect<false> | CheckoutPreferencesSelect<true>;
     'error-events': ErrorEventsSelect<false> | ErrorEventsSelect<true>;
+    'support-conversations': SupportConversationsSelect<false> | SupportConversationsSelect<true>;
+    'support-messages': SupportMessagesSelect<false> | SupportMessagesSelect<true>;
+    'support-attachments': SupportAttachmentsSelect<false> | SupportAttachmentsSelect<true>;
+    'support-canned-responses': SupportCannedResponsesSelect<false> | SupportCannedResponsesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -159,10 +171,12 @@ export interface Config {
   globals: {
     settings: Setting;
     'alerting-settings': AlertingSetting;
+    'support-settings': SupportSetting;
   };
   globalsSelect: {
     settings: SettingsSelect<false> | SettingsSelect<true>;
     'alerting-settings': AlertingSettingsSelect<false> | AlertingSettingsSelect<true>;
+    'support-settings': SupportSettingsSelect<false> | SupportSettingsSelect<true>;
   };
   locale: 'ru' | 'en';
   widgets: {
@@ -220,6 +234,17 @@ export interface Admin {
   id: number;
   name: string;
   role: 'admin' | 'superadmin';
+  support?: {
+    /**
+     * Только имя, например «Анна». Пусто — берётся поле «Имя».
+     */
+    displayName?: string | null;
+    avatar?: (number | null) | Media;
+    /**
+     * При автоматическом распределении диалоги этих тем достаются в первую очередь. Пусто — любые.
+     */
+    topics?: ('order' | 'product' | 'documents' | 'delivery' | 'payment' | 'other')[] | null;
+  };
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -238,46 +263,6 @@ export interface Admin {
     | null;
   password?: string | null;
   collection: 'admins';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users".
- */
-export interface User {
-  id: number;
-  name: string;
-  role: 'user' | 'admin' | 'superadmin';
-  status: 'active' | 'blocked' | 'suspended';
-  blockedUntil?: string | null;
-  twoFAVerified?: boolean | null;
-  twoFAVerifiedAt?: string | null;
-  emailVerified?: boolean | null;
-  cartOnboardingSeenAt?: string | null;
-  lastLoginAt?: string | null;
-  legacyPasswordHash?: string | null;
-  legacyPasswordMigrated?: boolean | null;
-  /**
-   * ID документа в старой базе (заполняется только миграцией)
-   */
-  legacyId?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  email: string;
-  resetPasswordToken?: string | null;
-  resetPasswordExpiration?: string | null;
-  salt?: string | null;
-  hash?: string | null;
-  loginAttempts?: number | null;
-  lockUntil?: string | null;
-  sessions?:
-    | {
-        id: string;
-        createdAt?: string | null;
-        expiresAt: string;
-      }[]
-    | null;
-  password?: string | null;
-  collection: 'users';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -326,6 +311,47 @@ export interface Media {
       filename?: string | null;
     };
   };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "users".
+ */
+export interface User {
+  id: number;
+  name: string;
+  role: 'user' | 'admin' | 'superadmin';
+  status: 'active' | 'blocked' | 'suspended';
+  blockedUntil?: string | null;
+  twoFAVerified?: boolean | null;
+  twoFAVerifiedAt?: string | null;
+  emailVerified?: boolean | null;
+  cartOnboardingSeenAt?: string | null;
+  supportChatBanned?: boolean | null;
+  lastLoginAt?: string | null;
+  legacyPasswordHash?: string | null;
+  legacyPasswordMigrated?: boolean | null;
+  /**
+   * ID документа в старой базе (заполняется только миграцией)
+   */
+  legacyId?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  email: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiration?: string | null;
+  salt?: string | null;
+  hash?: string | null;
+  loginAttempts?: number | null;
+  lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
+  password?: string | null;
+  collection: 'users';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1937,6 +1963,157 @@ export interface ErrorEvent {
   createdAt: string;
 }
 /**
+ * Переписка покупателей с менеджерами. Отвечать — в консоли поддержки; здесь записи только для просмотра.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-conversations".
+ */
+export interface SupportConversation {
+  id: number;
+  /**
+   * Пусто — аккаунт удалён, переписка обезличена.
+   */
+  user?: (number | null) | User;
+  status: 'open' | 'resolved';
+  snoozedUntil?: string | null;
+  /**
+   * Пусто — диалог в общей очереди.
+   */
+  assignee?: (number | null) | Admin;
+  assignedAt?: string | null;
+  topic: 'order' | 'product' | 'documents' | 'delivery' | 'payment' | 'other';
+  priority: 'normal' | 'high';
+  tags?: string[] | null;
+  /**
+   * Сообщения диалога нумеруются подряд с 1. Клиент после разрыва связи догружает всё, что новее известного ему номера.
+   */
+  lastSeq: number;
+  customerLastReadSeq: number;
+  staffLastReadSeq: number;
+  lastMessageAt?: string | null;
+  lastCustomerMessageAt?: string | null;
+  lastStaffMessageAt?: string | null;
+  /**
+   * Ставится первым неотвеченным сообщением покупателя, снимается ответом менеджера. Основа сроков ответа и порядка очереди.
+   */
+  awaitingReplySince?: string | null;
+  firstResponseAt?: string | null;
+  resolvedAt?: string | null;
+  reopenedCount: number;
+  csatScore?: number | null;
+  csatComment?: string | null;
+  /**
+   * Момент, когда покупатель подтвердил согласие, начиная переписку.
+   */
+  consentAcceptedAt?: string | null;
+  /**
+   * Slug соглашения, принятого при старте переписки.
+   */
+  consentDocument?: string | null;
+  userAgent?: string | null;
+  encryptionKey: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-messages".
+ */
+export interface SupportMessage {
+  id: number;
+  conversation: number | SupportConversation;
+  seq: number;
+  authorType: 'customer' | 'staff' | 'system';
+  authorUser?: (number | null) | User;
+  authorAdmin?: (number | null) | Admin;
+  kind: 'text' | 'note' | 'system';
+  /**
+   * В базе — шифртекст: текст, контекст (заказ, товар) и приложенные документы одним зашифрованным JSON (см. support-chat/server/crypto.ts). Показывается как простой текст, разметка от пользователя не исполняется.
+   */
+  body?: string | null;
+  clientMessageId?: string | null;
+  cannedResponse?: (number | null) | SupportCannedResponse;
+  editedAt?: string | null;
+  deletedAt?: string | null;
+  attachments?: {
+    docs?: (number | SupportAttachment)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-canned-responses".
+ */
+export interface SupportCannedResponse {
+  id: number;
+  title: string;
+  /**
+   * Короткое слово для вставки командой: «серт» → менеджер набирает /серт.
+   */
+  shortcut?: string | null;
+  /**
+   * Переменные подставляются при вставке: {{имя}} — имя покупателя, {{менеджер}} — имя менеджера, {{номерЗаказа}} — заказ из контекста.
+   */
+  body: string;
+  /**
+   * Сертификаты, паспорта, инструкции из медиатеки — уходят вместе с текстом.
+   */
+  attachments?: (number | Media)[] | null;
+  /**
+   * Когда сообщение покупателя содержит все слова фразы (в любой форме), заготовка подсказывается менеджеру.
+   */
+  triggers?:
+    | {
+        phrase: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * В диалогах этих тем заготовка поднимается выше.
+   */
+  topics?: ('order' | 'product' | 'documents' | 'delivery' | 'payment' | 'other')[] | null;
+  scope: 'shared' | 'personal';
+  owner?: (number | null) | Admin;
+  isActive?: boolean | null;
+  usageCount?: number | null;
+  /**
+   * Часто подсказывается и редко используется — триггеры стоит уточнить.
+   */
+  suggestedCount?: number | null;
+  lastUsedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-attachments".
+ */
+export interface SupportAttachment {
+  id: number;
+  conversation?: (number | null) | SupportConversation;
+  /**
+   * Пусто — загружено, но ещё не отправлено.
+   */
+  message?: (number | null) | SupportMessage;
+  uploadedByUser?: (number | null) | User;
+  uploadedByAdmin?: (number | null) | Admin;
+  visibleToUser?: (number | null) | User;
+  attachedAt?: string | null;
+  mimeType: string;
+  filesize: number;
+  width?: number | null;
+  height?: number | null;
+  hasThumbnail?: boolean | null;
+  storageKey: string;
+  encryptedName: string;
+  encryptionKey: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -2103,6 +2280,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'error-events';
         value: number | ErrorEvent;
+      } | null)
+    | ({
+        relationTo: 'support-conversations';
+        value: number | SupportConversation;
+      } | null)
+    | ({
+        relationTo: 'support-messages';
+        value: number | SupportMessage;
+      } | null)
+    | ({
+        relationTo: 'support-attachments';
+        value: number | SupportAttachment;
+      } | null)
+    | ({
+        relationTo: 'support-canned-responses';
+        value: number | SupportCannedResponse;
       } | null);
   globalSlug?: string | null;
   user:
@@ -2163,6 +2356,13 @@ export interface PayloadMigration {
 export interface AdminsSelect<T extends boolean = true> {
   name?: T;
   role?: T;
+  support?:
+    | T
+    | {
+        displayName?: T;
+        avatar?: T;
+        topics?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -2193,6 +2393,7 @@ export interface UsersSelect<T extends boolean = true> {
   twoFAVerifiedAt?: T;
   emailVerified?: T;
   cartOnboardingSeenAt?: T;
+  supportChatBanned?: T;
   lastLoginAt?: T;
   legacyPasswordHash?: T;
   legacyPasswordMigrated?: T;
@@ -3344,6 +3545,105 @@ export interface ErrorEventsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-conversations_select".
+ */
+export interface SupportConversationsSelect<T extends boolean = true> {
+  user?: T;
+  status?: T;
+  snoozedUntil?: T;
+  assignee?: T;
+  assignedAt?: T;
+  topic?: T;
+  priority?: T;
+  tags?: T;
+  lastSeq?: T;
+  customerLastReadSeq?: T;
+  staffLastReadSeq?: T;
+  lastMessageAt?: T;
+  lastCustomerMessageAt?: T;
+  lastStaffMessageAt?: T;
+  awaitingReplySince?: T;
+  firstResponseAt?: T;
+  resolvedAt?: T;
+  reopenedCount?: T;
+  csatScore?: T;
+  csatComment?: T;
+  consentAcceptedAt?: T;
+  consentDocument?: T;
+  userAgent?: T;
+  encryptionKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-messages_select".
+ */
+export interface SupportMessagesSelect<T extends boolean = true> {
+  conversation?: T;
+  seq?: T;
+  authorType?: T;
+  authorUser?: T;
+  authorAdmin?: T;
+  kind?: T;
+  body?: T;
+  clientMessageId?: T;
+  cannedResponse?: T;
+  editedAt?: T;
+  deletedAt?: T;
+  attachments?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-attachments_select".
+ */
+export interface SupportAttachmentsSelect<T extends boolean = true> {
+  conversation?: T;
+  message?: T;
+  uploadedByUser?: T;
+  uploadedByAdmin?: T;
+  visibleToUser?: T;
+  attachedAt?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  hasThumbnail?: T;
+  storageKey?: T;
+  encryptedName?: T;
+  encryptionKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-canned-responses_select".
+ */
+export interface SupportCannedResponsesSelect<T extends boolean = true> {
+  title?: T;
+  shortcut?: T;
+  body?: T;
+  attachments?: T;
+  triggers?:
+    | T
+    | {
+        phrase?: T;
+        id?: T;
+      };
+  topics?: T;
+  scope?: T;
+  owner?: T;
+  isActive?: T;
+  usageCount?: T;
+  suggestedCount?: T;
+  lastUsedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -3551,6 +3851,65 @@ export interface AlertingSetting {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-settings".
+ */
+export interface SupportSetting {
+  id: number;
+  /**
+   * Рубильник. Выключен — писать могут только покупатели из пилотной группы ниже; менеджеры подключаются к консоли всегда.
+   */
+  enabled?: boolean | null;
+  /**
+   * Покупатели, которым чат доступен, пока он выключен для всех.
+   */
+  betaAllowlist?: (number | User)[] | null;
+  /**
+   * Идентификатор IANA, например Europe/Moscow.
+   */
+  timezone: string;
+  /**
+   * Дни без интервала — нерабочие. Интервал не может переходить через полночь. «Срок ответа» интервала — для часов, когда отвечаем медленнее (например, в выходные).
+   */
+  schedule?:
+    | {
+        day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+        opensAt: string;
+        closesAt: string;
+        /**
+         * Пусто — общий срок первого ответа.
+         */
+        slaMinutes?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  holidays?:
+    | {
+        date: string;
+        note?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  texts?: {
+    greeting?: string | null;
+    offHoursReply?: string | null;
+  };
+  routing: {
+    mode: 'auto' | 'manual';
+    firstResponseSlaMinutes: number;
+    reassignAfterMinutes: number;
+  };
+  lifecycle: {
+    /**
+     * Покупатель написал позже — начинается новый диалог.
+     */
+    reopenWindowDays: number;
+    autoCloseAfterDays: number;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "settings_select".
  */
 export interface SettingsSelect<T extends boolean = true> {
@@ -3660,6 +4019,53 @@ export interface AlertingSettingsSelect<T extends boolean = true> {
   cooldownResetSeconds?: T;
   maxMessagesPerHour?: T;
   burstEscalation?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "support-settings_select".
+ */
+export interface SupportSettingsSelect<T extends boolean = true> {
+  enabled?: T;
+  betaAllowlist?: T;
+  timezone?: T;
+  schedule?:
+    | T
+    | {
+        day?: T;
+        opensAt?: T;
+        closesAt?: T;
+        slaMinutes?: T;
+        id?: T;
+      };
+  holidays?:
+    | T
+    | {
+        date?: T;
+        note?: T;
+        id?: T;
+      };
+  texts?:
+    | T
+    | {
+        greeting?: T;
+        offHoursReply?: T;
+      };
+  routing?:
+    | T
+    | {
+        mode?: T;
+        firstResponseSlaMinutes?: T;
+        reassignAfterMinutes?: T;
+      };
+  lifecycle?:
+    | T
+    | {
+        reopenWindowDays?: T;
+        autoCloseAfterDays?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

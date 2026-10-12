@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import { sql } from "@payloadcms/db-postgres";
 import type { Payload } from "payload";
 import { env } from "@/env";
+import { kickUserSockets } from "@/modules/support-chat/server/kick";
+import { anonymizeUserConversations } from "@/modules/support-chat/server/maintenance";
 import { AUTH_FLOW_CONTEXT } from "@/payload/hooks/users/requireServerAuthFlow";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import {
@@ -245,6 +247,8 @@ export class AccountDeletionService {
 		const userId = Number(row.user_id);
 		try {
 			await this.anonymizeAndDeleteUser(userId, requestId);
+			// Окно чата удалённого аккаунта закрывается сразу (server/kick.ts).
+			void kickUserSockets(userId);
 			accountDeletionLogger.info("Account deletion completed", { requestId });
 		} catch (error) {
 			await this.payload.db.drizzle.execute(sql`
@@ -292,6 +296,12 @@ export class AccountDeletionService {
 			);
 			await tx.execute(sql`DELETE FROM feedbacks WHERE user_id = ${userId}`);
 			await tx.execute(sql`DELETE FROM companies WHERE user_id = ${userId}`);
+
+			// Переписка с поддержкой: ключи диалогов уничтожаются, сообщения и
+			// вложения удаляются, остаются обезличенные цифры для отчётов
+			// (support-chat/server/maintenance.ts). Файлы вложений на диске —
+			// без ключей нечитаемые — уберёт шлюз: у этого воркера тома нет.
+			await anonymizeUserConversations(tx, userId);
 
 			// Orders are retained for accounting. The transactional amounts and order
 			// number remain; every account/recipient/contact/device field is removed.

@@ -15,7 +15,8 @@ export function QueryProvider({
     <QueryClientProvider client={queryClient}>
       {children}
       {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools initialIsOpen={false} />
+        // Слева: правый нижний угол занят кнопкой чата поддержки.
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
       )}
     </QueryClientProvider>
   )

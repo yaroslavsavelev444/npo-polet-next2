@@ -35,6 +35,20 @@ upstream polet_next_main {
     keepalive 32;
 }
 
+# Чат поддержки: Socket.IO-шлюз (сервис support-gateway, docker-compose.prod.yml).
+# Тот же блок location /realtime/ нужен и в конфиге admin.npo-polet.ru —
+# консоль менеджеров подключается к шлюзу со своего хоста
+# (см. deploy/nginx-support-chat.conf и deploy/README.md).
+upstream polet_support_main {
+    server 127.0.0.1:3005;
+    keepalive 16;
+}
+
+# Одновременных соединений с шлюзом с одного IP. Вкладки одного покупателя
+# шлюз и сам ограничивает (10 на аккаунт); этот предел — против перебора
+# рукопожатий с одного адреса.
+limit_conn_zone $binary_remote_addr zone=npo_realtime_main:10m;
+
 map $http_upgrade $connection_upgrade_npo_main {
     default upgrade;
     ''      close;
@@ -158,6 +172,20 @@ server {
         proxy_pass http://polet_next_main;
         proxy_set_header Host $host;
         add_header Cache-Control "public, max-age=604800";
+    }
+
+    # Чат поддержки: WebSocket и long-polling Socket.IO (/realtime/socket.io/)
+    # и проверка живости шлюза (/realtime/health). Upgrade/Connection берутся
+    # из proxy_params_npo_main.conf. Таймауты — час: соединение чата живёт,
+    # пока открыта вкладка (пинг Socket.IO раз в 25 с держит его и так);
+    # буферизация выключена — иначе long-polling ждал бы заполнения буфера.
+    location /realtime/ {
+        limit_conn npo_realtime_main 20;
+        proxy_pass http://polet_support_main;
+        include /etc/nginx/proxy_params_npo_main.conf;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        proxy_buffering off;
     }
 
     location / {

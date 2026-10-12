@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { ProductCardData } from "@/modules/productCard";
 import { formatPrice } from "@/modules/productCard";
 import { ProductQuantitySelector } from "@/modules/productCard/components/ProductQuantitySelector";
+import { AskManagerButton } from "@/modules/support-chat/widget/AskManagerButton";
 import { WishlistButton } from "@/modules/wishlist/components/WishlistButton";
 import type { ProductDetailData } from "../types";
 import { ProductInstructionLink } from "./ProductInstructionLink";
@@ -115,6 +116,13 @@ export function ProductBuyPanel({ product, cardData }: ProductBuyPanelProps) {
 			{product.instruction && (
 				<ProductInstructionLink instruction={product.instruction} />
 			)}
+
+			<AskManagerButton
+				context={{ type: "product", id: product.id, title: product.title }}
+				topic="product"
+			>
+				Задать вопрос о товаре
+			</AskManagerButton>
 		</div>
 	);
 }

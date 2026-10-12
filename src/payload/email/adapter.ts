@@ -1,7 +1,7 @@
 import type { EmailAdapter } from "payload";
 import { getEmailConfig } from "../../services/email/config.ts";
 import { emailLogger } from "../../services/email/logger.ts";
-import { getEmailTransporter } from "../../services/email/transport.ts";
+import { sendMailWithFailover } from "../../services/email/transport.ts";
 
 /**
  * Email-адаптер Payload поверх того же nodemailer-транспорта, которым
@@ -58,11 +58,9 @@ export const projectEmailAdapter: EmailAdapter<unknown> = () => ({
 			return null;
 		}
 
-		return getEmailTransporter().sendMail({
-			...message,
-			from:
-				message.from ??
-				`"${config.EMAIL_FROM_NAME}" <${config.EMAIL_FROM_ADDRESS}>`,
-		});
+		// `from` Payload сюда не доходит: отправителя ставит транспорт, под
+		// основной и запасной SMTP свой — чужой адрес серверы не пропускают.
+		const { from: _from, ...mail } = message;
+		return sendMailWithFailover(mail);
 	},
 });

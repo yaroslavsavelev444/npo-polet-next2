@@ -12,6 +12,7 @@ import { orderCreatedAdminEmailTemplate } from "./orders/order-created-admin.tem
 import { orderCreatedUserEmailTemplate } from "./orders/order-created-user.template.ts";
 import { orderStatusChangedEmailTemplate } from "./orders/order-status-changed.template.ts";
 import { reviewStatusChangedEmailTemplate } from "./reviews/review-status-changed.template.ts";
+import { supportStaffAlertEmailTemplate } from "./support/support-staff-alert.template.ts";
 
 export const emailTemplates = {
 	otp: otpEmailTemplate,
@@ -28,4 +29,5 @@ export const emailTemplates = {
 	contactRequestAdmin: contactRequestAdminEmailTemplate,
 	errorAlert: errorAlertEmailTemplate,
 	errorDigest: errorDigestEmailTemplate,
+	supportStaffAlert: supportStaffAlertEmailTemplate,
 } as const;

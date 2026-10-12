@@ -73,6 +73,29 @@ function safeRedirectTarget(req: NextRequest): string {
  * В dev добавляются 'unsafe-eval' (React использует eval для отладки) и ws:
  * (HMR); upgrade-insecure-requests в dev выключен — локалка работает по http.
  */
+/**
+ * Шлюз чата поддержки для connect-src.
+ *
+ * В проде шлюз на том же хосте (/realtime/, nginx). По CSP3 'self' покрывает
+ * и wss того же хоста, но Safari до 15.4 так не считает — поэтому wss хоста
+ * витрины (NEXT_PUBLIC_APP_URL) перечисляется явно.
+ *
+ * В разработке шлюз на своём порту (SUPPORT_GATEWAY_PUBLIC_URL=
+ * http://localhost:3005): разрешаются и http(s) транспорта long-polling, и
+ * ws(s) WebSocket.
+ */
+function supportGatewaySources(): string {
+  const raw = process.env.SUPPORT_GATEWAY_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    const ws = `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}`;
+    return process.env.SUPPORT_GATEWAY_PUBLIC_URL ? ` ${url.origin} ${ws}` : ` ${ws}`;
+  } catch {
+    return "";
+  }
+}
+
 function buildCsp(nonce: string, isDev: boolean): string {
   const directives = [
     `default-src 'self'`,
@@ -80,7 +103,7 @@ function buildCsp(nonce: string, isDev: boolean): string {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
-    `connect-src 'self' https://mc.yandex.ru https://mc.yandex.com${isDev ? " ws: wss:" : ""}`,
+    `connect-src 'self' https://mc.yandex.ru https://mc.yandex.com${supportGatewaySources()}${isDev ? " ws: wss:" : ""}`,
     `frame-src 'self' https://mc.yandex.ru ${ALLOWED_EMBED_FRAME_SRC.join(" ")} ${ALLOWED_MAP_FRAME_SRC.join(" ")}`,
     `worker-src 'self' blob:`,
     `object-src 'none'`,
@@ -175,6 +198,11 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/payload") ||
     pathname.startsWith("/api/auth/session-status") ||
+    // Файлы вложений чата ставят себе собственный, более строгий CSP
+    // (sandbox, default-src 'none' — app/api/support/attachments/[id]):
+    // присланный покупателем файл не должен получить права страницы
+    // витрины. CSP витрины поверх него этот запрет отменял бы.
+    pathname.startsWith("/api/support/attachments/") ||
     pathname.startsWith("/admin") ||
     pathname.includes(".")
   ) {

@@ -1,0 +1,307 @@
+/*
+ * Отчёты чата поддержки. Как и консоль — только переменные темы Payload,
+ * чтобы светлая и тёмная темы админки работали без своих цветов. Данные —
+ * одним оттенком (success): серий по одной, категориальная палитра не нужна.
+ */
+
+.page {
+	padding: 0 var(--gutter-h, 24px) 32px;
+	color: var(--theme-text);
+}
+
+.topBar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 0 16px;
+}
+
+.heading {
+	margin: 0;
+	font-size: 1.25rem;
+}
+
+.back {
+	font-size: 0.875rem;
+	color: var(--theme-elevation-650) !important;
+}
+
+.periods {
+	display: inline-flex;
+	gap: 4px;
+	margin-left: auto;
+}
+
+.period,
+.periodOn {
+	font: inherit;
+	font-size: 0.8125rem;
+	padding: 4px 12px;
+	border-radius: 999px;
+	border: 1px solid var(--theme-elevation-150);
+	background: var(--theme-elevation-0);
+	color: var(--theme-text);
+	cursor: pointer;
+}
+
+.periodOn {
+	background: var(--theme-elevation-900);
+	border-color: var(--theme-elevation-900);
+	color: var(--theme-elevation-0);
+}
+
+.card {
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-m, 8px);
+	background: var(--theme-elevation-0);
+	padding: 16px;
+	margin-bottom: 16px;
+	min-width: 0;
+}
+
+.cardTitle {
+	margin: 0 0 12px;
+	font-size: 0.9375rem;
+	font-weight: 600;
+}
+
+.muted {
+	color: var(--theme-elevation-550);
+	font-weight: 400;
+	font-size: 0.8125rem;
+}
+
+.error {
+	color: var(--theme-error-650);
+}
+
+.tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 12px;
+}
+
+.tile {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 12px;
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-elevation-50);
+}
+
+.tileLabel {
+	font-size: 0.8125rem;
+	color: var(--theme-elevation-600);
+}
+
+.tileValue {
+	font-size: 1.5rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.tileHint {
+	font-size: 0.75rem;
+	color: var(--theme-elevation-550);
+}
+
+.bad {
+	color: var(--theme-error-650);
+}
+
+.agents {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 20px;
+	margin: 12px 0 0;
+	padding: 0;
+	list-style: none;
+	font-size: 0.875rem;
+}
+
+.dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	margin-right: 6px;
+	vertical-align: middle;
+}
+
+.dot_available {
+	background: var(--theme-success-500);
+}
+
+.dot_away {
+	background: var(--theme-warning-500);
+}
+
+.dot_offline {
+	background: var(--theme-elevation-300);
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0 16px;
+}
+
+.wide {
+	grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+	.grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+/* ── Столбцы по дням ─────────────────────────────────────────────────────── */
+
+.bars {
+	display: flex;
+	align-items: flex-end;
+	gap: 2px;
+	height: 160px;
+	padding-bottom: 18px;
+	border-bottom: 1px solid var(--theme-elevation-150);
+}
+
+.barCol {
+	position: relative;
+	flex: 1;
+	height: 100%;
+	display: flex;
+	align-items: flex-end;
+}
+
+.barCol:hover .bar {
+	background: var(--theme-success-750);
+}
+
+.bar {
+	width: 100%;
+	min-height: 1px;
+	border-radius: 4px 4px 0 0;
+	background: var(--theme-success-500);
+}
+
+.barLabel {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	padding-top: 4px;
+	font-size: 0.6875rem;
+	color: var(--theme-elevation-550);
+	white-space: nowrap;
+}
+
+.axisNote {
+	margin: 8px 0 0;
+	font-size: 0.75rem;
+	color: var(--theme-elevation-550);
+}
+
+/* ── Тепловая карта ──────────────────────────────────────────────────────── */
+
+.heatScroll {
+	overflow-x: auto;
+}
+
+.heat {
+	border-collapse: separate;
+	border-spacing: 2px;
+	font-size: 0.6875rem;
+}
+
+.heat th {
+	font-weight: 400;
+	color: var(--theme-elevation-550);
+	padding: 0 4px;
+	text-align: left;
+}
+
+.heat td {
+	width: 24px;
+	min-width: 24px;
+	height: 20px;
+	border-radius: 3px;
+	background: var(--theme-elevation-50);
+}
+
+/* ── Ранжированные полосы ────────────────────────────────────────────────── */
+
+.ranked {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-size: 0.8125rem;
+}
+
+.ranked li {
+	display: grid;
+	grid-template-columns: minmax(80px, 40%) 1fr auto;
+	align-items: center;
+	gap: 8px;
+}
+
+.rankedLabel {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rankedTrack {
+	height: 8px;
+	border-radius: 4px;
+	background: var(--theme-elevation-50);
+}
+
+.rankedBar {
+	display: block;
+	height: 100%;
+	border-radius: 4px;
+	background: var(--theme-success-500);
+}
+
+.rankedValue {
+	font-variant-numeric: tabular-nums;
+	min-width: 2ch;
+	text-align: right;
+}
+
+/* ── Таблица менеджеров ──────────────────────────────────────────────────── */
+
+.tableWrap {
+	overflow-x: auto;
+}
+
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+
+.table th,
+.table td {
+	padding: 6px 8px;
+	text-align: left;
+	border-bottom: 1px solid var(--theme-elevation-100);
+}
+
+.table thead th {
+	font-weight: 500;
+	color: var(--theme-elevation-600);
+}
+
+.table tbody th {
+	font-weight: 500;
+}
+
+.table td {
+	font-variant-numeric: tabular-nums;
+}

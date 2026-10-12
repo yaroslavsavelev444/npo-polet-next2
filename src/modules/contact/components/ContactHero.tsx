@@ -1,4 +1,5 @@
 import { ArrowDown, Clock } from "lucide-react";
+import { AskManagerButton } from "@/modules/support-chat/widget/AskManagerButton";
 import type { Setting } from "@/payload-types";
 import { Reveal, RevealLines } from "@/shared/components/motion/Reveal";
 import { hero } from "../content/contacts-content";
@@ -87,6 +88,11 @@ export function ContactHero({ settings }: { settings: Setting }) {
 						<p className="max-w-[54ch] text-[clamp(0.9375rem,0.86rem+0.35vw,1.125rem)] leading-relaxed text-[var(--text-secondary)]">
 							{hero.lead}
 						</p>
+						{/* Быстрее любого канала ниже — менеджер видит заказы
+						    покупателя и отвечает на сайте же. */}
+						<AskManagerButton className="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--primary)] px-5 py-2.5 text-[0.9375rem] font-semibold text-[var(--text-inverse)] transition-colors hover:bg-[var(--primary-hover)]">
+							Написать в чат
+						</AskManagerButton>
 					</Reveal>
 
 					{settings.workingHours ? (

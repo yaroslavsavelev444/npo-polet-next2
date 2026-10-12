@@ -1,5 +1,6 @@
 import { ArrowRight, PackageSearch, Star } from "lucide-react";
 import Link from "next/link";
+import { AskManagerButton } from "@/modules/support-chat/widget/AskManagerButton";
 import { isOrderRepeatable } from "../../lib/status.groups";
 import { ORDER_STATUS_VIEW } from "../../lib/status-view";
 import type { OrderStatus } from "../../types";
@@ -8,6 +9,7 @@ import { RepeatOrderAction } from "../RepeatOrderAction";
 
 interface Props {
 	orderId: string;
+	orderNumber: string;
 	status: OrderStatus;
 }
 
@@ -39,7 +41,7 @@ interface Props {
  * RepeatOrderAction). «Отследить посылку» система не поддерживает, и кнопки
  * для него нет: кнопка, которая ничего не делает, хуже её отсутствия.
  */
-export function OrderPageActions({ orderId, status }: Props) {
+export function OrderPageActions({ orderId, orderNumber, status }: Props) {
 	const isDelivered = ORDER_STATUS_VIEW[status].tone === "done";
 	const isRepeatable = isOrderRepeatable(status);
 
@@ -66,6 +68,19 @@ export function OrderPageActions({ orderId, status }: Props) {
 					variant={isDelivered ? "quiet" : "primary"}
 				/>
 			)}
+
+			<AskManagerButton
+				className={`${styles.btn} ${styles.btnQuiet}`}
+				context={{
+					type: "order",
+					id: orderNumber,
+					title: orderNumber,
+					url: `/orders/${orderNumber}`,
+				}}
+				topic="order"
+			>
+				Вопрос по заказу
+			</AskManagerButton>
 
 			<Link href="/orders" className={`${styles.btn} ${styles.btnQuiet}`}>
 				<PackageSearch size={16} aria-hidden />

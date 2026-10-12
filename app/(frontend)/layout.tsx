@@ -10,14 +10,18 @@ import type { Viewport } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import localFont from "next/font/local";
 import { cookies } from "next/headers";
+import { Suspense } from "react";
+import { env } from "@/env";
 import { BannerGate } from "@/modules/banners/components/BannerGate";
 import {
 	parseSchemePreference,
 	SCHEME_COOKIE,
 } from "@/modules/color-scheme/lib/scheme";
+import { PERSONAL_DATA_CONSENT_SLUG } from "@/modules/contact/schemas/contact-request.schema";
 import { AnalyticsGate } from "@/modules/cookie-consent/components/AnalyticsGate";
 import { CookieConsentBanner } from "@/modules/cookie-consent/components/CookieConsentBanner";
 import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
+import { SupportWidget } from "@/modules/support-chat/widget/SupportWidget";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import { Providers } from "@/providers/Providers";
 import { baseURL, home } from "@/resources/content";
@@ -166,6 +170,18 @@ export default async function RootLayout({
 					</Flex>
 
 					<Footer />
+
+					{/* Чат с менеджером — правый нижний угол (обратная связь — в
+					    левом). Suspense: кнопка читает ?chat=open (useSearchParams). */}
+					<Suspense fallback={null}>
+						<SupportWidget
+							socketUrl={env.SUPPORT_GATEWAY_PUBLIC_URL ?? null}
+							consent={{
+								slug: PERSONAL_DATA_CONSENT_SLUG,
+								url: `/consents/${PERSONAL_DATA_CONSENT_SLUG}`,
+							}}
+						/>
+					</Suspense>
 
 					<CookieConsentBanner />
 
