@@ -12,6 +12,7 @@ import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { env } from "@/env";
+import { isYandexIdEnabled } from "@/modules/auth/oauth/config";
 import { BannerGate } from "@/modules/banners/components/BannerGate";
 import {
 	parseSchemePreference,
@@ -122,9 +123,10 @@ export default async function RootLayout({
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
-	const [settings, cookieStore] = await Promise.all([
+	const [settings, cookieStore, yandexIdEnabled] = await Promise.all([
 		getCachedSettings(),
 		cookies(),
+		isYandexIdEnabled(),
 	]);
 	// Явный выбор темы. «Авто» — отсутствие атрибута: тему по настройке
 	// системы разрешает CSS (см. шапку app/(frontend)/theme.css). Выставляется
@@ -135,7 +137,7 @@ export default async function RootLayout({
 	);
 
 	return (
-		<Providers>
+		<Providers oauth={{ yandex: yandexIdEnabled }}>
 			<Flex
 				as="html"
 				lang="ru"

@@ -99,6 +99,7 @@ export interface Config {
     'product-reviews': ProductReview;
     sessions: Session;
     'trusted-devices': TrustedDevice;
+    'user-identities': UserIdentity;
     'restock-subscriptions': RestockSubscription;
     'user-consents': UserConsent;
     'account-deletion-requests': AccountDeletionRequest;
@@ -150,6 +151,7 @@ export interface Config {
     'product-reviews': ProductReviewsSelect<false> | ProductReviewsSelect<true>;
     sessions: SessionsSelect<false> | SessionsSelect<true>;
     'trusted-devices': TrustedDevicesSelect<false> | TrustedDevicesSelect<true>;
+    'user-identities': UserIdentitiesSelect<false> | UserIdentitiesSelect<true>;
     'restock-subscriptions': RestockSubscriptionsSelect<false> | RestockSubscriptionsSelect<true>;
     'user-consents': UserConsentsSelect<false> | UserConsentsSelect<true>;
     'account-deletion-requests': AccountDeletionRequestsSelect<false> | AccountDeletionRequestsSelect<true>;
@@ -325,6 +327,7 @@ export interface User {
   twoFAVerified?: boolean | null;
   twoFAVerifiedAt?: string | null;
   emailVerified?: boolean | null;
+  hasPassword?: boolean | null;
   cartOnboardingSeenAt?: string | null;
   supportChatBanned?: boolean | null;
   lastLoginAt?: string | null;
@@ -1697,7 +1700,7 @@ export interface ContentBlock {
 export interface OtpCode {
   id: number;
   user: number | User;
-  type: 'email_verify' | 'login_2fa';
+  type: 'email_verify' | 'login_2fa' | 'link_oauth' | 'account_delete';
   codeHash: string;
   expiresAt: string;
   attempts?: number | null;
@@ -1784,6 +1787,22 @@ export interface TrustedDevice {
   expiresAt: string;
   revoked?: boolean | null;
   revokedReason?: ('user' | 'password_changed' | 'logout_all' | 'reuse' | 'admin') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Внешние сервисы, через которые покупатель входит на сайт. Удаление записи отвязывает сервис; войти им снова можно будет только после подтверждения почты кодом.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user-identities".
+ */
+export interface UserIdentity {
+  id: number;
+  user: number | User;
+  provider: 'yandex';
+  subject: string;
+  emailAtLink?: string | null;
+  lastUsedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2262,6 +2281,10 @@ export interface PayloadLockedDocument {
         value: number | TrustedDevice;
       } | null)
     | ({
+        relationTo: 'user-identities';
+        value: number | UserIdentity;
+      } | null)
+    | ({
         relationTo: 'restock-subscriptions';
         value: number | RestockSubscription;
       } | null)
@@ -2392,6 +2415,7 @@ export interface UsersSelect<T extends boolean = true> {
   twoFAVerified?: T;
   twoFAVerifiedAt?: T;
   emailVerified?: T;
+  hasPassword?: T;
   cartOnboardingSeenAt?: T;
   supportChatBanned?: T;
   lastLoginAt?: T;
@@ -3409,6 +3433,19 @@ export interface TrustedDevicesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user-identities_select".
+ */
+export interface UserIdentitiesSelect<T extends boolean = true> {
+  user?: T;
+  provider?: T;
+  subject?: T;
+  emailAtLink?: T;
+  lastUsedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "restock-subscriptions_select".
  */
 export interface RestockSubscriptionsSelect<T extends boolean = true> {
@@ -3744,6 +3781,12 @@ export interface Setting {
      */
     enabled?: boolean | null;
   };
+  yandexId?: {
+    /**
+     * Показывает кнопку «Войти с Яндекс ID» на формах входа и регистрации и привязку в кабинете. Работает, только если на сервере заданы YANDEX_CLIENT_ID и YANDEX_CLIENT_SECRET. Уже привязанный Яндекс ID при выключении остаётся в профиле покупателя; войти можно по почте и паролю или через восстановление пароля.
+     */
+    enabled?: boolean | null;
+  };
   heroBackground?: {
     type?: ('none' | 'image' | 'video') | null;
     /**
@@ -3963,6 +4006,11 @@ export interface SettingsSelect<T extends boolean = true> {
         disableOrdering?: T;
       };
   printService?:
+    | T
+    | {
+        enabled?: T;
+      };
+  yandexId?:
     | T
     | {
         enabled?: T;

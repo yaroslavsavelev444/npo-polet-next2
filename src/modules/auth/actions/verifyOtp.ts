@@ -14,6 +14,8 @@ import { RATE_LIMITS } from "../lib/rateLimit";
 import { parseDeviceLabel } from "../lib/session";
 import { issueTrustedDevice } from "../lib/trustedDevice";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import { linkIdentity } from "../oauth/identities";
+import { resolveOAuthReturnPath } from "../oauth/returnPath";
 import type { AuthErrorCode, OtpVerifyResult } from "../types";
 
 /** Куда попадает пользователь сразу после завершения входа на своей странице. */
@@ -24,7 +26,7 @@ const verifyOtpSchema = z.object({
 		.string()
 		.length(6, "Код должен содержать 6 цифр")
 		.regex(/^\d{6}$/, "Код должен содержать только цифры"),
-	type: z.enum(["login_2fa", "email_verify"]),
+	type: z.enum(["login_2fa", "email_verify", "link_oauth"]),
 	/**
 	 * Откуда пришла форма.
 	 *
@@ -146,8 +148,33 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 		ip: pending.ip,
 		userAgent: pending.userAgent,
 		twoFactorPassed: true,
-		markEmailVerified: type === "email_verify",
+		// Код на почту доказывает владение ею одинаково — при регистрации и при
+		// привязке Яндекс ID к существующему аккаунту.
+		markEmailVerified: type === "email_verify" || type === "link_oauth",
 	});
+
+	// ── Вход через Яндекс ID: привязка — только теперь ──────────────────────
+	//
+	// До верного кода Яндекс-аккаунт ни к чему не привязан (см. oauth/
+	// resolve.ts). Сбой привязки не отменяет вход: человек доказал владение
+	// почтой и вошёл в СВОЙ аккаунт; в следующий раз Яндекс снова попросит код.
+	if (pending.oauthLink) {
+		try {
+			const link = await linkIdentity(payload, {
+				userId: pending.userId,
+				provider: pending.oauthLink.provider,
+				subject: pending.oauthLink.subject,
+				email: pending.oauthLink.email,
+			});
+			if (link.ok && link.created) {
+				void notify(payload, pending.userId, "oauth_linked", {
+					providerLabel: "Яндекс ID",
+				});
+			}
+		} catch (err) {
+			logUnexpectedAuthError("verifyOtp.linkIdentity", err);
+		}
+	}
 
 	await clearPendingAuth();
 
@@ -235,5 +262,17 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 	// Server Action идёт уже после того, как выставлены cookies, и приносит
 	// свежее RSC-дерево. redirect() бросает NEXT_REDIRECT, поэтому вызывается
 	// вне try/catch — иначе исключение будет проглочено.
-	redirect(REDIRECT_AFTER_LOGIN);
+	// Вход через Яндекс ID несёт адрес, с которого его начали (корзина,
+	// оформление); перепроверяем его тем же правилом, что и при старте.
+	redirect(
+		pending.redirectTo
+			? resolveOAuthReturnPath(pending.redirectTo, {
+					// Origin здесь только опорный: проверяется, что путь
+					// относительный и не уводит на другой хост, а redirect()
+					// всё равно получает путь, а не абсолютный адрес.
+					origin: "http://localhost",
+					fallback: REDIRECT_AFTER_LOGIN,
+				})
+			: REDIRECT_AFTER_LOGIN,
+	);
 }

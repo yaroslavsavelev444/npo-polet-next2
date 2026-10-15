@@ -88,6 +88,19 @@ const serverSchema = z.object({
   // (/realtime/ проксирует nginx). В разработке — http://localhost:3005,
   // потому что Next и шлюз — разные процессы на разных портах.
   SUPPORT_GATEWAY_PUBLIC_URL: z.string().url().optional(),
+
+  // ── Вход через Яндекс ID (src/modules/auth/oauth) ────────────────────────
+  // Приложение на oauth.yandex.ru. Секрет — без префикса NEXT_PUBLIC_.
+  // Одних ключей мало: сам вход включает владелец в админке («Настройки сайта →
+  // Вход через Яндекс ID», по умолчанию выключено). Без ключей галочка
+  // ничего не включает.
+  YANDEX_CLIENT_ID: z.string().optional(),
+  YANDEX_CLIENT_SECRET: z.string().optional(),
+  // Адреса Яндекса. В боевом окружении НЕ задаются — используются
+  // официальные. Переопределяются только в E2E, чтобы гонять весь поток
+  // против локального мока (как DADATA_SUGGEST_URL).
+  YANDEX_OAUTH_URL: z.string().url().optional(),
+  YANDEX_LOGIN_URL: z.string().url().optional(),
 });
 
 /**
@@ -131,6 +144,10 @@ function buildEnv() {
     SUPPORT_ENCRYPTION_KEYS: process.env.SUPPORT_ENCRYPTION_KEYS,
     SUPPORT_ATTACHMENTS_DIR: process.env.SUPPORT_ATTACHMENTS_DIR,
     SUPPORT_GATEWAY_PUBLIC_URL: process.env.SUPPORT_GATEWAY_PUBLIC_URL,
+    YANDEX_CLIENT_ID: process.env.YANDEX_CLIENT_ID,
+    YANDEX_CLIENT_SECRET: process.env.YANDEX_CLIENT_SECRET,
+    YANDEX_OAUTH_URL: process.env.YANDEX_OAUTH_URL,
+    YANDEX_LOGIN_URL: process.env.YANDEX_LOGIN_URL,
   };
 
   const clientEnv = {

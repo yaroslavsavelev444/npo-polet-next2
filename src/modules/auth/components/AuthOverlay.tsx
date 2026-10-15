@@ -67,6 +67,17 @@ export function AuthOverlay() {
 	const [consents, setConsents] = useState<ConsentListItem[] | null>(null);
 	const [consentsError, setConsentsError] = useState(false);
 	const [isFinishing, setIsFinishing] = useState(false);
+	// Вход через Яндекс ID уводит со страницы на oauth.yandex.ru и обратно —
+	// возвращаемся туда, откуда открыли окно (корзина, оформление, карточка).
+	// Гостевая корзина при этом не теряется: она в localStorage и сольётся
+	// с аккаунтом при появлении пользователя (CartProvider). Продолжение,
+	// ради которого окно открыли («добавить в избранное»), этим путём не
+	// выполняется — его придётся повторить.
+	const [returnPath] = useState(() =>
+		typeof window === "undefined"
+			? null
+			: `${window.location.pathname}${window.location.search}`,
+	);
 
 	// Каждое открытие начинается с чистого листа: шаг — тот, о котором
 	// попросил вызывающий, введённая почта — забыта. Без сброса окно,
@@ -217,6 +228,7 @@ export function AuthOverlay() {
 					}}
 					onRequiresOtp={handleRequiresOtp("email_verify")}
 					onSwitchToLogin={() => setStep("login")}
+					oauthNext={returnPath}
 				/>
 			) : (
 				<LoginForm
@@ -224,6 +236,7 @@ export function AuthOverlay() {
 					onRequiresOtp={handleRequiresOtp("login_2fa")}
 					onAuthenticated={handleAuthenticated}
 					onSwitchToRegister={() => setStep("register")}
+					oauthNext={returnPath}
 					// Восстановление пароля — единственная ветка, которая всё-таки
 					// уводит со страницы: это отдельный флоу с письмом и ссылкой, и
 					// втискивать его в окно поверх корзины значило бы удерживать
@@ -252,12 +265,14 @@ function RegisterStep({
 	onRetry,
 	onRequiresOtp,
 	onSwitchToLogin,
+	oauthNext,
 }: {
 	consents: ConsentListItem[] | null;
 	hasError: boolean;
 	onRetry: () => void;
 	onRequiresOtp: (email: string) => void;
 	onSwitchToLogin: () => void;
+	oauthNext: string | null;
 }) {
 	if (hasError) {
 		return (
@@ -298,6 +313,7 @@ function RegisterStep({
 			consents={consents}
 			onRequiresOtp={onRequiresOtp}
 			onSwitchToLogin={onSwitchToLogin}
+			oauthNext={oauthNext}
 		/>
 	);
 }

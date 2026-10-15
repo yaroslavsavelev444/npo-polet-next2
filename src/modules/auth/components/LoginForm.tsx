@@ -5,6 +5,8 @@ import { useActionState, useEffect } from 'react';
 import Button from '@/UI/Button/Button';
 import Input from '@/UI/Input/Input';
 import { loginAction } from '../actions/login';
+import { OAuthErrorNotice } from '../oauth/components/OAuthErrorNotice';
+import { OAuthDivider, YandexIdButton } from '../oauth/components/YandexIdButton';
 import { AuthAlert } from './AuthAlert';
 import { Typewriter } from './Typewriter';
 
@@ -35,6 +37,12 @@ interface LoginFormProps {
    * сам нажал «Войти и оформить».
    */
   compact?: boolean;
+  /**
+   * Куда вернуть после входа через Яндекс ID. Вход через внешний сервис —
+   * переход на другой сайт, и вернуться оверлей сам не может: вызывающий
+   * сообщает адрес, с которого окно открыли (страница входа — свой ?from=).
+   */
+  oauthNext?: string | null;
 }
 
 type LoginState = Awaited<ReturnType<typeof loginAction>> | null;
@@ -57,6 +65,7 @@ export function LoginForm({
   onSwitchToRegister,
   onForgotPassword,
   compact = false,
+  oauthNext,
 }: LoginFormProps) {
   const [state, action, isPending] = useActionState(loginAction, null);
 
@@ -90,6 +99,14 @@ export function LoginForm({
             ? 'Корзина сохранится — вы вернётесь на этот же экран'
             : 'Введите данные, чтобы войти в аккаунт'}
         </p>
+      </div>
+
+      {/* Вход через Яндекс ID — вне формы: это ссылка, а не поле формы.
+          Ошибка возврата с Яндекса показывается здесь же, над кнопкой. */}
+      <div className="mb-4 space-y-4">
+        {!state && <OAuthErrorNotice />}
+        <YandexIdButton next={oauthNext} disabled={isPending} />
+        <OAuthDivider />
       </div>
 
       <form action={action} className="space-y-4">

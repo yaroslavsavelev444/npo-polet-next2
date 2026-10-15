@@ -146,6 +146,10 @@ export async function resetPasswordAction(
       data: {
         twoFAVerified: false,
         twoFAVerifiedAt: null,
+        // Аккаунт, заведённый через Яндекс ID, получил пароль, который знает
+        // сам покупатель: с этого момента ему доступны вход по паролю, смена
+        // пароля и отвязка Яндекса (см. modules/auth/oauth).
+        hasPassword: true,
       },
       overrideAccess: true,
     });

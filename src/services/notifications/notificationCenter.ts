@@ -22,6 +22,8 @@ export type NotificationScenario =
   | "login_new_device"
   | "device_trusted"
   | "password_changed"
+  | "oauth_linked"
+  | "oauth_unlinked"
   | "account_locked"
   | "account_blocked"
   | "account_suspended"
@@ -41,6 +43,8 @@ interface ScenarioDataMap {
   login_new_device: { deviceLabel: string; ip: string };
   device_trusted: { deviceLabel: string; ip: string };
   password_changed: Record<string, never>;
+  oauth_linked: { providerLabel: string };
+  oauth_unlinked: { providerLabel: string };
   account_locked: { minutesLeft: number };
   account_blocked: Record<string, never>;
   account_suspended: Record<string, never>;
@@ -117,6 +121,28 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
       title: "Пароль изменён",
       body: "Пароль вашего аккаунта был успешно изменён.",
       link: "/profile",
+    }),
+  },
+  /**
+   * Привязка/отвязка внешнего сервиса входа (Яндекс ID). Только колокольчик,
+   * без письма: письма вне исполнения заказа ограничены документами /consents
+   * (см. oauth/CHECKLIST.md, раздел 0). Тип `security` — это изменение
+   * способов входа в аккаунт: если это сделал не владелец, он должен заметить.
+   */
+  oauth_linked: {
+    type: "security",
+    build: ({ providerLabel }) => ({
+      title: `${providerLabel} привязан`,
+      body: `Теперь в аккаунт можно входить через ${providerLabel}. Если это сделали не вы — отвяжите его в разделе «Безопасность» и смените пароль.`,
+      link: "/profile?tab=security",
+    }),
+  },
+  oauth_unlinked: {
+    type: "security",
+    build: ({ providerLabel }) => ({
+      title: `${providerLabel} отвязан`,
+      body: `Вход через ${providerLabel} для вашего аккаунта отключён.`,
+      link: "/profile?tab=security",
     }),
   },
   account_locked: {

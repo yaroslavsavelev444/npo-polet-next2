@@ -9,6 +9,13 @@ import {
   PASSWORD_UPPERCASE_REGEX,
 } from "../lib/passwordPolicy";
 
+/** Имя покупателя — общее для обычной регистрации и регистрации через Яндекс ID. */
+export const nameSchema = z
+  .string()
+  .min(2, "Имя минимум 2 символа")
+  .max(60, "Имя не более 60 символов")
+  .regex(/^[a-zA-Zа-яёА-ЯЁ\s\-']+$/, "Имя содержит недопустимые символы");
+
 export const registerSchema = z
   .object({
     // Единый источник правды по email: формат + blocklist (заглушки,
@@ -43,11 +50,7 @@ export const registerSchema = z
 
     confirmPassword: z.string().min(1, "Подтвердите пароль"),
 
-    name: z
-      .string()
-      .min(2, "Имя минимум 2 символа")
-      .max(60, "Имя не более 60 символов")
-      .regex(/^[a-zA-Zа-яёА-ЯЁ\s\-']+$/, "Имя содержит недопустимые символы"),
+    name: nameSchema,
 
     // Массив принятых согласий передаётся как JSON-строка из FormData
     consentsJson: z.string().min(1, "Необходимо принять соглашения"),

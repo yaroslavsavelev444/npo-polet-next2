@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { registerAction } from '../actions/register';
+import { OAuthDivider, YandexIdButton } from '../oauth/components/YandexIdButton';
 import { AuthAlert } from './AuthAlert';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { Typewriter } from './Typewriter';
@@ -25,6 +26,8 @@ interface RegisterFormProps {
   onSwitchToLogin?: () => void;
   /** Компактная шапка для оверлея — см. LoginForm. */
   compact?: boolean;
+  /** Куда вернуть после регистрации через Яндекс ID — см. LoginForm. */
+  oauthNext?: string | null;
 }
 
 type RegisterState = Awaited<ReturnType<typeof registerAction>> | null;
@@ -61,6 +64,7 @@ export function RegisterForm({
   onRequiresOtp,
   onSwitchToLogin,
   compact = false,
+  oauthNext,
 }: RegisterFormProps) {
   const [state, action, isPending] = useActionState(registerAction, null);
   const [checkedSlugs, setCheckedSlugs] = useState<Record<string, boolean>>({});
@@ -122,6 +126,17 @@ export function RegisterForm({
             ? 'Займёт минуту — корзина останется на месте'
             : 'Создайте аккаунт, чтобы начать'}
         </p>
+      </div>
+
+      {/* Регистрация через Яндекс ID — та же кнопка, что на входе: новому
+          покупателю после Яндекса покажем короткую форму «имя + согласия». */}
+      <div className="mb-4 space-y-4">
+        <YandexIdButton
+          next={oauthNext}
+          label="Продолжить с Яндекс ID"
+          disabled={isPending}
+        />
+        <OAuthDivider />
       </div>
 
       <form action={handleSubmit} className="space-y-4">

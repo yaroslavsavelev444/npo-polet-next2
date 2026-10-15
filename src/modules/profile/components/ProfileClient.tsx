@@ -34,6 +34,10 @@ interface ProfileClientProps {
 	trustedDevices: ProfileTrustedDevice[];
 	/** Раздел, разобранный сервером из адреса. */
 	initialTab: ProfileTab;
+	/** false — аккаунт без своего пароля (вход через Яндекс ID). */
+	hasPassword: boolean;
+	/** Блок «Способы входа» для вкладки «Безопасность» (modules/auth/oauth). */
+	loginMethods?: React.ReactNode;
 	actions: {
 		updateAccount: (payload: UpdateAccountPayload) => Promise<void>;
 		changePassword: (payload: ChangePasswordPayload) => Promise<void>;
@@ -84,6 +88,8 @@ export function ProfileClient({
 	sessions: initialSessions,
 	trustedDevices: initialTrustedDevices,
 	initialTab,
+	hasPassword,
+	loginMethods,
 	actions,
 }: ProfileClientProps) {
 	const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
@@ -199,7 +205,11 @@ export function ProfileClient({
 						)}
 
 						{activeTab === "security" && (
-							<SecurityTab onChangePassword={actions.changePassword} />
+							<SecurityTab
+								onChangePassword={actions.changePassword}
+								hasPassword={hasPassword}
+								loginMethods={loginMethods}
+							/>
 						)}
 
 						{activeTab === "sessions" && (

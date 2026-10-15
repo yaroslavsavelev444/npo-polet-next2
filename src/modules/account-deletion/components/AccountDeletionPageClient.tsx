@@ -16,7 +16,7 @@ import {
 	Breadcrumbs,
 } from "@/components/Breadcrumbs/Breadcrumbs";
 import catalog from "@/modules/productCatalog/components/Catalog.module.css";
-import { PasswordField } from "@/modules/profile/components/fields";
+import { PasswordField, TextField } from "@/modules/profile/components/fields";
 import styles from "@/modules/profile/components/Profile.module.css";
 import { formatDateTime, plural } from "@/modules/profile/lib/format";
 import { Reveal, RevealLines } from "@/shared/components/motion/Reveal";
@@ -26,10 +26,17 @@ import type { AccountDeletionView } from "../lib/service";
 type Props = {
 	request: AccountDeletionView | null;
 	createRequest: (input: {
-		password: string;
+		password?: string;
+		code?: string;
 		acknowledged: boolean;
 	}) => Promise<AccountDeletionView>;
 	cancelRequest: (requestId: string) => Promise<AccountDeletionView>;
+	/**
+	 * false — аккаунт заведён через Яндекс ID и своего пароля не имеет: заявку
+	 * подтверждает код на почту (sendCode), а не пароль.
+	 */
+	hasPassword: boolean;
+	sendCode: () => Promise<void>;
 };
 
 const BREADCRUMBS: BreadcrumbItem[] = [
@@ -98,9 +105,13 @@ export function AccountDeletionPageClient({
 	request: initialRequest,
 	createRequest,
 	cancelRequest,
+	hasPassword,
+	sendCode,
 }: Props) {
 	const [request, setRequest] = useState(initialRequest);
 	const [password, setPassword] = useState("");
+	const [code, setCode] = useState("");
+	const [codeSent, setCodeSent] = useState(false);
 	const [acknowledged, setAcknowledged] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isPending, startTransition] = useTransition();
@@ -136,9 +147,12 @@ export function AccountDeletionPageClient({
 		setError(null);
 		startTransition(async () => {
 			try {
-				const next = await createRequest({ password, acknowledged });
+				const next = await createRequest(
+					hasPassword ? { password, acknowledged } : { code, acknowledged },
+				);
 				setRequest(next);
 				setPassword("");
+				setCode("");
 				setAcknowledged(false);
 			} catch (cause) {
 				setError(
@@ -149,6 +163,22 @@ export function AccountDeletionPageClient({
 			}
 		});
 	}
+
+	function requestCode() {
+		setError(null);
+		startTransition(async () => {
+			try {
+				await sendCode();
+				setCodeSent(true);
+			} catch (cause) {
+				setError(
+					cause instanceof Error ? cause.message : "Не удалось отправить код",
+				);
+			}
+		});
+	}
+
+	const secret = hasPassword ? password : code;
 
 	function cancel() {
 		if (!request) return;
@@ -437,20 +467,53 @@ export function AccountDeletionPageClient({
 								<div className={styles.sectionAside}>
 									<h2 className={styles.sectionTitle}>Создать заявку</h2>
 									<p className={styles.sectionHint}>
-										Пароль подтверждает, что заявку создаёте именно вы, а не
-										тот, кто получил доступ к открытой вкладке.
+										{hasPassword
+											? "Пароль подтверждает, что заявку создаёте именно вы, а не тот, кто получил доступ к открытой вкладке."
+											: "Вы входите через Яндекс ID и пароля у аккаунта нет — заявку подтвердит код, который мы пришлём на вашу почту."}
 									</p>
 								</div>
 
 								<div className={styles.sectionBody}>
-									<PasswordField
-										label="Текущий пароль"
-										placeholder="Введите пароль от аккаунта"
-										value={password}
-										onChange={(event) => setPassword(event.target.value)}
-										disabled={isPending || blocked}
-										autoComplete="current-password"
-									/>
+									{hasPassword ? (
+										<PasswordField
+											label="Текущий пароль"
+											placeholder="Введите пароль от аккаунта"
+											value={password}
+											onChange={(event) => setPassword(event.target.value)}
+											disabled={isPending || blocked}
+											autoComplete="current-password"
+										/>
+									) : (
+										<>
+											<TextField
+												label="Код из письма"
+												placeholder="6 цифр"
+												inputMode="numeric"
+												autoComplete="one-time-code"
+												maxLength={6}
+												value={code}
+												onChange={(event) =>
+													setCode(event.target.value.replace(/\D/g, ""))
+												}
+												disabled={isPending || blocked || !codeSent}
+												hint={
+													codeSent
+														? "Код отправлен. Он действует 10 минут."
+														: undefined
+												}
+											/>
+											<button
+												type="button"
+												onClick={requestCode}
+												disabled={isPending || blocked}
+												className={`${styles.btn} ${styles.btnQuiet}`}
+											>
+												{codeSent
+													? "Отправить код ещё раз"
+													: "Получить код на почту"}
+											</button>
+										</>
+									)}
 
 									<label className={styles.check} htmlFor={ackId}>
 										<input
@@ -490,7 +553,7 @@ export function AccountDeletionPageClient({
 											type="button"
 											onClick={submit}
 											disabled={
-												!password || !acknowledged || isPending || blocked
+												!secret || !acknowledged || isPending || blocked
 											}
 											className={`${styles.btn} ${styles.btnDanger}`}
 										>

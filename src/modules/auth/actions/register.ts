@@ -5,6 +5,10 @@ import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
 import {
+  findMissingRequiredConsents,
+  recordUserConsents,
+} from "../lib/consents";
+import {
   isFieldTakenError,
   logUnexpectedAuthError,
   safeCreateOtp,
@@ -83,26 +87,9 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
 
   const payload = await getPayloadInstance();
 
-  // 3. Проверяем обязательные согласия.
-  // Критерии должны совпадать с теми, по которым страница регистрации
-  // решает, какие согласия показывать пользователю (см. RegisterPage),
-  // иначе бэкенд может требовать принятия согласий, которые фронт
-  // никогда не показал как чекбокс (needsAcceptance: false).
-  const { docs: requiredConsents } = await payload.find({
-    collection: "consents",
-    where: {
-      and: [
-        { isRequired: { equals: true } },
-        { isActive: { equals: true } },
-        { needsAcceptance: { equals: true } },
-      ],
-    },
-    overrideAccess: true,
-  });
-
-  const requiredSlugs = requiredConsents.map((c) => c.slug as string);
-  const acceptedSlugs = acceptedConsents.map((c) => c.slug);
-  const missing = requiredSlugs.filter((s) => !acceptedSlugs.includes(s));
+  // 3. Проверяем обязательные согласия — по тем же критериям, по которым
+  // страница регистрации решает, какие показывать (см. lib/consents.ts).
+  const missing = await findMissingRequiredConsents(payload, acceptedConsents);
 
   if (missing.length > 0) {
     return actionError(
@@ -192,23 +179,12 @@ export async function registerAction(_prevState: unknown, formData: FormData) {
   // вместе с выдачей токена.
 
   // 7. Фиксируем принятые согласия
-  await Promise.all(
-    acceptedConsents.map((c) =>
-      payload.create({
-        collection: "user-consents",
-        data: {
-          user: user.id,
-          consent: c.consentId,
-          consentSlug: c.slug,
-          version: c.version,
-          acceptedAt: new Date().toISOString(),
-          ip,
-          userAgent,
-        },
-        overrideAccess: true,
-      }),
-    ),
-  );
+  await recordUserConsents(payload, {
+    userId: user.id,
+    accepted: acceptedConsents,
+    ip,
+    userAgent,
+  });
 
   // 8. OTP для верификации email. Без самой OTP-записи пользователю нечего
   // будет ввести на следующем экране, поэтому (в отличие от отправки письма

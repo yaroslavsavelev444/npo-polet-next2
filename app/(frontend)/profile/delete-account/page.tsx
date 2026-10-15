@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import {
 	cancelAccountDeletionRequestAction,
 	createAccountDeletionRequestAction,
+	sendAccountDeletionCodeAction,
 } from "@/modules/account-deletion/actions";
 import { AccountDeletionPageClient } from "@/modules/account-deletion/components/AccountDeletionPageClient";
 import { getAccountDeletionService } from "@/modules/account-deletion/lib/service";
@@ -31,6 +32,10 @@ export default async function DeleteAccountPage() {
 			request={request}
 			createRequest={createAccountDeletionRequestAction}
 			cancelRequest={cancelAccountDeletionRequestAction}
+			hasPassword={
+				(user as { hasPassword?: boolean | null }).hasPassword !== false
+			}
+			sendCode={sendAccountDeletionCodeAction}
 		/>
 	);
 }

@@ -37,6 +37,7 @@
 		"test:support-chat": "EMAIL_ENABLED=false node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit --test-concurrency=1 tests/support-chat/*.test.ts",
 		"test:support-chat:load": "EMAIL_ENABLED=false node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs tests/support-chat/load.ts",
 		"test:email": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/email/*.test.ts",
+		"test:oauth": "EMAIL_ENABLED=false node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit --test-concurrency=1 tests/auth-oauth/*.test.ts",
 		"test:restock": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit tests/restock/*.test.ts",
 		"test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/security/*.test.ts tests/checkout/*.test.ts tests/contact/*.test.ts tests/promo/*.test.ts tests/banners/*.test.ts tests/cart/*.test.ts tests/search/*.test.ts tests/catalog/*.test.ts tests/observability/*.test.ts tests/email/*.test.ts tests/support-chat/pure.test.ts",
 		"test:mutation": "stryker run",

@@ -1,7 +1,11 @@
 import type { EmailTemplate, RenderedEmail } from "../../types.ts";
 import { renderEmailLayout } from "../shared/layout.ts";
 
-export type OtpEmailPurpose = "email_verify" | "login_2fa";
+export type OtpEmailPurpose =
+	| "email_verify"
+	| "login_2fa"
+	| "link_oauth"
+	| "account_delete";
 
 export interface OtpEmailData {
 	purpose: OtpEmailPurpose;
@@ -22,6 +26,24 @@ const COPY: Record<
 		subject: "Код входа",
 		heading: "Код для входа",
 		description: "Для входа в аккаунт введите код:",
+	},
+	// Письмо приходит владельцу аккаунта, когда кто-то пытается войти в него
+	// через Яндекс ID с той же почтой. Текст обязан прямо назвать действие:
+	// если это не он, по нему он и поймёт, что вводить код нельзя.
+	link_oauth: {
+		subject: "Привязка Яндекс ID",
+		heading: "Подтвердите вход через Яндекс ID",
+		description:
+			"Чтобы привязать Яндекс ID к вашему аккаунту и войти, введите код. Если вы не входили через Яндекс ID — никому не сообщайте код:",
+	},
+	// Удаление аккаунта без пароля (вход только через Яндекс ID): код
+	// заменяет повторный ввод пароля. Необратимое действие — текст прямо
+	// говорит, что подтверждается.
+	account_delete: {
+		subject: "Удаление аккаунта",
+		heading: "Подтвердите удаление аккаунта",
+		description:
+			"Чтобы создать заявку на удаление аккаунта, введите код. Если вы этого не запрашивали — никому не сообщайте код и смените пароль:",
 	},
 };
 

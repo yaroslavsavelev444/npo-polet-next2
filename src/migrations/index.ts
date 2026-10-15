@@ -31,6 +31,8 @@ import * as migration_20260928_180000_error_events from "./20260928_180000_error
 import * as migration_20261006_120000_product_motion from "./20261006_120000_product_motion.ts";
 import * as migration_20261011_120000_support_chat from "./20261011_120000_support_chat.ts";
 import * as migration_20261012_120000_support_chat_ban from "./20261012_120000_support_chat_ban.ts";
+import * as migration_20261013_120000_user_identities from "./20261013_120000_user_identities.ts";
+import * as migration_20261015_120000_settings_yandex_id from "./20261015_120000_settings_yandex_id.ts";
 
 export const migrations = [
 	{
@@ -197,5 +199,15 @@ export const migrations = [
 		up: migration_20261012_120000_support_chat_ban.up,
 		down: migration_20261012_120000_support_chat_ban.down,
 		name: "20261012_120000_support_chat_ban",
+	},
+	{
+		up: migration_20261013_120000_user_identities.up,
+		down: migration_20261013_120000_user_identities.down,
+		name: "20261013_120000_user_identities",
+	},
+	{
+		up: migration_20261015_120000_settings_yandex_id.up,
+		down: migration_20261015_120000_settings_yandex_id.down,
+		name: "20261015_120000_settings_yandex_id",
 	},
 ];

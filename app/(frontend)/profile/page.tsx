@@ -9,6 +9,12 @@ import { readTrustedDeviceCookie } from "@/modules/auth/lib/trustedDevice";
 import { getUserTrustedDevices } from "@/modules/auth/lib/trustedDevice.db";
 import { isUser } from "@/modules/auth/lib/typeGuards";
 import {
+	sendSetPasswordLinkAction,
+	unlinkOAuthIdentityAction,
+} from "@/modules/auth/oauth/actions";
+import { LoginMethodsSection } from "@/modules/auth/oauth/components/LoginMethodsSection";
+import { listIdentities } from "@/modules/auth/oauth/identities";
+import {
 	changePasswordAction,
 	logoutAction,
 	refreshSessionsAction,
@@ -81,11 +87,13 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 	// Сессии, доверенные устройства и cookie текущего браузера читаются
 	// одновременно: три независимых чтения, и последовательное ожидание
 	// добавило бы к первому экрану кабинета два лишних обхода базы.
-	const [rawSessions, rawTrustedDevices, trustedCookie] = await Promise.all([
-		getUserActiveSessions(payload, String(user.id)),
-		getUserTrustedDevices(payload, String(user.id)),
-		readTrustedDeviceCookie(),
-	]);
+	const [rawSessions, rawTrustedDevices, trustedCookie, identities] =
+		await Promise.all([
+			getUserActiveSessions(payload, String(user.id)),
+			getUserTrustedDevices(payload, String(user.id)),
+			readTrustedDeviceCookie(),
+			listIdentities(payload, user.id),
+		]);
 	const sessions: ProfileSession[] = rawSessions.map((s) => ({
 		id: String(s.id),
 		deviceLabel: (s.deviceLabel ?? "Устройство") as string,
@@ -134,6 +142,19 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 				sessions={sessions}
 				trustedDevices={trustedDevices}
 				initialTab={initialTab}
+				hasPassword={user.hasPassword !== false}
+				loginMethods={
+					<LoginMethodsSection
+						identities={identities.map((i) => ({
+							id: i.id,
+							emailAtLink: i.emailAtLink,
+							createdAt: i.createdAt,
+						}))}
+						hasPassword={user.hasPassword !== false}
+						onUnlink={unlinkOAuthIdentityAction}
+						onSendSetPasswordLink={sendSetPasswordLinkAction}
+					/>
+				}
 				actions={{
 					updateAccount: updateAccountAction,
 					changePassword: changePasswordAction,

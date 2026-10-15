@@ -9,7 +9,7 @@ import { RATE_LIMITS } from "../lib/rateLimit";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
 
 const resendSchema = z.object({
-	type: z.enum(["login_2fa", "email_verify"]),
+	type: z.enum(["login_2fa", "email_verify", "link_oauth"]),
 });
 
 /**

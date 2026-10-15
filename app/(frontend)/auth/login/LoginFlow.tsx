@@ -77,6 +77,8 @@ export function LoginFlow() {
 		<LoginForm
 			onRequiresOtp={handleRequiresOtp}
 			onAuthenticated={handleAuthenticated}
+			// Тот же ?from=, что и для обычного входа; проверяет его сервер.
+			oauthNext={searchParams.get("from")}
 		/>
 	);
 }

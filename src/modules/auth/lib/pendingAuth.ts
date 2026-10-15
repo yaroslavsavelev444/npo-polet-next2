@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import type { OtpType } from "../types";
+import type { PendingOAuthLink } from "../oauth/types";
+import type { ChallengeOtpType } from "../types";
 import { OTP_TTL_MS } from "./otp";
 import { redis } from "./redis";
 
@@ -24,7 +25,7 @@ export interface PendingAuth {
 	userId: string;
 	email: string;
 	name: string;
-	type: OtpType;
+	type: ChallengeOtpType;
 	/**
 	 * JWT, выданный payload.login() ещё на шаге проверки пароля.
 	 *
@@ -52,6 +53,19 @@ export interface PendingAuth {
 	 * этот флаг.
 	 */
 	decoy?: boolean;
+	/**
+	 * Вход через Яндекс ID, которому нужно подтверждение почты кодом: привязка
+	 * к существующему аккаунту (type link_oauth) или регистрация с почтой не на
+	 * домене Яндекса (email_verify). verifyOtpAction создаёт привязку только
+	 * после верного кода — до этого Яндекс-аккаунт к нашему ничем не привязан.
+	 * Токенов Яндекса здесь нет. См. modules/auth/oauth.
+	 */
+	oauthLink?: PendingOAuthLink;
+	/**
+	 * Куда вернуть после кода (уже прошедший resolveSafeRedirect путь). Нет —
+	 * в кабинет, как раньше.
+	 */
+	redirectTo?: string;
 }
 
 const redisKey = (id: string) => `pending-auth:${id}`;

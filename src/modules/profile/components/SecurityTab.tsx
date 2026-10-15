@@ -52,6 +52,14 @@ const RULES: { id: string; label: string; test: (value: string) => boolean }[] =
 
 interface SecurityTabProps {
 	onChangePassword: (payload: ChangePasswordPayload) => Promise<void>;
+	/**
+	 * false — аккаунт заведён через Яндекс ID и своего пароля не имеет: менять
+	 * нечего (форма требует текущий пароль), задать его предлагает блок
+	 * «Способы входа».
+	 */
+	hasPassword?: boolean;
+	/** «Способы входа» (modules/auth/oauth) — собирается на сервере. */
+	loginMethods?: React.ReactNode;
 }
 
 /**
@@ -76,7 +84,11 @@ interface SecurityTabProps {
  * сменой пароля, то есть среди действий, ради которых в раздел заходят
  * осознанно.
  */
-export function SecurityTab({ onChangePassword }: SecurityTabProps) {
+export function SecurityTab({
+	onChangePassword,
+	hasPassword = true,
+	loginMethods,
+}: SecurityTabProps) {
 	const [form, setForm] = useState<FormState>({
 		oldPassword: "",
 		newPassword: "",
@@ -185,124 +197,129 @@ export function SecurityTab({ onChangePassword }: SecurityTabProps) {
 
 	return (
 		<div className="flex flex-col">
-			<section className={styles.section}>
-				<div className={styles.sectionAside}>
-					<h2 className={styles.sectionTitle}>Смена пароля</h2>
-					<p className={styles.sectionHint}>
-						После смены вход сохранится только на этом устройстве — на остальных
-						придётся войти заново. Так украденная сессия теряет доступ сразу.
-					</p>
-				</div>
+			{loginMethods}
 
-				<div className={styles.sectionBody}>
-					{/* Настоящая форма, а не набор полей с кнопкой: Enter в любом поле
+			{hasPassword && (
+				<section className={styles.section}>
+					<div className={styles.sectionAside}>
+						<h2 className={styles.sectionTitle}>Смена пароля</h2>
+						<p className={styles.sectionHint}>
+							После смены вход сохранится только на этом устройстве — на
+							остальных придётся войти заново. Так украденная сессия теряет
+							доступ сразу.
+						</p>
+					</div>
+
+					<div className={styles.sectionBody}>
+						{/* Настоящая форма, а не набор полей с кнопкой: Enter в любом поле
 					    отправляет, менеджеры паролей распознают смену пароля и
 					    предлагают сохранить новый. */}
-					<form onSubmit={handleSubmit} noValidate aria-busy={isPending}>
-						<div className="flex flex-col gap-[1.25rem]">
-							<PasswordField
-								label="Текущий пароль"
-								placeholder="Введите текущий пароль"
-								value={form.oldPassword}
-								onChange={setField("oldPassword")}
-								onBlur={handleBlur("oldPassword")}
-								error={errors.oldPassword}
-								disabled={isPending}
-								autoComplete="current-password"
-							/>
-
-							<div className="flex flex-col gap-[0.75rem]">
+						<form onSubmit={handleSubmit} noValidate aria-busy={isPending}>
+							<div className="flex flex-col gap-[1.25rem]">
 								<PasswordField
-									label="Новый пароль"
-									placeholder="Придумайте новый пароль"
-									value={form.newPassword}
-									onChange={setField("newPassword")}
-									onBlur={handleBlur("newPassword")}
-									error={errors.newPassword}
+									label="Текущий пароль"
+									placeholder="Введите текущий пароль"
+									value={form.oldPassword}
+									onChange={setField("oldPassword")}
+									onBlur={handleBlur("oldPassword")}
+									error={errors.oldPassword}
+									disabled={isPending}
+									autoComplete="current-password"
+								/>
+
+								<div className="flex flex-col gap-[0.75rem]">
+									<PasswordField
+										label="Новый пароль"
+										placeholder="Придумайте новый пароль"
+										value={form.newPassword}
+										onChange={setField("newPassword")}
+										onBlur={handleBlur("newPassword")}
+										error={errors.newPassword}
+										disabled={isPending}
+										autoComplete="new-password"
+									/>
+
+									<ul className={styles.rules} aria-label="Требования к паролю">
+										{RULES.map((rule) => {
+											const met = rule.test(form.newPassword);
+											return (
+												<li
+													key={rule.id}
+													className={styles.rule}
+													data-met={met || undefined}
+												>
+													<span className={styles.ruleMark} aria-hidden>
+														<svg
+															viewBox="0 0 24 24"
+															className="size-[0.5rem]"
+															fill="none"
+															stroke="currentColor"
+															strokeWidth="4"
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+															<path
+																className={styles.ruleCheck}
+																d="M4 12.5 9.5 18 20 6.5"
+															/>
+														</svg>
+													</span>
+													{/* Состояние проговаривается словом, а не только
+												    цветом и галочкой: иначе список бесполезен для
+												    скринридера и для того, кто не различает
+												    зелёный. */}
+													<span>
+														{rule.label}
+														<span className="sr-only">
+															{met ? " — выполнено" : " — не выполнено"}
+														</span>
+													</span>
+												</li>
+											);
+										})}
+									</ul>
+								</div>
+
+								<PasswordField
+									label="Подтверждение"
+									placeholder="Повторите новый пароль"
+									value={form.confirmPassword}
+									onChange={setField("confirmPassword")}
+									onBlur={handleBlur("confirmPassword")}
+									error={errors.confirmPassword}
 									disabled={isPending}
 									autoComplete="new-password"
 								/>
 
-								<ul className={styles.rules} aria-label="Требования к паролю">
-									{RULES.map((rule) => {
-										const met = rule.test(form.newPassword);
-										return (
-											<li
-												key={rule.id}
-												className={styles.rule}
-												data-met={met || undefined}
-											>
-												<span className={styles.ruleMark} aria-hidden>
-													<svg
-														viewBox="0 0 24 24"
-														className="size-[0.5rem]"
-														fill="none"
-														stroke="currentColor"
-														strokeWidth="4"
-														strokeLinecap="round"
-														strokeLinejoin="round"
-													>
-														<path
-															className={styles.ruleCheck}
-															d="M4 12.5 9.5 18 20 6.5"
-														/>
-													</svg>
-												</span>
-												{/* Состояние проговаривается словом, а не только
-												    цветом и галочкой: иначе список бесполезен для
-												    скринридера и для того, кто не различает
-												    зелёный. */}
-												<span>
-													{rule.label}
-													<span className="sr-only">
-														{met ? " — выполнено" : " — не выполнено"}
-													</span>
-												</span>
-											</li>
-										);
-									})}
-								</ul>
+								{done && (
+									<p
+										role="status"
+										className={`${styles.notice} ${styles.noticeOk}`}
+									>
+										<CheckCircle2
+											size={15}
+											aria-hidden
+											className={`${styles.noticeIcon} ${styles.noticeOkIcon}`}
+										/>
+										Пароль изменён. Сессии на других устройствах завершены — там
+										понадобится войти заново.
+									</p>
+								)}
+
+								<div className={styles.actions}>
+									<button
+										type="submit"
+										disabled={!canSubmit || isPending}
+										className={`${styles.btn} ${styles.btnPrimary}`}
+									>
+										{isPending ? "Меняем…" : "Сменить пароль"}
+									</button>
+								</div>
 							</div>
-
-							<PasswordField
-								label="Подтверждение"
-								placeholder="Повторите новый пароль"
-								value={form.confirmPassword}
-								onChange={setField("confirmPassword")}
-								onBlur={handleBlur("confirmPassword")}
-								error={errors.confirmPassword}
-								disabled={isPending}
-								autoComplete="new-password"
-							/>
-
-							{done && (
-								<p
-									role="status"
-									className={`${styles.notice} ${styles.noticeOk}`}
-								>
-									<CheckCircle2
-										size={15}
-										aria-hidden
-										className={`${styles.noticeIcon} ${styles.noticeOkIcon}`}
-									/>
-									Пароль изменён. Сессии на других устройствах завершены — там
-									понадобится войти заново.
-								</p>
-							)}
-
-							<div className={styles.actions}>
-								<button
-									type="submit"
-									disabled={!canSubmit || isPending}
-									className={`${styles.btn} ${styles.btnPrimary}`}
-								>
-									{isPending ? "Меняем…" : "Сменить пароль"}
-								</button>
-							</div>
-						</div>
-					</form>
-				</div>
-			</section>
+						</form>
+					</div>
+				</section>
+			)}
 
 			<section className={`${styles.section} ${styles.sectionDanger}`}>
 				<div className={styles.sectionAside}>

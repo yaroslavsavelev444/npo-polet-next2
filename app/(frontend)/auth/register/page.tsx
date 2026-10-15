@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { ConsentListItem } from "@/modules/auth/types";
 import { AuthShell } from "@/modules/auth/components/AuthShell";
+import { listConsentsForAcceptance } from "@/modules/auth/lib/consents";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import { getAuthImages } from "@/utils/settings-helpers";
@@ -16,31 +16,10 @@ import { RegisterPageClient } from "./RegisterPageClient";
 export default async function RegisterPage() {
   const payload = await getPayloadInstance();
 
-  const [{ docs: consents }, settings] = await Promise.all([
-    payload.find({
-      collection: "consents",
-      where: {
-        and: [
-          { isActive: { equals: true } },
-          { needsAcceptance: { equals: true } },
-        ],
-      },
-      sort: "-isRequired", // Обязательные сначала
-      limit: 20,
-      overrideAccess: true,
-    }),
+  const [consentList, settings] = await Promise.all([
+    listConsentsForAcceptance(payload),
     getCachedSettings(),
   ]);
-
-  // Маппим в простой объект для клиентского компонента
-  const consentList: ConsentListItem[] = consents.map((c) => ({
-    id: Number(c.id),
-    slug: c.slug as string,
-    title: c.title as string,
-    version: (c.version ?? "1.0.0") as string,
-    isRequired: (c.isRequired ?? false) as boolean,
-    documentUrl: (c.documentUrl ?? null) as string | null,
-  }));
 
   const { registerUrl } = getAuthImages(settings);
 

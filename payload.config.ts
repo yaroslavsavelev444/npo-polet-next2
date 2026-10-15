@@ -45,6 +45,7 @@ import TransportCompanies from "./src/payload/collections/TransportCompanies.ts"
 import { TrustedDevices } from "./src/payload/collections/TrustedDevices.ts";
 import { Users } from "./src/payload/collections/User.ts";
 import { UserConsents } from "./src/payload/collections/UserConsents.ts"; // добавили
+import { UserIdentities } from "./src/payload/collections/UserIdentities.ts";
 import { Wishlists } from "./src/payload/collections/Wishlists.ts";
 import { projectEmailAdapter } from "./src/payload/email/adapter.ts";
 import { AlertingSettings } from "./src/payload/globals/AlertingSettings.ts";
@@ -186,6 +187,8 @@ export default buildConfig({
 		// аккаунт», здесь «какому браузеру разрешено входить без кода». Сроки
 		// жизни у них разные, поэтому и коллекции разные (см. шапку).
 		TrustedDevices,
+		// Привязки к внешним сервисам входа (Яндекс ID) — см. modules/auth/oauth.
+		UserIdentities,
 		RestockSubscriptions,
 		UserConsents, // добавили
 		AccountDeletionRequests,

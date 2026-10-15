@@ -29,6 +29,8 @@ export const OtpCodes: CollectionConfig = {
     {
       // login_2fa — второй фактор при входе
       // email_verify — подтверждение email при регистрации
+      // link_oauth — подтверждение владения аккаунтом перед привязкой Яндекс ID
+      // account_delete — подтверждение удаления аккаунта, у которого нет пароля
       name: 'type',
       type: 'select',
       required: true,
@@ -37,6 +39,8 @@ export const OtpCodes: CollectionConfig = {
       options: [
         { label: 'Email верификация', value: 'email_verify' },
         { label: 'Login 2FA', value: 'login_2fa' },
+        { label: 'Привязка Яндекс ID', value: 'link_oauth' },
+        { label: 'Удаление аккаунта', value: 'account_delete' },
       ],
     },
     {

@@ -19,7 +19,13 @@ const GUEST_AUTH_PATHS = [
   "/auth/login",
   "/auth/register",
   "/auth/forgot-password",
-  "/auth/password-reset",
+  // /auth/password-reset сюда НЕ входит: ссылку из письма открывает и
+  // вошедший покупатель — так задаёт пароль аккаунт, заведённый через
+  // Яндекс ID («Задать пароль» в кабинете). Сброс пароля всё равно завершает
+  // все сессии (resetPasswordAction), так что гостевой редирект там не нужен.
+  // Последний шаг регистрации через Яндекс ID. Сами /auth/yandex/start и
+  // /callback сюда не входят: привязку из кабинета начинает вошедший.
+  "/auth/yandex/complete",
 ];
 
 function isGuestAuthPath(pathname: string): boolean {
@@ -173,14 +179,30 @@ async function isMalformedFormPost(req: NextRequest): Promise<boolean> {
  * страницу помечаем запрос как прямой заход (`none` — то же, что браузер
  * присылает при вводе адреса и обновлении). /api не трогаем: обработчики
  * сами решают, доверять ли чужому сайту (см. api/catalog/products/[id]/view).
+ *
+ * Вход через Яндекс ID держится на этом же: callback приходит переходом с
+ * oauth.yandex.ru, то есть cross-site, и вся цепочка редиректов после него
+ * (на /profile, /cart) для браузера остаётся cross-site. Без пометки
+ * привязка из кабинета не узнавала бы вошедшего, а /profile сразу после входа
+ * стирал бы только что выданную сессию. Мок Яндекса на localhost:4610 этого
+ * не показывал: для браузера это тот же сайт, что localhost:3000.
+ *
+ * Исключение — /auth/yandex/start: с intent=link это GET, который запускает
+ * привязку к вошедшему аккаунту. Чужой сайт не должен уметь начать её за
+ * покупателя (в браузере мог оказаться открыт чужой Яндекс), поэтому там
+ * запрос с чужого сайта остаётся гостевым — привязку начинают из кабинета.
  */
+const CROSS_SITE_GUEST_PATHS = ["/auth/yandex/start"];
+
 function isCrossSitePageNavigation(req: NextRequest): boolean {
+  const { pathname } = req.nextUrl;
   return (
     (req.method === "GET" || req.method === "HEAD") &&
     req.headers.get("sec-fetch-mode") === "navigate" &&
     req.headers.get("sec-fetch-site") === "cross-site" &&
     !req.headers.has("origin") &&
-    !req.nextUrl.pathname.startsWith("/api")
+    !pathname.startsWith("/api") &&
+    !CROSS_SITE_GUEST_PATHS.includes(pathname)
   );
 }
 

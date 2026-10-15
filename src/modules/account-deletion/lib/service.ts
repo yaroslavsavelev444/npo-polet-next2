@@ -120,22 +120,30 @@ export class AccountDeletionService {
 		return row ? toView(row) : null;
 	}
 
-	async requestDeletion(input: {
-		userId: number | string;
-		email: string;
-		password: string;
-	}): Promise<AccountDeletionView> {
+	async requestDeletion(
+		input: { userId: number | string; email: string } & (
+			| { password: string }
+			/**
+			 * Аккаунт без пароля (заведён через Яндекс ID): повторную
+			 * аутентификацию заменяет код на почту, который вызывающий УЖЕ
+			 * проверил (verifyOtpCode, тип account_delete — см. actions.ts).
+			 */
+			| { confirmedByCode: true }
+		),
+	): Promise<AccountDeletionView> {
 		// Re-authentication protects a destructive action even if the browser
 		// session has been hijacked. Do not leak whether a user exists.
 		// AUTH_FLOW_CONTEXT — см. requireServerAuthFlow.ts: это сверка пароля,
 		// а не выдача сессии (токен из результата не используется).
-		const login = await this.payload.login({
-			collection: "users",
-			data: { email: input.email, password: input.password },
-			context: AUTH_FLOW_CONTEXT,
-		});
-		if (!login.user || String(login.user.id) !== String(input.userId)) {
-			throw new AccountDeletionError("Неверный пароль", "INVALID_PASSWORD");
+		if ("password" in input) {
+			const login = await this.payload.login({
+				collection: "users",
+				data: { email: input.email, password: input.password },
+				context: AUTH_FLOW_CONTEXT,
+			});
+			if (!login.user || String(login.user.id) !== String(input.userId)) {
+				throw new AccountDeletionError("Неверный пароль", "INVALID_PASSWORD");
+			}
 		}
 
 		const now = new Date();
@@ -288,6 +296,11 @@ export class AccountDeletionService {
 			);
 			await tx.execute(sql`DELETE FROM otp_codes WHERE user_id = ${userId}`);
 			await tx.execute(sql`DELETE FROM sessions WHERE user_id = ${userId}`);
+			// Привязка к Яндекс ID: после удаления вход тем же Яндексом — новая
+			// регистрация, а не «воскрешение» удалённого аккаунта.
+			await tx.execute(
+				sql`DELETE FROM user_identities WHERE user_id = ${userId}`,
+			);
 			await tx.execute(
 				sql`DELETE FROM user_consents WHERE user_id = ${userId}`,
 			);

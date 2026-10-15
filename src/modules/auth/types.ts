@@ -2,7 +2,17 @@
 
 export type UserRole = "user" | "admin" | "superadmin";
 export type UserStatus = "active" | "blocked" | "suspended";
-export type OtpType = "email_verify" | "login_2fa";
+export type OtpType =
+	| "email_verify"
+	| "login_2fa"
+	| "link_oauth"
+	| "account_delete";
+
+/**
+ * Коды, которые ведут через экран /auth/verify-otp (pending-auth). Код
+ * удаления аккаунта вводится на странице удаления и сюда не попадает.
+ */
+export type ChallengeOtpType = Exclude<OtpType, "account_delete">;
 
 export interface AuthUser {
 	id: string;
