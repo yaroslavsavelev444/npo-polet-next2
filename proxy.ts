@@ -154,6 +154,36 @@ async function isMalformedFormPost(req: NextRequest): Promise<boolean> {
   }
 }
 
+/**
+ * Переход на страницу витрины с чужого сайта: ссылка из Google/Яндекса,
+ * письма, мессенджера.
+ *
+ * Браузер присылает в таком запросе payload-token (SameSite=Lax разрешает
+ * cookie именно для top-level GET-навигации), но с `Sec-Fetch-Site:
+ * cross-site` и без Origin. Payload в этом случае cookie игнорирует: при
+ * заданном csrf (ALLOWED_ORIGINS) он принимает запрос без Origin только с
+ * Sec-Fetch-Site same-origin/same-site/none (payload/dist/auth/extractJWT.js).
+ * Итог — покупатель, пришедший из поиска, видел страницу гостем, а на
+ * защищённом пути гейт ниже ещё и стирал ему куки сессии. После F5 браузер
+ * шлёт `none`, и вход «появлялся».
+ *
+ * Для чтения страницы такая проверка ничего не защищает: CSRF — это изменение
+ * состояния, а оно идёт через Server Actions (POST с Origin — проверка
+ * Payload и Next там остаётся) и /api. Поэтому только для GET-навигации на
+ * страницу помечаем запрос как прямой заход (`none` — то же, что браузер
+ * присылает при вводе адреса и обновлении). /api не трогаем: обработчики
+ * сами решают, доверять ли чужому сайту (см. api/catalog/products/[id]/view).
+ */
+function isCrossSitePageNavigation(req: NextRequest): boolean {
+  return (
+    (req.method === "GET" || req.method === "HEAD") &&
+    req.headers.get("sec-fetch-mode") === "navigate" &&
+    req.headers.get("sec-fetch-site") === "cross-site" &&
+    !req.headers.has("origin") &&
+    !req.nextUrl.pathname.startsWith("/api")
+  );
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -219,6 +249,9 @@ export async function proxy(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
+  if (isCrossSitePageNavigation(req)) {
+    requestHeaders.set("sec-fetch-site", "none");
+  }
 
   const applyCsp = (res: NextResponse): NextResponse => {
     res.headers.set("Content-Security-Policy", csp);
@@ -300,7 +333,7 @@ export async function proxy(req: NextRequest) {
   // поле users.twoFAVerified, которое остаётся true 24 часа после первого
   // подтверждения — из-за чего при повторном входе в этом окне OTP
   // пропускался полностью.
-  const status = await checkSessionStatus(req, sessionId);
+  const status = await checkSessionStatus(requestHeaders, sessionId);
 
   if (!status) {
     // JWT есть, но сессия отозвана или истекла → чистим куки и на логин
@@ -332,12 +365,14 @@ export async function proxy(req: NextRequest) {
 // код удалял payload-token/session-id, вместе с которыми терялся только что
 // начатый вход. Прямой вызов Local API убирает саму возможность такого сбоя.
 
+// Заголовки — уже подготовленные для рендера (requestHeaders в proxy()), а не
+// исходные: гейт должен видеть пользователя так же, как страница за ним.
 async function checkSessionStatus(
-  req: NextRequest,
+  headers: Headers,
   sessionId: string | undefined,
 ): Promise<{ userId: string } | null> {
   const payload = await getPayloadInstance();
-  const status = await resolveSessionStatus(payload, req.headers, sessionId);
+  const status = await resolveSessionStatus(payload, headers, sessionId);
   return status ? { userId: status.userId } : null;
 }
 
