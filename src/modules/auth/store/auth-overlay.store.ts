@@ -48,10 +48,18 @@ interface AuthOverlayState {
 	 */
 	reason: string | null;
 	continuation: AuthOverlayContinuation | null;
+	/**
+	 * Куда вернуться после входа через Яндекс ID. Тот путь уводит со страницы,
+	 * и колбэк `onSuccess` не выполнится — если продолжение — это переход
+	 * (корзина → оформление), его адрес передаётся здесь. По умолчанию —
+	 * страница, где окно открыли.
+	 */
+	returnPath: string | null;
 	open: (options?: {
 		step?: AuthOverlayStep;
 		reason?: string;
 		onSuccess?: AuthOverlayContinuation;
+		returnPath?: string;
 	}) => void;
 	close: () => void;
 }
@@ -61,6 +69,7 @@ export const useAuthOverlay = create<AuthOverlayState>((set) => ({
 	initialStep: "login",
 	reason: null,
 	continuation: null,
+	returnPath: null,
 
 	open: (options = {}) =>
 		set({
@@ -68,12 +77,14 @@ export const useAuthOverlay = create<AuthOverlayState>((set) => ({
 			initialStep: options.step ?? "login",
 			reason: options.reason ?? null,
 			continuation: options.onSuccess ?? null,
+			returnPath: options.returnPath ?? null,
 		}),
 
 	// Продолжение снимается вместе с закрытием: оставленный колбэк выполнился
 	// бы при следующем открытии окна — то есть после входа ради избранного
 	// человека унесло бы на оформление заказа.
-	close: () => set({ isOpen: false, reason: null, continuation: null }),
+	close: () =>
+		set({ isOpen: false, reason: null, continuation: null, returnPath: null }),
 }));
 
 /**

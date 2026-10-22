@@ -1,5 +1,6 @@
 import type { BasePayload } from "payload";
 import { findIdentity, linkIdentity } from "./identities";
+import { findOutdatedLinkConsents } from "./linkConsent";
 import type { OAuthErrorCode, OAuthProviderId } from "./types";
 import { isYandexOwnedEmail, type YandexProfile } from "./yandex";
 
@@ -11,6 +12,7 @@ import { isYandexOwnedEmail, type YandexProfile } from "./yandex";
  *
  *   привязка есть ─────────────────────────────── login
  *   пришли из кабинета ──── привязать к себе ──── linked | already_linked_elsewhere
+ *                      └─ старая редакция Согласия ── consent_required
  *   почты у аккаунта Яндекса нет ──────────────── no_email
  *   почта совпала с аккаунтом ──────────────────── link_required (код на почту)
  *   почта новая ────────────────────────────────── signup (форма «имя + согласия»)
@@ -23,6 +25,8 @@ import { isYandexOwnedEmail, type YandexProfile } from "./yandex";
 export type Resolution =
 	| { kind: "login"; userId: number; identityId: number }
 	| { kind: "linked"; userId: number; created: boolean }
+	/** Привязка из кабинета ждёт согласия действующей редакции (linkConsent.ts). */
+	| { kind: "consent_required"; userId: number }
 	| { kind: "link_required"; userId: number; email: string; name: string }
 	| {
 			kind: "signup";
@@ -47,6 +51,18 @@ export async function resolveOAuthProfile(
 
 	if (intent === "link") {
 		if (!params.linkUserId) return { kind: "error", code: "generic" };
+		// Согласие спрашиваем только когда привязка действительно будет
+		// создана: чужой Яндекс — сразу отказ, уже свой — без лишнего экрана.
+		const existing = await findIdentity(payload, provider, profile.subject);
+		if (!existing) {
+			const outdated = await findOutdatedLinkConsents(
+				payload,
+				params.linkUserId,
+			);
+			if (outdated.length > 0) {
+				return { kind: "consent_required", userId: Number(params.linkUserId) };
+			}
+		}
 		const result = await linkIdentity(payload, {
 			userId: params.linkUserId,
 			provider,

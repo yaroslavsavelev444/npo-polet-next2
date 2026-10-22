@@ -7,10 +7,15 @@ import {
 } from "@/modules/auth/lib/errorHandling";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { RATE_LIMITS } from "@/modules/auth/lib/rateLimit";
+import { parseDeviceLabel } from "@/modules/auth/lib/session";
 import { getRequestMeta } from "@/modules/auth/lib/utils";
 import { getYandexConfig } from "@/modules/auth/oauth/config";
 import { startConfirmationByCode } from "@/modules/auth/oauth/confirmByCode";
-import { consumeFlow, savePendingSignup } from "@/modules/auth/oauth/flowStore";
+import {
+	consumeFlow,
+	savePendingLink,
+	savePendingSignup,
+} from "@/modules/auth/oauth/flowStore";
 import { touchIdentity } from "@/modules/auth/oauth/identities";
 import { issueSessionWithoutPassword } from "@/modules/auth/oauth/issueSession";
 import { sameOpaqueValue } from "@/modules/auth/oauth/pkce";
@@ -111,6 +116,19 @@ export async function GET(request: Request) {
 			case "error":
 				return fail(resolution.code);
 
+			case "consent_required": {
+				// Привязка из кабинета к аккаунту со старой редакцией Согласия:
+				// сначала экран согласия (linkConsent.ts), привязка — после него.
+				await savePendingLink({
+					userId: String(resolution.userId),
+					provider: flow.provider,
+					subject: result.profile.subject,
+					email: result.profile.email,
+					next: flow.next,
+				});
+				return redirectTo("/auth/yandex/link");
+			}
+
 			case "linked": {
 				if (resolution.created) {
 					void notify(payload, resolution.userId, "oauth_linked", {
@@ -136,6 +154,11 @@ export async function GET(request: Request) {
 				void touchIdentity(payload, resolution.identityId).catch((err) =>
 					logUnexpectedAuthError("oauth.touchIdentity", err),
 				);
+				void notify(payload, resolution.userId, "login_oauth", {
+					providerLabel: PROVIDER_LABEL,
+					deviceLabel: parseDeviceLabel(userAgent),
+					ip,
+				});
 				revalidatePath("/", "layout");
 				return redirectTo(flow.next);
 			}

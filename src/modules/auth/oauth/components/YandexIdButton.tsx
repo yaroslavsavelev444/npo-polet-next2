@@ -1,13 +1,20 @@
 "use client";
 
 import { useOAuthProviders } from "./OAuthProvidersContext";
+import { YandexIdMark } from "./YandexIdMark";
 
 interface YandexIdButtonProps {
 	/** Куда вернуть после входа; проверяется на сервере (returnPath.ts). */
 	next?: string | null;
 	/** link — привязка из кабинета вошедшим покупателем. */
 	intent?: "login" | "link";
-	label?: string;
+	/**
+	 * Правила Яндекса запрещают менять текст кнопки — есть только два
+	 * варианта: полный «Войти с Яндекс ID» и короткий «Яндекс ID» (когда
+	 * полный не помещается или рядом своя подпись, как «Привязать вход» в
+	 * кабинете). Своего текста кнопка не принимает намеренно.
+	 */
+	variant?: "full" | "short";
 	disabled?: boolean;
 }
 
@@ -17,15 +24,16 @@ interface YandexIdButtonProps {
  * Обычная ссылка на /auth/yandex/start, не кнопка с обработчиком: переход на
  * oauth.yandex.ru — навигация, и она должна работать до гидрации.
  *
- * Оформление — по правилам Яндекса для кнопок входа: чёрная кнопка, знак «Я»
- * в красном круге, текст «Войти с Яндекс ID». Цвета брендовые и от темы сайта
- * не зависят. Цвет текста на <a> — с `!`: глобальное правило Once UI
+ * Оформление — по правилам Яндекса для кнопок входа
+ * (https://yandex.ru/dev/id/doc/ru/codes/buttons-design): основная версия,
+ * чёрная, размер M (44 px), знак «Я» в красном круге. Цвет, обводку, текст,
+ * значок и отступы менять нельзя — от темы сайта они не зависят. Цвет текста на <a> — с `!`: глобальное правило Once UI
  * `a:not(.button){color}` сильнее утилит Tailwind.
  */
 export function YandexIdButton({
 	next,
 	intent = "login",
-	label = "Войти с Яндекс ID",
+	variant = "full",
 	disabled = false,
 }: YandexIdButtonProps) {
 	const { yandex } = useOAuthProviders();
@@ -42,26 +50,16 @@ export function YandexIdButton({
 			href={disabled ? undefined : href}
 			aria-disabled={disabled || undefined}
 			className={
-				"flex h-11 w-full items-center justify-center gap-2.5 rounded-[var(--radius-m,10px)] " +
-				"bg-[#000] px-4 text-[15px] font-medium !text-white no-underline transition-opacity " +
+				// Геометрия — из макета Яндекса (M: высота 44, скругление 12, знак
+				// 24, до текста ~13 px, текст 16 px); от токенов сайта не зависит.
+				"flex h-11 w-full items-center justify-center gap-3 rounded-[12px] " +
+				"bg-[#000] px-4 text-base font-medium !text-white no-underline transition-opacity " +
 				"hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 " +
 				"focus-visible:outline-[var(--accent)] aria-disabled:pointer-events-none aria-disabled:opacity-50"
 			}
 		>
-			<svg
-				width="22"
-				height="22"
-				viewBox="0 0 22 22"
-				aria-hidden="true"
-				focusable="false"
-			>
-				<circle cx="11" cy="11" r="11" fill="#FC3F1D" />
-				<path
-					d="M12.4 17.4h2.2V4.6h-3.2c-3.2 0-4.9 1.6-4.9 4.1 0 2 1 3.1 2.7 4.3l-3 4.4h2.4l3.3-4.9-1.1-.8c-1.4-.9-2-1.7-2-3.2 0-1.4.9-2.3 2.7-2.3h.9v11.2z"
-					fill="#fff"
-				/>
-			</svg>
-			<span>{label}</span>
+			<YandexIdMark />
+			<span>{variant === "full" ? "Войти с Яндекс ID" : "Яндекс ID"}</span>
 		</a>
 	);
 }

@@ -20,6 +20,7 @@ import type { NotificationType } from "../../modules/notifications/types.ts";
 
 export type NotificationScenario =
 	| "login_new_device"
+	| "login_oauth"
 	| "device_trusted"
 	| "password_changed"
 	| "oauth_linked"
@@ -41,6 +42,7 @@ export type NotificationScenario =
 
 interface ScenarioDataMap {
 	login_new_device: { deviceLabel: string; ip: string };
+	login_oauth: { providerLabel: string; deviceLabel: string; ip: string };
 	device_trusted: { deviceLabel: string; ip: string };
 	password_changed: Record<string, never>;
 	oauth_linked: { providerLabel: string };
@@ -91,6 +93,22 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
 		build: ({ deviceLabel, ip }) => ({
 			title: "Вход в аккаунт",
 			body: `Выполнен вход с устройства «${deviceLabel}» (IP ${ip}). Если это не вы — смените пароль и завершите чужие сессии.`,
+			link: "/profile?tab=sessions",
+		}),
+	},
+	/**
+	 * Вход через внешний сервис (Яндекс ID) — без нашего пароля и кода. Как и
+	 * у входа по паролю, бесшумных входов быть не должно: колокольчик на каждый
+	 * вход, письма нет (документы /consents запрещают рассылки, а колокольчик
+	 * не требует внимания в момент события). Свой текст, потому что «смените
+	 * пароль» аккаунту без пароля ничего не даёт: угроза здесь — чужой доступ
+	 * к аккаунту Яндекса.
+	 */
+	login_oauth: {
+		type: "login_from_new_device",
+		build: ({ providerLabel, deviceLabel, ip }) => ({
+			title: `Вход через ${providerLabel}`,
+			body: `Выполнен вход через ${providerLabel} с устройства «${deviceLabel}» (IP ${ip}). Если это не вы — завершите чужие сессии и проверьте безопасность аккаунта ${providerLabel}.`,
 			link: "/profile?tab=sessions",
 		}),
 	},

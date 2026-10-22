@@ -7,6 +7,7 @@ import { formatDate } from "@/modules/profile/lib/format";
 import { OAuthErrorNotice } from "./OAuthErrorNotice";
 import { useOAuthProviders } from "./OAuthProvidersContext";
 import { YandexIdButton } from "./YandexIdButton";
+import { YandexIdMark } from "./YandexIdMark";
 
 export interface LoginMethodIdentity {
 	id: number;
@@ -123,13 +124,7 @@ export function LoginMethodsSection({
 
 					<li className={styles.row}>
 						<span className={styles.rowIcon} aria-hidden>
-							<svg width="18" height="18" viewBox="0 0 22 22" focusable="false">
-								<circle cx="11" cy="11" r="11" fill="#FC3F1D" />
-								<path
-									d="M12.4 17.4h2.2V4.6h-3.2c-3.2 0-4.9 1.6-4.9 4.1 0 2 1 3.1 2.7 4.3l-3 4.4h2.4l3.3-4.9-1.1-.8c-1.4-.9-2-1.7-2-3.2 0-1.4.9-2.3 2.7-2.3h.9v11.2z"
-									fill="#fff"
-								/>
-							</svg>
+							<YandexIdMark size={18} />
 						</span>
 						<span className={styles.rowMain}>
 							<span className={styles.rowTitle}>
@@ -160,11 +155,16 @@ export function LoginMethodsSection({
 				</ul>
 
 				{!yandexIdentity && yandex && (
+					// Текст кнопки Яндекса менять нельзя — «привязать» говорит
+					// подпись, а кнопка — короткая «Яндекс ID».
 					<div className="mt-3 max-w-xs">
+						<p className="mb-2 text-sm text-[var(--text-secondary)]">
+							Привязать вход через:
+						</p>
 						<YandexIdButton
 							intent="link"
+							variant="short"
 							next="/profile?tab=security"
-							label="Привязать Яндекс ID"
 							disabled={isPending}
 						/>
 					</div>

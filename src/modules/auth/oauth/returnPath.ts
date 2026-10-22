@@ -1,4 +1,4 @@
-import { resolveSafeRedirect } from "../lib/safeRedirect";
+import { resolveSafeRedirect } from "../lib/safeRedirect.ts";
 
 /**
  * Куда вернуть покупателя после входа через Яндекс ID. Те же правила, что у

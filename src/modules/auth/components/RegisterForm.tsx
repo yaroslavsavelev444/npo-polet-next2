@@ -135,14 +135,11 @@ export function RegisterForm({
 				</p>
 			</div>
 
-			{/* Регистрация через Яндекс ID — та же кнопка, что на входе: новому
+			{/* Регистрация через Яндекс ID — та же кнопка и тот же текст, что на
+          входе (менять текст правила Яндекса не разрешают): новому
           покупателю после Яндекса покажем короткую форму «имя + согласия». */}
 			<div className="mb-4 space-y-4">
-				<YandexIdButton
-					next={oauthNext}
-					label="Продолжить с Яндекс ID"
-					disabled={isPending}
-				/>
+				<YandexIdButton next={oauthNext} disabled={isPending} />
 				<OAuthDivider />
 			</div>
 

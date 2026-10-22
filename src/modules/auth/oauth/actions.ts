@@ -32,12 +32,16 @@ import {
 } from "../schemas/register.schema";
 import { startConfirmationByCode } from "./confirmByCode";
 import {
+	consumePendingLink,
 	consumePendingSignup,
 	type PendingSignup,
+	readPendingLink,
 	readPendingSignup,
 } from "./flowStore";
 import { linkIdentity, listIdentities, unlinkIdentity } from "./identities";
 import { issueSessionWithoutPassword } from "./issueSession";
+import { findOutdatedLinkConsents } from "./linkConsent";
+import { resolveOAuthReturnPath } from "./returnPath";
 
 const PROVIDER_LABEL = "Яндекс ID";
 
@@ -241,6 +245,109 @@ async function createAccountFromSignup(
 	});
 	revalidatePath("/", "layout");
 	return signup.next;
+}
+
+const LINK_EXPIRED_MESSAGE =
+	"Время на привязку истекло. Привяжите Яндекс ID ещё раз в разделе «Безопасность».";
+
+/**
+ * Экран согласия перед привязкой Яндекс ID (/auth/yandex/link): аккаунт
+ * принимал старую редакцию Согласия, где идентификатора Яндекс ID ещё не было
+ * (linkConsent.ts). Личность уже подтверждена — сессией кабинета или кодом на
+ * почту; здесь сверяется, что черновик привязки — этого же покупателя.
+ *
+ * Порядок: сверка → согласие записано → черновик забран (одноразово) →
+ * привязка. Отказаться — просто уйти: черновик истечёт сам, аккаунт останется
+ * без привязки.
+ */
+export async function acceptLinkConsentAction(
+	_prevState: unknown,
+	formData: FormData,
+) {
+	const user = await getCurrentUser();
+	if (!user) return actionError("Войдите, чтобы продолжить.");
+
+	const pending = await readPendingLink();
+	if (!pending || pending.userId !== String(user.id)) {
+		return actionError(LINK_EXPIRED_MESSAGE);
+	}
+
+	let accepted: AcceptedConsentInput[];
+	try {
+		const raw = JSON.parse(String(formData.get("consentsJson") ?? "[]"));
+		accepted = (raw as unknown[]).map((c) => acceptedConsentSchema.parse(c));
+	} catch {
+		return actionError("Некорректные данные согласий", undefined, "validation");
+	}
+
+	const payload = await getPayloadInstance();
+	// Принять нужно ровно действующую редакцию — версия из формы сверяется с
+	// базой: старую подсунуть нельзя.
+	const required = await findOutdatedLinkConsents(payload, user.id);
+	const missing = required.filter(
+		(c) =>
+			!accepted.some(
+				(a) =>
+					a.consentId === c.id && a.slug === c.slug && a.version === c.version,
+			),
+	);
+	if (missing.length > 0) {
+		return actionError(
+			"Чтобы привязать Яндекс ID, примите Согласие на обработку персональных данных.",
+			{ consents: missing.map((c) => c.title) },
+			"validation",
+		);
+	}
+
+	const link = await consumePendingLink();
+	if (!link || link.userId !== String(user.id)) {
+		return actionError(LINK_EXPIRED_MESSAGE);
+	}
+
+	const { ip, userAgent } = await getRequestMeta();
+	try {
+		await recordUserConsents(payload, {
+			userId: user.id,
+			accepted: accepted.filter((a) =>
+				required.some((c) => c.id === a.consentId),
+			),
+			ip,
+			userAgent,
+		});
+		const result = await linkIdentity(payload, {
+			userId: user.id,
+			provider: link.provider,
+			subject: link.subject,
+			email: link.email,
+		});
+		if (!result.ok) {
+			return actionError(
+				"Этот Яндекс ID уже привязан к другому аккаунту на нашем сайте.",
+				undefined,
+				"validation",
+			);
+		}
+		if (result.created) {
+			void notify(payload, user.id, "oauth_linked", {
+				providerLabel: PROVIDER_LABEL,
+			});
+		}
+	} catch (err) {
+		logUnexpectedAuthError("oauth.acceptLinkConsent", err);
+		return actionError(
+			"Не удалось привязать Яндекс ID. Попробуйте ещё раз.",
+			undefined,
+			"server_error",
+		);
+	}
+
+	revalidatePath("/profile");
+	redirect(
+		resolveOAuthReturnPath(link.next, {
+			origin: "http://localhost",
+			fallback: "/profile?tab=security",
+		}),
+	);
 }
 
 /**

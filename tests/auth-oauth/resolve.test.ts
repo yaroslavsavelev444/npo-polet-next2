@@ -1,6 +1,7 @@
 /**
  * Развилка входа через Яндекс ID (oauth/resolve.ts) и привязки
- * (oauth/identities.ts) на настоящем Postgres, плюс чистые функции потока.
+ * (oauth/identities.ts) на настоящем Postgres. Чистые функции потока —
+ * pure.test.ts (идёт и в `pnpm test`, и под Stryker).
  *
  *   pnpm test:oauth
  *
@@ -20,15 +21,11 @@ import {
 	listIdentities,
 } from "../../src/modules/auth/oauth/identities.ts";
 import {
-	codeChallengeFor,
-	sameOpaqueValue,
-} from "../../src/modules/auth/oauth/pkce.ts";
+	findOutdatedLinkConsents,
+	LINK_CONSENT_SLUG,
+} from "../../src/modules/auth/oauth/linkConsent.ts";
 import { resolveOAuthProfile } from "../../src/modules/auth/oauth/resolve.ts";
-import { resolveOAuthReturnPath } from "../../src/modules/auth/oauth/returnPath.ts";
-import {
-	isYandexOwnedEmail,
-	type YandexProfile,
-} from "../../src/modules/auth/oauth/yandex.ts";
+import type { YandexProfile } from "../../src/modules/auth/oauth/yandex.ts";
 
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -73,8 +70,41 @@ const resolve = (
 		linkUserId,
 	});
 
+/** Действующая редакция Согласия — в чистой базе (CI) документа нет. */
+let consent: { id: number; version: string };
+
+/** Покупатель принял редакцию `version` Согласия (как при регистрации). */
+async function acceptConsent(userId: number, version: string) {
+	await payload.create({
+		collection: "user-consents",
+		data: {
+			user: userId,
+			consent: consent.id,
+			consentSlug: LINK_CONSENT_SLUG,
+			version,
+			acceptedAt: new Date().toISOString(),
+			ip: "127.0.0.1",
+			userAgent: "resolve-test",
+		},
+		overrideAccess: true,
+	});
+}
+
 before(async () => {
 	payload = await getPayload({ config });
+	await payload.db.drizzle.execute(sql`
+		INSERT INTO consents (title, slug, content, needs_acceptance, is_active, version)
+		VALUES ('Согласие на обработку персональных данных (тест)', ${LINK_CONSENT_SLUG},
+			'Тестовая редакция.', TRUE, TRUE, '1.0.0')
+		ON CONFLICT (slug) DO NOTHING
+	`);
+	const row = (await payload.db.drizzle.execute(
+		sql`SELECT id, version FROM consents WHERE slug = ${LINK_CONSENT_SLUG}`,
+	)) as { rows: { id: number; version: string | null }[] };
+	consent = {
+		id: Number(row.rows[0].id),
+		version: row.rows[0].version ?? "1.0.0",
+	};
 });
 
 after(async () => {
@@ -82,6 +112,13 @@ after(async () => {
 		sql`DELETE FROM user_identities WHERE subject LIKE ${`test-${RUN}-%`}`,
 	);
 	if (userIds.length) {
+		const ids = sql.join(
+			userIds.map((id) => sql`${id}`),
+			sql`, `,
+		);
+		await payload.db.drizzle.execute(
+			sql`DELETE FROM user_consents WHERE user_id IN (${ids})`,
+		);
 		await payload.db.drizzle.execute(
 			sql`DELETE FROM users WHERE id IN (${sql.join(
 				userIds.map((id) => sql`${id}`),
@@ -155,6 +192,8 @@ describe("resolveOAuthProfile", () => {
 	test("привязка из кабинета: создаётся, повтор — без изменений, чужая — отказ", async () => {
 		const owner = await createUser("owner");
 		const other = await createUser("other");
+		await acceptConsent(owner, consent.version);
+		await acceptConsent(other, consent.version);
 
 		const first = await resolve(
 			profile({ subject: subject("cab") }),
@@ -182,6 +221,75 @@ describe("resolveOAuthProfile", () => {
 		assert.equal((await listIdentities(payload, other)).length, 0);
 	});
 
+	test("старая редакция Согласия: привязка из кабинета ждёт согласия и ничего не создаёт", async () => {
+		const id = await createUser("old-consent");
+		await acceptConsent(id, `${consent.version}-old`);
+
+		assert.equal((await findOutdatedLinkConsents(payload, id)).length, 1);
+		const [outdated] = await findOutdatedLinkConsents(payload, id);
+		assert.equal(outdated.slug, LINK_CONSENT_SLUG);
+		assert.equal(outdated.version, consent.version);
+		assert.equal(outdated.isRequired, true);
+
+		const result = await resolve(
+			profile({ subject: subject("old-consent") }),
+			"link",
+			String(id),
+		);
+		assert.deepEqual(result, { kind: "consent_required", userId: id });
+		assert.equal(
+			await findIdentity(payload, "yandex", subject("old-consent")),
+			null,
+		);
+
+		// Принял действующую — привязка проходит сразу.
+		await acceptConsent(id, consent.version);
+		assert.deepEqual(await findOutdatedLinkConsents(payload, id), []);
+		assert.deepEqual(
+			await resolve(
+				profile({ subject: subject("old-consent") }),
+				"link",
+				String(id),
+			),
+			{ kind: "linked", userId: id, created: true },
+		);
+	});
+
+	test("согласий нет вовсе (перенесённый аккаунт) — тоже спрашиваем", async () => {
+		const id = await createUser("no-consent");
+		assert.equal((await findOutdatedLinkConsents(payload, id)).length, 1);
+	});
+
+	test("чужой Яндекс — отказ без экрана согласия; уже свой — без экрана", async () => {
+		const owner = await createUser("cons-owner");
+		const stranger = await createUser("cons-stranger");
+		await acceptConsent(owner, consent.version);
+		await linkIdentity(payload, {
+			userId: owner,
+			provider: "yandex",
+			subject: subject("cons"),
+			email: null,
+		});
+		await acceptConsent(owner, `${consent.version}-old`);
+
+		assert.deepEqual(
+			await resolve(
+				profile({ subject: subject("cons") }),
+				"link",
+				String(stranger),
+			),
+			{ kind: "error", code: "already_linked_elsewhere" },
+		);
+		assert.deepEqual(
+			await resolve(
+				profile({ subject: subject("cons") }),
+				"link",
+				String(owner),
+			),
+			{ kind: "linked", userId: owner, created: false },
+		);
+	});
+
 	test("две вкладки привязывают одновременно — одна запись", async () => {
 		const id = await createUser("race");
 		const results = await Promise.all(
@@ -197,43 +305,5 @@ describe("resolveOAuthProfile", () => {
 		assert.ok(results.every((r) => r.ok));
 		assert.equal(results.filter((r) => r.ok && r.created).length, 1);
 		assert.equal((await listIdentities(payload, id)).length, 1);
-	});
-});
-
-describe("чистые функции потока", () => {
-	test("PKCE S256 — эталонный вектор RFC 7636 (приложение B)", () => {
-		assert.equal(
-			codeChallengeFor("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
-			"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-		);
-	});
-
-	test("state сравнивается целиком", () => {
-		assert.equal(sameOpaqueValue("abc", "abc"), true);
-		assert.equal(sameOpaqueValue("abc", "abd"), false);
-		assert.equal(sameOpaqueValue("abc", "abcd"), false);
-	});
-
-	test("адрес возврата: только свой сайт и не страницы входа", () => {
-		const r = (from: string | null) =>
-			resolveOAuthReturnPath(from, {
-				origin: "https://npo-polet.ru",
-				fallback: "/profile",
-			});
-		assert.equal(r("/cart?step=2"), "/cart?step=2");
-		assert.equal(r(null), "/profile");
-		assert.equal(r("https://evil.example/x"), "/profile");
-		assert.equal(r("//evil.example/x"), "/profile");
-		assert.equal(r("/\\evil.example"), "/profile");
-		assert.equal(r("/auth/login"), "/profile");
-		assert.equal(r("/auth/yandex/callback?code=1"), "/profile");
-		assert.equal(r("/auth/verify-otp"), "/profile");
-	});
-
-	test("домены почты Яндекса", () => {
-		assert.equal(isYandexOwnedEmail("a@yandex.ru"), true);
-		assert.equal(isYandexOwnedEmail("a@YA.RU"), true);
-		assert.equal(isYandexOwnedEmail("a@yandex.ru.evil.com"), false);
-		assert.equal(isYandexOwnedEmail("yandex.ru@gmail.com"), false);
 	});
 });

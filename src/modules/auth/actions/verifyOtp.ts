@@ -14,7 +14,9 @@ import { RATE_LIMITS } from "../lib/rateLimit";
 import { parseDeviceLabel } from "../lib/session";
 import { issueTrustedDevice } from "../lib/trustedDevice";
 import { actionError, actionSuccess, getRequestMeta } from "../lib/utils";
+import { savePendingLink } from "../oauth/flowStore";
 import { linkIdentity } from "../oauth/identities";
+import { findOutdatedLinkConsents } from "../oauth/linkConsent";
 import { resolveOAuthReturnPath } from "../oauth/returnPath";
 import type { AuthErrorCode, OtpVerifyResult } from "../types";
 
@@ -158,18 +160,33 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 	// До верного кода Яндекс-аккаунт ни к чему не привязан (см. oauth/
 	// resolve.ts). Сбой привязки не отменяет вход: человек доказал владение
 	// почтой и вошёл в СВОЙ аккаунт; в следующий раз Яндекс снова попросит код.
+	let afterLogin: string | null = null;
 	if (pending.oauthLink) {
 		try {
-			const link = await linkIdentity(payload, {
-				userId: pending.userId,
-				provider: pending.oauthLink.provider,
-				subject: pending.oauthLink.subject,
-				email: pending.oauthLink.email,
-			});
-			if (link.ok && link.created) {
-				void notify(payload, pending.userId, "oauth_linked", {
-					providerLabel: "Яндекс ID",
+			// Аккаунт со старой редакцией Согласия: привязку создаст экран
+			// согласия (/auth/yandex/link), а не этот код (linkConsent.ts).
+			if (
+				flow !== "overlay" &&
+				(await findOutdatedLinkConsents(payload, pending.userId)).length > 0
+			) {
+				await savePendingLink({
+					userId: pending.userId,
+					...pending.oauthLink,
+					next: pending.redirectTo ?? REDIRECT_AFTER_LOGIN,
 				});
+				afterLogin = "/auth/yandex/link";
+			} else {
+				const link = await linkIdentity(payload, {
+					userId: pending.userId,
+					provider: pending.oauthLink.provider,
+					subject: pending.oauthLink.subject,
+					email: pending.oauthLink.email,
+				});
+				if (link.ok && link.created) {
+					void notify(payload, pending.userId, "oauth_linked", {
+						providerLabel: "Яндекс ID",
+					});
+				}
 			}
 		} catch (err) {
 			logUnexpectedAuthError("verifyOtp.linkIdentity", err);
@@ -264,6 +281,7 @@ export async function verifyOtpAction(_prevState: unknown, formData: FormData) {
 	// вне try/catch — иначе исключение будет проглочено.
 	// Вход через Яндекс ID несёт адрес, с которого его начали (корзина,
 	// оформление); перепроверяем его тем же правилом, что и при старте.
+	if (afterLogin) redirect(afterLogin);
 	redirect(
 		pending.redirectTo
 			? resolveOAuthReturnPath(pending.redirectTo, {

@@ -4,6 +4,7 @@ import { Loader2, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Modal } from "@/UI/Modal/Modal";
+import { WEBVISOR_HIDE } from "@/widgets/Analytics/webvisor";
 import { getRegisterConsentsAction } from "../actions/consents";
 import {
 	type AuthOverlayStep,
@@ -68,15 +69,17 @@ export function AuthOverlay() {
 	const [consentsError, setConsentsError] = useState(false);
 	const [isFinishing, setIsFinishing] = useState(false);
 	// Вход через Яндекс ID уводит со страницы на oauth.yandex.ru и обратно —
-	// возвращаемся туда, откуда открыли окно (корзина, оформление, карточка).
-	// Гостевая корзина при этом не теряется: она в localStorage и сольётся
-	// с аккаунтом при появлении пользователя (CartProvider). Продолжение,
-	// ради которого окно открыли («добавить в избранное»), этим путём не
-	// выполняется — его придётся повторить.
+	// возвращаемся туда, куда попросил открывший окно (оформление → /cart),
+	// иначе — откуда открыли (карточка, страница корзины). Гостевая корзина
+	// при этом не теряется: она в localStorage и сольётся с аккаунтом при
+	// появлении пользователя (CartProvider). Продолжение-действие («добавить
+	// в избранное») этим путём не выполняется — его придётся повторить.
+	const requestedReturnPath = useAuthOverlay((s) => s.returnPath);
 	const [returnPath] = useState(() =>
 		typeof window === "undefined"
-			? null
-			: `${window.location.pathname}${window.location.search}`,
+			? requestedReturnPath
+			: (requestedReturnPath ??
+				`${window.location.pathname}${window.location.search}`),
 	);
 
 	// Каждое открытие начинается с чистого листа: шаг — тот, о котором
@@ -171,6 +174,7 @@ export function AuthOverlay() {
 			closeOnOverlay={!isFinishing}
 			closeOnEscape={!isFinishing}
 			width={460}
+			className={WEBVISOR_HIDE}
 		>
 			{reason && step !== "otp" && (
 				<p className="mb-5 flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5 text-[13px] leading-snug text-[var(--text-secondary)]">
