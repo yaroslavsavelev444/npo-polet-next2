@@ -18,10 +18,10 @@ import {
 	parseSchemePreference,
 	SCHEME_COOKIE,
 } from "@/modules/color-scheme/lib/scheme";
-import { PERSONAL_DATA_CONSENT_SLUG } from "@/modules/contact/schemas/contact-request.schema";
 import { AnalyticsGate } from "@/modules/cookie-consent/components/AnalyticsGate";
 import { CookieConsentBanner } from "@/modules/cookie-consent/components/CookieConsentBanner";
 import { FeedbackButton } from "@/modules/feedback/components/FeedbackButton";
+import { SUPPORT_CONSENT_SLUG } from "@/modules/support-chat/lib/constants";
 import { SupportWidget } from "@/modules/support-chat/widget/SupportWidget";
 import { getCachedSettings } from "@/payload/services/settings.service";
 import { Providers } from "@/providers/Providers";
@@ -32,6 +32,7 @@ import {
 	buildWebsiteSchema,
 } from "@/shared/lib/seo/schema";
 import { cn } from "@/utils/cn";
+import { WEBVISOR_NO_KEYS } from "@/widgets/Analytics/webvisor";
 import Footer from "@/widgets/Footer/Footer";
 import { HeaderSpacer } from "@/widgets/Header/HeaderSpacer";
 import { StickyHeader } from "@/widgets/Header/StickyHeader";
@@ -141,6 +142,9 @@ export default async function RootLayout({
 			<Flex
 				as="html"
 				lang="ru"
+				// Плавная прокрутка (Once UI) — только внутри страницы: на переходе
+				// Next её отключает, новая страница открывается сразу сверху.
+				data-scroll-behavior="smooth"
 				fillWidth
 				className={cn(manrope.variable, mono.variable, display.variable)}
 				style={{ height: "100%" }}
@@ -148,6 +152,8 @@ export default async function RootLayout({
 			>
 				<Column
 					as="body"
+					// Вебвизор не записывает ввод ни в одном поле (webvisor.tsx).
+					className={WEBVISOR_NO_KEYS}
 					background="page"
 					fillWidth
 					style={{ minHeight: "100vh" }}
@@ -179,8 +185,9 @@ export default async function RootLayout({
 						<SupportWidget
 							socketUrl={env.SUPPORT_GATEWAY_PUBLIC_URL ?? null}
 							consent={{
-								slug: PERSONAL_DATA_CONSENT_SLUG,
-								url: `/consents/${PERSONAL_DATA_CONSENT_SLUG}`,
+								// Тот же slug, что проверяет сервер чата.
+								slug: SUPPORT_CONSENT_SLUG,
+								url: `/consents/${SUPPORT_CONSENT_SLUG}`,
 							}}
 						/>
 					</Suspense>

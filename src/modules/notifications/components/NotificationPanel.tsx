@@ -5,6 +5,7 @@ import { BellOff, CheckCheck } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Empty } from "@/UI/Empty/Empty";
 import { Spinner } from "@/UI/Spinner/Spinner";
+import { WEBVISOR_HIDE } from "@/widgets/Analytics/webvisor";
 import { useMarkAllAsRead } from "../hooks/useMarkAllAsRead";
 import { useNotificationsList } from "../hooks/useNotificationsList";
 import { notificationsKeys } from "../queryKeys";
@@ -64,8 +65,11 @@ export function NotificationPanel({ onNavigate }: NotificationPanelProps) {
 	const items = data?.pages.flatMap((page) => page.items) ?? [];
 	const hasUnread = (latestUnreadCount ?? 0) > 0;
 
+	// Уведомления называют заказы и обращения — не в запись Вебвизора.
 	return (
-		<div className="flex max-h-[28rem] w-full flex-col sm:w-[380px]">
+		<div
+			className={`flex max-h-[28rem] w-full flex-col sm:w-[380px] ${WEBVISOR_HIDE}`}
+		>
 			<div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-4 py-3">
 				<span className="text-sm font-semibold text-[var(--text-primary)]">
 					Уведомления

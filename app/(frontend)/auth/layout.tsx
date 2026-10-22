@@ -1,5 +1,6 @@
 // app/(frontend)/auth/layout.tsx
 import type { Metadata } from "next";
+import { WebvisorPrivate } from "@/widgets/Analytics/webvisor";
 
 export const metadata: Metadata = {
 	title: { default: "Авторизация", template: "%s — НПО Полёт" },
@@ -11,5 +12,6 @@ export default function AuthLayout({
 }: {
 	children: React.ReactNode;
 }) {
-	return <>{children}</>;
+	// Почта, коды, имя — не в запись Вебвизора.
+	return <WebvisorPrivate>{children}</WebvisorPrivate>;
 }

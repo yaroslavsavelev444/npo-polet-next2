@@ -1,6 +1,7 @@
 "use client";
 
 import { Modal } from "@/UI";
+import { WEBVISOR_HIDE } from "@/widgets/Analytics/webvisor";
 import { FeedbackForm } from "./FeedbackForm";
 
 interface FeedbackDialogProps {
@@ -15,7 +16,13 @@ export function FeedbackDialog({
 	userEmail,
 }: FeedbackDialogProps) {
 	return (
-		<Modal open={open} onClose={onClose} title="Обратная связь" width={520}>
+		<Modal
+			open={open}
+			onClose={onClose}
+			title="Обратная связь"
+			width={520}
+			className={WEBVISOR_HIDE}
+		>
 			<FeedbackForm userEmail={userEmail} onSuccess={onClose} />
 		</Modal>
 	);

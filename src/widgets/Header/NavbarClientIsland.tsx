@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/modules/color-scheme/components/ThemeToggle";
 import { NotificationBell } from "@/modules/notifications";
 import { WishlistIcon } from "@/modules/wishlist";
 import type { Category, Setting, User } from "@/payload-types";
+import { WEBVISOR_HIDE } from "@/widgets/Analytics/webvisor";
 import { BurgerButton } from "./BurgerButton";
 import type { CatalogMenuData } from "./catalog-menu";
 import Logo from "./Logo";
@@ -132,7 +133,10 @@ export default function NavbarClientIsland({
 					{/* Меню профиля ниже sm целиком повторено в бургер-меню
 					    (Профиль, Заказы, Мои отзывы, Выйти) — в шапке телефона
 					    оно занимало половину ширины. Гостю «Войти» видно всегда. */}
-					<div className={user ? "hidden sm:flex" : "flex"}>
+					{/* Имя покупателя на кнопке меню — не в запись Вебвизора. */}
+					<div
+						className={`${user ? "hidden sm:flex" : "flex"} ${WEBVISOR_HIDE}`}
+					>
 						<UserMenu user={user} />
 					</div>
 
