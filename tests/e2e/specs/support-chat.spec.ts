@@ -231,8 +231,14 @@ test("WebSocket заблокирован прокси — чат работае�
 		.getByRole("textbox", { name: "Сообщение менеджеру" })
 		.fill("Пишу из-за прокси");
 	await widget.getByRole("button", { name: "Отправить" }).click();
-	await expect(widget.getByText("Пишу из-за прокси")).toBeVisible();
+	// Текст сообщения — в <span> внутри пузыря (автоссылки), поэтому по тексту
+	// находится и пузырь, и span: берём первый, а отсутствие дубля проверяем
+	// ниже по самим пузырям.
+	await expect(widget.getByText("Пишу из-за прокси").first()).toBeVisible();
 	await expect(widget.getByText("отправляется…")).toHaveCount(0);
+	await expect(
+		widget.locator("p", { hasText: "Пишу из-за прокси" }),
+	).toHaveCount(1);
 	await expect(widget.getByRole("button", { name: "Повторить" })).toHaveCount(
 		0,
 	);
