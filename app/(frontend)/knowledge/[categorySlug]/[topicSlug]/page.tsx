@@ -17,6 +17,7 @@ import type { Media } from "@/payload-types";
 import { baseURL } from "@/resources/content";
 import { JsonLd } from "@/shared/components/JsonLd";
 import { buildBreadcrumbSchema } from "@/shared/lib/seo/schema";
+import { SITE_TIME_ZONE } from "@/shared/lib/time-zone";
 
 interface ArticlePageProps {
 	params: Promise<{ categorySlug: string; topicSlug: string }>;
@@ -218,6 +219,7 @@ export default async function KnowledgeArticlePage({
 
 function formatDate(value: string): string {
 	return new Date(value).toLocaleDateString("ru-RU", {
+		timeZone: SITE_TIME_ZONE,
 		day: "numeric",
 		month: "long",
 		year: "numeric",

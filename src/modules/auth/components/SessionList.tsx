@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { SITE_TIME_ZONE } from "@/shared/lib/time-zone";
 import { logoutAllAction, revokeSessionAction } from "../actions/logout";
 
 interface SessionItem {
@@ -62,7 +63,9 @@ export function SessionList({ sessions }: SessionListProps) {
 							</div>
 							<p className="text-xs text-gray-400 mt-0.5">
 								{session.ip} · Последняя активность:{" "}
-								{new Date(session.lastActiveAt).toLocaleString("ru-RU")}
+								{new Date(session.lastActiveAt).toLocaleString("ru-RU", {
+									timeZone: SITE_TIME_ZONE,
+								})}
 							</p>
 						</div>
 

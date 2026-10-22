@@ -110,7 +110,11 @@ export function Block({
 			onKeyDown={
 				clickable
 					? (e) => {
-							if (e.key === "Enter" || e.key === " ") onClick?.(e as any);
+							// Клавиатура — как клик мышью: настоящий click, тот же обработчик.
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								e.currentTarget.click();
+							}
 						}
 					: undefined
 			}

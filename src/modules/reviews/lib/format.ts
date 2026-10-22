@@ -1,4 +1,7 @@
+import { SITE_TIME_ZONE } from "@/shared/lib/time-zone";
+
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
+	timeZone: SITE_TIME_ZONE,
 	day: "numeric",
 	month: "long",
 	year: "numeric",
@@ -23,6 +26,7 @@ export function pluralizeReviews(count: number): string {
 
 /** Короткая дата отзыва — «5 июл 2026». Для служебных подписей. */
 const shortDateFormatter = new Intl.DateTimeFormat("ru-RU", {
+	timeZone: SITE_TIME_ZONE,
 	day: "numeric",
 	month: "short",
 	year: "numeric",

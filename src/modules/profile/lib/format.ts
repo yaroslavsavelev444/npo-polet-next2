@@ -1,3 +1,5 @@
+import { SITE_TIME_ZONE } from "@/shared/lib/time-zone";
+
 /**
  * Форматирование данных кабинета.
  *
@@ -8,6 +10,7 @@
  */
 
 const DATE_TIME = new Intl.DateTimeFormat("ru-RU", {
+	timeZone: SITE_TIME_ZONE,
 	day: "2-digit",
 	month: "short",
 	year: "numeric",
@@ -16,6 +19,7 @@ const DATE_TIME = new Intl.DateTimeFormat("ru-RU", {
 });
 
 const DATE_ONLY = new Intl.DateTimeFormat("ru-RU", {
+	timeZone: SITE_TIME_ZONE,
 	day: "2-digit",
 	month: "long",
 	year: "numeric",
@@ -94,15 +98,21 @@ export function initialsOf(name: string, email: string): string {
 	return (email.trim()[0] ?? "?").toUpperCase();
 }
 
-/** Человеческое имя роли. Неизвестное значение показываем как есть. */
+/**
+ * Человеческое имя роли — значения из users.role (коллекция User).
+ * Неизвестное значение показываем как есть.
+ *
+ * Покупатель — `user`: раньше здесь ждали `customer`, которого в коллекции нет,
+ * и в кабинете висел сырой бейдж «USER».
+ */
 export function roleLabel(role: string): string {
 	switch (role) {
-		case "customer":
+		case "user":
 			return "Покупатель";
 		case "admin":
 			return "Администратор";
-		case "manager":
-			return "Менеджер";
+		case "superadmin":
+			return "Суперадминистратор";
 		default:
 			return role;
 	}

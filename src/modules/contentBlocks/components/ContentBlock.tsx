@@ -271,7 +271,6 @@ export const ContentBlock = memo(
 								<div className="flex flex-wrap justify-center gap-2">
 									{displayTags.map((tag, i) => (
 										<span
-											/* biome-ignore lint/suspicious/noArrayIndexKey: теги стабильны */
 											key={`${tag}-${i}`}
 											className={[
 												"inline-flex items-center rounded-[var(--radius-sm)]",

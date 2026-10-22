@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/utils/cn";
 import styles from "./BrandLogo.module.css";
 
@@ -19,18 +20,21 @@ export function BrandLogo({
 }) {
 	return (
 		<span className={cn("inline-block", className)}>
-			<img
+			<Image
 				src="/brand/polet-logo-black.png"
 				alt={alt}
 				width={318}
 				height={240}
+				// Знак в шапке виден сразу — без ленивой загрузки (как было у <img>).
+				loading="eager"
 				className={cn(styles.logo, styles.onLight)}
 			/>
-			<img
+			<Image
 				src="/brand/polet-logo-white.png"
 				alt={alt}
 				width={318}
 				height={240}
+				loading="eager"
 				className={cn(styles.logo, styles.onDark)}
 			/>
 		</span>

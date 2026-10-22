@@ -17,6 +17,7 @@ import {
 	BANNER_PUBLISH_DELAY_MS,
 	isSafeBannerHref,
 } from "../../modules/banners/vocabulary.ts";
+import { SITE_TIME_ZONE } from "../../shared/lib/time-zone.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
 
@@ -499,7 +500,7 @@ function describeVisibility(doc: Record<string, unknown>): string {
 
 	const startAt = doc.startAt ? new Date(String(doc.startAt)) : null;
 	if (startAt && startAt.getTime() > now) {
-		return `Проверка пройдена, показ начнётся ${startAt.toLocaleString("ru-RU")}`;
+		return `Проверка пройдена, показ начнётся ${startAt.toLocaleString("ru-RU", { timeZone: SITE_TIME_ZONE })} (МСК)`;
 	}
 
 	const endAt = doc.endAt ? new Date(String(doc.endAt)) : null;

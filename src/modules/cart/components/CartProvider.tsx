@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { appToast } from "@/shared/lib/toast";
 import { readGuestCart, subscribeToGuestCart } from "../lib/guest-cart-storage";
 import {
@@ -44,13 +44,20 @@ export function CartProvider({ userId, onboardingSeen, categories }: Props) {
 
 	// init обязан отработать ДО первого эффекта, который на него опирается:
 	// слияние ниже читает isGuest из стора, и увидеть там прошлую сессию оно
-	// не должно. Поэтому — синхронно в теле рендера, один раз на изменение
-	// личности, а не в useEffect.
+	// не должно. Поэтому — layout-эффект: все layout-эффекты коммита идут
+	// раньше любых обычных (и до отрисовки кадра — без мигания), один раз на
+	// изменение личности.
+	//
+	// Не в теле рендера, как было: set() стора посреди рендера обновлял
+	// подписчиков (CartDrawer, счётчик в шапке) — React ругался «Cannot update
+	// a component while rendering a different component», а на сервере рендер
+	// менял стор, общий для всех запросов процесса.
 	const lastIdentity = useRef<string | null | undefined>(undefined);
-	if (lastIdentity.current !== userId) {
+	useLayoutEffect(() => {
+		if (lastIdentity.current === userId) return;
 		lastIdentity.current = userId;
 		init({ userId, onboardingSeen });
-	}
+	}, [userId, onboardingSeen, init]);
 
 	/* — закрытые уведомления о недоступных товарах ————————————
 	   Читаются из localStorage в эффекте, а не в рендере: на сервере

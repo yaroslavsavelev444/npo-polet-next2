@@ -133,7 +133,11 @@ export function splitByTerms(
 	if (terms.length === 0 || !text) return [{ text, match: false }];
 
 	const normalized = normalizeForSearch(text);
-	const flags = new Array<boolean>(text.length).fill(false);
+	// Посимвольно — по кодовым точкам, а не по UTF-16: эмодзи занимает две
+	// единицы, и индексы флагов съезжали бы на символ после каждого (в «🚀
+	// сеть» подсвечивалось « сет» и «ь» отдельно).
+	const chars = Array.from(text);
+	const flags = new Array<boolean>(chars.length).fill(false);
 
 	// Нормализация меняет длину строки, поэтому позиции считаем по карте
 	// соответствия символов: каждому символу исходной строки сопоставлен его
@@ -142,7 +146,7 @@ export function splitByTerms(
 	{
 		let normalizedIndex = 0;
 		let lastWasSeparator = true;
-		for (const char of text) {
+		for (const char of chars) {
 			const isWordChar = /[\p{L}\p{N}]/u.test(char);
 			if (isWordChar) {
 				map.push(normalizedIndex);
@@ -161,7 +165,7 @@ export function splitByTerms(
 		for (;;) {
 			const found = normalized.indexOf(term, from);
 			if (found === -1) break;
-			for (let i = 0; i < text.length; i++) {
+			for (let i = 0; i < chars.length; i++) {
 				const pos = map[i];
 				if (pos >= found && pos < found + term.length) flags[i] = true;
 			}
@@ -173,12 +177,12 @@ export function splitByTerms(
 	let buffer = "";
 	let current = flags[0] ?? false;
 
-	for (let i = 0; i < text.length; i++) {
+	for (let i = 0; i < chars.length; i++) {
 		if (flags[i] === current) {
-			buffer += text[i];
+			buffer += chars[i];
 		} else {
 			parts.push({ text: buffer, match: current });
-			buffer = text[i];
+			buffer = chars[i];
 			current = flags[i];
 		}
 	}

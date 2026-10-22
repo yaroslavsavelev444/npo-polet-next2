@@ -1,7 +1,10 @@
+import { SITE_TIME_ZONE } from "@/shared/lib/time-zone";
+
 /** Форматирование дат заказа — единый вид по всему модулю. */
 
 export function formatOrderDate(iso: string): string {
 	return new Date(iso).toLocaleDateString("ru-RU", {
+		timeZone: SITE_TIME_ZONE,
 		day: "2-digit",
 		month: "long",
 		year: "numeric",
@@ -10,6 +13,7 @@ export function formatOrderDate(iso: string): string {
 
 export function formatOrderDateTime(iso: string): string {
 	return new Date(iso).toLocaleString("ru-RU", {
+		timeZone: SITE_TIME_ZONE,
 		day: "2-digit",
 		month: "long",
 		year: "numeric",
@@ -21,6 +25,7 @@ export function formatOrderDateTime(iso: string): string {
 /** Короткая дата+время для истории статусов: «15 июля, 12:24». */
 export function formatOrderShortDateTime(iso: string): string {
 	return new Date(iso).toLocaleString("ru-RU", {
+		timeZone: SITE_TIME_ZONE,
 		day: "2-digit",
 		month: "short",
 		hour: "2-digit",

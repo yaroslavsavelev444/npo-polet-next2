@@ -76,18 +76,19 @@ export function Input(props: AdvancedInputProps) {
 		else if (forwardedRef) forwardedRef.current = node;
 	};
 
+	// Обработчик владельца, а не весь rest: rest — новый объект на каждый
+	// рендер, и колбэк от него пересоздавался бы всегда.
+	const ownerOnChange = (
+		rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>
+	).onChange;
 	const handleAutoResize = useCallback(
 		(e: ChangeEvent<HTMLTextAreaElement>) => {
 			const el = e.currentTarget;
 			el.style.height = "auto";
 			el.style.height = `${el.scrollHeight}px`;
-			if ("onChange" in rest && rest.onChange) {
-				(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>).onChange?.(
-					e,
-				);
-			}
+			ownerOnChange?.(e);
 		},
-		[rest],
+		[ownerOnChange],
 	);
 
 	// ── Показ/скрытие пароля ───────────────────────────────────────────────────
