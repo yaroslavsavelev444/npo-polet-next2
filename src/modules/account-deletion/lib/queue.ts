@@ -29,6 +29,16 @@ function getQueue(): Queue<AccountDeletionJob> {
 	return queue;
 }
 
+/**
+ * Id задачи по заявке — без двоеточия: BullMQ 5 отвергает пользовательский
+ * jobId с «:» (он служебный разделитель ключей Redis), и заявка уходила в
+ * failed / QUEUE_SCHEDULING_FAILED. Один на заявку — повторная постановка
+ * не создаёт вторую задачу, а отмена находит именно её.
+ */
+export function accountDeletionJobId(requestId: number): string {
+	return `account-deletion-${requestId}`;
+}
+
 export async function scheduleAccountDeletion(
 	requestId: number,
 	delay: number,
@@ -37,7 +47,7 @@ export async function scheduleAccountDeletion(
 		ACCOUNT_DELETION_JOB_NAME,
 		{ requestId },
 		{
-			jobId: `account-deletion:${requestId}`,
+			jobId: accountDeletionJobId(requestId),
 			delay,
 			attempts: 8,
 			backoff: { type: "exponential", delay: 60_000 },
@@ -48,7 +58,7 @@ export async function scheduleAccountDeletion(
 }
 
 export async function cancelScheduledAccountDeletion(requestId: number) {
-	const job = await getQueue().getJob(`account-deletion:${requestId}`);
+	const job = await getQueue().getJob(accountDeletionJobId(requestId));
 	await job?.remove();
 }
 

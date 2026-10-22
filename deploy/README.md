@@ -402,6 +402,24 @@ IMAGE_TOOLS="ghcr.io/<owner>/<repo>-tools:$(cat ../.deploy-state/last_successful
 Чтобы он поднимался при каждой выкладке — задайте `UP_PROFILES=workers` в
 `deploy/deploy.sh`.
 
+**Заявки, застрявшие в `failed` (до 21.10.2026).** Очередь отвергала каждую
+задачу (jobId с двоеточием), а с 17.07 само удаление падало на
+`feedbacks.user_id` — поэтому все поданные до исправления заявки лежат в
+`failed`. Список (без ПД — id заявки и аккаунта, даты, код ошибки):
+
+```
+[VPS]
+docker exec polet-next-support-gateway-prod node \
+  --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types \
+  --import ./tests/support/next-subpath-resolver.mjs scripts/account-deletion-failed.ts
+```
+
+Тот же вызов с `--reschedule` возвращает их в очередь с прежним сроком: у кого
+14 дней уже прошли, исполнится сразу, как только задачу возьмёт воркер. Без
+запущенного `account-deletion-worker` (см. выше) задачи будут только ждать.
+Заявки, у аккаунта которых уже есть новая активная, и заявки удалённых
+аккаунтов скрипт пропускает.
+
 ---
 
 ## Чат поддержки

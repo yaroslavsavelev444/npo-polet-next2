@@ -307,7 +307,12 @@ export class AccountDeletionService {
 			await tx.execute(
 				sql`DELETE FROM product_reviews WHERE user_id = ${userId}`,
 			);
-			await tx.execute(sql`DELETE FROM feedbacks WHERE user_id = ${userId}`);
+			// У обращений с 17.07 нет связи с аккаунтом (миграция
+			// feedback_simplify убрала user_id) — только почта для связи.
+			await tx.execute(sql`
+        DELETE FROM feedbacks
+        WHERE lower(user_email) = (SELECT lower(email) FROM users WHERE id = ${userId})
+      `);
 			await tx.execute(sql`DELETE FROM companies WHERE user_id = ${userId}`);
 
 			// Переписка с поддержкой: ключи диалогов уничтожаются, сообщения и
