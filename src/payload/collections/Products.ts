@@ -196,7 +196,12 @@ export const Products: CollectionConfig = {
 					// было сохранить: и админка, и повторный прогон миграции
 					// падали на «Максимальное количество должно быть больше или
 					// равно минимальному», хотя максимум просто не указан.
-					validate: (value: any, { siblingData }: { siblingData: any }) => {
+					validate: (
+						value: number | null | undefined,
+						{
+							siblingData,
+						}: { siblingData: { minOrderQuantity?: number | null } },
+					) => {
 						if (
 							value != null &&
 							siblingData?.minOrderQuantity != null &&
@@ -257,7 +262,7 @@ export const Products: CollectionConfig = {
 					admin: {
 						condition: (_, siblingData) => siblingData?.type === "link",
 					},
-					validate: (value: any) => {
+					validate: (value: string | null | undefined) => {
 						if (value && !/^https?:\/\//.test(value)) {
 							return "Введите корректный URL (начинается с http:// или https://)";
 						}

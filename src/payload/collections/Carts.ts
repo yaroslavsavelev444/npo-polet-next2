@@ -93,23 +93,6 @@ export const Carts: CollectionConfig = {
 // ─── Хелперы (Server-side) ────────────────────────────────────────────────────
 
 /**
- * Аналог CartSchema.statics.findByUser.
- * Используй в Server Components / Route Handlers вместо прямого запроса.
- *
- * @example
- * const cart = await findCartByUser(payload, userId)
- */
-export async function findCartByUser(payload: any, userId: string) {
-	const { docs } = await payload.find({
-		collection: "carts",
-		where: { user: { equals: userId } },
-		depth: 2, // populate items.product
-		limit: 1,
-	});
-	return docs[0] ?? null;
-}
-
-/**
  * Аналог virtual totalItems.
  * Вычисляй на сервере после получения корзины.
  */

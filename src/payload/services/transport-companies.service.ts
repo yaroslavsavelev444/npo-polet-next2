@@ -17,7 +17,7 @@ function buildTransportCompaniesWhere(
 	options: GetTransportCompaniesOptions,
 ): Where {
 	const where: Where = {};
-	const conditions: any[] = [];
+	const conditions: Where[] = [];
 
 	if (options.name) {
 		conditions.push({ name: { contains: options.name } });

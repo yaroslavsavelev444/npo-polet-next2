@@ -17,7 +17,7 @@ export interface GetConsentsOptions {
 
 function buildConsentsWhere(options: GetConsentsOptions): Where {
 	const where: Where = {};
-	const conditions: any[] = [];
+	const conditions: Where[] = [];
 
 	if (options.isActive !== undefined) {
 		conditions.push({ isActive: { equals: options.isActive } });

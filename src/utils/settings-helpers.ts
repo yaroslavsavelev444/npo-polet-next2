@@ -33,7 +33,7 @@ export function getCompanyName(Setting: Setting | null): string | null {
  */
 export function getLogoUrl(Setting: Setting | null): string | null {
 	if (!Setting?.logo) return null;
-	const logo = Setting.logo as any;
+	const logo = Setting.logo;
 	if (typeof logo === "object" && logo?.url) {
 		return logo.url;
 	}

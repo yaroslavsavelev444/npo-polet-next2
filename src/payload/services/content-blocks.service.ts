@@ -18,7 +18,7 @@ export interface GetContentBlocksOptions {
 }
 
 function buildContentBlocksWhere(options: GetContentBlocksOptions): Where {
-	const conditions: any[] = [];
+	const conditions: Where[] = [];
 
 	if (options.isActive !== undefined) {
 		conditions.push({ isActive: { equals: options.isActive } });

@@ -15,7 +15,7 @@ export interface GetPickupPointsOptions {
 
 function buildPickupPointsWhere(options: GetPickupPointsOptions): Where {
 	const where: Where = {};
-	const conditions: any[] = [];
+	const conditions: Where[] = [];
 
 	if (options.city) {
 		conditions.push({ city: { equals: options.city } });

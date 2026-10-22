@@ -18,7 +18,7 @@ export interface GetNotificationsOptions {
 
 function buildNotificationsWhere(options: GetNotificationsOptions): Where {
 	const where: Where = {};
-	const conditions: any[] = [];
+	const conditions: Where[] = [];
 
 	if (options.user) {
 		conditions.push({ user: { equals: options.user } });

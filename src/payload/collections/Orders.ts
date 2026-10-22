@@ -120,7 +120,11 @@ export type PaymentMethodType =
  * суффиксом -L<legacyId>, который миграция даёт заказам, чей исходный номер
  * уже был занят (см. resolveFreeOrderNumber в orders.migration.ts).
  */
-const generateOrderNumber = async ({ operation, data, req }: any) => {
+const generateOrderNumber: CollectionBeforeChangeHook = async ({
+	operation,
+	data,
+	req,
+}) => {
 	// Только при создании
 	if (operation !== "create") return data;
 

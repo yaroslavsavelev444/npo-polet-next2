@@ -1,6 +1,6 @@
 // import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { createHash } from "node:crypto";
-import type { CollectionConfig } from "payload";
+import type { CollectionBeforeChangeHook, CollectionConfig } from "payload";
 import { getRelationshipUser } from "../access/getRelationshipUser.ts";
 import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
 import { legacyIdField } from "../fields/legacyId.ts";
@@ -16,7 +16,12 @@ import { createRevalidateCacheHook } from "../hooks/revalidateCache.ts";
  *  2. Инкрементируем patch-версию (semver)
  *  3. Обновляем checksum SHA-256
  */
-const versioningHook = async ({ data, originalDoc, operation, req }: any) => {
+const versioningHook: CollectionBeforeChangeHook = async ({
+	data,
+	originalDoc,
+	operation,
+	req,
+}) => {
 	// Срабатывает только при обновлении существующего документа
 	if (operation !== "update" || !originalDoc) return data;
 

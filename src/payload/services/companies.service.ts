@@ -17,7 +17,7 @@ export interface GetCompaniesOptions {
 
 function buildCompaniesWhere(options: GetCompaniesOptions): Where {
 	const where: Where = {};
-	const conditions: any[] = [];
+	const conditions: Where[] = [];
 
 	if (options.user) {
 		conditions.push({ user: { equals: options.user } });
