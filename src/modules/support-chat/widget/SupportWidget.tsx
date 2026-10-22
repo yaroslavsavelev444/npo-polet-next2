@@ -4,6 +4,7 @@ import { MessageCircle, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { WEBVISOR_HIDE } from "@/widgets/Analytics/webvisor";
 import type { SupportTopic } from "../lib/constants";
 import type { MessageContext } from "../lib/events";
 import {
@@ -142,8 +143,9 @@ export function SupportWidget({
 	const unread = widget?.state === "ready" ? widget.unread : 0;
 	const loginHref = `/auth/login?from=${encodeURIComponent(`${pathname}?chat=open`)}`;
 
+	// Переписка конфиденциальна — Вебвизору ни окна, ни счётчика (webvisor.tsx).
 	return (
-		<>
+		<div className={WEBVISOR_HIDE} style={{ display: "contents" }}>
 			{!open && (
 				<button
 					ref={launcherRef}
@@ -215,6 +217,6 @@ export function SupportWidget({
 					</div>
 				</div>
 			)}
-		</>
+		</div>
 	);
 }

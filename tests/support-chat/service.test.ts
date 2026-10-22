@@ -96,6 +96,28 @@ describe("сообщения покупателя", () => {
 			"invalid",
 		);
 
+		// Действующий, но другой документ (например, о cookie) — не согласие
+		// на обработку переписки.
+		const otherSlug = `support-chat-other-${Date.now().toString(36)}`;
+		await fixture.payload.db.drizzle.execute(sql`
+			INSERT INTO consents (title, slug, content, needs_acceptance, is_active, version)
+			VALUES ('Другой документ', ${otherSlug}, 'Текст', TRUE, TRUE, '1.0.0')
+		`);
+		try {
+			await rejectsWith(
+				service.sendCustomerMessage(
+					d,
+					customer,
+					send("Здравствуйте", { consent: { document: otherSlug } }),
+				),
+				"invalid",
+			);
+		} finally {
+			await fixture.payload.db.drizzle.execute(
+				sql`DELETE FROM consents WHERE slug = ${otherSlug}`,
+			);
+		}
+
 		const result = await service.sendCustomerMessage(
 			d,
 			customer,
@@ -108,7 +130,13 @@ describe("сообщения покупателя", () => {
 			WHERE id = ${result.conversation.id}
 		`);
 		const stored = (row as { rows: Record<string, unknown>[] }).rows[0];
-		assert.equal(stored.consent_document, `${CONSENT_SLUG}@2.1.0`);
+		const current = (await fixture.payload.db.drizzle.execute(
+			sql`SELECT version FROM consents WHERE slug = ${CONSENT_SLUG}`,
+		)) as { rows: { version: string | null }[] };
+		assert.equal(
+			stored.consent_document,
+			`${CONSENT_SLUG}@${current.rows[0].version ?? "1.0.0"}`,
+		);
 		assert.ok(stored.consent_accepted_at);
 	});
 

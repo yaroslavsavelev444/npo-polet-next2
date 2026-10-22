@@ -23,7 +23,7 @@ export function renderCannedBody(
 	variables: CannedVariables,
 ): { text: string; missing: string[] } {
 	const missing = new Set<string>();
-	const text = template
+	let text = template
 		.replace(PLACEHOLDER, (_, name: string) => {
 			const value = (variables as Record<string, string | null | undefined>)[
 				name
@@ -36,5 +36,13 @@ export function renderCannedBody(
 		.replace(/[ \t]{2,}/g, " ")
 		.replace(/ +([,.!?;:])/g, "$1")
 		.trim();
+	if (missing.size > 0) {
+		text = text
+			// «Здравствуйте, {{имя}}!» без имени — не «Здравствуйте,!».
+			.replace(/,([.!?;:])/g, "$1")
+			// «{{имя}}, здравствуйте!» без имени — не «, здравствуйте!».
+			.replace(/^[,;:]\s*/, "");
+		text = text.charAt(0).toLocaleUpperCase("ru") + text.slice(1);
+	}
 	return { text, missing: [...missing] };
 }

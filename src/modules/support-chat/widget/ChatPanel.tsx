@@ -283,6 +283,10 @@ export function ChatPanel({
 		const body = draft.trim();
 		if (!body && attachments.length === 0) return;
 		if (uploading > 0) return;
+		// Пока диалог не загружен, неизвестно, первое ли это сообщение: без
+		// этой проверки быстрая отправка уходила без согласия, и сервер
+		// отвечал «Нужно согласие» с кнопкой «Повторить».
+		if (!chat.loaded) return;
 		if (firstMessage && !consentGiven) {
 			setError("Отметьте согласие на обработку персональных данных");
 			return;
@@ -637,7 +641,9 @@ export function ChatPanel({
 						className={styles.sendButton}
 						onClick={send}
 						disabled={
-							uploading > 0 || (!draft.trim() && attachments.length === 0)
+							!chat.loaded ||
+							uploading > 0 ||
+							(!draft.trim() && attachments.length === 0)
 						}
 						aria-label="Отправить"
 					>

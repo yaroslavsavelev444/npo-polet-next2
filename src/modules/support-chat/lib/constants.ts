@@ -76,3 +76,16 @@ export const ATTACHMENT_MIME_TYPES = [
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ] as const;
+
+/** Отчёт «подсказывается, но не используется»: меньше подсказок — доля ещё ничего не значит. */
+export const CANNED_UNDERUSED_MIN_SUGGESTIONS = 5;
+/** …и вставляют реже, чем в каждой пятой подсказке. */
+export const CANNED_UNDERUSED_MAX_RATIO = 0.2;
+
+/**
+ * Документ согласия, который принимают, начиная чат: Согласие на обработку
+ * ПД — тот же, что у формы контактов (PERSONAL_DATA_CONSENT_SLUG в
+ * modules/contact). Другой slug сервер не принимает: иначе «согласием» мог
+ * бы стать любой действующий документ, например согласие на cookie.
+ */
+export const SUPPORT_CONSENT_SLUG = "personal-data";

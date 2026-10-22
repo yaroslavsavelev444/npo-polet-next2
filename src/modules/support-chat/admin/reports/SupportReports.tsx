@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SUPPORT_TOPICS } from "../../lib/constants";
+import {
+	CANNED_UNDERUSED_MIN_SUGGESTIONS,
+	SUPPORT_TOPICS,
+} from "../../lib/constants";
 import type { SupportReportDTO } from "../../server/reports";
 import type { SupportLiveDTO } from "../../server/support.service";
 import styles from "./reports.module.css";
@@ -339,6 +342,56 @@ function Report({ report }: { report: SupportReportDTO }) {
 												{agent.csatAverage === null
 													? "—"
 													: `${agent.csatAverage} (${agent.csatCount})`}
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+					)}
+				</section>
+
+				<section className={`${styles.card} ${styles.wide}`}>
+					<h2 className={styles.cardTitle}>
+						Подсказываются, но не используются
+					</h2>
+					<p className={styles.muted}>
+						Общие заготовки, которые консоль подсказывала хотя бы{" "}
+						{CANNED_UNDERUSED_MIN_SUGGESTIONS} раз, а вставляли реже, чем в
+						каждом пятом случае. За всё время, а не за период. Обычно это
+						слишком широкие фразы-триггеры или устаревший текст.
+					</p>
+					{report.cannedUnderused.length === 0 ? (
+						<p className={styles.muted}>Таких заготовок нет</p>
+					) : (
+						<div className={styles.tableWrap}>
+							<table className={styles.table}>
+								<thead>
+									<tr>
+										<th scope="col">Заготовка</th>
+										<th scope="col">Подсказана</th>
+										<th scope="col">Вставлена</th>
+										<th scope="col">Доля</th>
+										<th scope="col">Последний раз</th>
+									</tr>
+								</thead>
+								<tbody>
+									{report.cannedUnderused.map((c) => (
+										<tr key={c.id}>
+											<th scope="row">
+												<a
+													href={`/admin/collections/support-canned-responses/${c.id}`}
+												>
+													{c.title}
+												</a>
+											</th>
+											<td>{c.suggested}</td>
+											<td>{c.used}</td>
+											<td>{Math.round(c.ratio * 100)} %</td>
+											<td>
+												{c.lastUsedAt
+													? new Date(c.lastUsedAt).toLocaleDateString("ru-RU")
+													: "никогда"}
 											</td>
 										</tr>
 									))}

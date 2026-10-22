@@ -1,6 +1,10 @@
 import { sql } from "@payloadcms/db-postgres";
 import type { Payload } from "payload";
-import type { SupportTopic } from "../lib/constants.ts";
+import {
+	CANNED_UNDERUSED_MAX_RATIO,
+	CANNED_UNDERUSED_MIN_SUGGESTIONS,
+	type SupportTopic,
+} from "../lib/constants.ts";
 import { drizzleOf, type Executor, num, numOrNull, query, str } from "./db.ts";
 import { currentInterval } from "./eta.ts";
 import { getSupportConfig, type SupportConfig } from "./settings.ts";
@@ -61,6 +65,20 @@ export interface SupportReportDTO {
 	topics: { topic: SupportTopic; count: number }[];
 	tags: { tag: string; count: number }[];
 	canned: { id: number; title: string; uses: number }[];
+	/**
+	 * Заготовки, которые часто подсказываются, но редко вставляются, — за всё
+	 * время (счётчики накопительные): слишком широкие фразы-триггеры или
+	 * устаревший текст. По возрастанию доли использования.
+	 */
+	cannedUnderused: {
+		id: number;
+		title: string;
+		suggested: number;
+		used: number;
+		/** used / suggested, 0…1 (может быть > 1: вставляют и через «/»). */
+		ratio: number;
+		lastUsedAt: string | null;
+	}[];
 }
 
 export function percentile(
@@ -159,6 +177,7 @@ export async function buildSupportReport(
 		topicRows,
 		tagRows,
 		cannedRows,
+		underusedRows,
 	] = await Promise.all([
 		query(
 			db,
@@ -250,6 +269,22 @@ export async function buildSupportReport(
 				JOIN support_canned_responses r ON r.id = m.canned_response_id
 				WHERE ${inPeriod("m.created_at")}
 				GROUP BY r.id, r.title ORDER BY 3 DESC LIMIT 15`,
+		),
+		// Только общие активные: личные заготовки менеджер подбирает себе сам.
+		query(
+			db,
+			sql`SELECT id, title,
+					COALESCE(suggested_count, 0)::float AS suggested,
+					COALESCE(usage_count, 0)::float AS used,
+					last_used_at
+				FROM support_canned_responses
+				WHERE is_active IS NOT FALSE AND scope = 'shared'
+					AND COALESCE(suggested_count, 0) >= ${CANNED_UNDERUSED_MIN_SUGGESTIONS}
+					AND COALESCE(usage_count, 0)
+						< COALESCE(suggested_count, 0) * ${CANNED_UNDERUSED_MAX_RATIO}
+				ORDER BY COALESCE(usage_count, 0) / COALESCE(suggested_count, 1),
+					suggested_count DESC
+				LIMIT 15`,
 		),
 	]);
 
@@ -361,5 +396,19 @@ export async function buildSupportReport(
 			title: String(row.title),
 			uses: num(row.n),
 		})),
+		cannedUnderused: underusedRows.map((row) => {
+			const suggested = num(row.suggested);
+			const used = num(row.used);
+			return {
+				id: num(row.id),
+				title: String(row.title),
+				suggested,
+				used,
+				ratio: suggested > 0 ? used / suggested : 0,
+				lastUsedAt: row.last_used_at
+					? new Date(row.last_used_at as string).toISOString()
+					: null,
+			};
+		}),
 	};
 }

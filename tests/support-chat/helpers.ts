@@ -12,6 +12,7 @@ import Redis from "ioredis";
 import { getPayload, type Payload } from "payload";
 import config from "../../payload.config.ts";
 import { redisConfig } from "../../src/modules/auth/lib/redis-config.ts";
+import { SUPPORT_CONSENT_SLUG } from "../../src/modules/support-chat/lib/constants.ts";
 import { deleteAttachmentFiles } from "../../src/modules/support-chat/server/attachments.ts";
 import type { Broadcaster } from "../../src/modules/support-chat/server/broadcast.ts";
 import type {
@@ -25,7 +26,12 @@ import { AUTH_FLOW_CONTEXT } from "../../src/payload/hooks/users/requireServerAu
 
 export const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 export const PASSWORD = "Support-Chat-Test-1";
-export const CONSENT_SLUG = `support-chat-test-${RUN}`;
+/**
+ * Чат принимает только Согласие на обработку ПД (SUPPORT_CONSENT_SLUG). В
+ * локальной базе документ уже есть (его версию тесты читают из базы), в
+ * чистой (CI) — фикстура заводит его и не удаляет: это общий документ сайта.
+ */
+export const CONSENT_SLUG = SUPPORT_CONSENT_SLUG;
 
 /** Событие, «отправленное» сервисом: куда, что и с чем. */
 export interface Emitted {
@@ -72,7 +78,8 @@ export async function setupFixture(): Promise<Fixture> {
 
 	await payload.db.drizzle.execute(sql`
 		INSERT INTO consents (title, slug, content, needs_acceptance, is_active, version)
-		VALUES ('Тест чата', ${CONSENT_SLUG}, 'Текст', TRUE, TRUE, '2.1.0')
+		VALUES ('Согласие на обработку ПД (тест чата)', ${CONSENT_SLUG}, 'Текст', TRUE, TRUE, '1.0.0')
+		ON CONFLICT (slug) DO NOTHING
 	`);
 
 	const current = await payload.findGlobal({
@@ -276,11 +283,6 @@ export async function teardownFixture(fixture: Fixture): Promise<void> {
 			),
 		);
 	}
-	await swallow(() =>
-		payload.db.drizzle.execute(
-			sql`DELETE FROM consents WHERE slug = ${CONSENT_SLUG}`,
-		),
-	);
 
 	if (fixture.settingsBackup) {
 		await swallow(() =>

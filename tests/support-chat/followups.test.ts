@@ -434,6 +434,61 @@ describe("отчёты", () => {
 		assert.ok(report.heatmap.flat().reduce((a, b) => a + b, 0) >= 1);
 		assert.ok(!JSON.stringify(report).includes("7731"), "текста в отчёте нет");
 
+		// «Подсказывается, но не используется»: общие, ≥ 5 подсказок, < 20 %.
+		const canned = async (
+			key: string,
+			data: Record<string, unknown>,
+		): Promise<number> => {
+			const doc = await fixture.payload.create({
+				collection: "support-canned-responses",
+				data: {
+					title: `Отчёт ${key} ${agent.adminId}`,
+					body: "Текст заготовки.",
+					scope: "shared",
+					...data,
+				},
+				overrideAccess: true,
+			});
+			return Number(doc.id);
+		};
+		const ids = [
+			await canned("шум", { suggestedCount: 40, usageCount: 2 }),
+			await canned("никогда", { suggestedCount: 10, usageCount: 0 }),
+			await canned("в-ходу", { suggestedCount: 10, usageCount: 5 }),
+			await canned("мало-подсказок", { suggestedCount: 4, usageCount: 0 }),
+			await canned("выключена", {
+				suggestedCount: 50,
+				usageCount: 0,
+				isActive: false,
+			}),
+			await canned("личная", {
+				suggestedCount: 50,
+				usageCount: 0,
+				scope: "personal",
+				owner: agent.adminId,
+			}),
+		];
+		try {
+			const { cannedUnderused } = await buildSupportReport(fixture.payload, 7);
+			const mine = cannedUnderused.filter((c) => ids.includes(c.id));
+			assert.deepEqual(
+				mine.map((c) => [c.id, c.suggested, c.used, c.lastUsedAt]),
+				[
+					[ids[1], 10, 0, null],
+					[ids[0], 40, 2, null],
+				],
+				"по доле: сначала «никогда», потом «шум»",
+			);
+			assert.equal(mine[1].ratio, 0.05);
+		} finally {
+			await fixture.payload.db.drizzle.execute(
+				sql`DELETE FROM support_canned_responses WHERE id IN (${sql.join(
+					ids.map((id) => sql`${id}`),
+					sql`, `,
+				)})`,
+			);
+		}
+
 		const live = await service.supportLive(d);
 		assert.equal(typeof live.queue, "number");
 		assert.ok(live.agents.some((a) => a.adminId === agent.adminId));

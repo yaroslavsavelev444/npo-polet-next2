@@ -1,10 +1,11 @@
 import { sql } from "@payloadcms/db-postgres";
 import type { Payload } from "payload";
-import type {
-	ConversationPriority,
-	ConversationStatus,
-	MessageAuthorType,
-	SupportTopic,
+import {
+	type ConversationPriority,
+	type ConversationStatus,
+	type MessageAuthorType,
+	SUPPORT_CONSENT_SLUG,
+	type SupportTopic,
 } from "../lib/constants.ts";
 import type {
 	StaffConversationDTO,
@@ -485,6 +486,12 @@ export async function ensureActiveConversation(
 
 		let consent: { acceptedAt: string; document: string } | null = null;
 		if (input.consent) {
+			if (input.consent.document !== SUPPORT_CONSENT_SLUG) {
+				throw new SupportError(
+					"invalid",
+					"Нужно согласие на обработку персональных данных",
+				);
+			}
 			const document = await resolveConsentDocument(db, input.consent.document);
 			if (!document) {
 				throw new SupportError("invalid", "Документ согласия не найден");
