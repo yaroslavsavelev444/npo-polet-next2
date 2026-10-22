@@ -41,7 +41,7 @@
 		"test:oauth": "EMAIL_ENABLED=false node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit --test-concurrency=1 tests/auth-oauth/*.test.ts",
 		"test:account-deletion": "EMAIL_ENABLED=false node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit tests/account-deletion/*.test.ts",
 		"test:restock": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit tests/restock/*.test.ts",
-		"test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test tests/security/*.test.ts tests/checkout/*.test.ts tests/contact/*.test.ts tests/promo/*.test.ts tests/banners/*.test.ts tests/cart/*.test.ts tests/search/*.test.ts tests/catalog/*.test.ts tests/observability/*.test.ts tests/email/*.test.ts tests/support-chat/pure.test.ts tests/support-chat/access.test.ts tests/support-chat/content.test.ts tests/auth-oauth/pure.test.ts tests/orders/*.test.ts tests/profile/*.test.ts tests/wishlist/*.test.ts tests/content/*.test.ts",
+		"test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs --test --test-force-exit tests/security/*.test.ts tests/checkout/*.test.ts tests/contact/*.test.ts tests/promo/*.test.ts tests/banners/*.test.ts tests/cart/*.test.ts tests/search/*.test.ts tests/catalog/*.test.ts tests/observability/*.test.ts tests/email/*.test.ts tests/support-chat/pure.test.ts tests/support-chat/access.test.ts tests/support-chat/content.test.ts tests/auth-oauth/pure.test.ts tests/orders/*.test.ts tests/profile/*.test.ts tests/wishlist/*.test.ts tests/content/*.test.ts",
 		"test:mutation": "stryker run",
 		"seed:storefront-ci": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs scripts/seed-storefront-ci.ts",
 		"seed:e2e": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/seed-checkout-e2e.ts",
@@ -50,7 +50,7 @@
 		"test:e2e:support": "tests/e2e/.runner/node_modules/.bin/playwright test --config tests/e2e/support-chat.config.ts",
 		"test:e2e:yandex": "tests/e2e/.runner/node_modules/.bin/playwright test --config tests/e2e/yandex-id.config.ts",
 		"test:e2e:ui": "tests/e2e/.runner/node_modules/.bin/playwright test --config tests/e2e/playwright.config.ts --ui",
-		"e2e:install": "npm --prefix tests/e2e/.runner install && tests/e2e/.runner/node_modules/.bin/playwright install chromium",
+		"e2e:install": "npm --prefix tests/e2e/.runner install && ln -sfn .runner/node_modules tests/e2e/node_modules && tests/e2e/.runner/node_modules/.bin/playwright install chromium",
 		"payload:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/payload-cli.mts migrate",
 		"payload:migrate:create": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/payload-cli.mts migrate:create",
 		"payload:migrate:status": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/payload-cli.mts migrate:status"

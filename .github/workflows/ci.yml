@@ -228,9 +228,12 @@ jobs:
 
       # Playwright — в отдельном дереве tests/e2e/.runner (см.
       # playwright.config.ts), браузер — с системными зависимостями.
+      # Конфиги и спеки лежат в tests/e2e и импортируют @playwright/test — Node
+      # ищет его в tests/e2e/node_modules, поэтому туда — ссылка на раннер.
       - name: Playwright
         run: |
           npm --prefix tests/e2e/.runner ci
+          ln -sfn .runner/node_modules tests/e2e/node_modules
           tests/e2e/.runner/node_modules/.bin/playwright install --with-deps chromium
 
       - name: Ключ шифрования чата
