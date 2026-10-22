@@ -42,6 +42,18 @@ export const viewport: Viewport = {
 	themeColor: "#1A1D24",
 };
 
+// Рендер на каждый запрос, а не статичный HTML из сборки. Боты (KimiBot,
+// cohere-ai, Perplexity-User) шлют на несуществующие пути POST с выдуманным
+// Next-Action и заголовком RSC — сочетание, которого клиент Next не
+// присылает. Next отвечает «Server action not found.» (text/plain), а
+// статичная страница, ждущая из-за RSC-заголовка RSC-ответ, падает:
+// «InvariantError: Expected RSC response, got text/plain» (build/templates/
+// app-page.js, E789) — 500 вместо 404 и письмо дежурному. Отсечь такие
+// запросы в proxy.ts нельзя: Next убирает RSC-заголовки из запроса до proxy
+// (server/web/adapter.js). Страница лёгкая и в БД не ходит, так что
+// динамический рендер ей ничего не стоит.
+export const dynamic = "force-dynamic";
+
 export default function GlobalNotFound() {
 	return (
 		<html lang="ru" className={manrope.variable}>
