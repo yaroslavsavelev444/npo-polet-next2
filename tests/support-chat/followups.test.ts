@@ -397,7 +397,12 @@ describe("отчёты", () => {
 	});
 
 	test("отчёт за период: диалог, ответ, оценка и метка — в цифрах, без текста", async () => {
-		await setSettings(fixture, { schedule: ALWAYS_OPEN });
+		// Ручное распределение и явное «Взять»: иначе диалог автоматически уходит
+		// менеджеру «на месте» из соседнего теста, и строка отчёта — не наша.
+		await setSettings(fixture, {
+			schedule: ALWAYS_OPEN,
+			routingMode: "manual",
+		});
 		const customer = await makeCustomer(fixture, "report");
 		const agent = await makeAgent(fixture, "Отчётная");
 		const d = deps(fixture, recordingBroadcaster());
@@ -406,6 +411,7 @@ describe("отчёты", () => {
 			customer,
 			send("Секретный вопрос 7731", { consent, topic: "payment" }),
 		);
+		await service.claimForStaff(d, agent, conversation.id);
 		await service.sendStaffMessage(
 			d,
 			agent,

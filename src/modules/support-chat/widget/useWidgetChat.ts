@@ -190,7 +190,17 @@ export function useWidgetChat(options: {
 		});
 		socketRef.current = socket;
 
+		// Отказ шлюза при рукопожатии (middleware) Socket.IO сам не повторяет:
+		// socket.active = false, и виджет оставался бы мёртвым до перезагрузки.
+		// Временные отказы — «чат закрыт», «много вкладок» — проходят сами:
+		// шлюз держит настройки в кэше до 30 с, пилотную группу и рубильник
+		// включают, пока страница открыта. Повторяем с паузой 5→10→20→30 с.
+		// «Войдите» и «запрещено писать» без действия человека не пройдут.
+		let retryTimer: number | undefined;
+		let retryDelay = 5_000;
+
 		socket.on("connect", () => {
+			retryDelay = 5_000;
 			setConnection("online");
 			const known = messagesRef.current.at(-1);
 			const current = conversationRef.current;
@@ -241,6 +251,11 @@ export function useWidgetChat(options: {
 							: "offline",
 				);
 				if (code === "unauthorized" || code === "disabled") setLoaded(true);
+				if (!socket.active && code !== "unauthorized" && code !== "forbidden") {
+					window.clearTimeout(retryTimer);
+					retryTimer = window.setTimeout(() => socket.connect(), retryDelay);
+					retryDelay = Math.min(retryDelay * 2, 30_000);
+				}
 			},
 		);
 
@@ -313,6 +328,7 @@ export function useWidgetChat(options: {
 
 		return () => {
 			window.clearInterval(expire);
+			window.clearTimeout(retryTimer);
 			socket.removeAllListeners();
 			socket.disconnect();
 			socketRef.current = null;
