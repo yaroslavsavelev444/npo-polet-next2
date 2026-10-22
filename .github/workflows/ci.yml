@@ -80,16 +80,12 @@ jobs:
           PAYLOAD_SECRET: ci-placeholder-secret
           DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
 
-      # ⚠ Не блокирует. На момент перехода `biome check .` даёт 393 ошибки и
-      # 7 предупреждений — почти целиком расхождения форматирования (в дереве
-      # смешаны табы и пробелы). Сделать это жёстким барьером сейчас значит
-      # заблокировать любую выкладку до разовой уборки всего репозитория,
-      # которая к процессу деплоя отношения не имеет. Шаг оставлен видимым,
-      # чтобы число не росло молча; убрать `continue-on-error` — отдельная
-      # задача, после `pnpm exec biome check --write .`.
-      - name: Линт (biome, информационно)
+      # Блокирует (с 21.10.2026): разовая уборка `biome check --write .` сняла
+      # 295 ошибок, почти целиком форматирование. Сгенерированное
+      # (payload-types.ts, снимки миграций *.json, importMap) из проверки
+      # исключено в biome.json — его переписывает генератор.
+      - name: Линт (biome)
         run: pnpm lint
-        continue-on-error: true
 
       # Статический guard графа импортов payload.config.ts. Ни базы, ни сети
       # не требует — раньше зачем-то выполнялся на боевом сервере посреди
@@ -109,3 +105,152 @@ jobs:
         env:
           PAYLOAD_SECRET: ci-placeholder-secret
           DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
+
+  # Наборы, которым нужны настоящие Postgres и Redis: выдача сессии без
+  # пароля и развилка Яндекс ID, удаление аккаунта через очередь BullMQ,
+  # «Сообщить о поступлении», отзывы, чат поддержки (сокеты, гонки,
+  # шифрование). База каждый раз чистая — схему создают те же миграции, что
+  # на проде, так что заодно проверяется, что они проходят с нуля.
+  #
+  # Браузерные сценарии — отдельный job `e2e` ниже.
+  integration:
+    name: Интеграционные тесты (Postgres + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:8
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    # Только заглушки: база и Redis одноразовые, почта выключена
+    # (EMAIL_ENABLED=false в самих скриптах), а SMTP_* нужны лишь потому, что
+    # модуль почты проверяет форму конфига при старте.
+    env:
+      DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
+      PAYLOAD_SECRET: ci-placeholder-secret
+      REDIS_HOST: 127.0.0.1
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "1025"
+      SMTP_USER: ci
+      SMTP_PASSWORD: ci
+      EMAIL_FROM_ADDRESS: ci@example.test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      # Мастер-ключ чата — случайный на каждый прогон: шифртексты живут
+      # только в этой одноразовой базе.
+      - name: Ключ шифрования чата
+        run: echo "SUPPORT_ENCRYPTION_KEYS=ci:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
+      - name: Миграции с нуля
+        run: pnpm payload:migrate
+
+      - name: Яндекс ID
+        run: pnpm test:oauth
+      - name: Удаление аккаунта
+        run: pnpm test:account-deletion
+      - name: Сообщить о поступлении
+        run: pnpm test:restock
+      - name: Отзывы
+        run: pnpm test:reviews
+      - name: Чат поддержки
+        run: pnpm test:support-chat
+
+  # Браузерные сценарии на чистой базе: вход и регистрация через Яндекс ID (на
+  # моке oauth.yandex.ru) и чат поддержки (покупатель и менеджер, шлюз
+  # Socket.IO). Витрине нужен минимум — «Настройки сайта» с логотипом и
+  # документы согласий: их заводит scripts/seed-storefront-ci.ts.
+  #
+  # Оформление заказа (playwright.config.ts) здесь не гоняется: ему нужен
+  # каталог с опубликованными товарами и мок DaData — отдельная задача.
+  e2e:
+    name: Браузерные сценарии (Яндекс ID, чат)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:8
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URI: postgresql://ci:ci@127.0.0.1:5432/ci
+      PAYLOAD_SECRET: ci-placeholder-secret
+      REDIS_HOST: 127.0.0.1
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "1025"
+      SMTP_USER: ci
+      SMTP_PASSWORD: ci
+      EMAIL_FROM_ADDRESS: ci@example.test
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+      ALLOWED_ORIGINS: http://localhost:3000
+      SUPPORT_GATEWAY_PUBLIC_URL: http://localhost:3005
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      # Playwright — в отдельном дереве tests/e2e/.runner (см.
+      # playwright.config.ts), браузер — с системными зависимостями.
+      - name: Playwright
+        run: |
+          npm --prefix tests/e2e/.runner ci
+          tests/e2e/.runner/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Ключ шифрования чата
+        run: echo "SUPPORT_ENCRYPTION_KEYS=ci:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
+      - name: Миграции и минимальная витрина
+        run: |
+          pnpm payload:migrate
+          pnpm seed:storefront-ci
+
+      - name: Яндекс ID
+        run: pnpm test:e2e:yandex
+      - name: Чат поддержки
+        run: pnpm test:e2e:support
+
+      - name: Артефакты упавших сценариев
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-output
+          path: tests/e2e/.output
+          retention-days: 7
+

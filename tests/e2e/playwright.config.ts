@@ -28,8 +28,9 @@ const DADATA_API_KEY = "e2e-test-key";
 
 export default defineConfig({
 	testDir: path.join(DIRNAME, "specs"),
-	// Чат поддержки — свой конфиг со шлюзом и учётками (support-chat.config.ts).
-	testIgnore: /support-chat\.spec\.ts/,
+	// Чат поддержки и Яндекс ID — свои конфиги со шлюзом / моком Яндекса
+	// (support-chat.config.ts, yandex-id.config.ts).
+	testIgnore: /(support-chat|yandex-id)\.spec\.ts/,
 	outputDir: path.join(DIRNAME, ".output"),
 	globalSetup: path.join(DIRNAME, "global-setup.ts"),
 

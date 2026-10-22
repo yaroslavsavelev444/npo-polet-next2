@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
 import {
 	deliveryMethodButton,
@@ -248,8 +250,6 @@ test("несколько ошибок исправляются по одной, 
 /** Меняет состояние стенда посреди теста — так же, как это сделал бы
  * параллельный сеанс пользователя или администратор. */
 function runResetScript(flag: string): void {
-	const { execFileSync } = require("node:child_process");
-	const path = require("node:path");
 	execFileSync(
 		process.execPath,
 		[

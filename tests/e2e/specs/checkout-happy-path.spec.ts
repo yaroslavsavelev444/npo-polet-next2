@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
 import {
 	chooseCallTarget,
@@ -325,8 +327,6 @@ test("сохранённые данные подставляются в след
 
 /** Возвращает товары в корзину, НЕ трогая сохранённые предпочтения. */
 function resetCartKeepingPreferences(): void {
-	const { execFileSync } = require("node:child_process");
-	const path = require("node:path");
 	execFileSync(
 		process.execPath,
 		[

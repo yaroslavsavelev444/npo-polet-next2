@@ -3,9 +3,13 @@
  * Мутационное тестирование критичных зон (StrykerJS).
  *
  * Зоны — деньги (промокоды, итоги и цена заказа), доступ (редиректы,
- * доверенные устройства, границы прав Payload) и валидация оформления
- * (схема заказа, адрес, ИНН/ОГРН/КПП/ФИО). Остальной код намеренно не
- * мутируется: UI, коллекции и хуки Payload либо шумят, либо требуют БД.
+ * доверенные устройства, границы прав Payload), валидация оформления
+ * (схема заказа, адрес, ИНН/ОГРН/КПП/ФИО), вход через Яндекс ID (PKCE,
+ * state, адрес возврата, клиент Яндекса) и чат поддержки (шифрование,
+ * права на диалог, рукопожатие шлюза, вложения, автоссылки). Остальной код
+ * намеренно не мутируется: UI, коллекции и хуки Payload либо шумят, либо
+ * требуют БД — развилка входа (oauth/resolve.ts) и сервис чата проверяются
+ * интеграционными наборами, на каждого мутанта их не прогнать.
  *
  * У Stryker нет раннера для node:test, поэтому используется command runner:
  * на каждого мутанта запускается узкий набор юнит-тестов этих зон
@@ -23,7 +27,7 @@ const NODE_TEST =
 export default {
 	testRunner: "command",
 	commandRunner: {
-		command: `${NODE_TEST} tests/promo/*.test.ts tests/checkout/*.test.ts tests/security/*.test.ts`,
+		command: `${NODE_TEST} tests/promo/*.test.ts tests/checkout/*.test.ts tests/security/*.test.ts tests/auth-oauth/pure.test.ts tests/support-chat/pure.test.ts tests/support-chat/access.test.ts tests/support-chat/content.test.ts`,
 	},
 	coverageAnalysis: "off",
 	mutate: [
@@ -45,12 +49,27 @@ export default {
 		"src/modules/checkout/lib/checkout-schema.ts",
 		"src/modules/checkout/lib/address.ts",
 		"src/modules/checkout/lib/validate-*.ts",
+		// Зона 4 — вход через Яндекс ID
+		"src/modules/auth/oauth/pkce.ts",
+		"src/modules/auth/oauth/returnPath.ts",
+		"src/modules/auth/oauth/yandex.ts",
+		// Зона 5 — чат поддержки: конфиденциальность и доступ
+		"src/modules/support-chat/server/crypto.ts",
+		"src/modules/support-chat/server/permissions.ts",
+		"src/modules/support-chat/server/gateway/auth.ts",
+		"src/modules/support-chat/server/message-codec.ts",
+		"src/modules/support-chat/lib/linkify.ts",
+		"src/modules/support-chat/lib/canned-render.ts",
+		// Только проверка сигнатур и имени файла; запись/чтение — это диск и БД.
+		"src/modules/support-chat/server/attachments.ts:66-113",
 	],
 	// В песочницу копируется только нужное тестам, а не media/public/db.
 	ignorePatterns: [
 		"/*",
 		"!/src",
 		"!/tests",
+		// tests/security проверяет и раскладку роутов (payload-rest-route.test.ts).
+		"!/app",
 		"/tests/e2e",
 		"!/package.json",
 		"!/tsconfig.json",
@@ -59,7 +78,7 @@ export default {
 	// контрольных сумм) здесь важны, а процесс и так новый на каждый прогон.
 	ignoreStatic: false,
 	concurrency: 6,
-	// Достигнуто 90,5 %; остаток — в основном эквивалентные мутанты
+	// Достигнуто 94,7 % (21.10.2026, с зонами 4–5 и добивкой checkout-schema); остаток — в основном эквивалентные мутанты
 	// (эшелонированные проверки, тексты сообщений). break ловит регресс.
 	thresholds: { high: 90, low: 85, break: 85 },
 	reporters: ["clear-text", "progress", "html", "json"],
