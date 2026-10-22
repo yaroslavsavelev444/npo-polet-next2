@@ -255,5 +255,7 @@ jobs:
         with:
           name: e2e-output
           path: tests/e2e/.output
+          # .output — скрытая папка, а upload-artifact v4 их по умолчанию пропускает.
+          include-hidden-files: true
           retention-days: 7
 

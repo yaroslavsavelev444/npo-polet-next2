@@ -61,7 +61,12 @@ test("переписка покупателя и менеджера: сообщ�
 	await expect(
 		widget.getByText("Здравствуйте! Есть ли сертификаты на сеткомёт?"),
 	).toBeVisible();
-	await expect(widget.getByText("отправляется…")).toHaveCount(0);
+	// Тот же кэш настроек: диалог грузится через Next, а сокет шлюз пускает
+	// только когда сам увидит пилотную группу — до тех пор сообщение ждёт
+	// переподключения (на чистой базе CI шлюз стартует раньше сида).
+	await expect(widget.getByText("отправляется…")).toHaveCount(0, {
+		timeout: 45_000,
+	});
 	await expect(widget.getByRole("button", { name: "Повторить" })).toHaveCount(
 		0,
 	);
