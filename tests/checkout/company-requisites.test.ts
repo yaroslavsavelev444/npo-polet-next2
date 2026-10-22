@@ -36,7 +36,10 @@ test("ИНН: пустой, нецифровой и неверной длины 
 	assert.equal(validateInn("   "), "Укажите ИНН");
 	assert.equal(validateInn("770708389a"), "ИНН должен содержать только цифры");
 	assert.equal(validateInn("a770708389"), "ИНН должен содержать только цифры");
-	assert.equal(validateInn("77070838931"), "ИНН должен содержать 10 или 12 цифр");
+	assert.equal(
+		validateInn("77070838931"),
+		"ИНН должен содержать 10 или 12 цифр",
+	);
 	assert.equal(validateInn("770708389"), "ИНН должен содержать 10 или 12 цифр");
 	assert.equal(
 		validateInn("7707083893123"),

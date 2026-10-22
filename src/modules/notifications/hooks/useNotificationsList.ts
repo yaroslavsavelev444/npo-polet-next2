@@ -14,11 +14,11 @@ const PAGE_SIZE = 15;
  * staleTime — на глаз это ощущается как мгновенное открытие.
  */
 export function useNotificationsList() {
-  return useInfiniteQuery({
-    queryKey: notificationsKeys.list(),
-    queryFn: ({ pageParam }) => fetchNotificationsPage(pageParam, PAGE_SIZE),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 30_000,
-  });
+	return useInfiniteQuery({
+		queryKey: notificationsKeys.list(),
+		queryFn: ({ pageParam }) => fetchNotificationsPage(pageParam, PAGE_SIZE),
+		initialPageParam: 1,
+		getNextPageParam: (lastPage) => lastPage.nextCursor,
+		staleTime: 30_000,
+	});
 }

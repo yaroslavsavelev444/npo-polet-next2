@@ -1,8 +1,8 @@
-import type { CollectionBeforeLoginHook } from 'payload'
+import type { CollectionBeforeLoginHook } from "payload";
 import {
-  AccountBlockedError,
-  AccountSuspendedError,
-} from '../../../modules/auth/lib/accountStatusErrors.ts'
+	AccountBlockedError,
+	AccountSuspendedError,
+} from "../../../modules/auth/lib/accountStatusErrors.ts";
 
 /**
  * Вызывается Payload перед выдачей токена — но ПОСЛЕ проверки пароля и
@@ -18,11 +18,11 @@ import {
  * - аккаунт приостановлен (status: suspended)
  */
 export const checkUserStatus: CollectionBeforeLoginHook = async ({ user }) => {
-  if (user.status === 'blocked') {
-    throw new AccountBlockedError()
-  }
+	if (user.status === "blocked") {
+		throw new AccountBlockedError();
+	}
 
-  if (user.status === 'suspended') {
-    throw new AccountSuspendedError()
-  }
-}
+	if (user.status === "suspended") {
+		throw new AccountSuspendedError();
+	}
+};

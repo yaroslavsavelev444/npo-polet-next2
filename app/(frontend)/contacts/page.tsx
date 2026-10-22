@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import {
-  CompanyDetails,
-  ContactFormSection,
-  ContactHero,
-  NetworkSection,
-  SaveContactBar,
+	CompanyDetails,
+	ContactFormSection,
+	ContactHero,
+	NetworkSection,
+	SaveContactBar,
 } from "@/modules/contact";
 import { bySortOrder, primaryOf } from "@/modules/contact/lib/format";
 import { getCachedSettings } from "@/payload/services/settings.service";
@@ -16,24 +16,24 @@ const PAGE_PATH = "/contacts";
 const PAGE_URL = `${baseURL}${PAGE_PATH}`;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getCachedSettings();
-  const company = settings?.companyName ?? "НПО «Полёт»";
+	const settings = await getCachedSettings();
+	const company = settings?.companyName ?? "НПО «Полёт»";
 
-  const title = "Контакты";
-  const description = `Телефоны, почта и адреса ${company}. Свяжитесь с менеджером — ответим в течение рабочего дня.`;
+	const title = "Контакты";
+	const description = `Телефоны, почта и адреса ${company}. Свяжитесь с менеджером — ответим в течение рабочего дня.`;
 
-  return {
-    title,
-    description,
-    alternates: { canonical: PAGE_URL },
-    openGraph: {
-      title,
-      description,
-      url: PAGE_URL,
-      type: "website",
-    },
-    twitter: { card: "summary_large_image", title, description },
-  };
+	return {
+		title,
+		description,
+		alternates: { canonical: PAGE_URL },
+		openGraph: {
+			title,
+			description,
+			url: PAGE_URL,
+			type: "website",
+		},
+		twitter: { card: "summary_large_image", title, description },
+	};
 }
 
 /**
@@ -63,54 +63,54 @@ export async function generateMetadata(): Promise<Metadata> {
  * форма работает независимо от того, заполнены ли телефоны.
  */
 export default async function ContactsPage() {
-  const settings = await getCachedSettings();
+	const settings = await getCachedSettings();
 
-  if (!settings) {
-    // Глобал не заполнен вовсе — единственный работающий канал связи в этом
-    // случае форма, и показать её честнее, чем пустую страницу. Прежняя
-    // версия возвращала null, то есть белый экран под шапкой.
-    return (
-      <div
-        className="full-bleed"
-        style={{
-          marginTop: "calc(-1 * var(--responsive-space-l))",
-          marginBottom: "calc(-1 * var(--responsive-space-l))",
-        }}
-      >
-        <ContactFormSection />
-      </div>
-    );
-  }
+	if (!settings) {
+		// Глобал не заполнен вовсе — единственный работающий канал связи в этом
+		// случае форма, и показать её честнее, чем пустую страницу. Прежняя
+		// версия возвращала null, то есть белый экран под шапкой.
+		return (
+			<div
+				className="full-bleed"
+				style={{
+					marginTop: "calc(-1 * var(--responsive-space-l))",
+					marginBottom: "calc(-1 * var(--responsive-space-l))",
+				}}
+			>
+				<ContactFormSection />
+			</div>
+		);
+	}
 
-  const phones = bySortOrder(settings.phones);
-  const emails = bySortOrder(settings.emails);
-  const schema = buildContactPageSchema(settings, PAGE_URL);
+	const phones = bySortOrder(settings.phones);
+	const emails = bySortOrder(settings.emails);
+	const schema = buildContactPageSchema(settings, PAGE_URL);
 
-  return (
-    // Общий layout витрины кладёт страницу в центрированную колонку с
-    // отступом padding="l". Секциям контактов он не нужен: они сами задают и
-    // ширину контента, и вертикальный ритм. .full-bleed возвращает странице
-    // полную ширину окна, отрицательные поля снимают вертикальный отступ —
-    // иначе над первым экраном и под подвалом остаются полосы фона.
-    <div
-      className="full-bleed"
-      style={{
-        marginTop: "calc(-1 * var(--responsive-space-l))",
-        marginBottom: "calc(-1 * var(--responsive-space-l))",
-      }}
-    >
-      <JsonLd data={schema} />
+	return (
+		// Общий layout витрины кладёт страницу в центрированную колонку с
+		// отступом padding="l". Секциям контактов он не нужен: они сами задают и
+		// ширину контента, и вертикальный ритм. .full-bleed возвращает странице
+		// полную ширину окна, отрицательные поля снимают вертикальный отступ —
+		// иначе над первым экраном и под подвалом остаются полосы фона.
+		<div
+			className="full-bleed"
+			style={{
+				marginTop: "calc(-1 * var(--responsive-space-l))",
+				marginBottom: "calc(-1 * var(--responsive-space-l))",
+			}}
+		>
+			<JsonLd data={schema} />
 
-      <ContactHero settings={settings} />
-      <ContactFormSection fallbackEmail={primaryOf(emails)?.value} />
-      <CompanyDetails settings={settings} />
-      <NetworkSection settings={settings} />
-      <SaveContactBar
-        companyName={settings.companyName}
-        phones={phones}
-        emails={emails}
-        physicalAddress={settings.physicalAddress}
-      />
-    </div>
-  );
+			<ContactHero settings={settings} />
+			<ContactFormSection fallbackEmail={primaryOf(emails)?.value} />
+			<CompanyDetails settings={settings} />
+			<NetworkSection settings={settings} />
+			<SaveContactBar
+				companyName={settings.companyName}
+				phones={phones}
+				emails={emails}
+				physicalAddress={settings.physicalAddress}
+			/>
+		</div>
+	);
 }

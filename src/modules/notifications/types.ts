@@ -10,41 +10,41 @@
  * бы импортировать сюда напрямую.
  */
 export type NotificationType =
-  | "system"
-  | "subscription_match"
-  | "chat"
-  | "review"
-  | "order"
-  | "promotion"
-  | "discount"
-  | "product"
-  | "login_from_new_device"
-  | "security"
-  | "account";
+	| "system"
+	| "subscription_match"
+	| "chat"
+	| "review"
+	| "order"
+	| "promotion"
+	| "discount"
+	| "product"
+	| "login_from_new_device"
+	| "security"
+	| "account";
 
 export interface NotificationDTO {
-  id: number;
-  type: NotificationType;
-  title: string;
-  body: string;
-  link: string | null;
-  isRead: boolean;
-  createdAt: string;
+	id: number;
+	type: NotificationType;
+	title: string;
+	body: string;
+	link: string | null;
+	isRead: boolean;
+	createdAt: string;
 }
 
 export interface NotificationsPageResponse {
-  items: NotificationDTO[];
-  nextCursor: number | null;
-  totalDocs: number;
-  /**
-   * Актуальный счётчик непрочитанных ПОСЛЕ обработки этой страницы (см.
-   * логику авто-прочтения в app/api/notifications/route.ts). Позволяет
-   * синхронизировать бейдж без отдельного запроса к unread-count.
-   */
-  unreadCount: number;
+	items: NotificationDTO[];
+	nextCursor: number | null;
+	totalDocs: number;
+	/**
+	 * Актуальный счётчик непрочитанных ПОСЛЕ обработки этой страницы (см.
+	 * логику авто-прочтения в app/api/notifications/route.ts). Позволяет
+	 * синхронизировать бейдж без отдельного запроса к unread-count.
+	 */
+	unreadCount: number;
 }
 
 export interface MarkReadResponse {
-  updated: number;
-  unreadCount: number;
+	updated: number;
+	unreadCount: number;
 }

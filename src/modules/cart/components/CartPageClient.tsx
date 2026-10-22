@@ -16,10 +16,10 @@ import {
 	CartUnavailableNotice,
 	CartValidationNotice,
 } from "./CartNotices";
-import { CartUnavailableLineItem } from "./CartUnavailableLineItem";
 import { CartProgress } from "./CartProgress";
 import { CartSkeleton } from "./CartSkeleton";
 import { CartSummary } from "./CartSummary";
+import { CartUnavailableLineItem } from "./CartUnavailableLineItem";
 
 interface CartPageClientProps {
 	/**

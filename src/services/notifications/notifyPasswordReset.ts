@@ -1,7 +1,7 @@
 import { getEmailConfig } from "../../services/email/config.ts";
 import {
-  emailService,
-  passwordResetEmailTemplate,
+	emailService,
+	passwordResetEmailTemplate,
 } from "../../services/email/index.ts";
 import { emailLogger } from "../../services/email/logger.ts";
 
@@ -18,30 +18,30 @@ import { emailLogger } from "../../services/email/logger.ts";
  * письма в проекте.
  */
 export async function notifyPasswordReset(params: {
-  email: string;
-  token: string;
-  expiresInMinutes?: number;
+	email: string;
+	token: string;
+	expiresInMinutes?: number;
 }): Promise<void> {
-  try {
-    const { appUrl } = getEmailConfig();
-    await emailService.send(
-      passwordResetEmailTemplate,
-      {
-        resetUrl: `${appUrl}/auth/password-reset?token=${params.token}`,
-        expiresInMinutes: params.expiresInMinutes ?? 60,
-      },
-      { to: { email: params.email } },
-    );
-  } catch (error) {
-    // forgotPasswordAction всегда отвечает клиенту "успех" независимо от
-    // того, найден ли email — это защита от email enumeration (см. её
-    // комментарий). Пробрасывать ошибку сюда бессмысленно: caller всё
-    // равно не может honestly сообщить о сбое, не сломав этот контракт, —
-    // поэтому логируем и не мешаем остальному флоу, как и другие
-    // некритичные notify*.ts.
-    emailLogger.error("Не удалось отправить письмо восстановления пароля", {
-      email: params.email,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+	try {
+		const { appUrl } = getEmailConfig();
+		await emailService.send(
+			passwordResetEmailTemplate,
+			{
+				resetUrl: `${appUrl}/auth/password-reset?token=${params.token}`,
+				expiresInMinutes: params.expiresInMinutes ?? 60,
+			},
+			{ to: { email: params.email } },
+		);
+	} catch (error) {
+		// forgotPasswordAction всегда отвечает клиенту "успех" независимо от
+		// того, найден ли email — это защита от email enumeration (см. её
+		// комментарий). Пробрасывать ошибку сюда бессмысленно: caller всё
+		// равно не может honestly сообщить о сбое, не сломав этот контракт, —
+		// поэтому логируем и не мешаем остальному флоу, как и другие
+		// некритичные notify*.ts.
+		emailLogger.error("Не удалось отправить письмо восстановления пароля", {
+			email: params.email,
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
 }

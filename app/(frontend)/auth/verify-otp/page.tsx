@@ -10,21 +10,21 @@ import { getCachedSettings } from "@/payload/services/settings.service";
 import { getAuthImages } from "@/utils/settings-helpers";
 
 const COPY = {
-  login_2fa: {
-    title: "Подтверждение входа",
-    description: "Введите код, отправленный на",
-  },
-  email_verify: {
-    title: "Подтверждение email",
-    description: "Введите код, отправленный на",
-  },
-  // Вход через Яндекс ID в аккаунт, который уже есть: код доказывает, что
-  // почта аккаунта — ваша (см. modules/auth/oauth/resolve.ts).
-  link_oauth: {
-    title: "Подтвердите, что аккаунт ваш",
-    description:
-      "Аккаунт с этой почтой уже есть. Чтобы войти через Яндекс ID и привязать его, введите код, отправленный на",
-  },
+	login_2fa: {
+		title: "Подтверждение входа",
+		description: "Введите код, отправленный на",
+	},
+	email_verify: {
+		title: "Подтверждение email",
+		description: "Введите код, отправленный на",
+	},
+	// Вход через Яндекс ID в аккаунт, который уже есть: код доказывает, что
+	// почта аккаунта — ваша (см. modules/auth/oauth/resolve.ts).
+	link_oauth: {
+		title: "Подтвердите, что аккаунт ваш",
+		description:
+			"Аккаунт с этой почтой уже есть. Чтобы войти через Яндекс ID и привязать его, введите код, отправленный на",
+	},
 } as const;
 
 /**
@@ -34,35 +34,37 @@ const COPY = {
  * него на этом шаге нет и быть не должно (см. login.ts / verifyOtp.ts).
  */
 export default async function VerifyOtpPage() {
-  // payload-token существует только у полностью авторизованных — им сюда не надо.
-  if ((await cookies()).get("payload-token")) {
-    redirect("/profile");
-  }
+	// payload-token существует только у полностью авторизованных — им сюда не надо.
+	if ((await cookies()).get("payload-token")) {
+		redirect("/profile");
+	}
 
-  const pending = await readPendingAuth();
-  if (!pending) {
-    redirect("/auth/login");
-  }
+	const pending = await readPendingAuth();
+	if (!pending) {
+		redirect("/auth/login");
+	}
 
-  const copy = COPY[pending.type];
+	const copy = COPY[pending.type];
 
-  const settings = await getCachedSettings();
-  const { loginUrl, registerUrl } = getAuthImages(settings);
-  // email_verify относится к регистрации, login_2fa — ко входу.
-  const isRegister = pending.type === "email_verify";
+	const settings = await getCachedSettings();
+	const { loginUrl, registerUrl } = getAuthImages(settings);
+	// email_verify относится к регистрации, login_2fa — ко входу.
+	const isRegister = pending.type === "email_verify";
 
-  return (
-    <AuthShell
-      imageUrl={isRegister ? registerUrl : loginUrl}
-      imageAlt={isRegister ? "Подтверждение регистрации" : "Подтверждение входа"}
-      variant={isRegister ? "register" : "login"}
-    >
-      <OtpForm
-        type={pending.type}
-        email={pending.email}
-        title={copy.title}
-        description={copy.description}
-      />
-    </AuthShell>
-  );
+	return (
+		<AuthShell
+			imageUrl={isRegister ? registerUrl : loginUrl}
+			imageAlt={
+				isRegister ? "Подтверждение регистрации" : "Подтверждение входа"
+			}
+			variant={isRegister ? "register" : "login"}
+		>
+			<OtpForm
+				type={pending.type}
+				email={pending.email}
+				title={copy.title}
+				description={copy.description}
+			/>
+		</AuthShell>
+	);
 }

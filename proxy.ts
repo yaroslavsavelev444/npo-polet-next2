@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PENDING_AUTH_COOKIE } from "./src/modules/auth/lib/pendingAuth.ts";
-import { ALLOWED_MAP_FRAME_SRC } from "./src/modules/contact/lib/map-embed.ts";
-import { ALLOWED_EMBED_FRAME_SRC } from "./src/modules/knowledge/lib/videoEmbed.ts";
 import { resolveSafeRedirect } from "./src/modules/auth/lib/safeRedirect.ts";
 import { resolveSessionStatus } from "./src/modules/auth/lib/session.ts";
+import { ALLOWED_MAP_FRAME_SRC } from "./src/modules/contact/lib/map-embed.ts";
+import { ALLOWED_EMBED_FRAME_SRC } from "./src/modules/knowledge/lib/videoEmbed.ts";
 import { getPayloadInstance } from "./src/payload/services/getPayload.ts";
 
 // ── Защищённые пути (требуют завершённой авторизации) ────────────────────────
@@ -16,22 +16,22 @@ const OTP_PATH = "/auth/verify-otp";
 // авторизованному пользователю тут делать нечего (verify-otp обрабатывается
 // отдельно — это состояние №2, а не гостевая страница).
 const GUEST_AUTH_PATHS = [
-  "/auth/login",
-  "/auth/register",
-  "/auth/forgot-password",
-  // /auth/password-reset сюда НЕ входит: ссылку из письма открывает и
-  // вошедший покупатель — так задаёт пароль аккаунт, заведённый через
-  // Яндекс ID («Задать пароль» в кабинете). Сброс пароля всё равно завершает
-  // все сессии (resetPasswordAction), так что гостевой редирект там не нужен.
-  // Последний шаг регистрации через Яндекс ID. Сами /auth/yandex/start и
-  // /callback сюда не входят: привязку из кабинета начинает вошедший.
-  "/auth/yandex/complete",
+	"/auth/login",
+	"/auth/register",
+	"/auth/forgot-password",
+	// /auth/password-reset сюда НЕ входит: ссылку из письма открывает и
+	// вошедший покупатель — так задаёт пароль аккаунт, заведённый через
+	// Яндекс ID («Задать пароль» в кабинете). Сброс пароля всё равно завершает
+	// все сессии (resetPasswordAction), так что гостевой редирект там не нужен.
+	// Последний шаг регистрации через Яндекс ID. Сами /auth/yandex/start и
+	// /callback сюда не входят: привязку из кабинета начинает вошедший.
+	"/auth/yandex/complete",
 ];
 
 function isGuestAuthPath(pathname: string): boolean {
-  return GUEST_AUTH_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+	return GUEST_AUTH_PATHS.some(
+		(path) => pathname === path || pathname.startsWith(`${path}/`),
+	);
 }
 
 /**
@@ -42,12 +42,12 @@ function isGuestAuthPath(pathname: string): boolean {
  * и петля переадресаций.
  */
 function safeRedirectTarget(req: NextRequest): string {
-  return resolveSafeRedirect(req.nextUrl.searchParams.get("from"), {
-    origin: req.nextUrl.origin,
-    fallback: "/profile",
-    isDisallowedTarget: (pathname) =>
-      isGuestAuthPath(pathname) || pathname === OTP_PATH,
-  });
+	return resolveSafeRedirect(req.nextUrl.searchParams.get("from"), {
+		origin: req.nextUrl.origin,
+		fallback: "/profile",
+		isDisallowedTarget: (pathname) =>
+			isGuestAuthPath(pathname) || pathname === OTP_PATH,
+	});
 }
 
 /**
@@ -91,34 +91,37 @@ function safeRedirectTarget(req: NextRequest): string {
  * ws(s) WebSocket.
  */
 function supportGatewaySources(): string {
-  const raw = process.env.SUPPORT_GATEWAY_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (!raw) return "";
-  try {
-    const url = new URL(raw);
-    const ws = `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}`;
-    return process.env.SUPPORT_GATEWAY_PUBLIC_URL ? ` ${url.origin} ${ws}` : ` ${ws}`;
-  } catch {
-    return "";
-  }
+	const raw =
+		process.env.SUPPORT_GATEWAY_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL;
+	if (!raw) return "";
+	try {
+		const url = new URL(raw);
+		const ws = `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}`;
+		return process.env.SUPPORT_GATEWAY_PUBLIC_URL
+			? ` ${url.origin} ${ws}`
+			: ` ${ws}`;
+	} catch {
+		return "";
+	}
 }
 
 function buildCsp(nonce: string, isDev: boolean): string {
-  const directives = [
-    `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'unsafe-inline'`,
-    `img-src 'self' data: blob: https:`,
-    `font-src 'self' data:`,
-    `connect-src 'self' https://mc.yandex.ru https://mc.yandex.com${supportGatewaySources()}${isDev ? " ws: wss:" : ""}`,
-    `frame-src 'self' https://mc.yandex.ru ${ALLOWED_EMBED_FRAME_SRC.join(" ")} ${ALLOWED_MAP_FRAME_SRC.join(" ")}`,
-    `worker-src 'self' blob:`,
-    `object-src 'none'`,
-    `base-uri 'self'`,
-    `form-action 'self'`,
-    `frame-ancestors 'self'`,
-    ...(isDev ? [] : [`upgrade-insecure-requests`]),
-  ];
-  return directives.join("; ");
+	const directives = [
+		`default-src 'self'`,
+		`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+		`style-src 'self' 'unsafe-inline'`,
+		`img-src 'self' data: blob: https:`,
+		`font-src 'self' data:`,
+		`connect-src 'self' https://mc.yandex.ru https://mc.yandex.com${supportGatewaySources()}${isDev ? " ws: wss:" : ""}`,
+		`frame-src 'self' https://mc.yandex.ru ${ALLOWED_EMBED_FRAME_SRC.join(" ")} ${ALLOWED_MAP_FRAME_SRC.join(" ")}`,
+		`worker-src 'self' blob:`,
+		`object-src 'none'`,
+		`base-uri 'self'`,
+		`form-action 'self'`,
+		`frame-ancestors 'self'`,
+		...(isDev ? [] : [`upgrade-insecure-requests`]),
+	];
+	return directives.join("; ");
 }
 
 /**
@@ -141,23 +144,23 @@ function buildCsp(nonce: string, isDev: boolean): string {
  * свой разбор, вторые форм Server Actions не принимают вовсе.
  */
 async function isMalformedFormPost(req: NextRequest): Promise<boolean> {
-  if (req.method !== "POST") return false;
-  if (req.nextUrl.pathname.startsWith("/api")) return false;
-  if (req.headers.has("next-action")) return false;
-  const contentType = req.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
-    return false;
-  }
+	if (req.method !== "POST") return false;
+	if (req.nextUrl.pathname.startsWith("/api")) return false;
+	if (req.headers.has("next-action")) return false;
+	const contentType = req.headers.get("content-type") ?? "";
+	if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+		return false;
+	}
 
-  try {
-    const form = await req.clone().formData();
-    for (const key of form.keys()) {
-      if (key.startsWith("$ACTION_")) return false;
-    }
-    return true;
-  } catch {
-    return true;
-  }
+	try {
+		const form = await req.clone().formData();
+		for (const key of form.keys()) {
+			if (key.startsWith("$ACTION_")) return false;
+		}
+		return true;
+	} catch {
+		return true;
+	}
 }
 
 /**
@@ -195,180 +198,180 @@ async function isMalformedFormPost(req: NextRequest): Promise<boolean> {
 const CROSS_SITE_GUEST_PATHS = ["/auth/yandex/start"];
 
 function isCrossSitePageNavigation(req: NextRequest): boolean {
-  const { pathname } = req.nextUrl;
-  return (
-    (req.method === "GET" || req.method === "HEAD") &&
-    req.headers.get("sec-fetch-mode") === "navigate" &&
-    req.headers.get("sec-fetch-site") === "cross-site" &&
-    !req.headers.has("origin") &&
-    !pathname.startsWith("/api") &&
-    !CROSS_SITE_GUEST_PATHS.includes(pathname)
-  );
+	const { pathname } = req.nextUrl;
+	return (
+		(req.method === "GET" || req.method === "HEAD") &&
+		req.headers.get("sec-fetch-mode") === "navigate" &&
+		req.headers.get("sec-fetch-site") === "cross-site" &&
+		!req.headers.has("origin") &&
+		!pathname.startsWith("/api") &&
+		!CROSS_SITE_GUEST_PATHS.includes(pathname)
+	);
 }
 
 export async function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+	const { pathname } = req.nextUrl;
 
-  if (await isMalformedFormPost(req)) {
-    return new NextResponse("Bad Request", {
-      status: 400,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  }
-  const host = req.headers.get("host")?.split(":")[0] ?? "";
-  const adminHost = process.env.ADMIN_HOSTNAME; // напр. admin.npo-polet.ru
+	if (await isMalformedFormPost(req)) {
+		return new NextResponse("Bad Request", {
+			status: 400,
+			headers: { "Content-Type": "text/plain; charset=utf-8" },
+		});
+	}
+	const host = req.headers.get("host")?.split(":")[0] ?? "";
+	const adminHost = process.env.ADMIN_HOSTNAME; // напр. admin.npo-polet.ru
 
-  if (adminHost) {
-    const isAdminRoute =
-      pathname.startsWith("/admin") ||
-      pathname.startsWith("/api") ||
-      pathname.startsWith("/_next") ||
-      pathname.includes(".");
+	if (adminHost) {
+		const isAdminRoute =
+			pathname.startsWith("/admin") ||
+			pathname.startsWith("/api") ||
+			pathname.startsWith("/_next") ||
+			pathname.includes(".");
 
-    if (host === adminHost) {
-      // На admin-домене доступны только панель и Payload API
-      if (!isAdminRoute) {
-        return NextResponse.redirect(new URL("/admin", req.url));
-      }
-    } else {
-      // На витрине /admin полностью недоступен. Рерайт на несуществующий
-      // путь отдаёт кастомную 404 (app/global-not-found.tsx) со статусом 404 —
-      // то есть снаружи админки на этом домене просто нет, без намёка на
-      // редирект или запрет.
-      if (pathname.startsWith("/admin")) {
-        return NextResponse.rewrite(new URL("/404", req.url));
-      }
-    }
-  }
+		if (host === adminHost) {
+			// На admin-домене доступны только панель и Payload API
+			if (!isAdminRoute) {
+				return NextResponse.redirect(new URL("/admin", req.url));
+			}
+		} else {
+			// На витрине /admin полностью недоступен. Рерайт на несуществующий
+			// путь отдаёт кастомную 404 (app/global-not-found.tsx) со статусом 404 —
+			// то есть снаружи админки на этом домене просто нет, без намёка на
+			// редирект или запрет.
+			if (pathname.startsWith("/admin")) {
+				return NextResponse.rewrite(new URL("/404", req.url));
+			}
+		}
+	}
 
-  // ── 1. Служебные пути ── пропускаем без проверок и без CSP ────────────────
-  // CSP с nonce сюда не вешаем намеренно: /admin — это панель Payload со своим
-  // бандлом (строгий script-src мог бы её сломать), а /api и статика — не
-  // документы с inline-скриптами. Строгий CSP получают только storefront-
-  // страницы ниже.
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/api/payload") ||
-    pathname.startsWith("/api/auth/session-status") ||
-    // Файлы вложений чата ставят себе собственный, более строгий CSP
-    // (sandbox, default-src 'none' — app/api/support/attachments/[id]):
-    // присланный покупателем файл не должен получить права страницы
-    // витрины. CSP витрины поверх него этот запрет отменял бы.
-    pathname.startsWith("/api/support/attachments/") ||
-    pathname.startsWith("/admin") ||
-    pathname.includes(".")
-  ) {
-    return NextResponse.next();
-  }
+	// ── 1. Служебные пути ── пропускаем без проверок и без CSP ────────────────
+	// CSP с nonce сюда не вешаем намеренно: /admin — это панель Payload со своим
+	// бандлом (строгий script-src мог бы её сломать), а /api и статика — не
+	// документы с inline-скриптами. Строгий CSP получают только storefront-
+	// страницы ниже.
+	if (
+		pathname.startsWith("/_next") ||
+		pathname.startsWith("/api/payload") ||
+		pathname.startsWith("/api/auth/session-status") ||
+		// Файлы вложений чата ставят себе собственный, более строгий CSP
+		// (sandbox, default-src 'none' — app/api/support/attachments/[id]):
+		// присланный покупателем файл не должен получить права страницы
+		// витрины. CSP витрины поверх него этот запрет отменял бы.
+		pathname.startsWith("/api/support/attachments/") ||
+		pathname.startsWith("/admin") ||
+		pathname.includes(".")
+	) {
+		return NextResponse.next();
+	}
 
-  // ── CSP: одноразовый nonce на запрос ──────────────────────────────────────
-  // Генерируем nonce и кладём его И в заголовок запроса x-nonce (его читает
-  // <JsonLd> и сам Next для своих скриптов), И в CSP заголовок ответа. Все
-  // storefront-ответы ниже проходят через render()/redirectTo(), чтобы CSP
-  // гарантированно попадал на каждый из них.
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = buildCsp(nonce, process.env.NODE_ENV !== "production");
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("Content-Security-Policy", csp);
-  if (isCrossSitePageNavigation(req)) {
-    requestHeaders.set("sec-fetch-site", "none");
-  }
+	// ── CSP: одноразовый nonce на запрос ──────────────────────────────────────
+	// Генерируем nonce и кладём его И в заголовок запроса x-nonce (его читает
+	// <JsonLd> и сам Next для своих скриптов), И в CSP заголовок ответа. Все
+	// storefront-ответы ниже проходят через render()/redirectTo(), чтобы CSP
+	// гарантированно попадал на каждый из них.
+	const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+	const csp = buildCsp(nonce, process.env.NODE_ENV !== "production");
+	const requestHeaders = new Headers(req.headers);
+	requestHeaders.set("x-nonce", nonce);
+	requestHeaders.set("Content-Security-Policy", csp);
+	if (isCrossSitePageNavigation(req)) {
+		requestHeaders.set("sec-fetch-site", "none");
+	}
 
-  const applyCsp = (res: NextResponse): NextResponse => {
-    res.headers.set("Content-Security-Policy", csp);
-    return res;
-  };
-  // Рендер storefront-страницы: пробрасываем изменённые заголовки запроса
-  // (чтобы Next проставил nonce своим скриптам) и вешаем CSP на ответ.
-  const render = (): NextResponse =>
-    applyCsp(NextResponse.next({ request: { headers: requestHeaders } }));
-  const redirectTo = (url: URL): NextResponse =>
-    applyCsp(NextResponse.redirect(url));
+	const applyCsp = (res: NextResponse): NextResponse => {
+		res.headers.set("Content-Security-Policy", csp);
+		return res;
+	};
+	// Рендер storefront-страницы: пробрасываем изменённые заголовки запроса
+	// (чтобы Next проставил nonce своим скриптам) и вешаем CSP на ответ.
+	const render = (): NextResponse =>
+		applyCsp(NextResponse.next({ request: { headers: requestHeaders } }));
+	const redirectTo = (url: URL): NextResponse =>
+		applyCsp(NextResponse.redirect(url));
 
-  const redirectedFrom = req.nextUrl.searchParams.get("_r");
-  if (redirectedFrom === pathname) {
-    // Что-то пошло не так — не редиректим повторно на тот же путь,
-    // пропускаем дальше, чтобы не зациклиться
-    return render();
-  }
+	const redirectedFrom = req.nextUrl.searchParams.get("_r");
+	if (redirectedFrom === pathname) {
+		// Что-то пошло не так — не редиректим повторно на тот же путь,
+		// пропускаем дальше, чтобы не зациклиться
+		return render();
+	}
 
-  // Три состояния пользователя различимы уже по cookies:
-  // 1. нет ничего                     — не авторизован
-  // 2. только pending-auth челлендж   — пароль введён, OTP ещё не подтверждён
-  // 3. payload-token                  — полностью авторизован (токен выдаётся
-  //                                     ТОЛЬКО после успешного OTP,
-  //                                     см. verifyOtp.ts)
-  const payloadToken = req.cookies.get("payload-token")?.value;
-  const sessionId = req.cookies.get("session-id")?.value;
-  const hasPendingAuth = req.cookies.has(PENDING_AUTH_COOKIE);
+	// Три состояния пользователя различимы уже по cookies:
+	// 1. нет ничего                     — не авторизован
+	// 2. только pending-auth челлендж   — пароль введён, OTP ещё не подтверждён
+	// 3. payload-token                  — полностью авторизован (токен выдаётся
+	//                                     ТОЛЬКО после успешного OTP,
+	//                                     см. verifyOtp.ts)
+	const payloadToken = req.cookies.get("payload-token")?.value;
+	const sessionId = req.cookies.get("session-id")?.value;
+	const hasPendingAuth = req.cookies.has(PENDING_AUTH_COOKIE);
 
-  // ── 2. Проверяем, является ли путь защищённым ──────────────────────────────
-  const isProtected = PROTECTED_PATHS.some((path) => pathname.startsWith(path));
+	// ── 2. Проверяем, является ли путь защищённым ──────────────────────────────
+	const isProtected = PROTECTED_PATHS.some((path) => pathname.startsWith(path));
 
-  // ── 3. Если путь НЕ защищён — пропускаем без дополнительных проверок ──────
-  if (!isProtected) {
-    // Зеркало защиты ниже (гость → на логин): полностью авторизованному
-    // пользователю нечего делать на гостевых страницах входа/регистрации —
-    // уводим в кабинет (или на исходный путь из ?from=). Опираемся на наличие
-    // payload-token так же, как OTP-гейт: устаревший токен само-починится на
-    // защищённом пути (шаг 5 удалит куки и вернёт на логин).
-    if (payloadToken && isGuestAuthPath(pathname)) {
-      return redirectTo(new URL(safeRedirectTarget(req), req.url));
-    }
+	// ── 3. Если путь НЕ защищён — пропускаем без дополнительных проверок ──────
+	if (!isProtected) {
+		// Зеркало защиты ниже (гость → на логин): полностью авторизованному
+		// пользователю нечего делать на гостевых страницах входа/регистрации —
+		// уводим в кабинет (или на исходный путь из ?from=). Опираемся на наличие
+		// payload-token так же, как OTP-гейт: устаревший токен само-починится на
+		// защищённом пути (шаг 5 удалит куки и вернёт на логин).
+		if (payloadToken && isGuestAuthPath(pathname)) {
+			return redirectTo(new URL(safeRedirectTarget(req), req.url));
+		}
 
-    // Единственное исключение: /auth/verify-otp — экран состояния №2
-    if (pathname === OTP_PATH) {
-      // Уже полностью авторизован — на OTP делать нечего
-      if (payloadToken) {
-        return redirectTo(new URL("/profile", req.url));
-      }
-      // Нет незавершённого входа — вводить нечего, отправляем на логин
-      if (!hasPendingAuth) {
-        const loginUrl = new URL("/auth/login", req.url);
-        loginUrl.searchParams.set("from", pathname);
-        return redirectTo(loginUrl);
-      }
-      // Пароль введён, код ждёт — показываем страницу ввода OTP
-      return render();
-    }
+		// Единственное исключение: /auth/verify-otp — экран состояния №2
+		if (pathname === OTP_PATH) {
+			// Уже полностью авторизован — на OTP делать нечего
+			if (payloadToken) {
+				return redirectTo(new URL("/profile", req.url));
+			}
+			// Нет незавершённого входа — вводить нечего, отправляем на логин
+			if (!hasPendingAuth) {
+				const loginUrl = new URL("/auth/login", req.url);
+				loginUrl.searchParams.set("from", pathname);
+				return redirectTo(loginUrl);
+			}
+			// Пароль введён, код ждёт — показываем страницу ввода OTP
+			return render();
+		}
 
-    // Все остальные публичные пути — пропускаем
-    return render();
-  }
+		// Все остальные публичные пути — пропускаем
+		return render();
+	}
 
-  // ── 4. Защищённый путь: проверяем наличие токена ──────────────────────────
-  if (!payloadToken) {
-    // Состояние №2 (челлендж есть, кода ещё не было) — это НЕ авторизация:
-    // такому пользователю здесь так же нечего делать, как и гостю. Отправляем
-    // дальше вводить код.
-    const target = hasPendingAuth ? OTP_PATH : "/auth/login";
-    const url = new URL(target, req.url);
-    if (!hasPendingAuth) url.searchParams.set("from", pathname);
-    return redirectTo(url);
-  }
+	// ── 4. Защищённый путь: проверяем наличие токена ──────────────────────────
+	if (!payloadToken) {
+		// Состояние №2 (челлендж есть, кода ещё не было) — это НЕ авторизация:
+		// такому пользователю здесь так же нечего делать, как и гостю. Отправляем
+		// дальше вводить код.
+		const target = hasPendingAuth ? OTP_PATH : "/auth/login";
+		const url = new URL(target, req.url);
+		if (!hasPendingAuth) url.searchParams.set("from", pathname);
+		return redirectTo(url);
+	}
 
-  // ── 5. Проверяем статус сессии ───────────────────────────────────────────
-  // Отдельной проверки 2FA здесь больше нет и не должно быть: payload-token
-  // выдаётся только после успешного OTP (см. verifyOtp.ts), поэтому его
-  // наличие УЖЕ означает пройденный второй фактор. Раньше гейт опирался на
-  // поле users.twoFAVerified, которое остаётся true 24 часа после первого
-  // подтверждения — из-за чего при повторном входе в этом окне OTP
-  // пропускался полностью.
-  const status = await checkSessionStatus(requestHeaders, sessionId);
+	// ── 5. Проверяем статус сессии ───────────────────────────────────────────
+	// Отдельной проверки 2FA здесь больше нет и не должно быть: payload-token
+	// выдаётся только после успешного OTP (см. verifyOtp.ts), поэтому его
+	// наличие УЖЕ означает пройденный второй фактор. Раньше гейт опирался на
+	// поле users.twoFAVerified, которое остаётся true 24 часа после первого
+	// подтверждения — из-за чего при повторном входе в этом окне OTP
+	// пропускался полностью.
+	const status = await checkSessionStatus(requestHeaders, sessionId);
 
-  if (!status) {
-    // JWT есть, но сессия отозвана или истекла → чистим куки и на логин
-    const response = applyCsp(
-      NextResponse.redirect(new URL("/auth/login", req.url)),
-    );
-    response.cookies.delete("payload-token");
-    response.cookies.delete("session-id");
-    return response;
-  }
+	if (!status) {
+		// JWT есть, но сессия отозвана или истекла → чистим куки и на логин
+		const response = applyCsp(
+			NextResponse.redirect(new URL("/auth/login", req.url)),
+		);
+		response.cookies.delete("payload-token");
+		response.cookies.delete("session-id");
+		return response;
+	}
 
-  // ── 6. Всё хорошо: вход завершён ──────────────────────────────────────────
-  return render();
+	// ── 6. Всё хорошо: вход завершён ──────────────────────────────────────────
+	return render();
 }
 
 // ── checkSessionStatus ─────────────────────────────────────────────────────────
@@ -390,26 +393,26 @@ export async function proxy(req: NextRequest) {
 // Заголовки — уже подготовленные для рендера (requestHeaders в proxy()), а не
 // исходные: гейт должен видеть пользователя так же, как страница за ним.
 async function checkSessionStatus(
-  headers: Headers,
-  sessionId: string | undefined,
+	headers: Headers,
+	sessionId: string | undefined,
 ): Promise<{ userId: string } | null> {
-  const payload = await getPayloadInstance();
-  const status = await resolveSessionStatus(payload, headers, sessionId);
-  return status ? { userId: status.userId } : null;
+	const payload = await getPayloadInstance();
+	const status = await resolveSessionStatus(payload, headers, sessionId);
+	return status ? { userId: status.userId } : null;
 }
 
 // ── Matcher ───────────────────────────────────────────────────────────────────
 // Указываем на каких путях запускать middleware.
 // Исключаем статику Next.js явно — это быстрее чем проверка в коде.
 export const config = {
-  matcher: [
-    /*
-     * Запускаем на всех путях КРОМЕ:
-     * - _next/static  — статические файлы Next.js
-     * - _next/image   — оптимизация изображений
-     * - favicon.ico
-     * - файлы с расширением (svg, png, jpg и т.д.)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
-  ],
+	matcher: [
+		/*
+		 * Запускаем на всех путях КРОМЕ:
+		 * - _next/static  — статические файлы Next.js
+		 * - _next/image   — оптимизация изображений
+		 * - favicon.ico
+		 * - файлы с расширением (svg, png, jpg и т.д.)
+		 */
+		"/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+	],
 };

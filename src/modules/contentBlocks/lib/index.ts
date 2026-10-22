@@ -1,2 +1,2 @@
 // services/content-blocks/index.ts
-export * from '@/payload/services/content-blocks.service'
+export * from "@/payload/services/content-blocks.service";

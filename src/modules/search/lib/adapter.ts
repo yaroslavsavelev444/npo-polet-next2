@@ -1,10 +1,13 @@
-import type { Media, Product } from '@/payload-types'
-import { calculatePriceBreakdown, mapDiscountPercentage } from '@/modules/productCard'
-import { getProductHrefFromDoc } from '@/modules/productCard/lib/routing'
-import type { SearchResultProduct } from '../types'
+import {
+	calculatePriceBreakdown,
+	mapDiscountPercentage,
+} from "@/modules/productCard";
+import { getProductHrefFromDoc } from "@/modules/productCard/lib/routing";
+import type { Media, Product } from "@/payload-types";
+import type { SearchResultProduct } from "../types";
 
 function isPopulatedMedia(value: unknown): value is Media {
-  return typeof value === 'object' && value !== null
+	return typeof value === "object" && value !== null;
 }
 
 /**
@@ -13,40 +16,43 @@ function isPopulatedMedia(value: unknown): value is Media {
  * в поиске всегда совпадала с ценой на карточке товара.
  */
 export function mapProductToSearchResult(
-  product: Product,
-  matchedSpec: SearchResultProduct['matchedSpec'] = null,
+	product: Product,
+	matchedSpec: SearchResultProduct["matchedSpec"] = null,
 ): SearchResultProduct {
-  const category =
-    typeof product.category === 'object' && product.category !== null
-      ? {
-          id: String(product.category.id),
-          slug: product.category.slug,
-          name: product.category.name,
-        }
-      : null
+	const category =
+		typeof product.category === "object" && product.category !== null
+			? {
+					id: String(product.category.id),
+					slug: product.category.slug,
+					name: product.category.name,
+				}
+			: null;
 
-  const firstImage = product.images?.[0]
-  const media = isPopulatedMedia(firstImage) ? firstImage : null
+	const firstImage = product.images?.[0];
+	const media = isPopulatedMedia(firstImage) ? firstImage : null;
 
-  const originalPrice = product.pricing?.priceForIndividual ?? 0
-  const discountInfo = mapDiscountPercentage(product.pricing?.discount, originalPrice)
-  const { finalPrice, hasDiscount } = calculatePriceBreakdown(originalPrice, {
-    isActive: discountInfo.isActive,
-    percentage: discountInfo.percentage,
-  })
+	const originalPrice = product.pricing?.priceForIndividual ?? 0;
+	const discountInfo = mapDiscountPercentage(
+		product.pricing?.discount,
+		originalPrice,
+	);
+	const { finalPrice, hasDiscount } = calculatePriceBreakdown(originalPrice, {
+		isActive: discountInfo.isActive,
+		percentage: discountInfo.percentage,
+	});
 
-  return {
-    id: String(product.id),
-    title: product.title,
-    slug: product.slug ?? '',
-    href: getProductHrefFromDoc(product),
-    finalPrice,
-    originalPrice,
-    hasDiscount,
-    imageUrl: media?.sizes?.thumbnail?.url || media?.url || null,
-    imageAlt: media?.alt || product.title,
-    category,
-    status: product.inventory?.status ?? 'available',
-    matchedSpec,
-  }
+	return {
+		id: String(product.id),
+		title: product.title,
+		slug: product.slug ?? "",
+		href: getProductHrefFromDoc(product),
+		finalPrice,
+		originalPrice,
+		hasDiscount,
+		imageUrl: media?.sizes?.thumbnail?.url || media?.url || null,
+		imageAlt: media?.alt || product.title,
+		category,
+		status: product.inventory?.status ?? "available",
+		matchedSpec,
+	};
 }

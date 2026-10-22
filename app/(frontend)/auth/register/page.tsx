@@ -14,22 +14,22 @@ import { RegisterPageClient } from "./RegisterPageClient";
  * Нет клиентского fetch — данные готовы при рендере.
  */
 export default async function RegisterPage() {
-  const payload = await getPayloadInstance();
+	const payload = await getPayloadInstance();
 
-  const [consentList, settings] = await Promise.all([
-    listConsentsForAcceptance(payload),
-    getCachedSettings(),
-  ]);
+	const [consentList, settings] = await Promise.all([
+		listConsentsForAcceptance(payload),
+		getCachedSettings(),
+	]);
 
-  const { registerUrl } = getAuthImages(settings);
+	const { registerUrl } = getAuthImages(settings);
 
-  return (
-    <AuthShell
-      imageUrl={registerUrl}
-      imageAlt="Регистрация в личном кабинете"
-      variant="register"
-    >
-      <RegisterPageClient consents={consentList} />
-    </AuthShell>
-  );
+	return (
+		<AuthShell
+			imageUrl={registerUrl}
+			imageAlt="Регистрация в личном кабинете"
+			variant="register"
+		>
+			<RegisterPageClient consents={consentList} />
+		</AuthShell>
+	);
 }

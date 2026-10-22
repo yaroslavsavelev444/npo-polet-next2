@@ -9,10 +9,7 @@ import type {
 } from "../../../payload-types";
 import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
-import {
-	noReviewYet,
-	PRODUCT_STILL_ON_SALE,
-} from "./review-eligibility";
+import { noReviewYet, PRODUCT_STILL_ON_SALE } from "./review-eligibility";
 
 /**
  * Сервис отзывов о товарах.

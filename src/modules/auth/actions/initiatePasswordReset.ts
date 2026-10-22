@@ -8,14 +8,14 @@ import { notifyPasswordReset } from "@/services/notifications/notifyPasswordRese
 import { RATE_LIMITS } from "../lib/rateLimit";
 import { revokeAllUserSessions } from "../lib/session";
 import {
-  actionError,
-  actionSuccess,
-  formValues,
-  getRequestMeta,
+	actionError,
+	actionSuccess,
+	formValues,
+	getRequestMeta,
 } from "../lib/utils";
 import {
-  forgotPasswordSchema,
-  resetPasswordSchema,
+	forgotPasswordSchema,
+	resetPasswordSchema,
 } from "../schemas/passwordReset.schema";
 
 /**
@@ -33,58 +33,58 @@ import {
  * Всегда возвращаем success — защита от email enumeration.
  */
 export async function forgotPasswordAction(
-  _prevState: unknown,
-  formData: FormData,
+	_prevState: unknown,
+	formData: FormData,
 ) {
-  // Возвращаем email форме: React сбрасывает неуправляемые поля после каждого
-  // form action, и без эха пользователь перенабирал бы адрес после rate limit
-  // или опечатки (см. AuthFormValues).
-  const echo = formValues(formData, ["email"]);
+	// Возвращаем email форме: React сбрасывает неуправляемые поля после каждого
+	// form action, и без эха пользователь перенабирал бы адрес после rate limit
+	// или опечатки (см. AuthFormValues).
+	const echo = formValues(formData, ["email"]);
 
-  const parsed = forgotPasswordSchema.safeParse({
-    email: formData.get("email"),
-  });
-  if (!parsed.success) {
-    return actionError(
-      "Введите корректный email",
-      parsed.error.flatten().fieldErrors,
-      undefined,
-      echo,
-    );
-  }
+	const parsed = forgotPasswordSchema.safeParse({
+		email: formData.get("email"),
+	});
+	if (!parsed.success) {
+		return actionError(
+			"Введите корректный email",
+			parsed.error.flatten().fieldErrors,
+			undefined,
+			echo,
+		);
+	}
 
-  const { email } = parsed.data;
-  const { ip } = await getRequestMeta();
+	const { email } = parsed.data;
+	const { ip } = await getRequestMeta();
 
-  // Rate limit
-  const rl = await RATE_LIMITS.forgotPassword(ip);
-  if (!rl.allowed) {
-    return actionError(
-      "Слишком много запросов. Попробуйте позже.",
-      undefined,
-      undefined,
-      echo,
-    );
-  }
+	// Rate limit
+	const rl = await RATE_LIMITS.forgotPassword(ip);
+	if (!rl.allowed) {
+		return actionError(
+			"Слишком много запросов. Попробуйте позже.",
+			undefined,
+			undefined,
+			echo,
+		);
+	}
 
-  const payload = await getPayloadInstance();
+	const payload = await getPayloadInstance();
 
-  // Возвращает token, если email найден, иначе null — оба случая не
-  // раскрываем клиенту (см. actionSuccess ниже, единый для обоих веток).
-  const token = await payload.forgotPassword({
-    collection: "users",
-    data: { email },
-    disableEmail: true,
-  });
+	// Возвращает token, если email найден, иначе null — оба случая не
+	// раскрываем клиенту (см. actionSuccess ниже, единый для обоих веток).
+	const token = await payload.forgotPassword({
+		collection: "users",
+		data: { email },
+		disableEmail: true,
+	});
 
-  if (token) {
-    await notifyPasswordReset({ email, token });
-  }
+	if (token) {
+		await notifyPasswordReset({ email, token });
+	}
 
-  // Всегда возвращаем success
-  return actionSuccess({
-    message: "Если аккаунт существует, письмо со ссылкой будет отправлено.",
-  });
+	// Всегда возвращаем success
+	return actionSuccess({
+		message: "Если аккаунт существует, письмо со ссылкой будет отправлено.",
+	});
 }
 
 /**
@@ -103,86 +103,86 @@ export async function forgotPasswordAction(
  *   - сбрасываем twoFAVerified
  */
 export async function resetPasswordAction(
-  _prevState: unknown,
-  formData: FormData,
+	_prevState: unknown,
+	formData: FormData,
 ) {
-  const parsed = resetPasswordSchema.safeParse({
-    token: formData.get("token"),
-    password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
-  });
+	const parsed = resetPasswordSchema.safeParse({
+		token: formData.get("token"),
+		password: formData.get("password"),
+		confirmPassword: formData.get("confirmPassword"),
+	});
 
-  if (!parsed.success) {
-    return actionError(
-      "Проверьте введённые данные",
-      parsed.error.flatten().fieldErrors,
-    );
-  }
+	if (!parsed.success) {
+		return actionError(
+			"Проверьте введённые данные",
+			parsed.error.flatten().fieldErrors,
+		);
+	}
 
-  const { token, password } = parsed.data;
-  const payload = await getPayloadInstance();
+	const { token, password } = parsed.data;
+	const payload = await getPayloadInstance();
 
-  try {
-    // Payload сам проверяет токен, его срок жизни и обновляет пароль
-    const result = await payload.resetPassword({
-      collection: "users",
-      data: { token, password },
-      overrideAccess: true,
-      context: AUTH_FLOW_CONTEXT, // ← вот это добавить
-    });
+	try {
+		// Payload сам проверяет токен, его срок жизни и обновляет пароль
+		const result = await payload.resetPassword({
+			collection: "users",
+			data: { token, password },
+			overrideAccess: true,
+			context: AUTH_FLOW_CONTEXT, // ← вот это добавить
+		});
 
-    // Payload возвращает { token, user } — используем user.id
-    const userId = String(result.user.id);
+		// Payload возвращает { token, user } — используем user.id
+		const userId = String(result.user.id);
 
-    // Сбрасываем 2FA флаг — при следующем входе потребуется заново.
-    // Делается ДО отзыва сессий намеренно: payload.update перезаписывает
-    // документ пользователя целиком тем, что прочитал перед записью, включая
-    // массив сессий Payload (users.sessions). Выполненный после отзыва, он бы
-    // вернул только что удалённые сессии обратно — и сброс пароля перестал бы
-    // инвалидировать старые токены.
-    await payload.update({
-      collection: "users",
-      id: userId,
-      data: {
-        twoFAVerified: false,
-        twoFAVerifiedAt: null,
-        // Аккаунт, заведённый через Яндекс ID, получил пароль, который знает
-        // сам покупатель: с этого момента ему доступны вход по паролю, смена
-        // пароля и отвязка Яндекса (см. modules/auth/oauth).
-        hasPassword: true,
-      },
-      overrideAccess: true,
-    });
+		// Сбрасываем 2FA флаг — при следующем входе потребуется заново.
+		// Делается ДО отзыва сессий намеренно: payload.update перезаписывает
+		// документ пользователя целиком тем, что прочитал перед записью, включая
+		// массив сессий Payload (users.sessions). Выполненный после отзыва, он бы
+		// вернул только что удалённые сессии обратно — и сброс пароля перестал бы
+		// инвалидировать старые токены.
+		await payload.update({
+			collection: "users",
+			id: userId,
+			data: {
+				twoFAVerified: false,
+				twoFAVerifiedAt: null,
+				// Аккаунт, заведённый через Яндекс ID, получил пароль, который знает
+				// сам покупатель: с этого момента ему доступны вход по паролю, смена
+				// пароля и отвязка Яндекса (см. modules/auth/oauth).
+				hasPassword: true,
+			},
+			overrideAccess: true,
+		});
 
-    // Отзываем все сессии (пароль сменился — старые сессии не должны
-    // работать). Сюда же попадает и сессия, которую payload.resetPassword
-    // завёл для возвращённого им токена: наружу мы его не отдаём, войти нужно
-    // заново.
-    await revokeAllUserSessions(payload, userId, "password_changed");
+		// Отзываем все сессии (пароль сменился — старые сессии не должны
+		// работать). Сюда же попадает и сессия, которую payload.resetPassword
+		// завёл для возвращённого им токена: наружу мы его не отдаём, войти нужно
+		// заново.
+		await revokeAllUserSessions(payload, userId, "password_changed");
 
-    await notifyPasswordChanged({
-      email: result.user.email as string,
-      userName: result.user.name as string,
-    });
-    void notify(payload, userId, "password_changed", {});
+		await notifyPasswordChanged({
+			email: result.user.email as string,
+			userName: result.user.name as string,
+		});
+		void notify(payload, userId, "password_changed", {});
 
-    return actionSuccess({
-      message: "Пароль успешно изменён. Войдите с новым паролем.",
-    });
-  } catch (err: unknown) {
-    // Payload бросает если токен невалиден/истёк
-    const message =
-      err instanceof Error ? err.message : "Ссылка недействительна";
+		return actionSuccess({
+			message: "Пароль успешно изменён. Войдите с новым паролем.",
+		});
+	} catch (err: unknown) {
+		// Payload бросает если токен невалиден/истёк
+		const message =
+			err instanceof Error ? err.message : "Ссылка недействительна";
 
-    if (
-      message.toLowerCase().includes("token") ||
-      message.toLowerCase().includes("expired")
-    ) {
-      return actionError(
-        "Ссылка для сброса пароля недействительна или истекла.",
-      );
-    }
+		if (
+			message.toLowerCase().includes("token") ||
+			message.toLowerCase().includes("expired")
+		) {
+			return actionError(
+				"Ссылка для сброса пароля недействительна или истекла.",
+			);
+		}
 
-    throw err;
-  }
+		throw err;
+	}
 }

@@ -1,8 +1,7 @@
 import type { BasePayload } from "payload";
 import { captureError } from "@/services/observability/capture";
+import type { AuthErrorCode, OtpType } from "../types";
 import { createOtp } from "./OtpStore";
-import type { AuthErrorCode } from "../types";
-import type { OtpType } from "../types";
 
 /**
  * Payload с Turbopack грузит несколько независимых копий пакета `payload`
@@ -17,12 +16,12 @@ import type { OtpType } from "../types";
  * похожего дублирования модулей в будущем.
  */
 function errorNameIs(err: unknown, name: string): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "name" in err &&
-    (err as { name?: unknown }).name === name
-  );
+	return (
+		typeof err === "object" &&
+		err !== null &&
+		"name" in err &&
+		(err as { name?: unknown }).name === name
+	);
 }
 
 /**
@@ -33,26 +32,26 @@ function errorNameIs(err: unknown, name: string): boolean {
  * data.errors — поэтому подобные проверки нельзя делать через err.message.
  */
 export function extractPayloadErrorFieldPaths(err: unknown): string[] {
-  const data = (err as { data?: { errors?: unknown } } | null | undefined)
-    ?.data;
-  const errors = data?.errors;
-  if (!Array.isArray(errors)) return [];
-  return errors
-    .map((e) => (e && typeof e === "object" && "path" in e ? e.path : null))
-    .filter((p): p is string => typeof p === "string");
+	const data = (err as { data?: { errors?: unknown } } | null | undefined)
+		?.data;
+	const errors = data?.errors;
+	if (!Array.isArray(errors)) return [];
+	return errors
+		.map((e) => (e && typeof e === "object" && "path" in e ? e.path : null))
+		.filter((p): p is string => typeof p === "string");
 }
 
 export function isFieldTakenError(err: unknown, fieldName: string): boolean {
-  if (err instanceof Error) {
-    if (
-      err.message.includes("duplicate") ||
-      err.message.includes("unique") ||
-      err.message.includes("already exists")
-    ) {
-      return true;
-    }
-  }
-  return extractPayloadErrorFieldPaths(err).includes(fieldName);
+	if (err instanceof Error) {
+		if (
+			err.message.includes("duplicate") ||
+			err.message.includes("unique") ||
+			err.message.includes("already exists")
+		) {
+			return true;
+		}
+	}
+	return extractPayloadErrorFieldPaths(err).includes(fieldName);
 }
 
 /**
@@ -61,8 +60,11 @@ export function isFieldTakenError(err: unknown, fieldName: string): boolean {
  * ошибок (письмом дежурному, см. services/observability).
  */
 export function logUnexpectedAuthError(scope: string, err: unknown): void {
-  const errorId = captureError(err, { source: "action", module: `auth/${scope}` });
-  console.error(`[auth:${scope}]`, err, { errorId });
+	const errorId = captureError(err, {
+		source: "action",
+		module: `auth/${scope}`,
+	});
+	console.error(`[auth:${scope}]`, err, { errorId });
 }
 
 /**
@@ -78,16 +80,16 @@ export function logUnexpectedAuthError(scope: string, err: unknown): void {
  * пароля в новый формат.
  */
 export function isAccountAccessDeniedError(err: unknown): boolean {
-  return (
-    errorNameIs(err, "LockedAuth") ||
-    errorNameIs(err, "AccountBlockedError") ||
-    errorNameIs(err, "AccountSuspendedError")
-  );
+	return (
+		errorNameIs(err, "LockedAuth") ||
+		errorNameIs(err, "AccountBlockedError") ||
+		errorNameIs(err, "AccountSuspendedError")
+	);
 }
 
 export interface AuthErrorClassification {
-  code: AuthErrorCode;
-  message: string;
+	code: AuthErrorCode;
+	message: string;
 }
 
 /**
@@ -105,30 +107,30 @@ export interface AuthErrorClassification {
  * узнавать, какие email зарегистрированы.
  */
 export function classifyLoginError(err: unknown): AuthErrorClassification {
-  if (errorNameIs(err, "LockedAuth")) {
-    return {
-      code: "account_locked",
-      message:
-        "Слишком много неудачных попыток входа. Аккаунт временно заблокирован, попробуйте позже.",
-    };
-  }
-  if (errorNameIs(err, "AccountBlockedError")) {
-    return {
-      code: "account_blocked",
-      message: (err as Error).message,
-    };
-  }
-  if (errorNameIs(err, "AccountSuspendedError")) {
-    return {
-      code: "account_suspended",
-      message: (err as Error).message,
-    };
-  }
-  // AuthenticationError (неверный email/пароль) попадает сюда же, в default.
-  // Его бросает и requireServerAuthFlow, когда payload.login() вызван без
-  // AUTH_FLOW_CONTEXT — намеренно неотличимо для клиента (см. докстринг хука);
-  // настоящая причина в таком случае пишется в лог сервера.
-  return { code: "invalid_credentials", message: "Неверный email или пароль" };
+	if (errorNameIs(err, "LockedAuth")) {
+		return {
+			code: "account_locked",
+			message:
+				"Слишком много неудачных попыток входа. Аккаунт временно заблокирован, попробуйте позже.",
+		};
+	}
+	if (errorNameIs(err, "AccountBlockedError")) {
+		return {
+			code: "account_blocked",
+			message: (err as Error).message,
+		};
+	}
+	if (errorNameIs(err, "AccountSuspendedError")) {
+		return {
+			code: "account_suspended",
+			message: (err as Error).message,
+		};
+	}
+	// AuthenticationError (неверный email/пароль) попадает сюда же, в default.
+	// Его бросает и requireServerAuthFlow, когда payload.login() вызван без
+	// AUTH_FLOW_CONTEXT — намеренно неотличимо для клиента (см. докстринг хука);
+	// настоящая причина в таком случае пишется в лог сервера.
+	return { code: "invalid_credentials", message: "Неверный email или пароль" };
 }
 
 /**
@@ -141,14 +143,14 @@ export function classifyLoginError(err: unknown): AuthErrorClassification {
  * кода.
  */
 export async function safeCreateOtp(
-  payload: BasePayload,
-  args: { userId: string | number; type: OtpType; ip: string },
-  scope: string,
+	payload: BasePayload,
+	args: { userId: string | number; type: OtpType; ip: string },
+	scope: string,
 ): Promise<string | null> {
-  try {
-    return await createOtp(payload, args);
-  } catch (err) {
-    logUnexpectedAuthError(scope, err);
-    return null;
-  }
+	try {
+		return await createOtp(payload, args);
+	} catch (err) {
+		logUnexpectedAuthError(scope, err);
+		return null;
+	}
 }

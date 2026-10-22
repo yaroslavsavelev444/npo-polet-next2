@@ -1,19 +1,19 @@
-import type { Block } from 'payload'
+import type { Block } from "payload";
 
 export const ImageBlock: Block = {
-  slug: 'image',
+	slug: "image",
 
-  fields: [
-    {
-      name: 'image',
-      type: 'relationship',
-      relationTo: 'media',
-      required: true,
-    },
+	fields: [
+		{
+			name: "image",
+			type: "relationship",
+			relationTo: "media",
+			required: true,
+		},
 
-    {
-      name: 'caption',
-      type: 'text',
-    },
-  ],
-}
+		{
+			name: "caption",
+			type: "text",
+		},
+	],
+};

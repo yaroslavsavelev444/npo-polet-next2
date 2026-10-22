@@ -22,8 +22,8 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { Queue } from "bullmq";
 import { sql } from "@payloadcms/db-postgres";
+import { Queue } from "bullmq";
 import { getPayload } from "payload";
 import config from "../../payload.config.ts";
 import { redisConfig } from "../../src/modules/auth/lib/redis-config.ts";

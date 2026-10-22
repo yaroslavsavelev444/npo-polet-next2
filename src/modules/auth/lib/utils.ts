@@ -1,6 +1,5 @@
-import { headers } from 'next/headers'
-import { AuthErrorCode, AuthFormValues } from '../types'
-
+import { headers } from "next/headers";
+import { AuthErrorCode, AuthFormValues } from "../types";
 
 /**
  * Извлекает IP и User-Agent из входящего запроса.
@@ -18,14 +17,14 @@ import { AuthErrorCode, AuthFormValues } from '../types'
  * XFF — на случай окружения без X-Real-IP; XFF[0] не используем никогда.
  */
 export async function getRequestMeta() {
-  const headersList = await headers()
-  const xff = headersList.get('x-forwarded-for')
-  const ip =
-    headersList.get('x-real-ip')?.trim() ||
-    xff?.split(',').pop()?.trim() ||
-    'unknown'
-  const userAgent = headersList.get('user-agent') ?? ''
-  return { ip, userAgent }
+	const headersList = await headers();
+	const xff = headersList.get("x-forwarded-for");
+	const ip =
+		headersList.get("x-real-ip")?.trim() ||
+		xff?.split(",").pop()?.trim() ||
+		"unknown";
+	const userAgent = headersList.get("user-agent") ?? "";
+	return { ip, userAgent };
 }
 
 /**
@@ -39,12 +38,12 @@ export async function getRequestMeta() {
  * (см. AuthFormValues). Пароли туда не кладём никогда.
  */
 export function actionError(
-  message: string,
-  fieldErrors?: Record<string, string[]>,
-  code?: AuthErrorCode,
-  values?: AuthFormValues,
+	message: string,
+	fieldErrors?: Record<string, string[]>,
+	code?: AuthErrorCode,
+	values?: AuthFormValues,
 ) {
-  return { success: false as const, error: message, fieldErrors, code, values }
+	return { success: false as const, error: message, fieldErrors, code, values };
 }
 
 /**
@@ -52,17 +51,17 @@ export function actionError(
  * даже тогда, когда валидация не прошла и типизированных данных ещё нет.
  */
 export function formValues(
-  formData: FormData,
-  fields: ReadonlyArray<keyof AuthFormValues>,
+	formData: FormData,
+	fields: ReadonlyArray<keyof AuthFormValues>,
 ): AuthFormValues {
-  const values: AuthFormValues = {}
-  for (const field of fields) {
-    const raw = formData.get(field)
-    if (typeof raw === 'string') values[field] = raw
-  }
-  return values
+	const values: AuthFormValues = {};
+	for (const field of fields) {
+		const raw = formData.get(field);
+		if (typeof raw === "string") values[field] = raw;
+	}
+	return values;
 }
 
 export function actionSuccess<T>(data: T) {
-  return { success: true as const, data }
+	return { success: true as const, data };
 }

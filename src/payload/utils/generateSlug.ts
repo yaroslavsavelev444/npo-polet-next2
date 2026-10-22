@@ -1,5 +1,5 @@
-import type { FieldHook } from 'payload'
-import { slugify } from 'transliteration'
+import type { FieldHook } from "payload";
+import { slugify } from "transliteration";
 
 /**
  * Автогенерация slug из названия. Используется как beforeValidate-хук поля
@@ -19,7 +19,7 @@ import { slugify } from 'transliteration'
  *    руками было нельзя (поле readOnly), и товар не заводился вообще.
  *    Коллизия разрешается числовым суффиксом: `setkomet`, `setkomet-2`, ...
  */
-const FALLBACK_BASE = 'item'
+const FALLBACK_BASE = "item";
 
 /**
  * Транслитерация названия в основу slug, без учёта занятости.
@@ -32,64 +32,65 @@ const FALLBACK_BASE = 'item'
  * бы маршрут, поэтому есть запасная основа.
  */
 export function buildSlugBase(source: string): string {
-  return (
-    slugify(source, {
-      lowercase: true,
-      separator: '-',
-      // strict: true,      // удаляет спецсимволы
-    }) || FALLBACK_BASE
-  )
+	return (
+		slugify(source, {
+			lowercase: true,
+			separator: "-",
+			// strict: true,      // удаляет спецсимволы
+		}) || FALLBACK_BASE
+	);
 }
 
 export const generateSlug: FieldHook = async ({
-  value,
-  data,
-  originalDoc,
-  req,
-  collection,
+	value,
+	data,
+	originalDoc,
+	req,
+	collection,
 }) => {
-  // Если slug уже задан (вручную или сгенерирован раньше) — не трогаем
-  if (typeof value === 'string' && value.trim()) return value
+	// Если slug уже задан (вручную или сгенерирован раньше) — не трогаем
+	if (typeof value === "string" && value.trim()) return value;
 
-  // Берём название из текущих данных (data) или из уже сохранённого документа.
-  // `title` — у товаров, `name` — у категорий.
-  const source = data?.name || data?.title || originalDoc?.name || originalDoc?.title
+	// Берём название из текущих данных (data) или из уже сохранённого документа.
+	// `title` — у товаров, `name` — у категорий.
+	const source =
+		data?.name || data?.title || originalDoc?.name || originalDoc?.title;
 
-  // У локализованных полей при записи сразу во все локали (locale: 'all') сюда
-  // приходит объект вида { ru, en }, а не строка. Слепой String() дал бы slug
-  // "object-object", поэтому такой ввод пропускаем.
-  if (!source || typeof source !== 'string') return value
+	// У локализованных полей при записи сразу во все локали (locale: 'all') сюда
+	// приходит объект вида { ru, en }, а не строка. Слепой String() дал бы slug
+	// "object-object", поэтому такой ввод пропускаем.
+	if (!source || typeof source !== "string") return value;
 
-  const base = buildSlugBase(source)
+	const base = buildSlugBase(source);
 
-  // На всякий случай: у полей глобалов collection === null, а без коллекции
-  // проверить занятость негде.
-  if (!collection) return base
+	// На всякий случай: у полей глобалов collection === null, а без коллекции
+	// проверить занятость негде.
+	if (!collection) return base;
 
-  // Один запрос вместо цикла точечных проверок: `like` в постгресе — это
-  // ILIKE %base%, то есть выдача заведомо шире нужного (сюда попадут и
-  // "setkomet-ruchnoy"). Это не мешает — ниже нас интересует лишь точное
-  // совпадение с base и base-N.
-  const { docs } = await req.payload.find({
-    collection: collection.slug,
-    where: { slug: { like: base } },
-    limit: 0,
-    pagination: false,
-    depth: 0,
-    overrideAccess: true,
-  })
+	// Один запрос вместо цикла точечных проверок: `like` в постгресе — это
+	// ILIKE %base%, то есть выдача заведомо шире нужного (сюда попадут и
+	// "setkomet-ruchnoy"). Это не мешает — ниже нас интересует лишь точное
+	// совпадение с base и base-N.
+	const { docs } = await req.payload.find({
+		collection: collection.slug,
+		where: { slug: { like: base } },
+		limit: 0,
+		pagination: false,
+		depth: 0,
+		overrideAccess: true,
+	});
 
-  const taken = new Set(
-    docs
-      .filter((doc) => doc.id !== originalDoc?.id)
-      .map((doc) => (doc as { slug?: string | null }).slug)
-      .filter(Boolean),
-  )
+	const taken = new Set(
+		docs
+			.filter((doc) => doc.id !== originalDoc?.id)
+			.map((doc) => (doc as { slug?: string | null }).slug)
+			.filter(Boolean),
+	);
 
-  if (!taken.has(base)) return base
+	if (!taken.has(base)) return base;
 
-  let suffix = 2
-  while (taken.has(`${base}-${suffix}`)) suffix += 1
+	let suffix = 2;
+	while (taken.has(`${base}-${suffix}`)) suffix += 1;
 
-  return `${base}-${suffix}`
-}
+	return `${base}-${suffix}`;
+};

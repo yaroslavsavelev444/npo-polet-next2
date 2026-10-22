@@ -50,7 +50,11 @@ test("количество — целое от 1 до 100 000", () => {
 });
 
 test("товар указывается числовым id, имя — не короче двух символов", () => {
-	assert.ok(!productRequestSchema.safeParse({ ...VALID, productId: "x" }).success);
-	assert.ok(!productRequestSchema.safeParse({ ...VALID, productId: "" }).success);
+	assert.ok(
+		!productRequestSchema.safeParse({ ...VALID, productId: "x" }).success,
+	);
+	assert.ok(
+		!productRequestSchema.safeParse({ ...VALID, productId: "" }).success,
+	);
 	assert.ok(!productRequestSchema.safeParse({ ...VALID, name: " И " }).success);
 });

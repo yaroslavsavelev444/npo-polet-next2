@@ -13,12 +13,12 @@ import { notificationsKeys } from "../queryKeys";
 const REFETCH_INTERVAL_MS = 60_000;
 
 export function useUnreadCount(initialCount: number) {
-  return useQuery({
-    queryKey: notificationsKeys.unreadCount(),
-    queryFn: fetchUnreadCount,
-    initialData: initialCount,
-    staleTime: 15_000,
-    refetchInterval: REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: true,
-  });
+	return useQuery({
+		queryKey: notificationsKeys.unreadCount(),
+		queryFn: fetchUnreadCount,
+		initialData: initialCount,
+		staleTime: 15_000,
+		refetchInterval: REFETCH_INTERVAL_MS,
+		refetchOnWindowFocus: true,
+	});
 }

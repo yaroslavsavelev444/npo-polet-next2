@@ -4,10 +4,7 @@
 		{
 			"name": "npo-polet-dev",
 			"runtimeExecutable": "npx",
-			"runtimeArgs": [
-				"next",
-				"dev"
-			],
+			"runtimeArgs": ["next", "dev"],
 			"port": 3000,
 			"autoPort": true
 		},
@@ -23,17 +20,13 @@
 		{
 			"name": "support-gateway",
 			"runtimeExecutable": "pnpm",
-			"runtimeArgs": [
-				"support:gateway"
-			],
+			"runtimeArgs": ["support:gateway"],
 			"port": 3005
 		},
 		{
 			"name": "mock-yandex",
 			"runtimeExecutable": "node",
-			"runtimeArgs": [
-				"tests/e2e/mock-yandex.mjs"
-			],
+			"runtimeArgs": ["tests/e2e/mock-yandex.mjs"],
 			"port": 4610
 		},
 		{

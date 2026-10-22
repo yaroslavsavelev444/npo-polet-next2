@@ -7,13 +7,13 @@ import type { Admin, User } from "@/payload-types";
  * narrow through this guard first instead of casting.
  */
 export function isUser(
-  account: Admin | User | null | undefined,
+	account: Admin | User | null | undefined,
 ): account is User {
-  return !!account && account.collection === "users";
+	return !!account && account.collection === "users";
 }
 
 export function isAdmin(
-  account: Admin | User | null | undefined,
+	account: Admin | User | null | undefined,
 ): account is Admin {
-  return !!account && account.collection === "admins";
+	return !!account && account.collection === "admins";
 }

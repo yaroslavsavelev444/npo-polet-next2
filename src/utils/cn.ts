@@ -6,5 +6,5 @@ import { twMerge } from "tailwind-merge";
  * Использует clsx для условных классов и tailwind-merge для конфликтов.
  */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+	return twMerge(clsx(inputs));
 }

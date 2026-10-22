@@ -8,9 +8,9 @@
 import type { ProductCardDiscount } from "../types";
 
 export interface PriceBreakdown {
-  finalPrice: number;
-  hasDiscount: boolean;
-  discountPercentage: number | null;
+	finalPrice: number;
+	hasDiscount: boolean;
+	discountPercentage: number | null;
 }
 
 /**
@@ -22,25 +22,25 @@ export interface PriceBreakdown {
  * на этапе адаптера, чтобы UI-слой не знал о вариантах "percentage | fixed".
  */
 export function calculatePriceBreakdown(
-  priceForIndividual: number,
-  discount: ProductCardDiscount,
+	priceForIndividual: number,
+	discount: ProductCardDiscount,
 ): PriceBreakdown {
-  if (!discount.isActive || !discount.percentage || discount.percentage <= 0) {
-    return {
-      finalPrice: priceForIndividual,
-      hasDiscount: false,
-      discountPercentage: null,
-    };
-  }
+	if (!discount.isActive || !discount.percentage || discount.percentage <= 0) {
+		return {
+			finalPrice: priceForIndividual,
+			hasDiscount: false,
+			discountPercentage: null,
+		};
+	}
 
-  const clampedPercentage = Math.min(Math.max(discount.percentage, 0), 100);
-  const finalPrice = priceForIndividual * (1 - clampedPercentage / 100);
+	const clampedPercentage = Math.min(Math.max(discount.percentage, 0), 100);
+	const finalPrice = priceForIndividual * (1 - clampedPercentage / 100);
 
-  return {
-    finalPrice: Math.round(finalPrice * 100) / 100,
-    hasDiscount: finalPrice < priceForIndividual,
-    discountPercentage: Math.round(clampedPercentage),
-  };
+	return {
+		finalPrice: Math.round(finalPrice * 100) / 100,
+		hasDiscount: finalPrice < priceForIndividual,
+		discountPercentage: Math.round(clampedPercentage),
+	};
 }
 
 /**
@@ -48,16 +48,19 @@ export function calculatePriceBreakdown(
  * Возвращает кортеж [значение, валидно_ли_исходное].
  */
 export function clampOrderQuantity(
-  value: number,
-  minOrderQuantity: number,
-  maxOrderQuantity: number,
+	value: number,
+	minOrderQuantity: number,
+	maxOrderQuantity: number,
 ): { value: number; isValid: boolean } {
-  const safeMin = Math.max(minOrderQuantity, 1);
-  const safeMax = Math.max(maxOrderQuantity, safeMin);
+	const safeMin = Math.max(minOrderQuantity, 1);
+	const safeMax = Math.max(maxOrderQuantity, safeMin);
 
-  if (value < safeMin || value > safeMax) {
-    return { value: Math.min(Math.max(value, safeMin), safeMax), isValid: false };
-  }
+	if (value < safeMin || value > safeMax) {
+		return {
+			value: Math.min(Math.max(value, safeMin), safeMax),
+			isValid: false,
+		};
+	}
 
-  return { value, isValid: true };
+	return { value, isValid: true };
 }

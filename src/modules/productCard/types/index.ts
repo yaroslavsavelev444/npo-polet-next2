@@ -12,26 +12,26 @@
  */
 
 export type ProductAvailabilityStatus =
-  | "available"
-  | "preorder"
-  | "out_of_stock"
-  | "discontinued";
+	| "available"
+	| "preorder"
+	| "out_of_stock"
+	| "discontinued";
 
 export interface ProductCardImage {
-  url: string;
-  alt: string;
+	url: string;
+	alt: string;
 }
 
 export interface ProductCardDiscount {
-  isActive: boolean;
-  /** Итоговый процент скидки, уже посчитанный (0-100). */
-  percentage: number | null;
+	isActive: boolean;
+	/** Итоговый процент скидки, уже посчитанный (0-100). */
+	percentage: number | null;
 }
 
 export interface ProductCardCategory {
-  id: string;
-  slug: string;
-  title?: string;
+	id: string;
+	slug: string;
+	title?: string;
 }
 
 /**
@@ -39,91 +39,91 @@ export interface ProductCardCategory {
  * Получаются через `mapProductToCardData` из `lib/adapter.ts`.
  */
 export interface ProductCardData {
-  id: string;
-  title: string;
-  slug: string;
-  description?: string;
-  images: ProductCardImage[];
-  category: ProductCardCategory | null;
+	id: string;
+	title: string;
+	slug: string;
+	description?: string;
+	images: ProductCardImage[];
+	category: ProductCardCategory | null;
 
-  priceForIndividual: number;
-  discount: ProductCardDiscount;
+	priceForIndividual: number;
+	discount: ProductCardDiscount;
 
-  status: ProductAvailabilityStatus;
-  minOrderQuantity: number;
-  maxOrderQuantity: number;
+	status: ProductAvailabilityStatus;
+	minOrderQuantity: number;
+	maxOrderQuantity: number;
 
-  /** Производитель (brand.manufacturer). Уходит в Product JSON-LD как brand. */
-  brand?: string;
+	/** Производитель (brand.manufacturer). Уходит в Product JSON-LD как brand. */
+	brand?: string;
 
-  /**
-   * Средняя оценка и количество ОДОБРЕННЫХ отзывов. Денормализованы в
-   * `analytics.ratingAverage/reviewsCount` товара (см.
-   * payload/services/product-rating.db.ts) и прокидываются в adapter вторым
-   * аргументом. Если агрегат не передан — 0.
-   */
-  rating: number;
-  reviewsCount: number;
+	/**
+	 * Средняя оценка и количество ОДОБРЕННЫХ отзывов. Денормализованы в
+	 * `analytics.ratingAverage/reviewsCount` товара (см.
+	 * payload/services/product-rating.db.ts) и прокидываются в adapter вторым
+	 * аргументом. Если агрегат не передан — 0.
+	 */
+	rating: number;
+	reviewsCount: number;
 }
 
 export interface ProductCardProps {
-  product: ProductCardData;
-  /**
-   * Slug категории текущей страницы листинга — используется для построения
-   * ссылки на товар без обращения к product.category, если страница уже
-   * находится в контексте конкретной категории.
-   */
-  currentCategorySlug?: string;
-  /** Показывать ли кнопку быстрого просмотра. */
-  showQuickView?: boolean;
-  onQuickView?: (product: ProductCardData) => void;
-  /** Приоритетная загрузка изображения (для первых карточек above-the-fold). */
-  priorityImage?: boolean;
-  className?: string;
+	product: ProductCardData;
+	/**
+	 * Slug категории текущей страницы листинга — используется для построения
+	 * ссылки на товар без обращения к product.category, если страница уже
+	 * находится в контексте конкретной категории.
+	 */
+	currentCategorySlug?: string;
+	/** Показывать ли кнопку быстрого просмотра. */
+	showQuickView?: boolean;
+	onQuickView?: (product: ProductCardData) => void;
+	/** Приоритетная загрузка изображения (для первых карточек above-the-fold). */
+	priorityImage?: boolean;
+	className?: string;
 }
 
 export interface ProductImageProps {
-  images: ProductCardImage[];
-  productId: string;
-  hasDiscount: boolean;
-  discountPercentage: number | null;
-  status: ProductAvailabilityStatus;
-  priority?: boolean;
+	images: ProductCardImage[];
+	productId: string;
+	hasDiscount: boolean;
+	discountPercentage: number | null;
+	status: ProductAvailabilityStatus;
+	priority?: boolean;
 }
 
 export interface ProductActionsProps {
-  showQuickView: boolean;
-  onQuickView?: () => void;
+	showQuickView: boolean;
+	onQuickView?: () => void;
 }
 
 export interface ProductPriceProps {
-  finalPrice: number;
-  originalPrice: number;
-  hasDiscount: boolean;
-  /**
-   * "card" — одна строка с итоговой ценой (сетка каталога);
-   * "detail" — крупная цена со старой ценой и процентом скидки.
-   */
-  size?: "card" | "detail";
-  /** Показывается только при size="detail" рядом со старой ценой. */
-  discountPercentage?: number | null;
-  className?: string;
+	finalPrice: number;
+	originalPrice: number;
+	hasDiscount: boolean;
+	/**
+	 * "card" — одна строка с итоговой ценой (сетка каталога);
+	 * "detail" — крупная цена со старой ценой и процентом скидки.
+	 */
+	size?: "card" | "detail";
+	/** Показывается только при size="detail" рядом со старой ценой. */
+	discountPercentage?: number | null;
+	className?: string;
 }
 
 export interface ProductTitleProps {
-  title: string;
+	title: string;
 }
 
 export interface ProductStatusBadgeProps {
-  status: ProductAvailabilityStatus;
+	status: ProductAvailabilityStatus;
 }
 
 export interface ProductQuantitySelectorProps {
-  minOrderQuantity: number;
-  maxOrderQuantity: number;
-  /**
-   * "card" — одна кнопка во всю ширину (узкая колонка сетки, количество не
-   * настраивается); "full" — степпер + кнопка (страница товара, липкая панель).
-   */
-  variant?: "card" | "full";
+	minOrderQuantity: number;
+	maxOrderQuantity: number;
+	/**
+	 * "card" — одна кнопка во всю ширину (узкая колонка сетки, количество не
+	 * настраивается); "full" — степпер + кнопка (страница товара, липкая панель).
+	 */
+	variant?: "card" | "full";
 }

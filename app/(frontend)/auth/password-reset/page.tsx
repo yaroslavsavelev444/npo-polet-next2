@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation'
-import { ResetPasswordForm } from '@/modules/auth/components/PasswordResetForm'
+import { redirect } from "next/navigation";
+import { ResetPasswordForm } from "@/modules/auth/components/PasswordResetForm";
 
 interface ResetPasswordPageProps {
-  searchParams: Promise<{ token?: string }>
+	searchParams: Promise<{ token?: string }>;
 }
 
 /**
@@ -12,12 +12,14 @@ interface ResetPasswordPageProps {
  * Токен читается на сервере и передаётся в форму скрытым полем —
  * не нужно делать useSearchParams() на клиенте.
  */
-export default async function ResetPasswordPage({ searchParams }: ResetPasswordPageProps) {
-  const { token } = await searchParams
+export default async function ResetPasswordPage({
+	searchParams,
+}: ResetPasswordPageProps) {
+	const { token } = await searchParams;
 
-  if (!token) {
-    redirect('/auth/forgot-password')
-  }
+	if (!token) {
+		redirect("/auth/forgot-password");
+	}
 
-  return <ResetPasswordForm token={token} />
+	return <ResetPasswordForm token={token} />;
 }

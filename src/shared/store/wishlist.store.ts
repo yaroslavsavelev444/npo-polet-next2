@@ -1,12 +1,12 @@
-import { create } from 'zustand'
+import { create } from "zustand";
 
 interface WishlistStoreState {
-  productIds: Set<string>
-  hydrated: boolean
-  hydrate: (productIds: string[]) => void
-  add: (productId: string) => void
-  remove: (productId: string) => void
-  clear: () => void
+	productIds: Set<string>;
+	hydrated: boolean;
+	hydrate: (productIds: string[]) => void;
+	add: (productId: string) => void;
+	remove: (productId: string) => void;
+	clear: () => void;
 }
 
 /**
@@ -17,27 +17,31 @@ interface WishlistStoreState {
  * from productIds.size to avoid a second source of truth.
  */
 export const useWishlistStore = create<WishlistStoreState>((set) => ({
-  productIds: new Set(),
-  hydrated: false,
+	productIds: new Set(),
+	hydrated: false,
 
-  hydrate: (productIds) =>
-    set((state) => (state.hydrated ? state : { productIds: new Set(productIds), hydrated: true })),
+	hydrate: (productIds) =>
+		set((state) =>
+			state.hydrated
+				? state
+				: { productIds: new Set(productIds), hydrated: true },
+		),
 
-  add: (productId) =>
-    set((state) => {
-      if (state.productIds.has(productId)) return state
-      const next = new Set(state.productIds)
-      next.add(productId)
-      return { productIds: next }
-    }),
+	add: (productId) =>
+		set((state) => {
+			if (state.productIds.has(productId)) return state;
+			const next = new Set(state.productIds);
+			next.add(productId);
+			return { productIds: next };
+		}),
 
-  remove: (productId) =>
-    set((state) => {
-      if (!state.productIds.has(productId)) return state
-      const next = new Set(state.productIds)
-      next.delete(productId)
-      return { productIds: next }
-    }),
+	remove: (productId) =>
+		set((state) => {
+			if (!state.productIds.has(productId)) return state;
+			const next = new Set(state.productIds);
+			next.delete(productId);
+			return { productIds: next };
+		}),
 
-  clear: () => set({ productIds: new Set() }),
-}))
+	clear: () => set({ productIds: new Set() }),
+}));

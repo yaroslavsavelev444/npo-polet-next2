@@ -6,15 +6,15 @@
  * полагаясь на сравнение текста сообщения.
  */
 export class AccountBlockedError extends Error {
-  constructor(message = "Ваш аккаунт заблокирован. Обратитесь в поддержку.") {
-    super(message);
-    this.name = "AccountBlockedError";
-  }
+	constructor(message = "Ваш аккаунт заблокирован. Обратитесь в поддержку.") {
+		super(message);
+		this.name = "AccountBlockedError";
+	}
 }
 
 export class AccountSuspendedError extends Error {
-  constructor(message = "Ваш аккаунт приостановлен. Обратитесь в поддержку.") {
-    super(message);
-    this.name = "AccountSuspendedError";
-  }
+	constructor(message = "Ваш аккаунт приостановлен. Обратитесь в поддержку.") {
+		super(message);
+		this.name = "AccountSuspendedError";
+	}
 }

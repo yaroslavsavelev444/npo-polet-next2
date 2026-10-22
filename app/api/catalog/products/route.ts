@@ -90,7 +90,8 @@ export async function GET(
 		sortParam && ALLOWED_SORTS.includes(sortParam) ? sortParam : undefined;
 
 	const orderParam = params.get("order");
-	const order = orderParam === "asc" || orderParam === "desc" ? orderParam : undefined;
+	const order =
+		orderParam === "asc" || orderParam === "desc" ? orderParam : undefined;
 
 	// Цена — только конечное неотрицательное число: «abc» или «1e400» иначе
 	// превратились бы в NaN/Infinity в SQL-условии.

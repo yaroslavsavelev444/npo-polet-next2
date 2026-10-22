@@ -3,8 +3,8 @@ import { Button } from "@once-ui-system/core";
 import { Download } from "lucide-react";
 
 interface ConsentDocumentDownloadProps {
-  url?: string | null;
-  label?: string | null;
+	url?: string | null;
+	label?: string | null;
 }
 
 /**
@@ -18,22 +18,22 @@ interface ConsentDocumentDownloadProps {
  * соглашения корректно работает и без файла.
  */
 export function ConsentDocumentDownload({
-  url,
-  label,
+	url,
+	label,
 }: ConsentDocumentDownloadProps) {
-  if (!url) return null;
+	if (!url) return null;
 
-  return (
-    <Button
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      variant="primary"
-      size="m"
-      className="flex w-fit items-center gap-2"
-    >
-      <Download size={16} strokeWidth={2} />
-      {label || "Скачать документ"}
-    </Button>
-  );
+	return (
+		<Button
+			href={url}
+			target="_blank"
+			rel="noopener noreferrer"
+			variant="primary"
+			size="m"
+			className="flex w-fit items-center gap-2"
+		>
+			<Download size={16} strokeWidth={2} />
+			{label || "Скачать документ"}
+		</Button>
+	);
 }

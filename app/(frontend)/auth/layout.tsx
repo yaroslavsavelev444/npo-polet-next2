@@ -2,14 +2,14 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: { default: "Авторизация", template: "%s — НПО Полёт" },
-  robots: { index: false, follow: false },
+	title: { default: "Авторизация", template: "%s — НПО Полёт" },
+	robots: { index: false, follow: false },
 };
 
 export default function AuthLayout({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  return <>{children}</>;
+	return <>{children}</>;
 }

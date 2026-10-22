@@ -1,6 +1,6 @@
-import type { CollectionConfig } from 'payload'
-import { isAdminOrSuperAdmin } from '../access/isAdminOrSuperAdmin.ts'
-import { ownedByUserOrStaff } from '../access/ownership.ts'
+import type { CollectionConfig } from "payload";
+import { isAdminOrSuperAdmin } from "../access/isAdminOrSuperAdmin.ts";
+import { ownedByUserOrStaff } from "../access/ownership.ts";
 
 /**
  * Коллекция сессий пользователей.
@@ -17,107 +17,107 @@ import { ownedByUserOrStaff } from '../access/ownership.ts'
  * - При logout — помечаем сессию revoked, JWT истечёт сам по TTL.
  */
 export const Sessions: CollectionConfig = {
-  slug: 'sessions',
+	slug: "sessions",
 
-  admin: {
-    group: 'Пользователи',
-    useAsTitle: 'id',
-    defaultColumns: ['user', 'ip', 'createdAt', 'lastActiveAt', 'revoked'],
-    description: 'Активные и завершённые сессии пользователей',
-  },
+	admin: {
+		group: "Пользователи",
+		useAsTitle: "id",
+		defaultColumns: ["user", "ip", "createdAt", "lastActiveAt", "revoked"],
+		description: "Активные и завершённые сессии пользователей",
+	},
 
-  access: {
-    // Пользователь видит только свои сессии («Активные устройства» в профиле),
-    // персонал — все. См. ownership.ts: прежняя проверка по одному
-    // req.user.role отдавала покупателю с role=superadmin список сессий всех
-    // пользователей вместе с их IP и User-Agent.
-    read: ownedByUserOrStaff,
-    create: () => false, // Только через Local API
-    update: () => false, // Только через Local API
-    delete: isAdminOrSuperAdmin,
-  },
+	access: {
+		// Пользователь видит только свои сессии («Активные устройства» в профиле),
+		// персонал — все. См. ownership.ts: прежняя проверка по одному
+		// req.user.role отдавала покупателю с role=superadmin список сессий всех
+		// пользователей вместе с их IP и User-Agent.
+		read: ownedByUserOrStaff,
+		create: () => false, // Только через Local API
+		update: () => false, // Только через Local API
+		delete: isAdminOrSuperAdmin,
+	},
 
-  fields: [
-    {
-      name: 'user',
-      type: 'relationship',
-      relationTo: 'users',
-      required: true,
-      index: true,
-      label: 'Пользователь',
-    },
-    {
-      // claim `sid` того payload-token, который был выдан вместе с этой
-      // записью. Именно по нему Payload сверяет валидность JWT на каждом
-      // запросе (users_sessions), поэтому отзыв сессии обязан дойти сюда —
-      // см. src/modules/auth/lib/payloadSessions.ts. Без этой привязки
-      // «выйти» меняло только флаг revoked, а сам токен продолжал работать.
-      name: 'payloadSessionId',
-      type: 'text',
-      index: true,
-      label: 'ID сессии Payload',
-      admin: { readOnly: true, hidden: true },
-    },
-    {
-      name: 'userAgent',
-      type: 'text',
-      label: 'User Agent',
-      admin: { readOnly: true },
-    },
-    {
-      name: 'ip',
-      type: 'text',
-      label: 'IP адрес',
-      admin: { readOnly: true },
-    },
-    {
-      // Примерное устройство для отображения пользователю
-      name: 'deviceLabel',
-      type: 'text',
-      label: 'Устройство',
-      admin: { readOnly: true },
-    },
-    {
-      name: 'createdAt',
-      type: 'date',
-      required: true,
-      label: 'Создана',
-      admin: { readOnly: true },
-    },
-    {
-      name: 'lastActiveAt',
-      type: 'date',
-      required: true,
-      label: 'Последняя активность',
-      admin: { readOnly: true },
-    },
-    {
-      name: 'expiresAt',
-      type: 'date',
-      required: true,
-      index: true,
-      label: 'Истекает',
-      admin: { readOnly: true },
-    },
-    {
-      // Если true — сессия отозвана, middleware не пустит
-      name: 'revoked',
-      type: 'checkbox',
-      defaultValue: false,
-      index: true,
-      label: 'Отозвана',
-    },
-    {
-      // Причина отзыва для аудита
-      name: 'revokedReason',
-      type: 'select',
-      label: 'Причина отзыва',
-      options: [
-        { label: 'Выход пользователя', value: 'logout' },
-        { label: 'Выход со всех устройств', value: 'logout_all' },
-        { label: 'Смена пароля', value: 'password_changed' },
-        { label: 'Административный', value: 'admin' },
-      ],
-    },
-  ],
-}
+	fields: [
+		{
+			name: "user",
+			type: "relationship",
+			relationTo: "users",
+			required: true,
+			index: true,
+			label: "Пользователь",
+		},
+		{
+			// claim `sid` того payload-token, который был выдан вместе с этой
+			// записью. Именно по нему Payload сверяет валидность JWT на каждом
+			// запросе (users_sessions), поэтому отзыв сессии обязан дойти сюда —
+			// см. src/modules/auth/lib/payloadSessions.ts. Без этой привязки
+			// «выйти» меняло только флаг revoked, а сам токен продолжал работать.
+			name: "payloadSessionId",
+			type: "text",
+			index: true,
+			label: "ID сессии Payload",
+			admin: { readOnly: true, hidden: true },
+		},
+		{
+			name: "userAgent",
+			type: "text",
+			label: "User Agent",
+			admin: { readOnly: true },
+		},
+		{
+			name: "ip",
+			type: "text",
+			label: "IP адрес",
+			admin: { readOnly: true },
+		},
+		{
+			// Примерное устройство для отображения пользователю
+			name: "deviceLabel",
+			type: "text",
+			label: "Устройство",
+			admin: { readOnly: true },
+		},
+		{
+			name: "createdAt",
+			type: "date",
+			required: true,
+			label: "Создана",
+			admin: { readOnly: true },
+		},
+		{
+			name: "lastActiveAt",
+			type: "date",
+			required: true,
+			label: "Последняя активность",
+			admin: { readOnly: true },
+		},
+		{
+			name: "expiresAt",
+			type: "date",
+			required: true,
+			index: true,
+			label: "Истекает",
+			admin: { readOnly: true },
+		},
+		{
+			// Если true — сессия отозвана, middleware не пустит
+			name: "revoked",
+			type: "checkbox",
+			defaultValue: false,
+			index: true,
+			label: "Отозвана",
+		},
+		{
+			// Причина отзыва для аудита
+			name: "revokedReason",
+			type: "select",
+			label: "Причина отзыва",
+			options: [
+				{ label: "Выход пользователя", value: "logout" },
+				{ label: "Выход со всех устройств", value: "logout_all" },
+				{ label: "Смена пароля", value: "password_changed" },
+				{ label: "Административный", value: "admin" },
+			],
+		},
+	],
+};

@@ -19,286 +19,286 @@ import type { NotificationType } from "../../modules/notifications/types.ts";
  */
 
 export type NotificationScenario =
-  | "login_new_device"
-  | "device_trusted"
-  | "password_changed"
-  | "oauth_linked"
-  | "oauth_unlinked"
-  | "account_locked"
-  | "account_blocked"
-  | "account_suspended"
-  | "account_reactivated"
-  | "profile_updated"
-  | "order_created"
-  | "order_status_changed"
-  | "order_cancelled"
-  | "review_approved"
-  | "review_rejected"
-  | "review_invitation"
-  | "product_back_in_stock"
-  | "support_reply"
-  | "welcome";
+	| "login_new_device"
+	| "device_trusted"
+	| "password_changed"
+	| "oauth_linked"
+	| "oauth_unlinked"
+	| "account_locked"
+	| "account_blocked"
+	| "account_suspended"
+	| "account_reactivated"
+	| "profile_updated"
+	| "order_created"
+	| "order_status_changed"
+	| "order_cancelled"
+	| "review_approved"
+	| "review_rejected"
+	| "review_invitation"
+	| "product_back_in_stock"
+	| "support_reply"
+	| "welcome";
 
 interface ScenarioDataMap {
-  login_new_device: { deviceLabel: string; ip: string };
-  device_trusted: { deviceLabel: string; ip: string };
-  password_changed: Record<string, never>;
-  oauth_linked: { providerLabel: string };
-  oauth_unlinked: { providerLabel: string };
-  account_locked: { minutesLeft: number };
-  account_blocked: Record<string, never>;
-  account_suspended: Record<string, never>;
-  account_reactivated: Record<string, never>;
-  profile_updated: Record<string, never>;
-  order_created: { orderNumber: string; itemsCount: number };
-  order_status_changed: { orderNumber: string; status: string };
-  order_cancelled: { orderNumber: string; initiatedBy: "customer" | "admin" };
-  review_approved: { productTitle: string; productUrl: string };
-  review_rejected: {
-    productTitle: string;
-    productUrl: string;
-    reason?: string | null;
-  };
-  review_invitation: { orderNumber: string; productCount: number };
-  product_back_in_stock: {
-    productId: number;
-    productTitle: string;
-    productUrl: string;
-  };
-  support_reply: { conversationId: number };
-  welcome: Record<string, never>;
+	login_new_device: { deviceLabel: string; ip: string };
+	device_trusted: { deviceLabel: string; ip: string };
+	password_changed: Record<string, never>;
+	oauth_linked: { providerLabel: string };
+	oauth_unlinked: { providerLabel: string };
+	account_locked: { minutesLeft: number };
+	account_blocked: Record<string, never>;
+	account_suspended: Record<string, never>;
+	account_reactivated: Record<string, never>;
+	profile_updated: Record<string, never>;
+	order_created: { orderNumber: string; itemsCount: number };
+	order_status_changed: { orderNumber: string; status: string };
+	order_cancelled: { orderNumber: string; initiatedBy: "customer" | "admin" };
+	review_approved: { productTitle: string; productUrl: string };
+	review_rejected: {
+		productTitle: string;
+		productUrl: string;
+		reason?: string | null;
+	};
+	review_invitation: { orderNumber: string; productCount: number };
+	product_back_in_stock: {
+		productId: number;
+		productTitle: string;
+		productUrl: string;
+	};
+	support_reply: { conversationId: number };
+	welcome: Record<string, never>;
 }
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  confirmed: "подтверждён",
-  processing: "в обработке",
-  shipped: "отправлен",
-  delivered: "доставлен",
+	confirmed: "подтверждён",
+	processing: "в обработке",
+	shipped: "отправлен",
+	delivered: "доставлен",
 };
 
 interface CatalogEntry<S extends NotificationScenario> {
-  type: NotificationType;
-  build: (data: ScenarioDataMap[S]) => {
-    title: string;
-    body: string;
-    link?: string;
-  };
+	type: NotificationType;
+	build: (data: ScenarioDataMap[S]) => {
+		title: string;
+		body: string;
+		link?: string;
+	};
 }
 
 const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
-  login_new_device: {
-    type: "login_from_new_device",
-    build: ({ deviceLabel, ip }) => ({
-      title: "Вход в аккаунт",
-      body: `Выполнен вход с устройства «${deviceLabel}» (IP ${ip}). Если это не вы — смените пароль и завершите чужие сессии.`,
-      link: "/profile?tab=sessions",
-    }),
-  },
-  /**
-   * Устройство запомнено — с него больше не будут спрашивать код.
-   *
-   * Отдельный сценарий, а не приписка к login_new_device, и это не оформление:
-   * события разные по последствиям. «Вход выполнен» сообщает о том, что уже
-   * произошло; «устройство запомнено» — о правиле, которое теперь действует на
-   * будущее, и именно его человек обязан заметить, чтобы успеть отменить, если
-   * это был не он. Смешав их в одну формулировку, мы спрятали бы второе за
-   * привычным текстом первого.
-   *
-   * Тип `security`, а не `login_from_new_device`: это изменение настроек
-   * безопасности аккаунта, а не факт входа.
-   */
-  device_trusted: {
-    type: "security",
-    build: ({ deviceLabel, ip }) => ({
-      title: "Устройство запомнено",
-      body: `«${deviceLabel}» (IP ${ip}) добавлено в доверенные: при следующих входах с него код подтверждения запрашиваться не будет. Если это не ваше устройство — отзовите доверие и смените пароль.`,
-      link: "/profile?tab=sessions",
-    }),
-  },
-  password_changed: {
-    type: "security",
-    build: () => ({
-      title: "Пароль изменён",
-      body: "Пароль вашего аккаунта был успешно изменён.",
-      link: "/profile",
-    }),
-  },
-  /**
-   * Привязка/отвязка внешнего сервиса входа (Яндекс ID). Только колокольчик,
-   * без письма: письма вне исполнения заказа ограничены документами /consents
-   * (см. oauth/CHECKLIST.md, раздел 0). Тип `security` — это изменение
-   * способов входа в аккаунт: если это сделал не владелец, он должен заметить.
-   */
-  oauth_linked: {
-    type: "security",
-    build: ({ providerLabel }) => ({
-      title: `${providerLabel} привязан`,
-      body: `Теперь в аккаунт можно входить через ${providerLabel}. Если это сделали не вы — отвяжите его в разделе «Безопасность» и смените пароль.`,
-      link: "/profile?tab=security",
-    }),
-  },
-  oauth_unlinked: {
-    type: "security",
-    build: ({ providerLabel }) => ({
-      title: `${providerLabel} отвязан`,
-      body: `Вход через ${providerLabel} для вашего аккаунта отключён.`,
-      link: "/profile?tab=security",
-    }),
-  },
-  account_locked: {
-    type: "security",
-    build: ({ minutesLeft }) => ({
-      title: "Аккаунт временно заблокирован",
-      body: `Слишком много неудачных попыток входа. Повторите попытку через ${minutesLeft} мин.`,
-    }),
-  },
-  account_blocked: {
-    type: "account",
-    build: () => ({
-      title: "Аккаунт заблокирован",
-      body: "Ваш аккаунт заблокирован администратором. Обратитесь в поддержку для уточнения причины.",
-      link: "/contacts",
-    }),
-  },
-  account_suspended: {
-    type: "account",
-    build: () => ({
-      title: "Аккаунт приостановлен",
-      body: "Ваш аккаунт временно приостановлен администратором. Обратитесь в поддержку.",
-      link: "/contacts",
-    }),
-  },
-  account_reactivated: {
-    type: "account",
-    build: () => ({
-      title: "Аккаунт снова активен",
-      body: "Блокировка вашего аккаунта снята, доступ восстановлен в полном объёме.",
-    }),
-  },
-  profile_updated: {
-    type: "account",
-    build: () => ({
-      title: "Данные профиля обновлены",
-      body: "Изменения в вашем профиле успешно сохранены.",
-      link: "/profile",
-    }),
-  },
-  order_created: {
-    type: "order",
-    build: ({ orderNumber, itemsCount }) => ({
-      title: `Заказ №${orderNumber} оформлен`,
-      body: `Приняли ваш заказ из ${itemsCount} ${pluralizeItems(itemsCount)}. Следите за статусом здесь.`,
-      link: `/orders/${orderNumber}`,
-    }),
-  },
-  order_status_changed: {
-    type: "order",
-    build: ({ orderNumber, status }) => ({
-      title: `Заказ №${orderNumber}`,
-      body: `Статус заказа изменён: ${ORDER_STATUS_LABELS[status] ?? status}.`,
-      link: `/orders/${orderNumber}`,
-    }),
-  },
-  order_cancelled: {
-    type: "order",
-    build: ({ orderNumber, initiatedBy }) => ({
-      title: `Заказ №${orderNumber} отменён`,
-      body:
-        initiatedBy === "admin"
-          ? "Заказ отменён администратором. Подробности уточните в поддержке."
-          : "Заказ отменён по вашему запросу.",
-      link: `/orders/${orderNumber}`,
-    }),
-  },
-  review_approved: {
-    type: "review",
-    build: ({ productTitle, productUrl }) => ({
-      title: "Отзыв опубликован",
-      body: `Ваш отзыв на «${productTitle}» прошёл модерацию и опубликован.`,
-      link: productUrl,
-    }),
-  },
-  review_rejected: {
-    type: "review",
-    build: ({ productTitle, productUrl, reason }) => ({
-      title: "Отзыв отклонён",
-      body: reason
-        ? `Отзыв на «${productTitle}» отклонён: ${reason}`
-        : `Отзыв на «${productTitle}» не прошёл модерацию.`,
-      link: productUrl,
-    }),
-  },
-  /**
-   * Приглашение оценить полученные товары.
-   *
-   * Отдельный сценарий, а не приписка к order_status_changed, и это
-   * принципиально: то уведомление отвечает на вопрос «где мой заказ», это —
-   * просьба об услуге. Смешав их, мы получили бы либо просьбу, которую никто
-   * не заметит в строке про статус, либо строку про статус, в которой
-   * зачем-то торгуют.
-   *
-   * Ведёт сразу в раздел «Можно оценить», а не на общую страницу отзывов:
-   * приглашение обязано открывать список, ради которого его и отправили.
-   *
-   * Создаётся ТОЛЬКО когда есть что оценивать — проверку делает вызывающий
-   * (см. inviteToReviewDeliveredOrder), потому что только он знает состав
-   * заказа. Каталог формулировок за наличие повода не отвечает.
-   *
-   * Канал только внутрисайтовый. Письмо с тем же содержанием документы на
-   * /consents прямо запрещают — разбор в шапке inviteToReviewDeliveredOrder.
-   */
-  review_invitation: {
-    type: "review",
-    build: ({ orderNumber, productCount }) => ({
-      title: "Расскажите о покупке",
-      body:
-        productCount === 1
-          ? `Заказ №${orderNumber} доставлен — можно оценить товар из него. Отзывы покупателей помогают тем, кто только выбирает.`
-          : `Заказ №${orderNumber} доставлен — можно оценить ${productCount} ${pluralizeProducts(productCount)} из него. Отзывы покупателей помогают тем, кто только выбирает.`,
-      link: "/profile/reviews?status=to-review",
-    }),
-  },
-  /**
-   * Товар, о поступлении которого просил покупатель, снова можно заказать.
-   *
-   * Канал только внутрисайтовый — письма и мессенджеров для этого сценария
-   * нет намеренно (см. modules/restock). Создаётся не через notify(), а
-   * массовой вставкой из воркера (restock-subscriptions.db.ts): подписчиков у
-   * товара может быть много, и уведомление обязано появиться ровно в том же
-   * SQL-запросе, который закрывает подписку. Формулировка при этом берётся
-   * отсюда же — через renderNotification.
-   */
-  product_back_in_stock: {
-    type: "product",
-    build: ({ productTitle, productUrl }) => ({
-      title: "Товар снова в продаже",
-      body: `«${productTitle}», о поступлении которого вы просили сообщить, снова можно заказать.`,
-      link: productUrl,
-    }),
-  },
-  /**
-   * Менеджер ответил в чате, а покупатель не на сайте (нет открытого сокета).
-   *
-   * Текста ответа в уведомлении НЕТ: уведомления хранятся в базе открыто, а
-   * переписка — зашифрованной (modules/support-chat/server/crypto.ts).
-   * Ссылка открывает виджет чата поверх страницы истории.
-   */
-  support_reply: {
-    type: "chat",
-    build: () => ({
-      title: "Ответ в чате поддержки",
-      body: "Менеджер ответил на ваше сообщение. Откройте чат, чтобы прочитать.",
-      link: "/profile/support?chat=open",
-    }),
-  },
-  welcome: {
-    type: "system",
-    build: () => ({
-      title: "Добро пожаловать в НПО Полёт!",
-      body: "Спасибо за регистрацию. Здесь будут появляться уведомления о заказах, отзывах и активности аккаунта.",
-      link: "/profile",
-    }),
-  },
+	login_new_device: {
+		type: "login_from_new_device",
+		build: ({ deviceLabel, ip }) => ({
+			title: "Вход в аккаунт",
+			body: `Выполнен вход с устройства «${deviceLabel}» (IP ${ip}). Если это не вы — смените пароль и завершите чужие сессии.`,
+			link: "/profile?tab=sessions",
+		}),
+	},
+	/**
+	 * Устройство запомнено — с него больше не будут спрашивать код.
+	 *
+	 * Отдельный сценарий, а не приписка к login_new_device, и это не оформление:
+	 * события разные по последствиям. «Вход выполнен» сообщает о том, что уже
+	 * произошло; «устройство запомнено» — о правиле, которое теперь действует на
+	 * будущее, и именно его человек обязан заметить, чтобы успеть отменить, если
+	 * это был не он. Смешав их в одну формулировку, мы спрятали бы второе за
+	 * привычным текстом первого.
+	 *
+	 * Тип `security`, а не `login_from_new_device`: это изменение настроек
+	 * безопасности аккаунта, а не факт входа.
+	 */
+	device_trusted: {
+		type: "security",
+		build: ({ deviceLabel, ip }) => ({
+			title: "Устройство запомнено",
+			body: `«${deviceLabel}» (IP ${ip}) добавлено в доверенные: при следующих входах с него код подтверждения запрашиваться не будет. Если это не ваше устройство — отзовите доверие и смените пароль.`,
+			link: "/profile?tab=sessions",
+		}),
+	},
+	password_changed: {
+		type: "security",
+		build: () => ({
+			title: "Пароль изменён",
+			body: "Пароль вашего аккаунта был успешно изменён.",
+			link: "/profile",
+		}),
+	},
+	/**
+	 * Привязка/отвязка внешнего сервиса входа (Яндекс ID). Только колокольчик,
+	 * без письма: письма вне исполнения заказа ограничены документами /consents
+	 * (см. oauth/CHECKLIST.md, раздел 0). Тип `security` — это изменение
+	 * способов входа в аккаунт: если это сделал не владелец, он должен заметить.
+	 */
+	oauth_linked: {
+		type: "security",
+		build: ({ providerLabel }) => ({
+			title: `${providerLabel} привязан`,
+			body: `Теперь в аккаунт можно входить через ${providerLabel}. Если это сделали не вы — отвяжите его в разделе «Безопасность» и смените пароль.`,
+			link: "/profile?tab=security",
+		}),
+	},
+	oauth_unlinked: {
+		type: "security",
+		build: ({ providerLabel }) => ({
+			title: `${providerLabel} отвязан`,
+			body: `Вход через ${providerLabel} для вашего аккаунта отключён.`,
+			link: "/profile?tab=security",
+		}),
+	},
+	account_locked: {
+		type: "security",
+		build: ({ minutesLeft }) => ({
+			title: "Аккаунт временно заблокирован",
+			body: `Слишком много неудачных попыток входа. Повторите попытку через ${minutesLeft} мин.`,
+		}),
+	},
+	account_blocked: {
+		type: "account",
+		build: () => ({
+			title: "Аккаунт заблокирован",
+			body: "Ваш аккаунт заблокирован администратором. Обратитесь в поддержку для уточнения причины.",
+			link: "/contacts",
+		}),
+	},
+	account_suspended: {
+		type: "account",
+		build: () => ({
+			title: "Аккаунт приостановлен",
+			body: "Ваш аккаунт временно приостановлен администратором. Обратитесь в поддержку.",
+			link: "/contacts",
+		}),
+	},
+	account_reactivated: {
+		type: "account",
+		build: () => ({
+			title: "Аккаунт снова активен",
+			body: "Блокировка вашего аккаунта снята, доступ восстановлен в полном объёме.",
+		}),
+	},
+	profile_updated: {
+		type: "account",
+		build: () => ({
+			title: "Данные профиля обновлены",
+			body: "Изменения в вашем профиле успешно сохранены.",
+			link: "/profile",
+		}),
+	},
+	order_created: {
+		type: "order",
+		build: ({ orderNumber, itemsCount }) => ({
+			title: `Заказ №${orderNumber} оформлен`,
+			body: `Приняли ваш заказ из ${itemsCount} ${pluralizeItems(itemsCount)}. Следите за статусом здесь.`,
+			link: `/orders/${orderNumber}`,
+		}),
+	},
+	order_status_changed: {
+		type: "order",
+		build: ({ orderNumber, status }) => ({
+			title: `Заказ №${orderNumber}`,
+			body: `Статус заказа изменён: ${ORDER_STATUS_LABELS[status] ?? status}.`,
+			link: `/orders/${orderNumber}`,
+		}),
+	},
+	order_cancelled: {
+		type: "order",
+		build: ({ orderNumber, initiatedBy }) => ({
+			title: `Заказ №${orderNumber} отменён`,
+			body:
+				initiatedBy === "admin"
+					? "Заказ отменён администратором. Подробности уточните в поддержке."
+					: "Заказ отменён по вашему запросу.",
+			link: `/orders/${orderNumber}`,
+		}),
+	},
+	review_approved: {
+		type: "review",
+		build: ({ productTitle, productUrl }) => ({
+			title: "Отзыв опубликован",
+			body: `Ваш отзыв на «${productTitle}» прошёл модерацию и опубликован.`,
+			link: productUrl,
+		}),
+	},
+	review_rejected: {
+		type: "review",
+		build: ({ productTitle, productUrl, reason }) => ({
+			title: "Отзыв отклонён",
+			body: reason
+				? `Отзыв на «${productTitle}» отклонён: ${reason}`
+				: `Отзыв на «${productTitle}» не прошёл модерацию.`,
+			link: productUrl,
+		}),
+	},
+	/**
+	 * Приглашение оценить полученные товары.
+	 *
+	 * Отдельный сценарий, а не приписка к order_status_changed, и это
+	 * принципиально: то уведомление отвечает на вопрос «где мой заказ», это —
+	 * просьба об услуге. Смешав их, мы получили бы либо просьбу, которую никто
+	 * не заметит в строке про статус, либо строку про статус, в которой
+	 * зачем-то торгуют.
+	 *
+	 * Ведёт сразу в раздел «Можно оценить», а не на общую страницу отзывов:
+	 * приглашение обязано открывать список, ради которого его и отправили.
+	 *
+	 * Создаётся ТОЛЬКО когда есть что оценивать — проверку делает вызывающий
+	 * (см. inviteToReviewDeliveredOrder), потому что только он знает состав
+	 * заказа. Каталог формулировок за наличие повода не отвечает.
+	 *
+	 * Канал только внутрисайтовый. Письмо с тем же содержанием документы на
+	 * /consents прямо запрещают — разбор в шапке inviteToReviewDeliveredOrder.
+	 */
+	review_invitation: {
+		type: "review",
+		build: ({ orderNumber, productCount }) => ({
+			title: "Расскажите о покупке",
+			body:
+				productCount === 1
+					? `Заказ №${orderNumber} доставлен — можно оценить товар из него. Отзывы покупателей помогают тем, кто только выбирает.`
+					: `Заказ №${orderNumber} доставлен — можно оценить ${productCount} ${pluralizeProducts(productCount)} из него. Отзывы покупателей помогают тем, кто только выбирает.`,
+			link: "/profile/reviews?status=to-review",
+		}),
+	},
+	/**
+	 * Товар, о поступлении которого просил покупатель, снова можно заказать.
+	 *
+	 * Канал только внутрисайтовый — письма и мессенджеров для этого сценария
+	 * нет намеренно (см. modules/restock). Создаётся не через notify(), а
+	 * массовой вставкой из воркера (restock-subscriptions.db.ts): подписчиков у
+	 * товара может быть много, и уведомление обязано появиться ровно в том же
+	 * SQL-запросе, который закрывает подписку. Формулировка при этом берётся
+	 * отсюда же — через renderNotification.
+	 */
+	product_back_in_stock: {
+		type: "product",
+		build: ({ productTitle, productUrl }) => ({
+			title: "Товар снова в продаже",
+			body: `«${productTitle}», о поступлении которого вы просили сообщить, снова можно заказать.`,
+			link: productUrl,
+		}),
+	},
+	/**
+	 * Менеджер ответил в чате, а покупатель не на сайте (нет открытого сокета).
+	 *
+	 * Текста ответа в уведомлении НЕТ: уведомления хранятся в базе открыто, а
+	 * переписка — зашифрованной (modules/support-chat/server/crypto.ts).
+	 * Ссылка открывает виджет чата поверх страницы истории.
+	 */
+	support_reply: {
+		type: "chat",
+		build: () => ({
+			title: "Ответ в чате поддержки",
+			body: "Менеджер ответил на ваше сообщение. Откройте чат, чтобы прочитать.",
+			link: "/profile/support?chat=open",
+		}),
+	},
+	welcome: {
+		type: "system",
+		build: () => ({
+			title: "Добро пожаловать в НПО Полёт!",
+			body: "Спасибо за регистрацию. Здесь будут появляться уведомления о заказах, отзывах и активности аккаунта.",
+			link: "/profile",
+		}),
+	},
 };
 
 /**
@@ -309,20 +309,21 @@ const CATALOG: { [S in NotificationScenario]: CatalogEntry<S> } = {
  * функция на оба места давала бы «оценить 2 товаров».
  */
 function pluralizeProducts(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "товаров";
-  if (mod10 === 1) return "товар";
-  if (mod10 >= 2 && mod10 <= 4) return "товара";
-  return "товаров";
+	const mod10 = count % 10;
+	const mod100 = count % 100;
+	if (mod100 >= 11 && mod100 <= 14) return "товаров";
+	if (mod10 === 1) return "товар";
+	if (mod10 >= 2 && mod10 <= 4) return "товара";
+	return "товаров";
 }
 
 function pluralizeItems(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "товара";
-  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "товаров";
-  return "товаров";
+	const mod10 = count % 10;
+	const mod100 = count % 100;
+	if (mod10 === 1 && mod100 !== 11) return "товара";
+	if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100))
+		return "товаров";
+	return "товаров";
 }
 
 /**
@@ -333,12 +334,17 @@ function pluralizeItems(count: number): string {
  * каталоге выше.
  */
 export function renderNotification<S extends NotificationScenario>(
-  scenario: S,
-  data: ScenarioDataMap[S],
-): { type: NotificationType; title: string; body: string; link: string | null } {
-  const entry = CATALOG[scenario];
-  const { title, body, link } = entry.build(data);
-  return { type: entry.type, title, body, link: link ?? null };
+	scenario: S,
+	data: ScenarioDataMap[S],
+): {
+	type: NotificationType;
+	title: string;
+	body: string;
+	link: string | null;
+} {
+	const entry = CATALOG[scenario];
+	const { title, body, link } = entry.build(data);
+	return { type: entry.type, title, body, link: link ?? null };
 }
 
 /**
@@ -348,29 +354,32 @@ export function renderNotification<S extends NotificationScenario>(
  * же принципу, что и notify*.ts для писем.
  */
 export async function notify<S extends NotificationScenario>(
-  payload: BasePayload,
-  userId: string | number,
-  scenario: S,
-  data: ScenarioDataMap[S],
+	payload: BasePayload,
+	userId: string | number,
+	scenario: S,
+	data: ScenarioDataMap[S],
 ): Promise<void> {
-  try {
-    const entry = CATALOG[scenario];
-    const { title, body, link } = entry.build(data);
+	try {
+		const entry = CATALOG[scenario];
+		const { title, body, link } = entry.build(data);
 
-    await payload.create({
-      collection: "notifications",
-      data: {
-        user: Number(userId),
-        type: entry.type,
-        title,
-        body,
-        link: link ?? null,
-        data: data as Record<string, unknown>,
-        isRead: false,
-      },
-      overrideAccess: true,
-    });
-  } catch (err) {
-    console.error(`[notificationCenter] Не удалось создать уведомление (${scenario})`, err);
-  }
+		await payload.create({
+			collection: "notifications",
+			data: {
+				user: Number(userId),
+				type: entry.type,
+				title,
+				body,
+				link: link ?? null,
+				data: data as Record<string, unknown>,
+				isRead: false,
+			},
+			overrideAccess: true,
+		});
+	} catch (err) {
+		console.error(
+			`[notificationCenter] Не удалось создать уведомление (${scenario})`,
+			err,
+		);
+	}
 }

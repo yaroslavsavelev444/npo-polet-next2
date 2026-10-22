@@ -5,255 +5,255 @@ import { getPayloadInstance } from "@/payload/services/getPayload";
 import { notify } from "@/services/notifications/notificationCenter";
 import { notifyOtpCode } from "@/services/notifications/notifyOtpCode";
 import {
-  findMissingRequiredConsents,
-  recordUserConsents,
+	findMissingRequiredConsents,
+	recordUserConsents,
 } from "../lib/consents";
 import {
-  isFieldTakenError,
-  logUnexpectedAuthError,
-  safeCreateOtp,
+	isFieldTakenError,
+	logUnexpectedAuthError,
+	safeCreateOtp,
 } from "../lib/errorHandling";
 import { createPendingAuth } from "../lib/pendingAuth";
 import { RATE_LIMITS } from "../lib/rateLimit";
 import {
-  actionError,
-  actionSuccess,
-  formValues,
-  getRequestMeta,
+	actionError,
+	actionSuccess,
+	formValues,
+	getRequestMeta,
 } from "../lib/utils";
 import {
-  AcceptedConsentInput,
-  acceptedConsentSchema,
-  registerSchema,
+	AcceptedConsentInput,
+	acceptedConsentSchema,
+	registerSchema,
 } from "../schemas/register.schema";
 import type { RegisterResult } from "../types";
 
 export async function registerAction(_prevState: unknown, formData: FormData) {
-  // Email и имя возвращаем форме при любой ошибке: React сбрасывает
-  // неуправляемые поля после каждого form action, и без этого пользователь
-  // перезаполнял бы всю анкету заново из-за одной опечатки в пароле
-  // (см. AuthFormValues). Пароли сюда не кладём — их поля обязаны очищаться.
-  const echo = formValues(formData, ["email", "name"]);
+	// Email и имя возвращаем форме при любой ошибке: React сбрасывает
+	// неуправляемые поля после каждого form action, и без этого пользователь
+	// перезаполнял бы всю анкету заново из-за одной опечатки в пароле
+	// (см. AuthFormValues). Пароли сюда не кладём — их поля обязаны очищаться.
+	const echo = formValues(formData, ["email", "name"]);
 
-  // 1. Валидация
-  const raw = {
-    email: formData.get("email"),
-    password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
-    name: formData.get("name"),
-    consentsJson: formData.get("consentsJson"),
-  };
+	// 1. Валидация
+	const raw = {
+		email: formData.get("email"),
+		password: formData.get("password"),
+		confirmPassword: formData.get("confirmPassword"),
+		name: formData.get("name"),
+		consentsJson: formData.get("consentsJson"),
+	};
 
-  const parsed = registerSchema.safeParse(raw);
-  if (!parsed.success) {
-    return actionError(
-      "Проверьте введённые данные",
-      parsed.error.flatten().fieldErrors,
-      "validation",
-      echo,
-    );
-  }
+	const parsed = registerSchema.safeParse(raw);
+	if (!parsed.success) {
+		return actionError(
+			"Проверьте введённые данные",
+			parsed.error.flatten().fieldErrors,
+			"validation",
+			echo,
+		);
+	}
 
-  const { email, password, name, consentsJson } = parsed.data;
+	const { email, password, name, consentsJson } = parsed.data;
 
-  // Парсим согласия, убеждаясь, что consentId — число
-  let acceptedConsents: AcceptedConsentInput[];
-  try {
-    const rawConsents = JSON.parse(consentsJson);
-    acceptedConsents = rawConsents.map((c: unknown) =>
-      acceptedConsentSchema.parse(c),
-    );
-  } catch {
-    return actionError(
-      "Некорректные данные согласий",
-      undefined,
-      "validation",
-      echo,
-    );
-  }
+	// Парсим согласия, убеждаясь, что consentId — число
+	let acceptedConsents: AcceptedConsentInput[];
+	try {
+		const rawConsents = JSON.parse(consentsJson);
+		acceptedConsents = rawConsents.map((c: unknown) =>
+			acceptedConsentSchema.parse(c),
+		);
+	} catch {
+		return actionError(
+			"Некорректные данные согласий",
+			undefined,
+			"validation",
+			echo,
+		);
+	}
 
-  const { ip, userAgent } = await getRequestMeta();
+	const { ip, userAgent } = await getRequestMeta();
 
-  // 2. Rate limit
-  const rl = await RATE_LIMITS.register(ip);
-  if (!rl.allowed) {
-    return actionError(
-      "Слишком много попыток регистрации. Попробуйте позже.",
-      undefined,
-      "rate_limited",
-      echo,
-    );
-  }
+	// 2. Rate limit
+	const rl = await RATE_LIMITS.register(ip);
+	if (!rl.allowed) {
+		return actionError(
+			"Слишком много попыток регистрации. Попробуйте позже.",
+			undefined,
+			"rate_limited",
+			echo,
+		);
+	}
 
-  const payload = await getPayloadInstance();
+	const payload = await getPayloadInstance();
 
-  // 3. Проверяем обязательные согласия — по тем же критериям, по которым
-  // страница регистрации решает, какие показывать (см. lib/consents.ts).
-  const missing = await findMissingRequiredConsents(payload, acceptedConsents);
+	// 3. Проверяем обязательные согласия — по тем же критериям, по которым
+	// страница регистрации решает, какие показывать (см. lib/consents.ts).
+	const missing = await findMissingRequiredConsents(payload, acceptedConsents);
 
-  if (missing.length > 0) {
-    return actionError(
-      "Необходимо принять все обязательные соглашения",
-      { consents: [`Не приняты: ${missing.join(", ")}`] },
-      "validation",
-      echo,
-    );
-  }
+	if (missing.length > 0) {
+		return actionError(
+			"Необходимо принять все обязательные соглашения",
+			{ consents: [`Не приняты: ${missing.join(", ")}`] },
+			"validation",
+			echo,
+		);
+	}
 
-  // 4. Создаём пользователя (тип выводится автоматически)
-  let user: Awaited<ReturnType<typeof payload.create>>;
-  try {
-    user = await payload.create({
-      collection: "users",
-      data: {
-        email,
-        password,
-        name,
-        role: "user",
-        status: "active",
-        twoFAVerified: false,
-        emailVerified: false,
-      },
-      overrideAccess: true,
-    });
-    void notify(payload, user.id, "welcome", {});
-  } catch (err: unknown) {
-    if (isFieldTakenError(err, "email")) {
-      // Защита от enumeration: НЕ раскрываем, что email уже занят. Ставим
-      // челлендж-обманку и возвращаем ровно тот же ответ, что и при успешной
-      // регистрации (requiresOtp: true) — клиент уходит на экран ввода кода,
-      // как обычно. Реального OTP не создаём и письмо не шлём (иначе — вектор
-      // рассылки на чужой ящик); ввести код будет нельзя, и пользователь в
-      // итоге уйдёт на вход. Настоящий новый email при этом проходит обычным
-      // путём ниже и получает код. Снаружи два случая неотличимы.
-      try {
-        await createPendingAuth({
-          userId: "0",
-          email,
-          name,
-          type: "email_verify",
-          token: "",
-          ip,
-          userAgent,
-          decoy: true,
-        });
-      } catch (e) {
-        logUnexpectedAuthError("register.createDecoyPendingAuth", e);
-      }
-      return actionSuccess<RegisterResult>({ requiresOtp: true, email });
-    }
-    // Любая другая ошибка создания (неожиданная валидация Payload, сбой БД
-    // и т.п.) раньше пробрасывалась дальше (`throw err`) и роняла рендер
-    // Server Action в error boundary. Показываем нейтральное сообщение и
-    // логируем причину для разбора — учётка при этом не создаётся, так что
-    // ничего откатывать не нужно.
-    logUnexpectedAuthError("register.createUser", err);
-    return actionError(
-      "Не удалось создать аккаунт. Попробуйте позже.",
-      undefined,
-      "server_error",
-      echo,
-    );
-  }
+	// 4. Создаём пользователя (тип выводится автоматически)
+	let user: Awaited<ReturnType<typeof payload.create>>;
+	try {
+		user = await payload.create({
+			collection: "users",
+			data: {
+				email,
+				password,
+				name,
+				role: "user",
+				status: "active",
+				twoFAVerified: false,
+				emailVerified: false,
+			},
+			overrideAccess: true,
+		});
+		void notify(payload, user.id, "welcome", {});
+	} catch (err: unknown) {
+		if (isFieldTakenError(err, "email")) {
+			// Защита от enumeration: НЕ раскрываем, что email уже занят. Ставим
+			// челлендж-обманку и возвращаем ровно тот же ответ, что и при успешной
+			// регистрации (requiresOtp: true) — клиент уходит на экран ввода кода,
+			// как обычно. Реального OTP не создаём и письмо не шлём (иначе — вектор
+			// рассылки на чужой ящик); ввести код будет нельзя, и пользователь в
+			// итоге уйдёт на вход. Настоящий новый email при этом проходит обычным
+			// путём ниже и получает код. Снаружи два случая неотличимы.
+			try {
+				await createPendingAuth({
+					userId: "0",
+					email,
+					name,
+					type: "email_verify",
+					token: "",
+					ip,
+					userAgent,
+					decoy: true,
+				});
+			} catch (e) {
+				logUnexpectedAuthError("register.createDecoyPendingAuth", e);
+			}
+			return actionSuccess<RegisterResult>({ requiresOtp: true, email });
+		}
+		// Любая другая ошибка создания (неожиданная валидация Payload, сбой БД
+		// и т.п.) раньше пробрасывалась дальше (`throw err`) и роняла рендер
+		// Server Action в error boundary. Показываем нейтральное сообщение и
+		// логируем причину для разбора — учётка при этом не создаётся, так что
+		// ничего откатывать не нужно.
+		logUnexpectedAuthError("register.createUser", err);
+		return actionError(
+			"Не удалось создать аккаунт. Попробуйте позже.",
+			undefined,
+			"server_error",
+			echo,
+		);
+	}
 
-  // 5. Получаем токен, но НЕ выдаём его браузеру: пользователь считается
-  // авторизованным только после подтверждения email кодом (см. verifyOtp.ts).
-  // Токен ждёт своего часа на сервере, в pending-auth (см. pendingAuth.ts).
-  // Раньше payload-token выставлялся прямо здесь, и свежезарегистрированный
-  // пользователь был полноценно авторизован ещё до ввода кода.
-  let loginToken: string | undefined;
-  try {
-    // AUTH_FLOW_CONTEXT — см. requireServerAuthFlow.ts: токен здесь тоже не
-    // выдаётся браузеру, а ждёт подтверждения email кодом в pending-auth.
-    const loginResult = await payload.login({
-      collection: "users",
-      data: { email, password },
-      context: AUTH_FLOW_CONTEXT,
-    });
-    loginToken = loginResult.token;
-  } catch (err) {
-    logUnexpectedAuthError("register.loginAfterCreate", err);
-  }
+	// 5. Получаем токен, но НЕ выдаём его браузеру: пользователь считается
+	// авторизованным только после подтверждения email кодом (см. verifyOtp.ts).
+	// Токен ждёт своего часа на сервере, в pending-auth (см. pendingAuth.ts).
+	// Раньше payload-token выставлялся прямо здесь, и свежезарегистрированный
+	// пользователь был полноценно авторизован ещё до ввода кода.
+	let loginToken: string | undefined;
+	try {
+		// AUTH_FLOW_CONTEXT — см. requireServerAuthFlow.ts: токен здесь тоже не
+		// выдаётся браузеру, а ждёт подтверждения email кодом в pending-auth.
+		const loginResult = await payload.login({
+			collection: "users",
+			data: { email, password },
+			context: AUTH_FLOW_CONTEXT,
+		});
+		loginToken = loginResult.token;
+	} catch (err) {
+		logUnexpectedAuthError("register.loginAfterCreate", err);
+	}
 
-  // 6. Session-запись здесь не создаётся — она появится в verifyOtpAction
-  // вместе с выдачей токена.
+	// 6. Session-запись здесь не создаётся — она появится в verifyOtpAction
+	// вместе с выдачей токена.
 
-  // 7. Фиксируем принятые согласия
-  await recordUserConsents(payload, {
-    userId: user.id,
-    accepted: acceptedConsents,
-    ip,
-    userAgent,
-  });
+	// 7. Фиксируем принятые согласия
+	await recordUserConsents(payload, {
+		userId: user.id,
+		accepted: acceptedConsents,
+		ip,
+		userAgent,
+	});
 
-  // 8. OTP для верификации email. Без самой OTP-записи пользователю нечего
-  // будет ввести на следующем экране, поэтому (в отличие от отправки письма
-  // ниже) сбой здесь должен остановить флоу — но не откатывать уже
-  // созданный аккаунт/согласия, это необратимые побочные эффекты
-  // (см. также комментарий у notifyOtpCode ниже).
-  const otp = await safeCreateOtp(
-    payload,
-    { userId: String(user.id), type: "email_verify", ip },
-    "register.createOtp",
-  );
-  if (!otp) {
-    return actionError(
-      "Аккаунт создан, но не удалось отправить код подтверждения. Войдите, чтобы запросить код повторно.",
-      undefined,
-      "server_error",
-    );
-  }
+	// 8. OTP для верификации email. Без самой OTP-записи пользователю нечего
+	// будет ввести на следующем экране, поэтому (в отличие от отправки письма
+	// ниже) сбой здесь должен остановить флоу — но не откатывать уже
+	// созданный аккаунт/согласия, это необратимые побочные эффекты
+	// (см. также комментарий у notifyOtpCode ниже).
+	const otp = await safeCreateOtp(
+		payload,
+		{ userId: String(user.id), type: "email_verify", ip },
+		"register.createOtp",
+	);
+	if (!otp) {
+		return actionError(
+			"Аккаунт создан, но не удалось отправить код подтверждения. Войдите, чтобы запросить код повторно.",
+			undefined,
+			"server_error",
+		);
+	}
 
-  // 9. Челлендж, по которому экран ввода кода узнает пользователя. Без него
-  // (или без токена из шага 5) продолжать нечем — аккаунт уже создан, поэтому
-  // отправляем регистрироваться... точнее, входить обычным логином.
-  if (!loginToken) {
-    return actionError(
-      "Аккаунт создан, но автоматический вход не удался. Войдите, пожалуйста, вручную.",
-      undefined,
-      "server_error",
-    );
-  }
+	// 9. Челлендж, по которому экран ввода кода узнает пользователя. Без него
+	// (или без токена из шага 5) продолжать нечем — аккаунт уже создан, поэтому
+	// отправляем регистрироваться... точнее, входить обычным логином.
+	if (!loginToken) {
+		return actionError(
+			"Аккаунт создан, но автоматический вход не удался. Войдите, пожалуйста, вручную.",
+			undefined,
+			"server_error",
+		);
+	}
 
-  try {
-    await createPendingAuth({
-      userId: String(user.id),
-      email,
-      name,
-      type: "email_verify",
-      token: loginToken,
-      ip,
-      userAgent,
-    });
-  } catch (err) {
-    logUnexpectedAuthError("register.createPendingAuth", err);
-    return actionError(
-      "Аккаунт создан, но не удалось начать подтверждение. Войдите, пожалуйста, вручную.",
-      undefined,
-      "server_error",
-    );
-  }
+	try {
+		await createPendingAuth({
+			userId: String(user.id),
+			email,
+			name,
+			type: "email_verify",
+			token: loginToken,
+			ip,
+			userAgent,
+		});
+	} catch (err) {
+		logUnexpectedAuthError("register.createPendingAuth", err);
+		return actionError(
+			"Аккаунт создан, но не удалось начать подтверждение. Войдите, пожалуйста, вручную.",
+			undefined,
+			"server_error",
+		);
+	}
 
-  // Аккаунт, cookie-сессия и согласия уже созданы к этому моменту — это
-  // необратимые побочные эффекты, которые Server Action не откатывает.
-  // Раньше сбой отправки письма ронял весь рендер /auth/register (падение
-  // происходило ещё раньше, при импорте modules/auth/lib/email.ts: там
-  // `new Resend(process.env.RESEND_API_KEY)` вызывался на уровне модуля и
-  // бросал исключение при отсутствующем ключе — модуль удалён, письма OTP
-  // идут через centralized EmailService/Nodemailer). notifyOtpCode
-  // намеренно прокидывает ошибку доставки дальше (см. её докстринг) — мы
-  // ловим её здесь, логируем и всё равно пропускаем пользователя на экран
-  // ввода кода: там есть кнопка «отправить код повторно» (resendOtpAction),
-  // которой можно будет воспользоваться, когда почтовый сервис
-  // восстановится. Возврат ошибки вместо этого не дал бы форме
-  // регистрации перейти на экран OTP (см. RegisterForm.tsx — она
-  // навигирует дальше только при success), оставив уже созданный аккаунт
-  // в тупике.
-  try {
-    await notifyOtpCode({ to: email, code: otp, purpose: "email_verify" });
-  } catch (err) {
-    logUnexpectedAuthError("register.notifyOtpCode", err);
-  }
+	// Аккаунт, cookie-сессия и согласия уже созданы к этому моменту — это
+	// необратимые побочные эффекты, которые Server Action не откатывает.
+	// Раньше сбой отправки письма ронял весь рендер /auth/register (падение
+	// происходило ещё раньше, при импорте modules/auth/lib/email.ts: там
+	// `new Resend(process.env.RESEND_API_KEY)` вызывался на уровне модуля и
+	// бросал исключение при отсутствующем ключе — модуль удалён, письма OTP
+	// идут через centralized EmailService/Nodemailer). notifyOtpCode
+	// намеренно прокидывает ошибку доставки дальше (см. её докстринг) — мы
+	// ловим её здесь, логируем и всё равно пропускаем пользователя на экран
+	// ввода кода: там есть кнопка «отправить код повторно» (resendOtpAction),
+	// которой можно будет воспользоваться, когда почтовый сервис
+	// восстановится. Возврат ошибки вместо этого не дал бы форме
+	// регистрации перейти на экран OTP (см. RegisterForm.tsx — она
+	// навигирует дальше только при success), оставив уже созданный аккаунт
+	// в тупике.
+	try {
+		await notifyOtpCode({ to: email, code: otp, purpose: "email_verify" });
+	} catch (err) {
+		logUnexpectedAuthError("register.notifyOtpCode", err);
+	}
 
-  return actionSuccess<RegisterResult>({ requiresOtp: true, email });
+	return actionSuccess<RegisterResult>({ requiresOtp: true, email });
 }

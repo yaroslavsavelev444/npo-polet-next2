@@ -5,10 +5,10 @@ import type { Metadata } from "next";
  * Используй, когда страница полностью недоступна.
  */
 export const noIndexMetadata: Metadata = {
-  robots: {
-    index: false,
-    follow: false,
-  },
+	robots: {
+		index: false,
+		follow: false,
+	},
 };
 
 /**
@@ -16,15 +16,15 @@ export const noIndexMetadata: Metadata = {
  * Удобно для массового использования на разных страницах.
  */
 export function createUnavailablePageMetadata(
-  title: string,
-  description?: string,
+	title: string,
+	description?: string,
 ): Metadata {
-  return {
-    title,
-    description,
-    robots: {
-      index: false,
-      follow: false,
-    },
-  };
+	return {
+		title,
+		description,
+		robots: {
+			index: false,
+			follow: false,
+		},
+	};
 }

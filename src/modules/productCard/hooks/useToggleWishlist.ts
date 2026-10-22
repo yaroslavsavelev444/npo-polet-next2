@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 /**
  * modules/productCard/hooks/useToggleWishlist.ts
@@ -9,80 +9,85 @@
  * dependency — productCard -> wishlist, never the reverse.
  */
 
-import { useCallback, useState } from 'react'
-import { openAuthOverlay } from '@/modules/auth/store/auth-overlay.store'
-import { toggleWishlistAction } from '@/modules/wishlist/actions/wishlist.actions'
-import { useWishlistStore } from '@/shared/store/wishlist.store'
-import type { ProductCardData } from '../types'
-import { appToast } from '@/shared/lib/toast'
+import { useCallback, useState } from "react";
+import { openAuthOverlay } from "@/modules/auth/store/auth-overlay.store";
+import { toggleWishlistAction } from "@/modules/wishlist/actions/wishlist.actions";
+import { appToast } from "@/shared/lib/toast";
+import { useWishlistStore } from "@/shared/store/wishlist.store";
+import type { ProductCardData } from "../types";
 
 export interface UseToggleWishlistResult {
-  isInWishlist: boolean
-  isToggling: boolean
-  toggleWishlist: (product: ProductCardData) => Promise<void>
+	isInWishlist: boolean;
+	isToggling: boolean;
+	toggleWishlist: (product: ProductCardData) => Promise<void>;
 }
 
 export function useToggleWishlist(productId: string): UseToggleWishlistResult {
-  const [isToggling, setIsToggling] = useState(false)
+	const [isToggling, setIsToggling] = useState(false);
 
-  const isInWishlist = useWishlistStore((s) => s.productIds.has(productId))
-  const add = useWishlistStore((s) => s.add)
-  const remove = useWishlistStore((s) => s.remove)
+	const isInWishlist = useWishlistStore((s) => s.productIds.has(productId));
+	const add = useWishlistStore((s) => s.add);
+	const remove = useWishlistStore((s) => s.remove);
 
-  const toggleWishlist = useCallback(
-    async (product: ProductCardData) => {
-      const wasInWishlist = isInWishlist
-      setIsToggling(true)
+	const toggleWishlist = useCallback(
+		async (product: ProductCardData) => {
+			const wasInWishlist = isInWishlist;
+			setIsToggling(true);
 
-      // Optimistic update — instant heart flip, no waiting on the network.
-      if (wasInWishlist) remove(productId)
-      else add(productId)
+			// Optimistic update — instant heart flip, no waiting on the network.
+			if (wasInWishlist) remove(productId);
+			else add(productId);
 
-      try {
-        const result = await toggleWishlistAction(productId)
+			try {
+				const result = await toggleWishlistAction(productId);
 
-        if (!result.success) {
-          // Roll back the optimistic change
-          if (wasInWishlist) add(productId)
-          else remove(productId)
+				if (!result.success) {
+					// Roll back the optimistic change
+					if (wasInWishlist) add(productId);
+					else remove(productId);
 
-          if (result.error === 'AUTH_REQUIRED') {
-            // Раньше отсюда уводило на /auth/login?from=/wishlist — то есть
-            // человека, который нажал на сердечко в каталоге, выбрасывало со
-            // страницы, а после входа он оказывался не там, где был, а в
-            // избранном. Теперь окно входа открывается поверх, а после него
-            // нажатие повторяется само: намерение он уже выразил.
-            openAuthOverlay({
-              reason: 'Избранное хранится в аккаунте. Войдите — товар добавится сразу после этого.',
-              onSuccess: async () => {
-                await toggleWishlistAction(productId).then((retry) => {
-                  if (retry.success && retry.data.isFavorite) add(productId)
-                })
-              },
-            })
-            return
-          }
-          appToast.warning(result.message ?? 'Не удалось обновить избранное. Попробуйте ещё раз.')
-          return
-        }
+					if (result.error === "AUTH_REQUIRED") {
+						// Раньше отсюда уводило на /auth/login?from=/wishlist — то есть
+						// человека, который нажал на сердечко в каталоге, выбрасывало со
+						// страницы, а после входа он оказывался не там, где был, а в
+						// избранном. Теперь окно входа открывается поверх, а после него
+						// нажатие повторяется само: намерение он уже выразил.
+						openAuthOverlay({
+							reason:
+								"Избранное хранится в аккаунте. Войдите — товар добавится сразу после этого.",
+							onSuccess: async () => {
+								await toggleWishlistAction(productId).then((retry) => {
+									if (retry.success && retry.data.isFavorite) add(productId);
+								});
+							},
+						});
+						return;
+					}
+					appToast.warning(
+						result.message ??
+							"Не удалось обновить избранное. Попробуйте ещё раз.",
+					);
+					return;
+				}
 
-        // Reconcile with the server's view in case of a race
-        if (result.data.isFavorite) add(productId)
-        else remove(productId)
-appToast.success(result.data.isFavorite
-            ? `«${product.title}» добавлен в избранное`
-            : `«${product.title}» удалён из избранного`,
-          )
-      } catch {
-        if (wasInWishlist) add(productId)
-        else remove(productId)
-      appToast.warning('Не удалось обновить избранное. Попробуйте ещё раз.')
-      } finally {
-        setIsToggling(false)
-      }
-    },
-    [isInWishlist, productId, add, remove],
-  )
+				// Reconcile with the server's view in case of a race
+				if (result.data.isFavorite) add(productId);
+				else remove(productId);
+				appToast.success(
+					result.data.isFavorite
+						? `«${product.title}» добавлен в избранное`
+						: `«${product.title}» удалён из избранного`,
+				);
+			} catch {
+				if (wasInWishlist) add(productId);
+				else remove(productId);
+				appToast.warning("Не удалось обновить избранное. Попробуйте ещё раз.");
+			} finally {
+				setIsToggling(false);
+			}
+		},
+		[isInWishlist, productId, add, remove],
+	);
 
-  return { isInWishlist, isToggling, toggleWishlist }
+	return { isInWishlist, isToggling, toggleWishlist };
 }

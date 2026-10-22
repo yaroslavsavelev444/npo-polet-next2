@@ -24,50 +24,50 @@ let buildStub: PayloadInstance | null = null;
  * не установлена) эта ветка никогда не выполняется, и поведение не меняется.
  */
 function createBuildStub(): PayloadInstance {
-  const emptyFind = async () => ({
-    docs: [],
-    totalDocs: 0,
-    totalPages: 0,
-    page: 1,
-    limit: 0,
-    pagingCounter: 0,
-    hasNextPage: false,
-    hasPrevPage: false,
-    nextPage: null,
-    prevPage: null,
-  });
+	const emptyFind = async () => ({
+		docs: [],
+		totalDocs: 0,
+		totalPages: 0,
+		page: 1,
+		limit: 0,
+		pagingCounter: 0,
+		hasNextPage: false,
+		hasPrevPage: false,
+		nextPage: null,
+		prevPage: null,
+	});
 
-  return {
-    find: emptyFind,
-    findByID: async () => {
-      throw new Error("Payload Local API недоступна во время `next build`.");
-    },
-    findGlobal: async () => null,
-    auth: async () => ({ user: null }),
-    create: async () => {
-      throw new Error("Мутации Payload недоступны во время `next build`.");
-    },
-    update: async () => {
-      throw new Error("Мутации Payload недоступны во время `next build`.");
-    },
-    delete: async () => {
-      throw new Error("Мутации Payload недоступны во время `next build`.");
-    },
-    login: async () => {
-      throw new Error(
-        "Аутентификация Payload недоступна во время `next build`.",
-      );
-    },
-  } as unknown as PayloadInstance;
+	return {
+		find: emptyFind,
+		findByID: async () => {
+			throw new Error("Payload Local API недоступна во время `next build`.");
+		},
+		findGlobal: async () => null,
+		auth: async () => ({ user: null }),
+		create: async () => {
+			throw new Error("Мутации Payload недоступны во время `next build`.");
+		},
+		update: async () => {
+			throw new Error("Мутации Payload недоступны во время `next build`.");
+		},
+		delete: async () => {
+			throw new Error("Мутации Payload недоступны во время `next build`.");
+		},
+		login: async () => {
+			throw new Error(
+				"Аутентификация Payload недоступна во время `next build`.",
+			);
+		},
+	} as unknown as PayloadInstance;
 }
 
 export async function getPayloadInstance(): Promise<PayloadInstance> {
-  if (process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD) {
-    if (!buildStub) buildStub = createBuildStub();
-    return buildStub;
-  }
-  if (!cachedPayload) {
-    cachedPayload = await getPayload({ config });
-  }
-  return cachedPayload;
+	if (process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD) {
+		if (!buildStub) buildStub = createBuildStub();
+		return buildStub;
+	}
+	if (!cachedPayload) {
+		cachedPayload = await getPayload({ config });
+	}
+	return cachedPayload;
 }

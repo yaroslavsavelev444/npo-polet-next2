@@ -267,7 +267,10 @@ test("filterReviewableProducts пропускает только то, что р
 
 test("пустой список товаров не идёт в базу и возвращает пусто", async () => {
 	assert.deepEqual(await filterReviewableProducts(payload, userId, []), []);
-	assert.deepEqual(await filterReviewableProducts(payload, "не-число", [1]), []);
+	assert.deepEqual(
+		await filterReviewableProducts(payload, "не-число", [1]),
+		[],
+	);
 });
 
 /* ----------------------------------------------------------- переход --- */

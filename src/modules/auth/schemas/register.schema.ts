@@ -1,74 +1,86 @@
 import { z } from "zod";
 import { validateEmail } from "../lib/email";
 import {
-  PASSWORD_DIGIT_REGEX,
-  PASSWORD_LOWERCASE_REGEX,
-  PASSWORD_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_SPECIAL_REGEX,
-  PASSWORD_UPPERCASE_REGEX,
+	PASSWORD_DIGIT_REGEX,
+	PASSWORD_LOWERCASE_REGEX,
+	PASSWORD_MAX_LENGTH,
+	PASSWORD_MIN_LENGTH,
+	PASSWORD_SPECIAL_REGEX,
+	PASSWORD_UPPERCASE_REGEX,
 } from "../lib/passwordPolicy";
 
 /** Имя покупателя — общее для обычной регистрации и регистрации через Яндекс ID. */
 export const nameSchema = z
-  .string()
-  .min(2, "Имя минимум 2 символа")
-  .max(60, "Имя не более 60 символов")
-  .regex(/^[a-zA-Zа-яёА-ЯЁ\s\-']+$/, "Имя содержит недопустимые символы");
+	.string()
+	.min(2, "Имя минимум 2 символа")
+	.max(60, "Имя не более 60 символов")
+	.regex(/^[a-zA-Zа-яёА-ЯЁ\s\-']+$/, "Имя содержит недопустимые символы");
 
 export const registerSchema = z
-  .object({
-    // Единый источник правды по email: формат + blocklist (заглушки,
-    // одноразовые сервисы, подозрительный local-part). Ограничения по
-    // доменной зоне нет — почта любого домена подходит для регистрации.
-    // Эта же схема выполняется в registerAction, поэтому проверка работает и
-    // при прямом запросе к серверному экшену в обход формы. На клиенте те же
-    // функции из lib/email дают мгновенную подсказку (см. RegisterForm.tsx).
-    email: z
-      .string()
-      .min(1, "Email обязателен")
-      .trim()
-      .toLowerCase()
-      .superRefine((value, ctx) => {
-        const error = validateEmail(value);
-        if (error) {
-          ctx.addIssue({ code: "custom", message: error });
-        }
-      }),
+	.object({
+		// Единый источник правды по email: формат + blocklist (заглушки,
+		// одноразовые сервисы, подозрительный local-part). Ограничения по
+		// доменной зоне нет — почта любого домена подходит для регистрации.
+		// Эта же схема выполняется в registerAction, поэтому проверка работает и
+		// при прямом запросе к серверному экшену в обход формы. На клиенте те же
+		// функции из lib/email дают мгновенную подсказку (см. RegisterForm.tsx).
+		email: z
+			.string()
+			.min(1, "Email обязателен")
+			.trim()
+			.toLowerCase()
+			.superRefine((value, ctx) => {
+				const error = validateEmail(value);
+				if (error) {
+					ctx.addIssue({ code: "custom", message: error });
+				}
+			}),
 
-    // Регексы и границы длины — из lib/passwordPolicy.ts, того же источника,
-    // что использует PasswordStrengthMeter на клиенте, чтобы индикатор
-    // требований никогда не расходился с тем, что реально проверяет сервер.
-    password: z
-      .string()
-      .min(PASSWORD_MIN_LENGTH, `Пароль минимум ${PASSWORD_MIN_LENGTH} символов`)
-      .max(PASSWORD_MAX_LENGTH, `Пароль не более ${PASSWORD_MAX_LENGTH} символов`)
-      .regex(PASSWORD_UPPERCASE_REGEX, "Пароль должен содержать заглавную букву")
-      .regex(PASSWORD_LOWERCASE_REGEX, "Пароль должен содержать строчную букву")
-      .regex(PASSWORD_DIGIT_REGEX, "Пароль должен содержать цифру")
-      .regex(PASSWORD_SPECIAL_REGEX, "Пароль должен содержать специальный символ"),
+		// Регексы и границы длины — из lib/passwordPolicy.ts, того же источника,
+		// что использует PasswordStrengthMeter на клиенте, чтобы индикатор
+		// требований никогда не расходился с тем, что реально проверяет сервер.
+		password: z
+			.string()
+			.min(
+				PASSWORD_MIN_LENGTH,
+				`Пароль минимум ${PASSWORD_MIN_LENGTH} символов`,
+			)
+			.max(
+				PASSWORD_MAX_LENGTH,
+				`Пароль не более ${PASSWORD_MAX_LENGTH} символов`,
+			)
+			.regex(
+				PASSWORD_UPPERCASE_REGEX,
+				"Пароль должен содержать заглавную букву",
+			)
+			.regex(PASSWORD_LOWERCASE_REGEX, "Пароль должен содержать строчную букву")
+			.regex(PASSWORD_DIGIT_REGEX, "Пароль должен содержать цифру")
+			.regex(
+				PASSWORD_SPECIAL_REGEX,
+				"Пароль должен содержать специальный символ",
+			),
 
-    confirmPassword: z.string().min(1, "Подтвердите пароль"),
+		confirmPassword: z.string().min(1, "Подтвердите пароль"),
 
-    name: nameSchema,
+		name: nameSchema,
 
-    // Массив принятых согласий передаётся как JSON-строка из FormData
-    consentsJson: z.string().min(1, "Необходимо принять соглашения"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Пароли не совпадают",
-    path: ["confirmPassword"],
-  });
+		// Массив принятых согласий передаётся как JSON-строка из FormData
+		consentsJson: z.string().min(1, "Необходимо принять соглашения"),
+	})
+	.refine((data) => data.password === data.confirmPassword, {
+		message: "Пароли не совпадают",
+		path: ["confirmPassword"],
+	});
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 
 // Схема для одного принятого согласия
 export const acceptedConsentSchema = z.object({
-  consentId: z.coerce.number(),
+	consentId: z.coerce.number(),
 
-  slug: z.string(),
+	slug: z.string(),
 
-  version: z.string(),
+	version: z.string(),
 });
 
 export type AcceptedConsentInput = z.infer<typeof acceptedConsentSchema>;

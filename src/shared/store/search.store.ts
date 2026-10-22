@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create } from "zustand";
 
 /**
  * Состояние поля поиска в шапке — только интерфейс.
@@ -9,29 +9,29 @@ import { create } from 'zustand'
  * приходилось синхронизировать с AbortController самостоятельно.
  */
 interface SearchState {
-  query: string
-  isOpen: boolean
-  /** Ключ выделенного результата (`${type}-${id}`), а не индекс: индекс
-   *  съезжает, когда «Показать ещё» дописывает строки в середину списка. */
-  activeKey: string | null
+	query: string;
+	isOpen: boolean;
+	/** Ключ выделенного результата (`${type}-${id}`), а не индекс: индекс
+	 *  съезжает, когда «Показать ещё» дописывает строки в середину списка. */
+	activeKey: string | null;
 
-  setQuery: (query: string) => void
-  setActiveKey: (key: string | null) => void
-  open: () => void
-  close: () => void
-  reset: () => void
+	setQuery: (query: string) => void;
+	setActiveKey: (key: string | null) => void;
+	open: () => void;
+	close: () => void;
+	reset: () => void;
 }
 
 export const useSearchStore = create<SearchState>((set) => ({
-  query: '',
-  isOpen: false,
-  activeKey: null,
+	query: "",
+	isOpen: false,
+	activeKey: null,
 
-  setQuery: (query) => set({ query, activeKey: null }),
-  setActiveKey: (activeKey) => set({ activeKey }),
+	setQuery: (query) => set({ query, activeKey: null }),
+	setActiveKey: (activeKey) => set({ activeKey }),
 
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false, activeKey: null }),
+	open: () => set({ isOpen: true }),
+	close: () => set({ isOpen: false, activeKey: null }),
 
-  reset: () => set({ query: '', isOpen: false, activeKey: null }),
-}))
+	reset: () => set({ query: "", isOpen: false, activeKey: null }),
+}));

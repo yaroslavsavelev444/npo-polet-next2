@@ -5,212 +5,212 @@ import { z } from "zod";
  * Схема для серверных переменных (доступны только в Node.js / API routes / Server Components)
  */
 const serverSchema = z.object({
-  // Payload
-  PAYLOAD_SECRET: z.string().min(1),
+	// Payload
+	PAYLOAD_SECRET: z.string().min(1),
 
-  // База данных
-  DATABASE_URI: z.string().url(),
+	// База данных
+	DATABASE_URI: z.string().url(),
 
-  // Redis (для BullMQ, pending-auth челленджей и rate limit'ов)
-  REDIS_URL: z.string().url().optional(),
-  REDIS_HOST: z.string().optional(),
-  REDIS_PORT: z.string().optional(),
-  // Отдельная переменная, а не пароль внутри REDIS_URL: в URL его пришлось бы
-  // percent-кодировать, и любой спецсимвол в сгенерированном пароле тихо
-  // ломал бы разбор (`new URL` отрезал бы часть, а соединение падало бы с
-  // NOAUTH уже в проде). Та же самая переменная передаётся серверу Redis как
-  // --requirepass в docker-compose.prod.yml — один источник правды.
-  REDIS_PASSWORD: z.string().optional(),
+	// Redis (для BullMQ, pending-auth челленджей и rate limit'ов)
+	REDIS_URL: z.string().url().optional(),
+	REDIS_HOST: z.string().optional(),
+	REDIS_PORT: z.string().optional(),
+	// Отдельная переменная, а не пароль внутри REDIS_URL: в URL его пришлось бы
+	// percent-кодировать, и любой спецсимвол в сгенерированном пароле тихо
+	// ломал бы разбор (`new URL` отрезал бы часть, а соединение падало бы с
+	// NOAUTH уже в проде). Та же самая переменная передаётся серверу Redis как
+	// --requirepass в docker-compose.prod.yml — один источник правды.
+	REDIS_PASSWORD: z.string().optional(),
 
-  // Node env
-  NODE_ENV: z
-    .enum(["development", "production", "test"])
-    .default("development"),
+	// Node env
+	NODE_ENV: z
+		.enum(["development", "production", "test"])
+		.default("development"),
 
-  // ── CORS / CSRF ──────────────────────────────────────────────────────────
-  // Список через запятую, например: "https://npo-polet.ru,https://admin.npo-polet.ru".
-  // www.npo-polet.ru сюда добавлять не нужно: nginx редиректит www на голый
-  // домен ещё до приложения (см. nginx.txt), поэтому Origin с www в
-  // запросах, реально доходящих до Payload, никогда не возникает.
-  // Payload использует это ОДНО значение и для `cors`, и для `csrf` (см.
-  // payload.config.ts). Если Origin входящего запроса не входит в этот
-  // список, Payload молча отбрасывает JWT из cookie (см.
-  // node_modules/payload/dist/auth/extractJWT.js) — запрос выглядит как
-  // неавторизованный (req.user === null), хотя cookie в браузере валидна.
-  // Ровно это происходило в проде с admin.npo-polet.ru, когда админский
-  // origin забыли добавить в переменную при активации поддомена: 403 при
-  // сохранении в админке и 400 ("No User") при logout — Payload просто не
-  // видел пользователя ни в одном из этих запросов.
-  ALLOWED_ORIGINS: z.string().optional().default(""),
+	// ── CORS / CSRF ──────────────────────────────────────────────────────────
+	// Список через запятую, например: "https://npo-polet.ru,https://admin.npo-polet.ru".
+	// www.npo-polet.ru сюда добавлять не нужно: nginx редиректит www на голый
+	// домен ещё до приложения (см. nginx.txt), поэтому Origin с www в
+	// запросах, реально доходящих до Payload, никогда не возникает.
+	// Payload использует это ОДНО значение и для `cors`, и для `csrf` (см.
+	// payload.config.ts). Если Origin входящего запроса не входит в этот
+	// список, Payload молча отбрасывает JWT из cookie (см.
+	// node_modules/payload/dist/auth/extractJWT.js) — запрос выглядит как
+	// неавторизованный (req.user === null), хотя cookie в браузере валидна.
+	// Ровно это происходило в проде с admin.npo-polet.ru, когда админский
+	// origin забыли добавить в переменную при активации поддомена: 403 при
+	// сохранении в админке и 400 ("No User") при logout — Payload просто не
+	// видел пользователя ни в одном из этих запросов.
+	ALLOWED_ORIGINS: z.string().optional().default(""),
 
-  // ── Подсказки адресов (DaData) ───────────────────────────────────────────
-  // Ключ Suggestions API. Опционален: без него оформление заказа работает,
-  // но поле адреса сразу открывается в режиме ручного ввода (см.
-  // modules/checkout/server/dadata-client.ts). Префикса NEXT_PUBLIC_ здесь
-  // быть НЕ должно — иначе ключ уедет в клиентский бандл, и чужие запросы
-  // выберут наш дневной лимит.
-  DADATA_API_KEY: z.string().optional(),
+	// ── Подсказки адресов (DaData) ───────────────────────────────────────────
+	// Ключ Suggestions API. Опционален: без него оформление заказа работает,
+	// но поле адреса сразу открывается в режиме ручного ввода (см.
+	// modules/checkout/server/dadata-client.ts). Префикса NEXT_PUBLIC_ здесь
+	// быть НЕ должно — иначе ключ уедет в клиентский бандл, и чужие запросы
+	// выберут наш дневной лимит.
+	DADATA_API_KEY: z.string().optional(),
 
-  // Адрес апстрима подсказок. В боевом окружении НЕ задаётся — используется
-  // официальный URL DaData. Переопределяется только в E2E, чтобы прогонять
-  // весь путь запроса против локального мока вместо сети.
-  DADATA_SUGGEST_URL: z.string().url().optional(),
+	// Адрес апстрима подсказок. В боевом окружении НЕ задаётся — используется
+	// официальный URL DaData. Переопределяется только в E2E, чтобы прогонять
+	// весь путь запроса против локального мока вместо сети.
+	DADATA_SUGGEST_URL: z.string().url().optional(),
 
-  // Хост админки, например: "admin.npo-polet.ru" (без протокола). Используется
-  // proxy.ts для маршрутизации и ниже — чтобы на старте процесса проверить,
-  // что соответствующий https-origin присутствует в ALLOWED_ORIGINS.
-  ADMIN_HOSTNAME: z.string().optional(),
+	// Хост админки, например: "admin.npo-polet.ru" (без протокола). Используется
+	// proxy.ts для маршрутизации и ниже — чтобы на старте процесса проверить,
+	// что соответствующий https-origin присутствует в ALLOWED_ORIGINS.
+	ADMIN_HOSTNAME: z.string().optional(),
 
-  // ── Оповещения об ошибках (src/services/observability/README.md) ─────────
-  // Куда слать письма о серверных ошибках и суточную сводку. Несколько
-  // адресов — через запятую. Не задан — ошибки пишутся в журнал (админка →
-  // «Журнал ошибок»), но письмом не приходят. Намеренно окружение, а не
-  // настройка в админке: адрес нужен именно тогда, когда база недоступна.
-  ERROR_ALERT_EMAIL: z.string().optional(),
-  // Сколько дней хранить журнал ошибок (по умолчанию 90). Старые записи
-  // удаляет суточная задача.
-  ERROR_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(400).optional(),
+	// ── Оповещения об ошибках (src/services/observability/README.md) ─────────
+	// Куда слать письма о серверных ошибках и суточную сводку. Несколько
+	// адресов — через запятую. Не задан — ошибки пишутся в журнал (админка →
+	// «Журнал ошибок»), но письмом не приходят. Намеренно окружение, а не
+	// настройка в админке: адрес нужен именно тогда, когда база недоступна.
+	ERROR_ALERT_EMAIL: z.string().optional(),
+	// Сколько дней хранить журнал ошибок (по умолчанию 90). Старые записи
+	// удаляет суточная задача.
+	ERROR_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(400).optional(),
 
-  // ── Чат поддержки (src/modules/support-chat) ─────────────────────────────
-  // Порт Socket.IO-шлюза. Снаружи он не виден: nginx проксирует на него
-  // /realtime/ обоих хостов (витрины и админки).
-  SUPPORT_GATEWAY_PORT: z.coerce.number().int().min(1).max(65535).default(3005),
-  // Мастер-ключи шифрования переписки: "id:base64[,id:base64…]", первый —
-  // действующий. Формат проверяет modules/support-chat/server/crypto.ts при
-  // первом использовании (здесь он необязателен, чтобы сборка и миграции
-  // обходились без ключа). ⚠ Хранить ОТДЕЛЬНО от бэкапов базы и резервировать
-  // офлайн: потеря ключа = потеря всей переписки.
-  SUPPORT_ENCRYPTION_KEYS: z.string().optional(),
-  // Каталог зашифрованных вложений чата. По умолчанию — media/support-attachments
-  // (тот же том, что и Media, но файлы в нём без ключа нечитаемы).
-  SUPPORT_ATTACHMENTS_DIR: z.string().optional(),
-  // Адрес шлюза для браузера. В проде НЕ задаётся: шлюз на том же хосте
-  // (/realtime/ проксирует nginx). В разработке — http://localhost:3005,
-  // потому что Next и шлюз — разные процессы на разных портах.
-  SUPPORT_GATEWAY_PUBLIC_URL: z.string().url().optional(),
+	// ── Чат поддержки (src/modules/support-chat) ─────────────────────────────
+	// Порт Socket.IO-шлюза. Снаружи он не виден: nginx проксирует на него
+	// /realtime/ обоих хостов (витрины и админки).
+	SUPPORT_GATEWAY_PORT: z.coerce.number().int().min(1).max(65535).default(3005),
+	// Мастер-ключи шифрования переписки: "id:base64[,id:base64…]", первый —
+	// действующий. Формат проверяет modules/support-chat/server/crypto.ts при
+	// первом использовании (здесь он необязателен, чтобы сборка и миграции
+	// обходились без ключа). ⚠ Хранить ОТДЕЛЬНО от бэкапов базы и резервировать
+	// офлайн: потеря ключа = потеря всей переписки.
+	SUPPORT_ENCRYPTION_KEYS: z.string().optional(),
+	// Каталог зашифрованных вложений чата. По умолчанию — media/support-attachments
+	// (тот же том, что и Media, но файлы в нём без ключа нечитаемы).
+	SUPPORT_ATTACHMENTS_DIR: z.string().optional(),
+	// Адрес шлюза для браузера. В проде НЕ задаётся: шлюз на том же хосте
+	// (/realtime/ проксирует nginx). В разработке — http://localhost:3005,
+	// потому что Next и шлюз — разные процессы на разных портах.
+	SUPPORT_GATEWAY_PUBLIC_URL: z.string().url().optional(),
 
-  // ── Вход через Яндекс ID (src/modules/auth/oauth) ────────────────────────
-  // Приложение на oauth.yandex.ru. Секрет — без префикса NEXT_PUBLIC_.
-  // Одних ключей мало: сам вход включает владелец в админке («Настройки сайта →
-  // Вход через Яндекс ID», по умолчанию выключено). Без ключей галочка
-  // ничего не включает.
-  YANDEX_CLIENT_ID: z.string().optional(),
-  YANDEX_CLIENT_SECRET: z.string().optional(),
-  // Адреса Яндекса. В боевом окружении НЕ задаются — используются
-  // официальные. Переопределяются только в E2E, чтобы гонять весь поток
-  // против локального мока (как DADATA_SUGGEST_URL).
-  YANDEX_OAUTH_URL: z.string().url().optional(),
-  YANDEX_LOGIN_URL: z.string().url().optional(),
+	// ── Вход через Яндекс ID (src/modules/auth/oauth) ────────────────────────
+	// Приложение на oauth.yandex.ru. Секрет — без префикса NEXT_PUBLIC_.
+	// Одних ключей мало: сам вход включает владелец в админке («Настройки сайта →
+	// Вход через Яндекс ID», по умолчанию выключено). Без ключей галочка
+	// ничего не включает.
+	YANDEX_CLIENT_ID: z.string().optional(),
+	YANDEX_CLIENT_SECRET: z.string().optional(),
+	// Адреса Яндекса. В боевом окружении НЕ задаются — используются
+	// официальные. Переопределяются только в E2E, чтобы гонять весь поток
+	// против локального мока (как DADATA_SUGGEST_URL).
+	YANDEX_OAUTH_URL: z.string().url().optional(),
+	YANDEX_LOGIN_URL: z.string().url().optional(),
 });
 
 /**
  * Схема для клиентских переменных (должны иметь префикс NEXT_PUBLIC_)
  */
 const clientSchema = z.object({
-  // Единственный источник правды для абсолютного адреса приложения.
-  // Используется: payload.config.ts (serverURL для абсолютных URL медиа),
-  // письма (ссылки восстановления пароля и т.д.), email/config.ts.
-  // В dev по умолчанию localhost:3000, в проде ОБЯЗАН быть переопределён
-  // на реальный домен (https://npo-polet.ru) через .env.production.
-  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+	// Единственный источник правды для абсолютного адреса приложения.
+	// Используется: payload.config.ts (serverURL для абсолютных URL медиа),
+	// письма (ссылки восстановления пароля и т.д.), email/config.ts.
+	// В dev по умолчанию localhost:3000, в проде ОБЯЗАН быть переопределён
+	// на реальный домен (https://npo-polet.ru) через .env.production.
+	NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 
-  // Номер счётчика Яндекс.Метрики, например "87654321". Не задан — счётчик
-  // просто не рендерится (см. widgets/Analytics/YandexMetrika.tsx): слать хиты
-  // с dev и превью-стендов в боевой счётчик нельзя, иначе статистика
-  // перестаёт быть достоверной.
-  NEXT_PUBLIC_YM_ID: z.string().regex(/^\d+$/).optional(),
+	// Номер счётчика Яндекс.Метрики, например "87654321". Не задан — счётчик
+	// просто не рендерится (см. widgets/Analytics/YandexMetrika.tsx): слать хиты
+	// с dev и превью-стендов в боевой счётчик нельзя, иначе статистика
+	// перестаёт быть достоверной.
+	NEXT_PUBLIC_YM_ID: z.string().regex(/^\d+$/).optional(),
 });
 
 /**
  * Функция для валидации и парсинга переменных окружения
  */
 function buildEnv() {
-  // Собираем все переменные
-  const serverEnv = {
-    PAYLOAD_SECRET: process.env.PAYLOAD_SECRET,
-    DATABASE_URI: process.env.DATABASE_URI,
-    REDIS_URL: process.env.REDIS_URL,
-    REDIS_HOST: process.env.REDIS_HOST,
-    REDIS_PORT: process.env.REDIS_PORT,
-    REDIS_PASSWORD: process.env.REDIS_PASSWORD,
-    NODE_ENV: process.env.NODE_ENV,
-    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
-    ADMIN_HOSTNAME: process.env.ADMIN_HOSTNAME,
-    DADATA_API_KEY: process.env.DADATA_API_KEY,
-    DADATA_SUGGEST_URL: process.env.DADATA_SUGGEST_URL,
-    ERROR_ALERT_EMAIL: process.env.ERROR_ALERT_EMAIL,
-    ERROR_LOG_RETENTION_DAYS: process.env.ERROR_LOG_RETENTION_DAYS,
-    SUPPORT_GATEWAY_PORT: process.env.SUPPORT_GATEWAY_PORT,
-    SUPPORT_ENCRYPTION_KEYS: process.env.SUPPORT_ENCRYPTION_KEYS,
-    SUPPORT_ATTACHMENTS_DIR: process.env.SUPPORT_ATTACHMENTS_DIR,
-    SUPPORT_GATEWAY_PUBLIC_URL: process.env.SUPPORT_GATEWAY_PUBLIC_URL,
-    YANDEX_CLIENT_ID: process.env.YANDEX_CLIENT_ID,
-    YANDEX_CLIENT_SECRET: process.env.YANDEX_CLIENT_SECRET,
-    YANDEX_OAUTH_URL: process.env.YANDEX_OAUTH_URL,
-    YANDEX_LOGIN_URL: process.env.YANDEX_LOGIN_URL,
-  };
+	// Собираем все переменные
+	const serverEnv = {
+		PAYLOAD_SECRET: process.env.PAYLOAD_SECRET,
+		DATABASE_URI: process.env.DATABASE_URI,
+		REDIS_URL: process.env.REDIS_URL,
+		REDIS_HOST: process.env.REDIS_HOST,
+		REDIS_PORT: process.env.REDIS_PORT,
+		REDIS_PASSWORD: process.env.REDIS_PASSWORD,
+		NODE_ENV: process.env.NODE_ENV,
+		ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+		ADMIN_HOSTNAME: process.env.ADMIN_HOSTNAME,
+		DADATA_API_KEY: process.env.DADATA_API_KEY,
+		DADATA_SUGGEST_URL: process.env.DADATA_SUGGEST_URL,
+		ERROR_ALERT_EMAIL: process.env.ERROR_ALERT_EMAIL,
+		ERROR_LOG_RETENTION_DAYS: process.env.ERROR_LOG_RETENTION_DAYS,
+		SUPPORT_GATEWAY_PORT: process.env.SUPPORT_GATEWAY_PORT,
+		SUPPORT_ENCRYPTION_KEYS: process.env.SUPPORT_ENCRYPTION_KEYS,
+		SUPPORT_ATTACHMENTS_DIR: process.env.SUPPORT_ATTACHMENTS_DIR,
+		SUPPORT_GATEWAY_PUBLIC_URL: process.env.SUPPORT_GATEWAY_PUBLIC_URL,
+		YANDEX_CLIENT_ID: process.env.YANDEX_CLIENT_ID,
+		YANDEX_CLIENT_SECRET: process.env.YANDEX_CLIENT_SECRET,
+		YANDEX_OAUTH_URL: process.env.YANDEX_OAUTH_URL,
+		YANDEX_LOGIN_URL: process.env.YANDEX_LOGIN_URL,
+	};
 
-  const clientEnv = {
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    NEXT_PUBLIC_YM_ID: process.env.NEXT_PUBLIC_YM_ID,
-  };
+	const clientEnv = {
+		NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+		NEXT_PUBLIC_YM_ID: process.env.NEXT_PUBLIC_YM_ID,
+	};
 
-  // Парсим серверные переменные (только если запущено на сервере)
-  const parsedServer = serverSchema.safeParse(serverEnv);
-  if (!parsedServer.success) {
-    console.error(
-      "❌ Ошибка валидации серверных переменных окружения:",
-      parsedServer.error.format(),
-    );
-    // В проде лучше выбрасывать ошибку, чтобы не запускать приложение с невалидным конфигом
-    throw new Error("Invalid server environment variables");
-  }
+	// Парсим серверные переменные (только если запущено на сервере)
+	const parsedServer = serverSchema.safeParse(serverEnv);
+	if (!parsedServer.success) {
+		console.error(
+			"❌ Ошибка валидации серверных переменных окружения:",
+			parsedServer.error.format(),
+		);
+		// В проде лучше выбрасывать ошибку, чтобы не запускать приложение с невалидным конфигом
+		throw new Error("Invalid server environment variables");
+	}
 
-  // Кросс-проверка ALLOWED_ORIGINS/ADMIN_HOSTNAME: если админский поддомен
-  // уже сконфигурирован (ADMIN_HOSTNAME задан), его https-origin ОБЯЗАН
-  // присутствовать в ALLOWED_ORIGINS, иначе Payload будет молча отклонять
-  // все запросы из админки как неавторизованные (см. комментарий у
-  // ALLOWED_ORIGINS выше). Проверяем только в production и только когда
-  // ADMIN_HOSTNAME реально задан — на этапе, пока поддомен ещё не поднят
-  // (ADMIN_HOSTNAME пуст), эта проверка не мешает.
-  if (
-    parsedServer.data.NODE_ENV === "production" &&
-    parsedServer.data.ADMIN_HOSTNAME
-  ) {
-    const adminOrigin = `https://${parsedServer.data.ADMIN_HOSTNAME}`;
-    const allowedOrigins = parsedServer.data.ALLOWED_ORIGINS.split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean);
+	// Кросс-проверка ALLOWED_ORIGINS/ADMIN_HOSTNAME: если админский поддомен
+	// уже сконфигурирован (ADMIN_HOSTNAME задан), его https-origin ОБЯЗАН
+	// присутствовать в ALLOWED_ORIGINS, иначе Payload будет молча отклонять
+	// все запросы из админки как неавторизованные (см. комментарий у
+	// ALLOWED_ORIGINS выше). Проверяем только в production и только когда
+	// ADMIN_HOSTNAME реально задан — на этапе, пока поддомен ещё не поднят
+	// (ADMIN_HOSTNAME пуст), эта проверка не мешает.
+	if (
+		parsedServer.data.NODE_ENV === "production" &&
+		parsedServer.data.ADMIN_HOSTNAME
+	) {
+		const adminOrigin = `https://${parsedServer.data.ADMIN_HOSTNAME}`;
+		const allowedOrigins = parsedServer.data.ALLOWED_ORIGINS.split(",")
+			.map((origin) => origin.trim())
+			.filter(Boolean);
 
-    if (!allowedOrigins.includes(adminOrigin)) {
-      console.error(
-        `❌ ADMIN_HOSTNAME=${parsedServer.data.ADMIN_HOSTNAME} задан, но ${adminOrigin} отсутствует в ALLOWED_ORIGINS ` +
-          `(сейчас: "${parsedServer.data.ALLOWED_ORIGINS}"). Без этого Payload будет ` +
-          "отклонять запросы из админки (403 при сохранении, 400 при logout), " +
-          "потому что не сможет извлечь JWT из cookie для этого Origin.",
-      );
-      throw new Error(
-        `ALLOWED_ORIGINS должен включать ${adminOrigin} — добавьте его в .env.production`,
-      );
-    }
-  }
+		if (!allowedOrigins.includes(adminOrigin)) {
+			console.error(
+				`❌ ADMIN_HOSTNAME=${parsedServer.data.ADMIN_HOSTNAME} задан, но ${adminOrigin} отсутствует в ALLOWED_ORIGINS ` +
+					`(сейчас: "${parsedServer.data.ALLOWED_ORIGINS}"). Без этого Payload будет ` +
+					"отклонять запросы из админки (403 при сохранении, 400 при logout), " +
+					"потому что не сможет извлечь JWT из cookie для этого Origin.",
+			);
+			throw new Error(
+				`ALLOWED_ORIGINS должен включать ${adminOrigin} — добавьте его в .env.production`,
+			);
+		}
+	}
 
-  // Клиентские переменные (доступны и на клиенте, но валидируем везде)
-  const parsedClient = clientSchema.safeParse(clientEnv);
-  if (!parsedClient.success) {
-    console.error(
-      "❌ Ошибка валидации клиентских переменных окружения:",
-      parsedClient.error.format(),
-    );
-    if (typeof window === "undefined") {
-      throw new Error("Invalid client environment variables");
-    }
-  }
-  //
-  return {
-    ...parsedServer.data,
-    ...parsedClient.data,
-  };
+	// Клиентские переменные (доступны и на клиенте, но валидируем везде)
+	const parsedClient = clientSchema.safeParse(clientEnv);
+	if (!parsedClient.success) {
+		console.error(
+			"❌ Ошибка валидации клиентских переменных окружения:",
+			parsedClient.error.format(),
+		);
+		if (typeof window === "undefined") {
+			throw new Error("Invalid client environment variables");
+		}
+	}
+	//
+	return {
+		...parsedServer.data,
+		...parsedClient.data,
+	};
 }
 
 /**

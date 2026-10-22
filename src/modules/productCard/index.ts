@@ -9,7 +9,7 @@ export { getProductHref } from "./lib/routing";
 export { buildProductJsonLd, buildProductMetadata } from "./lib/seo";
 export { getProductStatusLabel, PRODUCT_STATUS_LABELS } from "./lib/status";
 export type {
-  ProductAvailabilityStatus,
-  ProductCardData,
-  ProductCardProps,
+	ProductAvailabilityStatus,
+	ProductCardData,
+	ProductCardProps,
 } from "./types";
