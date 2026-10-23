@@ -322,9 +322,15 @@ export const KnowledgeTopics: CollectionConfig = {
 			// Плоский текст статьи для поиска. Скрыт от редактора: это
 			// производное значение, править его руками нечего и незачем
 			// (см. indexKnowledgeTopic).
+			//
+			// Без `index: true`: обычный btree-индекс не принимает строку длиннее
+			// ~2,7 КБ после сжатия, и статья среднего размера (руководство с
+			// таблицами характеристик) не сохранялась вовсе — «index row size
+			// exceeds btree maximum». Искать по полю равенством незачем: поиск
+			// идёт через GIN-индекс knowledge_topics_search_fts_idx (миграция
+			// 20260902_180000_knowledge_module), он от длины не зависит.
 			name: "searchText",
 			type: "textarea",
-			index: true,
 			admin: { hidden: true },
 		},
 	],
