@@ -23,6 +23,7 @@
 		"catalog:normalize": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/normalize-catalog-keys.ts",
 		"slug:regenerate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/regenerate-product-slug.ts",
 		"seed:faq": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/seed-faq.ts",
+		"seed:knowledge-instructions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs scripts/seed-knowledge-instructions.ts",
 		"seed:banners": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/seed-banners.ts",
 		"type-check": "tsc --noEmit",
 		"test:security": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/security/*.test.ts",
