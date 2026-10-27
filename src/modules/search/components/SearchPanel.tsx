@@ -155,7 +155,19 @@ export function SearchPanel({
 				)}
 
 				{showSkeleton && <SearchLoadingState />}
-				{showEmpty && <SearchEmptyState query={query} />}
+				{showEmpty && (
+					<SearchEmptyState
+						query={query}
+						// Ушли в чат — поиск закрывается так же, как после выбора
+						// результата, и отпускает фокус: иначе первая же клавиша
+						// снова раскрыла бы его поверх окна чата.
+						onAskManager={() => {
+							onSelect();
+							if (document.activeElement instanceof HTMLElement)
+								document.activeElement.blur();
+						}}
+					/>
+				)}
 			</div>
 
 			{variant === "dropdown" && hasSections && (

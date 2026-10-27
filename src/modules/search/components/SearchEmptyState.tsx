@@ -3,9 +3,14 @@ import { AskManagerButton } from "@/modules/support-chat/widget/AskManagerButton
 
 interface SearchEmptyStateProps {
 	query: string;
+	/** Закрыть поиск: чат открывается вместо него, а не под ним. */
+	onAskManager: () => void;
 }
 
-export function SearchEmptyState({ query }: SearchEmptyStateProps) {
+export function SearchEmptyState({
+	query,
+	onAskManager,
+}: SearchEmptyStateProps) {
 	return (
 		<div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
 			<SearchX
@@ -21,6 +26,7 @@ export function SearchEmptyState({ query }: SearchEmptyStateProps) {
 			</p>
 			<AskManagerButton
 				topic="other"
+				onOpen={onAskManager}
 				className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs text-[color:var(--text-primary)] transition-colors hover:bg-[var(--surface-hover)]"
 			>
 				Спросить менеджера

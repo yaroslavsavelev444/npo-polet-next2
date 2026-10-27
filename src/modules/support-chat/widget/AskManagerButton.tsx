@@ -23,12 +23,18 @@ export function AskManagerButton({
 	className,
 	children = "Спросить менеджера",
 	icon = true,
+	onOpen,
 }: {
 	context?: MessageContext;
 	topic?: SupportTopic;
 	className?: string;
 	children?: ReactNode;
 	icon?: boolean;
+	/**
+	 * Вызывается перед открытием чата — чтобы закрыть слой, из которого
+	 * спросили (панель поиска): иначе окно чата открывается под ним.
+	 */
+	onOpen?: () => void;
 }) {
 	// На сервере и до ответа кнопки чата — скрыто: недоступный чат не
 	// должен мелькать кнопкой, которая ничего не откроет.
@@ -43,7 +49,8 @@ export function AskManagerButton({
 		<button
 			type="button"
 			className={className ?? styles.askButton}
-			onClick={() =>
+			onClick={() => {
+				onOpen?.();
 				openSupportChat({
 					topic,
 					// Ссылка по умолчанию — страница, с которой спросили: менеджер
@@ -51,8 +58,8 @@ export function AskManagerButton({
 					context: context
 						? { ...context, url: context.url ?? window.location.pathname }
 						: undefined,
-				})
-			}
+				});
+			}}
 		>
 			{icon && <MessageCircle size={16} aria-hidden />}
 			{children}
