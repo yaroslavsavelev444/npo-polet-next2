@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/modules/color-scheme/components/ThemeToggle";
 import { NotificationBell } from "@/modules/notifications";
 import { WishlistIcon } from "@/modules/wishlist";
 import type { Category, Setting, User } from "@/payload-types";
+import { isPrintServiceEnabled } from "@/utils/settings-helpers";
 import { WEBVISOR_HIDE } from "@/widgets/Analytics/webvisor";
 import { BurgerButton } from "./BurgerButton";
 import type { CatalogMenuData } from "./catalog-menu";
@@ -88,7 +89,10 @@ export default function NavbarClientIsland({
 				<div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
 					{/* Desktop Nav */}
 					<div className="hidden lg:flex items-center gap-8">
-						<NavMenus catalogMenu={catalogMenu} />
+						<NavMenus
+							catalogMenu={catalogMenu}
+							printServiceEnabled={isPrintServiceEnabled(settings)}
+						/>
 					</div>
 					{/* Тема — на desktop рядом со значками. Ниже lg её место в
 					    бургер-меню, где есть и возврат к «как в системе». */}

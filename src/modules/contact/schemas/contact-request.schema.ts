@@ -20,7 +20,7 @@ export const CONTACT_REQUEST_LIMITS = {
 
 /**
  * Тема обращения — откуда оно пришло: форма на странице контактов или заявка
- * на 3D-печать с главной. Те же значения — у поля `topic` коллекции.
+ * на 3D-печать со страницы услуги. Те же значения — у поля `topic` коллекции.
  */
 export const CONTACT_TOPICS = ["general", "print3d"] as const;
 export type ContactTopic = (typeof CONTACT_TOPICS)[number];

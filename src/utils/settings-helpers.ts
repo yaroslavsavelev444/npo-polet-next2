@@ -130,3 +130,17 @@ export function getLegalAddress(Setting: Setting | null): string | null {
 export function getPhysicalAddress(Setting: Setting | null): string | null {
 	return Setting?.physicalAddress || null;
 }
+
+/** Адрес страницы услуги 3D-печати — один на шапку, меню, sitemap и тесты. */
+export const PRINT_SERVICE_PATH = "/3d-printing";
+
+/**
+ * Включена ли услуга 3D-печати («Настройки сайта → 3D-печать на заказ»).
+ *
+ * Выключенной считается только явная отметка false: у поля defaultValue
+ * true, и незаполненный глобал (или запись, созданная до появления группы)
+ * означает «включено» — так же услуга вела себя на главной.
+ */
+export function isPrintServiceEnabled(Setting: Setting | null): boolean {
+	return Setting?.printService?.enabled !== false;
+}

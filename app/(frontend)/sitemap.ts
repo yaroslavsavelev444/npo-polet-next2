@@ -10,8 +10,13 @@ import {
 	getCachedCategoryProductCounts,
 	getCachedProducts,
 } from "@/payload/services/products.service";
+import { getCachedSettings } from "@/payload/services/settings.service";
 import type { Category } from "@/payload-types";
 import { baseURL } from "@/resources/content";
+import {
+	isPrintServiceEnabled,
+	PRINT_SERVICE_PATH,
+} from "@/utils/settings-helpers";
 
 // lastmod у статических страниц: "catalog" — дата последней правки товара или
 // раздела (из них собраны главная и витрина каталога), "knowledge" — последней
@@ -69,6 +74,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 		productsResult,
 		knowledgeEntries,
 		productCounts,
+		settings,
 	] = await Promise.all([
 		getCachedCategories({ isActive: true, limit: 200 }),
 		getCachedConsents({ isActive: true, limit: 100 }),
@@ -86,6 +92,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 		// поисковику ровно тогда же, когда пропадает с сайта.
 		getKnowledgeSitemapEntries(),
 		getCachedCategoryProductCounts(),
+		getCachedSettings(),
 	]);
 
 	// Раздел без единого видимого товара — пустая страница «товаров нет». Google
@@ -113,6 +120,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 		changeFrequency: route.changeFrequency,
 		priority: route.priority,
 	}));
+
+	// Страница услуги отвечает 404, пока услуга выключена в «Настройках
+	// сайта», — и в sitemap её тогда быть не должно.
+	if (isPrintServiceEnabled(settings)) {
+		staticEntries.push({
+			url: `${baseURL}${PRINT_SERVICE_PATH}`,
+			changeFrequency: "monthly",
+			priority: 0.6,
+		});
+	}
 
 	const categoryEntries: MetadataRoute.Sitemap = populatedCategories.map(
 		(category) => ({

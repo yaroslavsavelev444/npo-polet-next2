@@ -8,7 +8,6 @@ import { HomeHero } from "@/modules/home/components/HomeHero";
 import { ManifestoSection } from "@/modules/home/components/ManifestoSection";
 import { MotionShowcase } from "@/modules/home/components/MotionShowcase";
 import { OffersSection } from "@/modules/home/components/OffersSection";
-import { PrintServiceSection } from "@/modules/home/components/PrintServiceSection";
 import { ProductionSection } from "@/modules/home/components/ProductionSection";
 import { ProductsShowcase } from "@/modules/home/components/ProductsShowcase";
 import {
@@ -128,11 +127,6 @@ export default async function Home() {
 			<TrustSection reviews={reviews} documents={documents} />
 			<FaqSection questions={featuredQuestions} />
 			<FinalCta />
-			{/* Побочная услуга — после финального призыва, чтобы не прерывать
-			    основной рассказ; показ включается в «Настройках сайта». */}
-			{settings?.printService?.enabled !== false ? (
-				<PrintServiceSection />
-			) : null}
 		</div>
 	);
 }

@@ -12,7 +12,12 @@ import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
 import type { Category, Setting, User } from "@/payload-types";
 import { useCartStore } from "@/shared/store/cart.store";
 import { useWishlistStore } from "@/shared/store/wishlist.store";
-import { getPrimaryEmail, getPrimaryPhone } from "@/utils/settings-helpers";
+import {
+	getPrimaryEmail,
+	getPrimaryPhone,
+	isPrintServiceEnabled,
+	PRINT_SERVICE_PATH,
+} from "@/utils/settings-helpers";
 import styles from "./MobileMenu.module.css";
 import {
 	getPrimaryLinks,
@@ -290,6 +295,36 @@ export default function MobileMenu({
 										</Link>
 									);
 								})}
+							</div>
+						</section>
+					)}
+
+					{/* Тот же пункт, что «Дополнительные услуги» в шапке desktop, и
+					    по той же отметке в «Настройках сайта». Плитками, как
+					    категории: услуг немного, а крупная строка в списке выше
+					    поставила бы побочную услугу в ряд с каталогом. */}
+					{isPrintServiceEnabled(settings) && (
+						<section
+							className={`${styles.section} ${styles.reveal}`}
+							style={{ "--i": order++ } as React.CSSProperties}
+							aria-labelledby={`${panelId}-services`}
+						>
+							<h2 className={styles.sectionLabel} id={`${panelId}-services`}>
+								Дополнительные услуги
+							</h2>
+							<div className={styles.chips}>
+								<Link
+									href={PRINT_SERVICE_PATH}
+									onClick={onClose}
+									aria-current={
+										isLinkActive(pathname, PRINT_SERVICE_PATH)
+											? "page"
+											: undefined
+									}
+									className={styles.chip}
+								>
+									3D-печать
+								</Link>
 							</div>
 						</section>
 					)}

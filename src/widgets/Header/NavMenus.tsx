@@ -10,17 +10,21 @@ import {
 	useCallback,
 	useEffect,
 	useId,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/utils/cn";
+import { PRINT_SERVICE_PATH } from "@/utils/settings-helpers";
 import { CatalogPanel } from "./CatalogPanel";
 import type { CatalogMenuData } from "./catalog-menu";
 import styles from "./NavMenus.module.css";
 
 /**
- * Навигация шапки на desktop: «Каталог», «Ресурсы», «О нас».
+ * Навигация шапки на desktop: «Каталог», «Дополнительные услуги», «Ресурсы»,
+ * «О нас». «Дополнительные услуги» есть, только пока в них есть хоть одна
+ * включённая услуга (сейчас одна — 3D-печать, отметка в «Настройках сайта»).
  *
  * ────────────────────────────────────────────────────────────────────────────
  * ОДНА ШТОРКА НА ТРИ МЕНЮ
@@ -58,9 +62,7 @@ import styles from "./NavMenus.module.css";
  * Escape закрывает и возвращает фокус на пункт.
  */
 
-type MenuId = "catalog" | "resources" | "about";
-
-const MENU_ORDER: MenuId[] = ["catalog", "resources", "about"];
+type MenuId = "catalog" | "services" | "resources" | "about";
 
 const OPEN_DELAY_MS = 70;
 const CLOSE_DELAY_MS = 200;
@@ -76,6 +78,16 @@ const LINK_MENUS: Record<
 	Exclude<MenuId, "catalog">,
 	{ title: string; items: LinkItem[] }
 > = {
+	services: {
+		title: "Дополнительные услуги",
+		items: [
+			{
+				label: "3D-печать",
+				href: PRINT_SERVICE_PATH,
+				hint: "Печать деталей и моделей на заказ",
+			},
+		],
+	},
 	resources: {
 		title: "Ресурсы",
 		items: [
@@ -118,10 +130,25 @@ function isHoverPointer(event: ReactPointerEvent) {
 
 export default function NavMenus({
 	catalogMenu,
+	printServiceEnabled,
 }: {
 	catalogMenu: CatalogMenuData;
+	/** Отметка «3D-печать» в «Настройках сайта»: без неё меню услуг пусто. */
+	printServiceEnabled: boolean;
 }) {
 	const pathname = usePathname();
+	// Порядок пунктов — он же порядок панелей в шторке и обхода Tab'ом.
+	// useMemo: от массива зависит наблюдатель высот панелей.
+	const menuOrder = useMemo<MenuId[]>(
+		() =>
+			printServiceEnabled
+				? ["catalog", "services", "resources", "about"]
+				: ["catalog", "resources", "about"],
+		[printServiceEnabled],
+	);
+	const linkMenus = menuOrder.filter(
+		(menu): menu is Exclude<MenuId, "catalog"> => menu !== "catalog",
+	);
 	const baseId = useId();
 	const panelId = (menu: MenuId) => `${baseId}-${menu}`;
 
@@ -250,12 +277,12 @@ export default function NavMenus({
 				return next;
 			});
 		});
-		for (const menu of MENU_ORDER) {
+		for (const menu of menuOrder) {
 			const panel = panelRefs.current[menu];
 			if (panel) observer.observe(panel);
 		}
 		return () => observer.disconnect();
-	}, [primed]);
+	}, [primed, menuOrder]);
 
 	// Открытое меню слушает Escape и касание мимо — второе нужно для
 	// открытого пальцем или клавиатурой: курсора, который «уйдёт», там нет.
@@ -325,7 +352,7 @@ export default function NavMenus({
 			trigger?.focus();
 		} else if (!event.shiftKey && document.activeElement === last) {
 			event.preventDefault();
-			const next = MENU_ORDER[MENU_ORDER.indexOf(active) + 1];
+			const next = menuOrder[menuOrder.indexOf(active) + 1];
 			close();
 			(next ? triggerRefs.current[next] : trigger)?.focus();
 		}
@@ -389,7 +416,7 @@ export default function NavMenus({
 					</button>
 				</div>
 
-				{(["resources", "about"] as const).map((menu) => (
+				{linkMenus.map((menu) => (
 					<div key={menu} className={styles.item} {...hoverHandlers(menu)}>
 						<button
 							ref={(node) => {
@@ -445,7 +472,7 @@ export default function NavMenus({
 								</div>
 
 								<div className={styles.stage}>
-									{MENU_ORDER.map((menu, index) => {
+									{menuOrder.map((menu, index) => {
 										const isActive = active === menu;
 										// Где панель ждёт своей очереди: правее открытой — справа,
 										// левее — слева. Переход «Каталог → Ресурсы» уводит старое
@@ -453,7 +480,7 @@ export default function NavMenus({
 										// Пока шторка закрыта, сторон нет: она открывается и
 										// закрывается без бокового сдвига.
 										const side = active
-											? Math.sign(index - MENU_ORDER.indexOf(active))
+											? Math.sign(index - menuOrder.indexOf(active))
 											: 0;
 										return (
 											<div
