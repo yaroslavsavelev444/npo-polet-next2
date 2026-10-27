@@ -98,7 +98,7 @@ function contacts(): LexicalNode[] {
 			"Звоните ",
 			link("tel:+79105775751", PHONE),
 			", пишите на ",
-			link("mailto:npo-polet@yandex.ru", "npo-polet@yandex.ru"),
+			link("mailto:aleksei@npo-polet.ru", "aleksei@npo-polet.ru"),
 			" или в Telegram ",
 			link("https://t.me/Perehvatnet", "@Perehvatnet"),
 			".",
