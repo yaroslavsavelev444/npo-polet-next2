@@ -95,7 +95,9 @@ export function createPrintEngine(opts: {
 	room.dispose();
 	pmrem.dispose();
 
-	const camera = new THREE.PerspectiveCamera(36, DESIGN_ASPECT, 0.03, 40);
+	// Ближняя плоскость не ближе необходимого: самый близкий кадр — в ~0.4 м
+	// от предмета, а точность буфера глубины падает вместе с near.
+	const camera = new THREE.PerspectiveCamera(36, DESIGN_ASPECT, 0.08, 30);
 
 	const positions = new THREE.CatmullRomCurve3(
 		SHOTS.map((shot) => shot.position),

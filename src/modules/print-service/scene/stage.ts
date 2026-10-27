@@ -57,13 +57,18 @@ export const SHOTS: Shot[] = [
 	},
 	// 2. Стол с деталями крупно — печать идёт за прокруткой.
 	{
-		position: v(-0.86, 1.34, 0.66),
-		target: v(-0.54, 0.95, 0.02),
+		position: v(-0.91, 1.34, 0.66),
+		target: v(-0.57, 0.95, 0.02),
 		fov: 34,
 		side: -0.4,
 	},
 	// 3. Стойка катушек.
-	{ position: v(0.5, 1.16, 0.95), target: v(0, 1.07, 0), fov: 34, side: 0.4 },
+	{
+		position: v(0.42, 1.36, 1.08),
+		target: v(-0.1, 1.17, 0),
+		fov: 34,
+		side: 0.4,
+	},
 	// 4. Закрытые принтеры.
 	{
 		position: v(1.25, 1.32, 1.5),
@@ -111,23 +116,9 @@ export function buildPrintStage(shadowMapSize: number): PrintStage {
 	const [, deck1, deck2] = RACK.decks;
 	const deck0 = RACK.decks[0];
 
-	/* ---- Стеллаж A: открытые принтеры со стойками катушек ---------------- */
+	/* ---- Стеллаж A: открытые принтеры, у каждого своя стойка катушек ----- */
 	buildRack(m, fixed, v(0, 0, 0));
-	for (const level of [deck0, deck1]) {
-		rigs.push(
-			buildOpenPrinter(m, fixed, moving, v(-0.56, level, 0), {
-				feedSide: 1,
-				feedDistance: 0.5,
-				animated: true,
-			}),
-			buildOpenPrinter(m, fixed, moving, v(0.5, level, 0), {
-				feedSide: -1,
-				feedDistance: 0.44,
-				animated: true,
-			}),
-		);
-		spools.push(...buildFeeder(m, fixed, moving, v(-0.02, level, -0.02), true));
-	}
+	for (const level of [deck0, deck1]) openBay(0, level, true);
 	buildEmptySpools(m, fixed, v(-0.7, deck2, -0.05), 5);
 	buildCarton(m, fixed, v(0.45, deck2, 0), [0.46, 0.34, 0.44], 0.08);
 
@@ -144,18 +135,7 @@ export function buildPrintStage(shadowMapSize: number): PrintStage {
 
 	/* ---- Продолжение ряда и второй ряд — статичные ------------------------ */
 	buildRack(m, fixed, v(-2, 0, 0));
-	for (const level of [deck0, deck1]) {
-		for (const x of [-2.5, -1.5]) {
-			freeze(
-				buildOpenPrinter(m, fixed, fixed, v(x, level, 0), {
-					feedSide: 1,
-					feedDistance: 0.4,
-					animated: false,
-				}),
-				x + level,
-			);
-		}
-	}
+	for (const level of [deck0, deck1]) openBay(-2, level, false);
 	buildRack(m, fixed, v(4, 0, 0));
 	for (const level of [deck0, deck1]) {
 		for (const x of [3.58, 4.42]) {
@@ -236,6 +216,35 @@ export function buildPrintStage(shadowMapSize: number): PrintStage {
 		},
 	};
 
+	/**
+	 * Полка стеллажа с открытыми принтерами, как на фото: принтер, справа от
+	 * него его стойка катушек, трубки от стойки — в хаб на арке принтера.
+	 */
+	function openBay(cx: number, level: number, animated: boolean) {
+		const root = animated ? moving : fixed;
+		for (const dx of [-0.59, 0.27]) {
+			const rig = buildOpenPrinter(
+				m,
+				fixed,
+				root,
+				v(cx + dx, level, 0),
+				animated,
+			);
+			const feeder = buildFeeder(
+				m,
+				fixed,
+				root,
+				v(cx + dx + 0.43, level, -0.02),
+				animated,
+				rig.hubInlets,
+			);
+			if (animated) {
+				rigs.push(rig);
+				spools.push(...feeder);
+			} else freeze(rig, cx + dx + level);
+		}
+	}
+
 	/** Поставить неподвижный принтер в правдоподобную позу перед запеканием. */
 	function freeze(rig: PrinterRig, seed: number) {
 		const progress = 0.3 + Math.abs(Math.sin(seed * 12.9898)) * 0.65;
@@ -264,7 +273,7 @@ export function poseRig(
 		rig.head.position.x =
 			motion * (0.1 * Math.sin(t * 2.6 + 1) + 0.03 * Math.sin(t * 7.1));
 		// Верх стола (0.094) + детали + вылет сопла под головой.
-		if (rig.beam) rig.beam.position.y = 0.094 + rig.partHeight * p + 0.07;
+		if (rig.beam) rig.beam.position.y = 0.094 + rig.partHeight * p + 0.078;
 	} else {
 		if (rig.beam)
 			rig.beam.position.z =
@@ -272,4 +281,25 @@ export function poseRig(
 		rig.head.position.x =
 			motion * (0.11 * Math.sin(t * 2.9 + 2) + 0.025 * Math.sin(t * 8.3));
 	}
+	routeFeed(rig);
+}
+
+const route = [0, 1, 2, 3, 4].map(() => new THREE.Vector3());
+
+/**
+ * Трубка подачи следует за головой: вывод → изгиб от вывода → середина
+ * петли → над входом → вход головы.
+ */
+function routeFeed(rig: PrinterRig) {
+	const { feed } = rig;
+	const [from, lead, middle, above, inlet] = route;
+	rig.head.updateWorldMatrix(true, false);
+	inlet.copy(feed.inlet).applyMatrix4(rig.head.matrixWorld);
+	from.copy(feed.from);
+	lead.copy(feed.from).add(feed.lead);
+	above.copy(inlet);
+	above.y += feed.rise;
+	middle.lerpVectors(lead, above, 0.5);
+	middle.y += feed.rise * 0.35;
+	feed.tube.update(route);
 }
