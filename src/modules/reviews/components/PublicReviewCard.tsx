@@ -1,7 +1,7 @@
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, UserRound } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { PublicReviewView } from "@/payload/services/reviews.service";
-import { formatReviewShortDate, reviewInitials } from "../lib/format";
+import { formatReviewShortDate, REVIEW_AUTHOR_LABEL } from "../lib/format";
 import { ReviewComment } from "./ReviewComment";
 import { ReviewProductLink } from "./ReviewProductLink";
 import styles from "./Reviews.module.css";
@@ -23,11 +23,8 @@ interface PublicReviewCardProps {
  * сначала решает, интересен ли ему этот товар, и только потом читает.
  *
  * Подпись автора внизу, а не сверху: на публичной странице важно, ЧТО
- * написано, а не кем, — имя здесь подтверждает, что писал человек, и этого
- * достаточно.
- *
- * Имя приходит уже сокращённым до инициала фамилии (см. formatAuthorName в
- * reviews.service): публиковать полное ФИО покупателя нельзя.
+ * написано, а не кем. Подпись одна на всех — «Покупатель», имени нет вовсе
+ * (почему — у REVIEW_AUTHOR_LABEL).
  */
 export function PublicReviewCard({ review, index }: PublicReviewCardProps) {
 	return (
@@ -52,9 +49,9 @@ export function PublicReviewCard({ review, index }: PublicReviewCardProps) {
 				<footer className={styles.foot}>
 					<span className={styles.author}>
 						<span className={styles.avatar} aria-hidden>
-							{reviewInitials(review.authorName)}
+							<UserRound size={14} />
 						</span>
-						<span className={styles.authorName}>{review.authorName}</span>
+						<span className={styles.authorName}>{REVIEW_AUTHOR_LABEL}</span>
 					</span>
 
 					{review.isVerifiedPurchase && (

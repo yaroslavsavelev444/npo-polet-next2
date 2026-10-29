@@ -408,9 +408,19 @@ rollback_to() {
 # Образы берём у РАБОТАЮЩИХ контейнеров, а не из состояния: `docker inspect`
 # отвечает тем, что выкачено на самом деле, и перезапуск не может молча
 # подменить версию, если состояние и реальность разошлись.
+# Чтение состояния (`ps`) не должно зависеть от IMAGE_APP / IMAGE_TOOLS: их
+# `:?` в docker-compose.prod.yml проверяется при разборе файла для ЛЮБОЙ
+# команды compose. При ручном `--restart` / `--status` этих переменных нет,
+# разбор падал, ошибка глушилась `2>/dev/null` — и работающий app выглядел
+# как «не запущен» (найдено 29.10.2026 при добавлении ключей Яндекс ID).
+# Значения-заглушки на `ps` не влияют: он ищет контейнеры по меткам проекта.
+compose_ps() {
+    IMAGE_APP="${IMAGE_APP:-unset}" IMAGE_TOOLS="${IMAGE_TOOLS:-unset}" compose ps "$@"
+}
+
 running_image() {
     local id
-    id=$(compose ps -q "$1" 2>/dev/null) || return 1
+    id=$(compose_ps -q "$1" 2>/dev/null) || return 1
     [[ -n "$id" ]] || return 1
     docker inspect --format '{{.Config.Image}}' "$id" 2>/dev/null
 }
@@ -425,10 +435,10 @@ cmd_restart() {
 
     log "=== 🔄 Перезапуск с обновлённым $ENV_FILE ==="
     log "   app: $app_image"
-    before_app=$(compose ps -q app 2>/dev/null || echo "")
+    before_app=$(compose_ps -q app 2>/dev/null || echo "")
 
     IMAGE_APP="$app_image" IMAGE_TOOLS="$tools_image" up_and_wait || {
-        compose ps
+        compose_ps
         compose logs --tail 80 app || true
         fail "Сервисы не вышли в healthy за ${HEALTH_TIMEOUT}s"
     }
@@ -438,7 +448,7 @@ cmd_restart() {
     # идентификаторов до и после означает ровно одно: правки не попали в тот
     # файл, который прочитал compose (частая причина — `nano .env.production`
     # из домашнего каталога создаёт ~/.env.production).
-    if [[ "$(compose ps -q app 2>/dev/null || echo '')" == "$before_app" ]]; then
+    if [[ "$(compose_ps -q app 2>/dev/null || echo '')" == "$before_app" ]]; then
         log "⚠️  Контейнер app не пересоздан — окружение НЕ изменилось."
         log "    Проверьте, что редактировали именно $ENV_FILE"
         return 1
@@ -449,7 +459,7 @@ cmd_restart() {
 ### ── Статус ───────────────────────────────────────────────────────────────
 cmd_status() {
     echo "Выкачено сейчас:"
-    compose ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "  (стек не запущен)"
+    compose_ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "  (стек не запущен)"
     echo
     echo "Последний успешный SHA: $(cat "$STATE_FILE" 2>/dev/null || echo '—')"
     echo "Предыдущий (цель --rollback): $(cat "$PREV_FILE" 2>/dev/null || echo '—')"

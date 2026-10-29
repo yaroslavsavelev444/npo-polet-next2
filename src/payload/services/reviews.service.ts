@@ -1,12 +1,7 @@
 import { sql } from "@payloadcms/db-postgres";
 import { unstable_cache } from "next/cache";
 import type { Where } from "payload";
-import type {
-	Media,
-	Product,
-	ProductReview,
-	User,
-} from "../../../payload-types";
+import type { Media, Product, ProductReview } from "../../../payload-types";
 import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
 import { noReviewYet, PRODUCT_STILL_ON_SALE } from "./review-eligibility";
@@ -42,7 +37,6 @@ export interface ReviewView {
 	rating: number;
 	title: string | null;
 	comment: string;
-	authorName: string;
 	isVerifiedPurchase: boolean;
 	createdAt: string;
 }
@@ -63,26 +57,18 @@ function toNumber(value: unknown): number {
 }
 
 /**
- * Публичное имя автора отзыва: имя целиком, но фамилия сокращается до
- * инициала («Иван П.»), чтобы не публиковать полное ФИО покупателя.
+ * Автор в публичный вид отзыва не попадает вовсе — ни имя, ни инициалы:
+ * вместо него витрина пишет REVIEW_AUTHOR_LABEL (modules/reviews/lib/format).
+ * Показать имя покупателя всем посетителям — это распространение ПД, для
+ * него нужно отдельное согласие (ст. 10.1 152-ФЗ), а его форма отзыва не
+ * берёт. Поэтому поля нет в ReviewView: имя не уходит даже в JSON ответа.
  */
-function formatAuthorName(user: number | User | null | undefined): string {
-	if (!user || typeof user !== "object") return "Пользователь";
-	const raw = (user.name ?? "").trim();
-	if (!raw) return "Пользователь";
-	const [first, ...rest] = raw.split(/\s+/);
-	if (rest.length === 0) return first;
-	const lastInitial = rest[rest.length - 1]?.[0];
-	return lastInitial ? `${first} ${lastInitial.toUpperCase()}.` : first;
-}
-
 function mapReview(doc: ProductReview): ReviewView {
 	return {
 		id: String(doc.id),
 		rating: toNumber(doc.rating),
 		title: doc.title?.trim() || null,
 		comment: doc.comment,
-		authorName: formatAuthorName(doc.user),
 		isVerifiedPurchase: Boolean(doc.isVerifiedPurchase),
 		createdAt: doc.createdAt,
 	};
@@ -139,7 +125,8 @@ export async function getApprovedReviewsForProduct(
 		sort: "-createdAt",
 		page,
 		limit,
-		depth: 1,
+		// Связи не нужны: автор не показывается, товар известен.
+		depth: 0,
 		overrideAccess: true,
 	});
 

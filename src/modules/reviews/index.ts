@@ -24,8 +24,8 @@ export {
 	isLongComment,
 	pluralizeRatings,
 	pluralizeReviews,
+	REVIEW_AUTHOR_LABEL,
 	REVIEW_CLAMP_CHARS,
-	reviewInitials,
 } from "./lib/format";
 export {
 	isValidMyReviewsSection,

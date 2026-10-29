@@ -1,5 +1,6 @@
 import { ArrowRight, ExternalLink, FileText, Star } from "lucide-react";
 import Link from "next/link";
+import { REVIEW_AUTHOR_LABEL } from "@/modules/reviews/lib/format";
 import type { HomepageReview } from "@/payload/services/reviews.service";
 import { Reveal } from "@/shared/components/motion/Reveal";
 import { trust } from "../content/home-content";
@@ -87,7 +88,7 @@ export function TrustSection({
 											{review.comment}
 										</p>
 										<p className="text-[0.8125rem] text-[var(--text-muted)]">
-											{review.authorName}
+											{REVIEW_AUTHOR_LABEL}
 											{review.productTitle ? (
 												<>
 													{" · "}

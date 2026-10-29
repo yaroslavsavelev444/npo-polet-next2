@@ -8,6 +8,7 @@
  */
 
 import type { Metadata } from "next";
+import { REVIEW_AUTHOR_LABEL } from "@/modules/reviews/lib/format";
 import type { ProductCardData } from "../types";
 import { calculatePriceBreakdown } from "./pricing";
 
@@ -43,7 +44,6 @@ export interface ProductJsonLdReview {
 	rating: number;
 	title: string | null;
 	comment: string;
-	authorName: string;
 	createdAt: string;
 }
 
@@ -158,7 +158,9 @@ export function buildProductJsonLd(
 				...(review.title ? { name: review.title } : {}),
 				reviewBody: review.comment,
 				datePublished: review.createdAt,
-				author: { "@type": "Person", name: review.authorName },
+				// Та же подпись, что видна на странице: имени покупателя нет
+				// и в разметке (REVIEW_AUTHOR_LABEL).
+				author: { "@type": "Person", name: REVIEW_AUTHOR_LABEL },
 				reviewRating: {
 					"@type": "Rating",
 					ratingValue: review.rating,

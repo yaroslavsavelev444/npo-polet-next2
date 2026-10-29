@@ -1,5 +1,5 @@
-import { BadgeCheck } from "lucide-react";
-import { formatReviewDate } from "../lib/format";
+import { BadgeCheck, UserRound } from "lucide-react";
+import { formatReviewDate, REVIEW_AUTHOR_LABEL } from "../lib/format";
 import type { ReviewView } from "../types";
 import { StarRating } from "./StarRating";
 
@@ -8,8 +8,6 @@ interface ReviewCardProps {
 }
 
 export function ReviewCard({ review }: ReviewCardProps) {
-	const initial = review.authorName.charAt(0).toUpperCase() || "?";
-
 	return (
 		<article className="flex flex-col gap-3 border-b border-[var(--hairline)] py-5 first:pt-0 last:border-0">
 			<header className="flex items-start justify-between gap-3">
@@ -18,11 +16,11 @@ export function ReviewCard({ review }: ReviewCardProps) {
 						className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface-secondary)] text-sm font-semibold text-[var(--text-primary)]"
 						aria-hidden
 					>
-						{initial}
+						<UserRound className="h-4 w-4 text-[var(--text-secondary)]" />
 					</span>
 					<div className="flex flex-col gap-0.5">
 						<span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
-							{review.authorName}
+							{REVIEW_AUTHOR_LABEL}
 							{review.isVerifiedPurchase && (
 								<span
 									className="inline-flex items-center gap-1 text-xs font-normal text-[var(--success)]"

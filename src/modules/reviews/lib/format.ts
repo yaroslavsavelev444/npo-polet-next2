@@ -39,16 +39,16 @@ export function formatReviewShortDate(iso: string): string {
 }
 
 /**
- * Инициалы автора для кружка рядом с именем.
+ * Подпись автора под любым опубликованным отзывом — одна для всех.
  *
- * Публичное имя приходит уже сокращённым («Иван П.», см. formatAuthorName в
- * reviews.service) — берём первые буквы обеих частей.
+ * Имя покупателя (даже «Иван П.») на публичной странице — это
+ * распространение ПД: нужно отдельное согласие по ст. 10.1 152-ФЗ, а форма
+ * отзыва его не берёт. «Покупатель» при этом правдив: оставить отзыв можно
+ * только на купленный товар (getReviewEligibility). Если однажды имя
+ * понадобится — сначала согласие на распространение и правка уведомления в
+ * реестре РКН (src/modules/consents/RKN_NOTIFICATION.md), потом код.
  */
-export function reviewInitials(name: string): string {
-	const parts = name.trim().split(/\s+/).filter(Boolean);
-	const letters = parts.slice(0, 2).map((part) => part[0]);
-	return letters.join("").toUpperCase() || "?";
-}
+export const REVIEW_AUTHOR_LABEL = "Покупатель";
 
 /** Склонение слова «оценка»: 1 оценка, 2 оценки, 5 оценок. */
 export function pluralizeRatings(count: number): string {
