@@ -1,7 +1,18 @@
-// src/components/consents/index.ts
+// src/modules/consents/index.ts
 
-export { ConsentCard } from "./components/ConsentCard";
-export { ConsentContent } from "./components/ConsentContent";
-export { ConsentDocumentDownload } from "./components/ConsentDocumentDownload";
-export { ConsentsList } from "./components/ConsentsList";
-export { ConsentsListSkeleton } from "./components/ConsentsListSkeleton";
+export { ConsentDocument } from "./components/ConsentDocument";
+export { ConsentHero } from "./components/ConsentHero";
+export { ConsentRows } from "./components/ConsentRows";
+export { ConsentToc } from "./components/ConsentToc";
+export {
+	type ConsentBlock,
+	type ConsentSection,
+	type ParsedConsent,
+	parseConsent,
+} from "./lib/parseConsent";
+export {
+	byAcceptanceThenTitle,
+	type ConsentSummary,
+	formatServiceDate,
+	summarizeConsent,
+} from "./lib/summary";
