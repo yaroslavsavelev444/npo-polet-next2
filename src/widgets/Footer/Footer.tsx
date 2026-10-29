@@ -1,6 +1,7 @@
 import { Mail, Phone } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import Script from "next/script";
 import type { CSSProperties } from "react";
 import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
 import {
@@ -296,16 +297,28 @@ export default async function Footer({ className }: FooterProps = {}) {
 					className={cn(styles.legal, styles.item)}
 					style={{ "--i": order++ } as CSSProperties}
 				>
-					<p className={styles.legalMeta}>
-						{/* Год берётся в момент рендера. Все маршруты витрины серверные и
-						    динамические (см. вывод сборки), поэтому он не «застывает» на
-						    дате сборки, как это было бы у статически предгенерированной
-						    страницы. */}
-						<span className={styles.legalName}>
-							© {new Date().getFullYear()} {companyName}
-						</span>
-						{legalAddress ? <span>{legalAddress}</span> : null}
-					</p>
+					<div className={styles.legalStart}>
+						<p className={styles.legalMeta}>
+							{/* Год берётся в момент рендера. Все маршруты витрины серверные и
+							    динамические (см. вывод сборки), поэтому он не «застывает» на
+							    дате сборки, как это было бы у статически предгенерированной
+							    страницы. */}
+							<span className={styles.legalName}>
+								© {new Date().getFullYear()} {companyName}
+							</span>
+							{legalAddress ? <span>{legalAddress}</span> : null}
+						</p>
+
+						{/* Метка разработчика. Без JS остаётся обычной ссылкой; скрипт
+						    догружает next/script, поэтому он проходит строгий CSP через
+						    'strict-dynamic' без отдельного хоста. */}
+						<yrslv-mark className={styles.maker}>
+							<a href="https://yarsav.ru" rel="author">
+								Разработка сайта — YRSLV
+							</a>
+						</yrslv-mark>
+						<Script src="https://yarsav.ru/mark/v1.js" strategy="lazyOnload" />
+					</div>
 
 					<div className={styles.legalSide}>
 						<ul className={styles.legalLinks}>

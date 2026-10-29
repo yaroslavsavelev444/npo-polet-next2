@@ -563,6 +563,12 @@ a.channel:focus-visible .channelIcon {
 	}
 }
 
+.legalStart {
+	display: flex;
+	flex-direction: column;
+	gap: clamp(1rem, 2vw, 1.25rem);
+}
+
 .legalMeta {
 	display: flex;
 	flex-direction: column;
@@ -576,6 +582,14 @@ a.channel:focus-visible .channelIcon {
 
 .legalName {
 	color: var(--text-secondary);
+}
+
+/* Метка разработчика: точки берут цвет текста, поэтому приглушаем его до
+   уровня реквизитов. */
+.maker {
+	width: 15rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
 }
 
 /* Юридические ссылки и «Наверх» встают в один ряд с реквизитами на широком
