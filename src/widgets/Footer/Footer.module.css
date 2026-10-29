@@ -727,3 +727,18 @@ a.channel:focus-visible .channelIcon {
 		transform: none !important;
 	}
 }
+
+/* ---------------------------------------------------------------------------
+   Метка разработчика (<yrslv-mark> с yarsav.ru) — последней строкой, справа.
+   Цвет точек компонент берёт у текста, поэтому — приглушённый.
+   --------------------------------------------------------------------------- */
+.maker {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 28px;
+	color: var(--text-muted);
+}
+
+.maker yrslv-mark {
+	width: 260px;
+}

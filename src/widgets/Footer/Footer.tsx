@@ -1,6 +1,7 @@
 import { Mail, Phone } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import Script from "next/script";
 import type { CSSProperties } from "react";
 import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
 import {
@@ -327,7 +328,23 @@ export default async function Footer({ className }: FooterProps = {}) {
 						</div>
 					</div>
 				</div>
+
+				{/* Метка разработчика: веб-компонент с yarsav.ru (точки, которые
+				    просыпаются под курсором, весь блок — ссылка). Скрипт идёт через
+				    next/script: строгий script-src с nonce пропускает только его. */}
+				<div
+					className={cn(styles.maker, styles.item)}
+					style={{ "--i": order++ } as CSSProperties}
+				>
+					<yrslv-mark>
+						<a href="https://yarsav.ru" rel="author">
+							Разработка сайта — YRSLV
+						</a>
+					</yrslv-mark>
+				</div>
 			</FooterReveal>
+
+			<Script src="https://yarsav.ru/mark/v1.js" strategy="lazyOnload" />
 
 			<FooterNoScriptStyles />
 		</footer>
