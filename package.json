@@ -18,6 +18,7 @@
 		"support:gateway": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs src/modules/support-chat/gateway.ts",
 		"support:rotate-keys": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs scripts/support-rotate-keys.ts",
 		"account-deletion:failed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs scripts/account-deletion-failed.ts",
+		"account-deletion:scrub-orders": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --import ./tests/support/next-subpath-resolver.mjs scripts/anonymize-deleted-orders.ts",
 		"migrate:legacy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/db-migrate/run.ts",
 		"slugs:backfill": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/backfill-product-slugs.ts",
 		"catalog:normalize": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/normalize-catalog-keys.ts",
