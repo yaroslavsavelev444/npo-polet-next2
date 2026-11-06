@@ -11,6 +11,7 @@ import {
 	ACCOUNT_DELETION_LEASE_MS,
 } from "./constants";
 import { accountDeletionLogger } from "./logger";
+import { anonymizeOrdersOfUser } from "./order-anonymization";
 import {
 	cancelScheduledAccountDeletion,
 	scheduleAccountDeletion,
@@ -321,30 +322,9 @@ export class AccountDeletionService {
 			// без ключей нечитаемые — уберёт шлюз: у этого воркера тома нет.
 			await anonymizeUserConversations(tx, userId);
 
-			// Orders are retained for accounting. The transactional amounts and order
-			// number remain; every account/recipient/contact/device field is removed.
-			await tx.execute(sql`
-        UPDATE orders
-        SET user_id = NULL,
-            recipient_full_name = 'Удалено по запросу субъекта данных',
-            recipient_phone = NULL,
-            recipient_email = CONCAT('deleted-order-', id, '@example.invalid'),
-            recipient_contact_person = NULL,
-            contact_phone = NULL,
-            contact_preferred = NULL,
-            contact_customer_phone = NULL,
-            delivery_address_street = NULL,
-            delivery_address_city = NULL,
-            delivery_address_postal_code = NULL,
-            delivery_address_country = NULL,
-            delivery_notes = NULL,
-            company_info_contact_person = NULL,
-            notes = NULL,
-            ip_address = NULL,
-            user_agent = NULL,
-            updated_at = NOW()
-        WHERE user_id = ${userId}
-      `);
+			// Заказы остаются для учёта, но без данных покупателя: что очищается и
+			// что остаётся намеренно — в шапке order-anonymization.ts.
+			await anonymizeOrdersOfUser(tx, userId);
 
 			// Existing cancelled/failed requests are also detached before deleting the
 			// user. The retained HMAC is not reversible to an account identifier.

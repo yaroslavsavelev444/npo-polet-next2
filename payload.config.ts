@@ -85,6 +85,14 @@ export default buildConfig({
 					exact: true,
 					meta: { title: "Отчёты чата поддержки" },
 				},
+				// Вход только с кнопки на списке заказов: в меню пункта нет.
+				orderAnalytics: {
+					Component:
+						"@/modules/order-analytics/admin/OrderAnalyticsView#OrderAnalyticsView",
+					path: "/orders/analytics",
+					exact: true,
+					meta: { title: "Аналитика заказов" },
+				},
 			},
 			afterNavLinks: [
 				"@/modules/support-chat/admin/SupportNavLink#SupportNavLink",
