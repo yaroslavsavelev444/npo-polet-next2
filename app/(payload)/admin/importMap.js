@@ -1,4 +1,5 @@
 import { CopySpecificationsField as CopySpecificationsField_b6c7e6b030116e4ac71547c82b5abc68 } from '@/payload/fields/CopySpecifications/CopySpecificationsField'
+import { OrderAnalyticsButton as OrderAnalyticsButton_089db6403a365d8cd9d461900808ae9c } from '@/modules/order-analytics/admin/OrderAnalyticsButton'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -30,11 +31,13 @@ import { HomeDocumentRowLabel as HomeDocumentRowLabel_9ed9fe4ea83c1de3edb3f090bf
 import { SupportNavLink as SupportNavLink_441788eb9cd3ca7bc2ab2f9ea35a3165 } from '@/modules/support-chat/admin/SupportNavLink'
 import { SupportConsoleView as SupportConsoleView_6108a700fbd4d9109653cdf079bcb0db } from '@/modules/support-chat/admin/SupportConsoleView'
 import { SupportReportsView as SupportReportsView_559f2e3ad903d106688a50fc545caaf6 } from '@/modules/support-chat/admin/SupportReportsView'
+import { OrderAnalyticsView as OrderAnalyticsView_69bc0c29213b1878eca8f966aa3b74b2 } from '@/modules/order-analytics/admin/OrderAnalyticsView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
   "@/payload/fields/CopySpecifications/CopySpecificationsField#CopySpecificationsField": CopySpecificationsField_b6c7e6b030116e4ac71547c82b5abc68,
+  "@/modules/order-analytics/admin/OrderAnalyticsButton#OrderAnalyticsButton": OrderAnalyticsButton_089db6403a365d8cd9d461900808ae9c,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -66,5 +69,6 @@ export const importMap = {
   "@/modules/support-chat/admin/SupportNavLink#SupportNavLink": SupportNavLink_441788eb9cd3ca7bc2ab2f9ea35a3165,
   "@/modules/support-chat/admin/SupportConsoleView#SupportConsoleView": SupportConsoleView_6108a700fbd4d9109653cdf079bcb0db,
   "@/modules/support-chat/admin/SupportReportsView#SupportReportsView": SupportReportsView_559f2e3ad903d106688a50fc545caaf6,
+  "@/modules/order-analytics/admin/OrderAnalyticsView#OrderAnalyticsView": OrderAnalyticsView_69bc0c29213b1878eca8f966aa3b74b2,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

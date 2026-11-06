@@ -4,6 +4,7 @@ import type {
 	FieldHook,
 } from "payload";
 import type { Order } from "../../../payload-types.ts";
+import { orderAnalyticsEndpoint } from "../../modules/order-analytics/server/endpoint.ts";
 import {
 	type OrderContactPreference,
 	resolveOrderContact,
@@ -298,7 +299,16 @@ export const Orders: CollectionConfig = {
 			"createdAt",
 		],
 		group: "Магазин",
+		// Кнопка «Аналитика заказов» — единственный вход на /admin/orders/analytics.
+		components: {
+			beforeListTable: [
+				"@/modules/order-analytics/admin/OrderAnalyticsButton#OrderAnalyticsButton",
+			],
+		},
 	},
+
+	// Данные страницы аналитики; своя проверка прав внутри (см. шапку эндпоинта).
+	endpoints: [orderAnalyticsEndpoint],
 
 	access: {
 		// Покупатель видит только свои заказы, персонал — все.
