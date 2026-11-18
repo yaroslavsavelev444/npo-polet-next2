@@ -329,8 +329,14 @@ export function createSupportGateway(options: GatewayOptions): SupportGateway {
 	function registerCustomer(socket: SupportSocket, actor: CustomerActor) {
 		void socket.join(rooms.user(actor.userId));
 
-		on(socket, CLIENT_EVENTS.conversationOpen, conversationOpenSchema, () =>
-			service.openCustomerConversation(deps, actor),
+		on(
+			socket,
+			CLIENT_EVENTS.conversationOpen,
+			conversationOpenSchema,
+			async () => ({
+				userId: actor.userId,
+				...(await service.openCustomerConversation(deps, actor)),
+			}),
 		);
 
 		on(

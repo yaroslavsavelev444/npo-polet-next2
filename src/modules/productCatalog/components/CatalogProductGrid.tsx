@@ -1,11 +1,18 @@
 "use client";
 
 import { PackageSearch } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ProductGrid } from "@/modules/productCard/components/productGrid";
 import { Spinner } from "@/UI";
 import { useProductFilters } from "../hooks/useProductFilters";
 import { useProductsInfiniteQuery } from "../hooks/useProductsInfiniteQuery";
+import {
+	type CatalogVisit,
+	catalogProductLinkId,
+	getCatalogReturnTarget,
+	rememberCatalogVisit,
+} from "../lib/catalog-return";
 import { pluralizeProducts } from "../lib/catalogOptions";
 import type { CatalogFilters, ProductsPageResponse } from "../types/filters";
 import styles from "./Catalog.module.css";
@@ -33,33 +40,130 @@ export function CatalogProductGrid({
 		error,
 		fetchNextPage,
 		hasNextPage,
+		isFetching,
 		isFetchingNextPage,
+		isFetchNextPageError,
 		refetch,
 	} = useProductsInfiniteQuery({ categoryId, filters, initialPage });
 
 	const { activeFiltersCount, resetFilters } = useProductFilters();
 	const sentinelRef = useRef<HTMLDivElement>(null);
+	const pathname = usePathname();
+	const query = useSearchParams().toString();
+	const [returnTarget, setReturnTarget] = useState<CatalogVisit | null>(null);
+	const [keepRetryFocused, setKeepRetryFocused] = useState(false);
+	const [announcement, setAnnouncement] = useState("");
+
+	useLayoutEffect(() => {
+		const { pathname: currentPath, search } = window.location;
+		const isCurrentRoute =
+			pathname === currentPath &&
+			query === new URLSearchParams(search).toString();
+		setReturnTarget(isCurrentRoute ? getCatalogReturnTarget() : null);
+		setAnnouncement("");
+		setKeepRetryFocused(false);
+	}, [pathname, query]);
+
+	useEffect(() => {
+		if (!returnTarget) return;
+		const link = document.getElementById(
+			catalogProductLinkId(returnTarget.productId),
+		);
+		if (link) {
+			// Дожидаемся скролла навигации и появления сетки после загрузки порции.
+			const frame = requestAnimationFrame(() => {
+				if (getCatalogReturnTarget()?.productId !== returnTarget.productId)
+					return;
+				const rect = link.getBoundingClientRect();
+				const toolbar = document.querySelector<HTMLElement>(
+					"[data-catalog-toolbar]",
+				);
+				const topInset = toolbar
+					? Number.parseFloat(getComputedStyle(toolbar).top) +
+						toolbar.offsetHeight
+					: 0;
+				const minTop = topInset + 12;
+				const maxTop = window.innerHeight - rect.height - 12;
+				const desiredTop =
+					returnTarget.linkTop >= minTop && returnTarget.linkTop <= maxTop
+						? returnTarget.linkTop
+						: Math.max(minTop, (minTop + maxTop) / 2);
+				window.scrollTo({
+					top: window.scrollY + rect.top - desiredTop,
+					behavior: "instant",
+				});
+				link.focus({ preventScroll: true });
+				setReturnTarget(null);
+			});
+			return () => cancelAnimationFrame(frame);
+		}
+
+		// При отсутствии порций в кэше повторяем существующую цепочку курсоров.
+		if (isFetching || isFetchNextPageError || status === "error") return;
+		if (hasNextPage && (data?.pages.length ?? 0) < returnTarget.pageCount) {
+			void fetchNextPage({ cancelRefetch: false });
+		} else {
+			setReturnTarget(null);
+		}
+	}, [
+		returnTarget,
+		status,
+		data,
+		isFetching,
+		isFetchNextPageError,
+		hasNextPage,
+		fetchNextPage,
+	]);
+
+	function handleProductNavigate(productId: string) {
+		const pageIndex =
+			data?.pages.findIndex(({ products }) =>
+				products.some(({ id }) => id === productId),
+			) ?? -1;
+		rememberCatalogVisit(productId, Math.max(1, pageIndex + 1));
+	}
 
 	useEffect(() => {
 		const sentinel = sentinelRef.current;
-		if (!sentinel || !hasNextPage) return;
+		if (!sentinel || !hasNextPage || returnTarget || isFetchNextPageError)
+			return;
 
 		const observer = new IntersectionObserver(
 			(entries) => {
-				if (entries[0]?.isIntersecting && !isFetchingNextPage) {
-					void fetchNextPage();
+				if (entries[0]?.isIntersecting && !isFetching) {
+					void fetchNextPage({ cancelRefetch: false });
 				}
 			},
 			{ rootMargin: "600px" },
 		);
 		observer.observe(sentinel);
 		return () => observer.disconnect();
-	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+	}, [
+		hasNextPage,
+		isFetching,
+		isFetchNextPageError,
+		fetchNextPage,
+		returnTarget,
+	]);
 
 	const products =
 		data?.pages.flatMap((page) => page.products) ?? initialPage.products;
 
-	if (status === "error") {
+	async function retryNextPage(button: HTMLButtonElement) {
+		if (!isFetchNextPageError || isFetching) return;
+		setKeepRetryFocused(document.activeElement === button);
+		setReturnTarget(null);
+		setAnnouncement("Повторяем загрузку товаров");
+		const result = await fetchNextPage({ cancelRefetch: false });
+		if (!result.isFetchNextPageError) {
+			const count = result.data?.pages.at(-1)?.products.length ?? 0;
+			setAnnouncement(
+				count > 0 ? `Добавлено товаров: ${count}` : "Новых товаров нет",
+			);
+		}
+	}
+
+	if (status === "error" && products.length === 0) {
 		return (
 			<div className="flex flex-col items-center gap-3 py-[4rem] text-center">
 				<p className="text-sm text-[var(--text-secondary)]">
@@ -118,15 +222,42 @@ export function CatalogProductGrid({
 
 	return (
 		<div>
-			<ProductGrid products={products} />
+			<ProductGrid
+				products={products}
+				onProductNavigate={handleProductNavigate}
+				getProductLinkId={catalogProductLinkId}
+			/>
 
-			{hasNextPage && (
+			{(hasNextPage || keepRetryFocused) && (
 				<div ref={sentinelRef} className="flex justify-center py-[2rem]">
-					{isFetchingNextPage && (
+					{isFetchingNextPage && !isFetchNextPageError && !keepRetryFocused && (
 						<Spinner size="md" label="Загружаем ещё товары" />
+					)}
+					{(isFetchNextPageError || keepRetryFocused) && (
+						<div className="flex flex-col items-center gap-2">
+							{isFetchNextPageError && !isFetchingNextPage && (
+								<p className="text-sm text-[var(--text-secondary)]">
+									Не удалось загрузить ещё товары
+								</p>
+							)}
+							<button
+								type="button"
+								aria-disabled={isFetching || !isFetchNextPageError}
+								onBlur={() => setKeepRetryFocused(false)}
+								onClick={(event) => void retryNextPage(event.currentTarget)}
+								className="text-sm font-medium text-[var(--accent)] aria-disabled:opacity-60 hover:underline focus-visible:underline"
+							>
+								{isFetchingNextPage ? "Загружаем…" : "Повторить"}
+							</button>
+						</div>
 					)}
 				</div>
 			)}
+			<p role="status" className="sr-only">
+				{isFetchNextPageError && !isFetchingNextPage
+					? "Не удалось загрузить ещё товары"
+					: announcement}
+			</p>
 
 			{/* Конец выдачи отмечен линией со подписью по центру — тем же способом,
 			    которым разлинована вся страница. «Показаны все 1 товар» ломалось на

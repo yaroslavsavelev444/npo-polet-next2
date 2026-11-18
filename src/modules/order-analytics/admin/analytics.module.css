@@ -356,12 +356,26 @@
 }
 
 .error {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 8px 16px;
 	margin: 0 0 12px;
 	padding: 10px 12px;
 	border: 1px solid var(--theme-error-300, #d03b3b);
 	border-radius: var(--style-radius-s, 4px);
 	background: var(--theme-error-50, transparent);
 	color: var(--theme-error-750, inherit);
+}
+
+.error [role="alert"] {
+	display: grid;
+	gap: 4px;
+}
+
+.error p {
+	margin: 0;
 }
 
 .muted {

@@ -1,7 +1,10 @@
 "use client";
 
 import { ArrowRight, Loader2, LogIn } from "lucide-react";
+import { useId, useRef, useState } from "react";
 import { formatPrice } from "@/modules/productCard";
+import { Button, Modal } from "@/UI";
+import { buttonStyles } from "@/UI/Button/Button.styles";
 import type { CartView } from "../types";
 import styles from "./Cart.module.css";
 
@@ -13,7 +16,8 @@ interface Props {
 	isGuest: boolean;
 	isCheckingOut: boolean;
 	onCheckout: () => void;
-	onClear?: () => void;
+	onClear: () => void;
+	positionCount: number;
 	onContinue?: () => void;
 }
 
@@ -45,10 +49,14 @@ export function CartSummary({
 	isCheckingOut,
 	onCheckout,
 	onClear,
+	positionCount,
 	onContinue,
 }: Props) {
 	const hasDiscount = summary.totalDiscount > 0;
 	const blocked = !isValid;
+	const [isClearOpen, setIsClearOpen] = useState(false);
+	const cancelClearRef = useRef<HTMLButtonElement>(null);
+	const clearDescriptionId = useId();
 
 	return (
 		<footer className={styles.footer}>
@@ -111,28 +119,66 @@ export function CartSummary({
 						: "Способ доставки и оплаты выбираются на следующем шаге"}
 			</p>
 
-			{(onClear || onContinue) && (
-				<div className={styles.secondaryRow}>
-					{onContinue && (
+			<div className={styles.secondaryRow}>
+				{onContinue && (
+					<button
+						type="button"
+						className={styles.secondaryLink}
+						onClick={onContinue}
+					>
+						Продолжить покупки
+					</button>
+				)}
+				<button
+					type="button"
+					className={styles.secondaryLink}
+					aria-haspopup="dialog"
+					disabled={isStale}
+					onClick={(event) => {
+						event.currentTarget.focus({ preventScroll: true });
+						setIsClearOpen(true);
+					}}
+				>
+					Очистить корзину
+				</button>
+			</div>
+
+			<Modal
+				open={isClearOpen}
+				onClose={() => setIsClearOpen(false)}
+				title="Очистить корзину?"
+				width={420}
+				initialFocusRef={cancelClearRef}
+				describedBy={clearDescriptionId}
+				footer={
+					<>
 						<button
+							ref={cancelClearRef}
 							type="button"
-							className={styles.secondaryLink}
-							onClick={onContinue}
+							className={buttonStyles("outline", "sm", false)}
+							onClick={() => setIsClearOpen(false)}
 						>
-							Продолжить покупки
+							Отмена
 						</button>
-					)}
-					{onClear && (
-						<button
+						<Button
 							type="button"
-							className={styles.secondaryLink}
-							onClick={onClear}
+							variant="danger"
+							size="sm"
+							disabled={isStale}
+							onClick={() => {
+								setIsClearOpen(false);
+								onClear();
+							}}
 						>
 							Очистить корзину
-						</button>
-					)}
-				</div>
-			)}
+						</Button>
+					</>
+				}
+			>
+				<p id={clearDescriptionId}>
+					Из корзины будут удалены все позиции ({positionCount}).
+				</p>
+			</Modal>
 		</footer>
 	);
 }

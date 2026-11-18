@@ -1,29 +1,26 @@
 "use client";
 
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useLayoutEffect } from "react";
 import type { CompareMode } from "../../lib/constants";
 import type { PeriodInfo } from "../../lib/types";
 import styles from "../analytics.module.css";
+
+export interface ReportHeading {
+	description: string;
+	period: PeriodInfo;
+}
 
 export interface SectionProps {
 	params: string;
 	reloadKey: number;
 	setParams: (changes: Record<string, string | null>) => void;
 	searchParams: URLSearchParams | ReadonlyURLSearchParamsLike;
-	onPeriod: (period: PeriodInfo) => void;
+	onReport: (heading: ReportHeading | null) => void;
+	describeReport: (params: URLSearchParams, period: PeriodInfo) => string;
 }
 
 interface ReadonlyURLSearchParamsLike {
 	get(name: string): string | null;
-}
-
-export function usePeriodReport(
-	period: PeriodInfo | undefined,
-	onPeriod: (period: PeriodInfo) => void,
-) {
-	useEffect(() => {
-		if (period) onPeriod(period);
-	}, [period, onPeriod]);
 }
 
 export function compareName(mode: CompareMode | undefined): string {
@@ -33,27 +30,55 @@ export function compareName(mode: CompareMode | undefined): string {
 export function Frame({
 	loading,
 	error,
-	hasData,
+	data,
+	shownParams,
+	retry,
+	describeReport,
+	onReport,
 	children,
 }: {
 	loading: boolean;
 	error: string | null;
-	hasData: boolean;
+	data: { period: PeriodInfo } | null;
+	shownParams: URLSearchParams | null;
+	retry: () => void;
+	describeReport: SectionProps["describeReport"];
+	onReport?: SectionProps["onReport"];
 	children: ReactNode;
 }) {
+	const period = data?.period;
+	const description =
+		period && shownParams ? describeReport(shownParams, period) : null;
+	useLayoutEffect(() => {
+		onReport?.(period && description ? { period, description } : null);
+	}, [period, description, onReport]);
+
 	return (
 		<div>
 			{error && (
-				<p className={styles.error} role="alert">
-					{error}
+				<div className={styles.error}>
+					<div role="alert">
+						<p>
+							{data
+								? "Не удалось обновить отчёт."
+								: "Не удалось загрузить отчёт."}
+						</p>
+						{description && <p>Показаны данные за {description}.</p>}
+						<p className={styles.note}>{error}</p>
+					</div>
+					<button type="button" className={styles.ghostButton} onClick={retry}>
+						Повторить
+					</button>
+				</div>
+			)}
+			{!error && loading && (
+				<p className={styles.empty} role="status">
+					{description
+						? `Обновляем отчёт. Пока показаны данные за ${description}.`
+						: "Считаем показатели…"}
 				</p>
 			)}
-			{!hasData && !error && (
-				<p className={styles.empty} aria-busy="true">
-					Считаем показатели…
-				</p>
-			)}
-			{hasData && (
+			{data && (
 				<div className={loading ? styles.stale : undefined} aria-busy={loading}>
 					{children}
 				</div>

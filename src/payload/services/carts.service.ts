@@ -1,10 +1,14 @@
 // src/payload/services/carts.service.ts (append to the existing file)
 
+import type { PayloadRequest } from "payload";
 import type { Cart, Product } from "../../../payload-types";
 import { isProductOrderable } from "../utils/product-availability";
 import { getPayloadInstance } from "./getPayload";
 
-export async function getCartByUserId(userId: string): Promise<Cart | null> {
+export async function getCartByUserId(
+	userId: string,
+	req?: Partial<PayloadRequest>,
+): Promise<Cart | null> {
 	const payload = await getPayloadInstance();
 	const { docs } = await payload.find({
 		collection: "carts",
@@ -12,6 +16,7 @@ export async function getCartByUserId(userId: string): Promise<Cart | null> {
 		limit: 1,
 		depth: 2, // populate items.product AND product.images/category for pricing/UI
 		overrideAccess: true,
+		req,
 	});
 	return (docs[0] as unknown as Cart) ?? null;
 }
@@ -167,14 +172,18 @@ export async function setCartItems(
 	return updated as unknown as Cart;
 }
 
-export async function clearCartItems(userId: string): Promise<Cart> {
+export async function clearCartItems(
+	userId: string,
+	checkout?: { cartId: number; req: Partial<PayloadRequest> },
+): Promise<Cart> {
 	const payload = await getPayloadInstance();
-	const cart = await getOrCreateCart(userId);
+	const cartId = checkout?.cartId ?? (await getOrCreateCart(userId)).id;
 	const updated = await payload.update({
 		collection: "carts",
-		id: cart.id,
+		id: cartId,
 		data: { items: [] },
 		overrideAccess: true,
+		req: checkout?.req,
 	});
 	return updated as unknown as Cart;
 }

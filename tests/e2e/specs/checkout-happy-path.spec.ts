@@ -36,6 +36,9 @@ test("самовывоз: заказ оформляется и открывае�
 	await openCheckout(page);
 	await fillRecipient(page);
 	await page.getByRole("radio", { name: /E2E Пункт самовывоза/ }).click();
+	await expect(
+		page.getByRole("checkbox", { name: "Включать стоимость доставки в счёт" }),
+	).not.toBeChecked();
 
 	// Наличными при самовывозе — способ оплаты по умолчанию.
 	await expect(page.locator(FIELD.payment)).toContainText(
@@ -62,6 +65,7 @@ test("самовывоз: заказ оформляется и открывае�
 	const order = readOrder(orderNumber);
 
 	expect(order.delivery.method).toBe("self_pickup");
+	expect(order.delivery.includeShippingInInvoice).toBe(false);
 	// У самовывоза адреса нет вовсе — пункт хранится связью.
 	expect(order.delivery.address?.fullAddress ?? null).toBeFalsy();
 	expect(order.payment.method).toBe("self_pickup_cash");
@@ -166,6 +170,9 @@ test("курьер до двери: адрес из подсказок и дан
 	await page.getByLabel("Квартира / офис").fill("42");
 	await page.getByLabel("Подъезд").fill("2");
 	await page.getByLabel("Этаж").fill("5");
+	await page
+		.getByRole("checkbox", { name: "Включать стоимость доставки в счёт" })
+		.check();
 
 	await expect(errorSummary(page)).toBeHidden();
 	await submitButton(page).click();
@@ -175,6 +182,7 @@ test("курьер до двери: адрес из подсказок и дан
 	const address = order.delivery.address;
 
 	expect(order.delivery.method).toBe("door_to_door");
+	expect(order.delivery.includeShippingInInvoice).toBe(true);
 	// Каноническая строка адреса сохранена целиком.
 	expect(address.fullAddress).toBe("г Москва, ул Ленина, д 10");
 	// И разобранные компоненты — тоже: по ним строятся выгрузки перевозчику.

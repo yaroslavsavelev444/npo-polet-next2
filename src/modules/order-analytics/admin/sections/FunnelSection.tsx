@@ -11,13 +11,7 @@ import styles from "../analytics.module.css";
 import { BarList, Delta, FunnelBars, StatTile } from "../charts";
 import { dec, hoursLabel, int, money, moneyCompact, pct } from "../format";
 import { useAnalyticsData } from "../useAnalyticsData";
-import {
-	Card,
-	Frame,
-	Note,
-	type SectionProps,
-	usePeriodReport,
-} from "./shared";
+import { Card, Frame, Note, type SectionProps } from "./shared";
 
 const AGE_LABELS: Record<string, string> = {
 	"0-3": "до 3 дней",
@@ -42,15 +36,16 @@ function sliceLabel(row: VoidSliceRow): string {
 	return labels[row.key] ?? row.key;
 }
 
-export function FunnelSection({ params, reloadKey, onPeriod }: SectionProps) {
-	const { data, error, loading } = useAnalyticsData(
-		"funnel",
-		params,
-		reloadKey,
-	);
-	usePeriodReport(data?.period, onPeriod);
+export function FunnelSection({
+	params,
+	reloadKey,
+	onReport,
+	describeReport,
+}: SectionProps) {
+	const report = useAnalyticsData("funnel", params, reloadKey);
+	const { data } = report;
 	return (
-		<Frame loading={loading} error={error} hasData={Boolean(data)}>
+		<Frame {...report} describeReport={describeReport} onReport={onReport}>
 			{data && <Funnel data={data} />}
 		</Frame>
 	);

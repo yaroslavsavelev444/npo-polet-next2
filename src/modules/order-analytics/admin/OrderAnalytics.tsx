@@ -30,6 +30,7 @@ import { FunnelSection } from "./sections/FunnelSection";
 import { GeoSection } from "./sections/GeoSection";
 import { OverviewSection } from "./sections/OverviewSection";
 import { ProductsSection } from "./sections/ProductsSection";
+import type { ReportHeading } from "./sections/shared";
 import { clearAnalyticsCache, useAnalyticsData } from "./useAnalyticsData";
 
 const TABS = [
@@ -126,8 +127,10 @@ export function OrderAnalytics() {
 	const period = get("period") || "30d";
 	const activeFilters = FILTER_KEYS.filter((key) => get(key));
 
-	const filterLabel = (key: (typeof FILTER_KEYS)[number]): string => {
-		const value = get(key);
+	const filterLabel = (
+		key: (typeof FILTER_KEYS)[number],
+		value: string,
+	): string => {
 		switch (key) {
 			case "status":
 				return (
@@ -160,14 +163,37 @@ export function OrderAnalytics() {
 		}
 	};
 
+	function describeReport(params: URLSearchParams, reportPeriod: PeriodInfo) {
+		const selectedPeriod = params.get("period") ?? "30d";
+		const preset = PERIODS.find((item) => item.key === selectedPeriod);
+		const dates = rangeLabel(reportPeriod.from, reportPeriod.to);
+		const range =
+			preset && preset.key !== "custom" && preset.key !== "all"
+				? `${preset.label.toLowerCase()} (${dates})`
+				: dates;
+		const region = params.get("region");
+		const filters = [region ? filterLabel("region", region) : "все регионы"];
+		for (const key of FILTER_KEYS) {
+			const value = params.get(key);
+			if (key !== "region" && value) filters.push(filterLabel(key, value));
+		}
+		const search = params.get("q")?.trim();
+		if (search) filters.push(`поиск «${search}»`);
+		const compare = reportPeriod.compare;
+		if (compare)
+			filters.push(`сравнение ${rangeLabel(compare.from, compare.to)}`);
+		return [range, ...filters, "время московское"].join(" · ");
+	}
+
 	const sectionProps = {
 		params: dataParams,
 		reloadKey,
 		setParams,
 		searchParams,
+		describeReport,
 	};
 
-	const [shownPeriod, setShownPeriod] = useState<PeriodInfo | null>(null);
+	const [shownReport, setShownReport] = useState<ReportHeading | null>(null);
 
 	return (
 		<TipProvider>
@@ -181,15 +207,7 @@ export function OrderAnalytics() {
 				<header className={styles.header}>
 					<div>
 						<h1 className={styles.title}>Аналитика заказов</h1>
-						<p className={styles.subtitle}>
-							{shownPeriod
-								? `${rangeLabel(shownPeriod.from, shownPeriod.to)}${
-										shownPeriod.compare
-											? ` · сравнение: ${rangeLabel(shownPeriod.compare.from, shownPeriod.compare.to)}`
-											: ""
-									} · время московское`
-								: " "}
-						</p>
+						<p className={styles.subtitle}>{shownReport?.description ?? " "}</p>
 					</div>
 					<div className={styles.headerActions}>
 						<button
@@ -221,8 +239,8 @@ export function OrderAnalytics() {
 									period: value,
 									...(value === "custom"
 										? {
-												from: get("from") || shownPeriod?.from || "",
-												to: get("to") || shownPeriod?.to || "",
+												from: get("from") || shownReport?.period.from || "",
+												to: get("to") || shownReport?.period.to || "",
 											}
 										: { from: null, to: null }),
 								})
@@ -356,9 +374,9 @@ export function OrderAnalytics() {
 									type="button"
 									className={styles.chip}
 									onClick={() => setParams({ [key]: null })}
-									aria-label={`Снять фильтр: ${filterLabel(key)}`}
+									aria-label={`Снять фильтр: ${filterLabel(key, get(key))}`}
 								>
-									{filterLabel(key)} <span aria-hidden>×</span>
+									{filterLabel(key, get(key))} <span aria-hidden>×</span>
 								</button>
 							))}
 							<button
@@ -403,19 +421,19 @@ export function OrderAnalytics() {
 				</div>
 
 				{tab === "overview" && (
-					<OverviewSection {...sectionProps} onPeriod={setShownPeriod} />
+					<OverviewSection {...sectionProps} onReport={setShownReport} />
 				)}
 				{tab === "products" && (
-					<ProductsSection {...sectionProps} onPeriod={setShownPeriod} />
+					<ProductsSection {...sectionProps} onReport={setShownReport} />
 				)}
 				{tab === "geo" && (
-					<GeoSection {...sectionProps} onPeriod={setShownPeriod} />
+					<GeoSection {...sectionProps} onReport={setShownReport} />
 				)}
 				{tab === "customers" && (
-					<CustomersSection {...sectionProps} onPeriod={setShownPeriod} />
+					<CustomersSection {...sectionProps} onReport={setShownReport} />
 				)}
 				{tab === "funnel" && (
-					<FunnelSection {...sectionProps} onPeriod={setShownPeriod} />
+					<FunnelSection {...sectionProps} onReport={setShownReport} />
 				)}
 			</div>
 		</TipProvider>

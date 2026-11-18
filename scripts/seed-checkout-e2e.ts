@@ -135,6 +135,7 @@ async function main() {
 			{ title: { equals: spec.title } },
 			{
 				title: spec.title,
+				_status: "published",
 				description: `Товар для автотестов: ${spec.title}`,
 				category: category.id,
 				pricing: { priceForIndividual: spec.price },

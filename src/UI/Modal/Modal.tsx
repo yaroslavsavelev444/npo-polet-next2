@@ -2,7 +2,14 @@
 "use client";
 
 import { X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+	type ReactNode,
+	type RefObject,
+	useCallback,
+	useEffect,
+	useId,
+	useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { RemoveScroll } from "react-remove-scroll"; // <-- новый импорт
 import { cn } from "@/utils/cn";
@@ -18,6 +25,8 @@ interface ModalProps {
 	closeOnEscape?: boolean;
 	className?: string;
 	afterClose?: () => void;
+	initialFocusRef?: RefObject<HTMLElement | null>;
+	describedBy?: string;
 }
 
 export function Modal({
@@ -31,8 +40,11 @@ export function Modal({
 	closeOnEscape = true,
 	className,
 	afterClose,
+	initialFocusRef,
+	describedBy,
 }: ModalProps) {
 	const [mounted, setMounted] = useState(false);
+	const titleId = useId();
 	/**
 	 * Элемент <dialog> держится в СОСТОЯНИИ, а не в ref.
 	 *
@@ -54,7 +66,10 @@ export function Modal({
 	useEffect(() => {
 		if (!dialogEl) return;
 		if (open) {
-			if (!dialogEl.open) dialogEl.showModal();
+			if (!dialogEl.open) {
+				dialogEl.showModal();
+				initialFocusRef?.current?.focus({ preventScroll: true });
+			}
 		} else if (dialogEl.open) {
 			dialogEl.close();
 			// afterClose вызывается только после НАСТОЯЩЕГО закрытия. Вне этой
@@ -62,7 +77,7 @@ export function Modal({
 			// есть сообщал бы о событии, которого не было.
 			afterClose?.();
 		}
-	}, [open, afterClose, dialogEl]);
+	}, [open, afterClose, dialogEl, initialFocusRef]);
 
 	// Перехват Escape
 	useEffect(() => {
@@ -101,7 +116,8 @@ export function Modal({
 				)}
 				style={{ width: widthStyle, maxWidth: "calc(100vw - 32px)" }}
 				aria-modal="true"
-				aria-labelledby={title ? "modal-title" : undefined}
+				aria-labelledby={title ? titleId : undefined}
+				aria-describedby={describedBy}
 			>
 				<div
 					className={cn(
@@ -115,7 +131,7 @@ export function Modal({
 						<div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border)] shrink-0">
 							{title && (
 								<h2
-									id="modal-title"
+									id={titleId}
 									className="text-base font-semibold text-[var(--text-primary)] leading-snug"
 								>
 									{title}

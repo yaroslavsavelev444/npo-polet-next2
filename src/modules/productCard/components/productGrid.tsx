@@ -7,6 +7,8 @@ interface ProductGridProps {
 	products: ProductCardData[];
 	showQuickView?: boolean;
 	onQuickView?: (product: ProductCardData) => void;
+	onProductNavigate?: (productId: string) => void;
+	getProductLinkId?: (productId: string) => string;
 	className?: string;
 }
 
@@ -64,6 +66,8 @@ export function ProductGrid({
 	products,
 	showQuickView,
 	onQuickView,
+	onProductNavigate,
+	getProductLinkId,
 	className,
 }: ProductGridProps) {
 	return (
@@ -75,6 +79,8 @@ export function ProductGrid({
 						product={product}
 						showQuickView={showQuickView}
 						onQuickView={onQuickView}
+						onProductNavigate={onProductNavigate}
+						productLinkId={getProductLinkId?.(product.id)}
 						// Первый ряд грузится приоритетно: это самые вероятные LCP-кадры.
 						priorityImage={index < 5}
 					/>

@@ -18,7 +18,7 @@ export type WidgetState =
 	| { state: "guest" }
 	| { state: "disabled" }
 	| { state: "banned" }
-	| { state: "ready"; unread: number };
+	| { state: "ready"; unread: number; userId: number };
 
 /**
  * GET /api/support/widget — что показать на кнопке чата: войти, чат
@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
 		}
 		return json<WidgetState>({
 			state: "ready",
+			userId: actor.userId,
 			unread: await customerUnreadCount(deps, actor),
 		});
 	} catch (error) {

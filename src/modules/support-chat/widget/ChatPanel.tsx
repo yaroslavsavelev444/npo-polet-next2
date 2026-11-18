@@ -4,6 +4,7 @@ import { Paperclip, Search, Send, Star, X } from "lucide-react";
 import {
 	Fragment,
 	type KeyboardEvent,
+	useCallback,
 	useEffect,
 	useLayoutEffect,
 	useRef,
@@ -14,14 +15,15 @@ import {
 	MESSAGE_MAX_ATTACHMENTS,
 	MESSAGE_MAX_LENGTH,
 	SUPPORT_TOPICS,
-	type SupportTopic,
 } from "../lib/constants";
-import type {
-	MessageContext,
-	SupportAttachmentDTO,
-	SupportMessageDTO,
-} from "../lib/events";
+import type { SupportAttachmentDTO, SupportMessageDTO } from "../lib/events";
 import { linkify } from "../lib/linkify";
+import {
+	emptyWidgetDraft,
+	type UpdateWidgetDraft,
+	type WidgetDraft,
+} from "./draft";
+import type { OpenChatDetail } from "./open-chat";
 import { useWidgetChat } from "./useWidgetChat";
 import styles from "./widget.module.css";
 
@@ -153,26 +155,43 @@ interface KnowledgeHint {
  * широком экране — окно в углу, страница под ним остаётся живой.
  */
 export function ChatPanel({
+	userId,
 	socketUrl,
 	consent,
-	context,
-	topic: requestedTopic,
-	onContextConsumed,
+	drafts,
+	updateDraft,
+	request,
+	onRequestApplied,
 	onClose,
 }: {
+	userId: number;
 	socketUrl: string | null;
 	consent: { slug: string; url: string };
-	context: MessageContext | null;
-	topic: SupportTopic | null;
-	onContextConsumed: () => void;
+	drafts: Record<string, WidgetDraft>;
+	updateDraft: UpdateWidgetDraft;
+	request: OpenChatDetail | null;
+	onRequestApplied: () => void;
 	onClose: () => void;
 }) {
-	const chat = useWidgetChat({ socketUrl, enabled: true });
-	const [draft, setDraft] = useState("");
-	const [attachments, setAttachments] = useState<SupportAttachmentDTO[]>([]);
-	const [uploading, setUploading] = useState(0);
+	const chat = useWidgetChat({ socketUrl, enabled: true, userId });
+	const draftKey =
+		chat.loaded && chat.connection !== "unauthorized"
+			? `${userId}:${chat.conversation?.id ?? "new"}`
+			: null;
+	const {
+		text: draft,
+		attachments,
+		context,
+		topic,
+		uploading,
+	} = (draftKey ? drafts[draftKey] : undefined) ?? emptyWidgetDraft;
+	const changeDraft = useCallback(
+		(update: (draft: WidgetDraft) => WidgetDraft) => {
+			if (draftKey) updateDraft(draftKey, update);
+		},
+		[draftKey, updateDraft],
+	);
 	const [error, setError] = useState<string | null>(null);
-	const [topic, setTopic] = useState<SupportTopic>(requestedTopic ?? "other");
 	const [consentGiven, setConsentGiven] = useState(false);
 	const [hints, setHints] = useState<KnowledgeHint[] | null>(null);
 	const [csatScore, setCsatScore] = useState(0);
@@ -182,14 +201,30 @@ export function ChatPanel({
 	const feedRef = useRef<HTMLDivElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const lastTyping = useRef(0);
+	const uploadLock = useRef(false);
+	const focused = useRef(false);
 
 	const firstMessage = chat.loaded && chat.conversation === null;
 	const resolved = chat.conversation?.status === "resolved";
 	const awaitingCsat = resolved && chat.conversation?.csatScore === null;
+	const awaitingConversation =
+		(firstMessage || resolved) &&
+		chat.pending.some((message) => message.status === "sending");
+	const canCompose = draftKey !== null && !awaitingConversation;
 
 	useEffect(() => {
-		if (requestedTopic) setTopic(requestedTopic);
-	}, [requestedTopic]);
+		if (!request || !draftKey) return;
+		changeDraft((current) => {
+			if (current.text || current.attachments.length || current.uploading)
+				return current;
+			return {
+				...current,
+				context: request.context ?? current.context,
+				topic: request.topic ?? current.topic,
+			};
+		});
+		onRequestApplied();
+	}, [request, draftKey, changeDraft, onRequestApplied]);
 
 	useEffect(() => {
 		const media = window.matchMedia("(max-width: 640px)");
@@ -200,8 +235,10 @@ export function ChatPanel({
 	}, []);
 
 	useEffect(() => {
+		if (!canCompose || focused.current) return;
+		focused.current = true;
 		textareaRef.current?.focus();
-	}, []);
+	}, [canCompose]);
 
 	// Прочитано — когда окно открыто и вкладка на виду: при открытии, при
 	// возврате на вкладку и при каждом новом сообщении, пришедшем в открытое окно.
@@ -243,11 +280,15 @@ export function ChatPanel({
 	}
 
 	async function upload(files: FileList | File[]) {
-		for (const file of [...files].slice(
+		if (!canCompose || uploadLock.current || uploading) return;
+		const selected = [...files].slice(
 			0,
 			MESSAGE_MAX_ATTACHMENTS - attachments.length,
-		)) {
-			setUploading((n) => n + 1);
+		);
+		if (!selected.length) return;
+		uploadLock.current = true;
+		changeDraft((current) => ({ ...current, uploading: selected.length }));
+		for (const file of selected) {
 			try {
 				const body = new FormData();
 				body.append("file", file);
@@ -263,10 +304,11 @@ export function ChatPanel({
 				if (!response.ok || !data.attachment) {
 					throw new Error(data.error?.message ?? "Не удалось загрузить файл");
 				}
-				setAttachments((list) => [
-					...list,
-					data.attachment as SupportAttachmentDTO,
-				]);
+				const attachment = data.attachment;
+				changeDraft((current) => ({
+					...current,
+					attachments: [...current.attachments, attachment],
+				}));
 			} catch (uploadError) {
 				setError(
 					uploadError instanceof Error
@@ -274,9 +316,13 @@ export function ChatPanel({
 						: "Не удалось загрузить файл",
 				);
 			} finally {
-				setUploading((n) => n - 1);
+				changeDraft((current) => ({
+					...current,
+					uploading: current.uploading - 1,
+				}));
 			}
 		}
+		uploadLock.current = false;
 	}
 
 	function send() {
@@ -286,7 +332,7 @@ export function ChatPanel({
 		// Пока диалог не загружен, неизвестно, первое ли это сообщение: без
 		// этой проверки быстрая отправка уходила без согласия, и сервер
 		// отвечал «Нужно согласие» с кнопкой «Повторить».
-		if (!chat.loaded) return;
+		if (!canCompose) return;
 		if (firstMessage && !consentGiven) {
 			setError("Отметьте согласие на обработку персональных данных");
 			return;
@@ -297,11 +343,9 @@ export function ChatPanel({
 			context,
 			...(firstMessage ? { topic, consentDocument: consent.slug } : {}),
 		});
-		setDraft("");
-		setAttachments([]);
+		changeDraft((current) => ({ ...emptyWidgetDraft, topic: current.topic }));
 		setHints(null);
 		setError(null);
-		onContextConsumed();
 		chat.typing(false);
 	}
 
@@ -380,7 +424,29 @@ export function ChatPanel({
 			)}
 
 			<div className={styles.feed} ref={feedRef} aria-live="polite">
-				{!chat.loaded && <p className={styles.system}>Загрузка…</p>}
+				{chat.connection === "unauthorized" && (
+					<p className={styles.system}>
+						Войдите в аккаунт, чтобы открыть диалог.
+					</p>
+				)}
+				{!chat.loaded && chat.connection !== "unauthorized" && (
+					<p className={styles.system}>
+						{chat.loadFailed ? (
+							<>
+								Не удалось открыть диалог.{" "}
+								<button
+									type="button"
+									className={styles.linkButton}
+									onClick={() => void chat.openConversation()}
+								>
+									Повторить
+								</button>
+							</>
+						) : (
+							"Загрузка…"
+						)}
+					</p>
+				)}
 				{chat.hasMore && (
 					<button
 						type="button"
@@ -518,7 +584,9 @@ export function ChatPanel({
 									type="button"
 									aria-pressed={topic === t.value}
 									className={topic === t.value ? styles.topicOn : styles.topic}
-									onClick={() => setTopic(t.value)}
+									onClick={() =>
+										changeDraft((current) => ({ ...current, topic: t.value }))
+									}
 								>
 									{t.label}
 								</button>
@@ -546,7 +614,9 @@ export function ChatPanel({
 						<button
 							type="button"
 							aria-label="Не прикреплять"
-							onClick={onContextConsumed}
+							onClick={() =>
+								changeDraft((current) => ({ ...current, context: null }))
+							}
 						>
 							×
 						</button>
@@ -561,9 +631,12 @@ export function ChatPanel({
 									type="button"
 									aria-label={`Убрать ${file.filename}`}
 									onClick={() =>
-										setAttachments((list) =>
-											list.filter((a) => a.id !== file.id),
-										)
+										changeDraft((current) => ({
+											...current,
+											attachments: current.attachments.filter(
+												(a) => a.id !== file.id,
+											),
+										}))
 									}
 								>
 									×
@@ -602,6 +675,7 @@ export function ChatPanel({
 							type="file"
 							multiple
 							hidden
+							disabled={!canCompose || uploading > 0}
 							accept="image/jpeg,image/png,image/webp,application/pdf,.docx,.xlsx"
 							onChange={(event) => {
 								if (event.target.files) void upload(event.target.files);
@@ -613,6 +687,7 @@ export function ChatPanel({
 						ref={textareaRef}
 						className={styles.textarea}
 						value={draft}
+						disabled={!canCompose}
 						maxLength={MESSAGE_MAX_LENGTH}
 						rows={1}
 						placeholder={
@@ -620,7 +695,8 @@ export function ChatPanel({
 						}
 						aria-label="Сообщение менеджеру"
 						onChange={(event) => {
-							setDraft(event.target.value);
+							const text = event.target.value;
+							changeDraft((current) => ({ ...current, text }));
 							const now = Date.now();
 							if (now - lastTyping.current > 3_000) {
 								lastTyping.current = now;
@@ -641,7 +717,7 @@ export function ChatPanel({
 						className={styles.sendButton}
 						onClick={send}
 						disabled={
-							!chat.loaded ||
+							!canCompose ||
 							uploading > 0 ||
 							(!draft.trim() && attachments.length === 0)
 						}

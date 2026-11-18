@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AnalyticsSection } from "../lib/constants";
 import type {
 	AnalyticsResponse,
@@ -41,66 +41,104 @@ export function clearAnalyticsCache() {
 	cache.clear();
 }
 
+interface ReportSnapshot<S extends AnalyticsSection> {
+	data: SectionData[S];
+	params: URLSearchParams;
+}
+
+interface ReportState<S extends AnalyticsSection> {
+	snapshot: ReportSnapshot<S> | null;
+	completed: { key: string; error: string | null } | null;
+}
+
 export function useAnalyticsData<S extends AnalyticsSection>(
 	section: S,
 	params: string,
 	reloadKey = 0,
 ) {
-	const [data, setData] = useState<SectionData[S] | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [loading, setLoading] = useState(true);
-	const lastUrl = useRef<string | null>(null);
+	const url = `/api/orders/analytics?section=${section}${params ? `&${params}` : ""}`;
+	const [retryKey, setRetryKey] = useState(0);
+	const requestKey = `${reloadKey}:${retryKey}:${url}`;
+	const [state, setState] = useState<ReportState<S>>({
+		snapshot: null,
+		completed: null,
+	});
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: reloadKey — явный запрос обновить данные
+	const retry = useCallback(() => {
+		cache.delete(url);
+		setRetryKey((key) => key + 1);
+	}, [url]);
+
 	useEffect(() => {
-		const url = `/api/orders/analytics?section=${section}${params ? `&${params}` : ""}`;
-		lastUrl.current = url;
+		const finish = (data: SectionData[S]) => {
+			setState({
+				snapshot: { data, params: new URLSearchParams(params) },
+				completed: { key: requestKey, error: null },
+			});
+		};
 
 		const cached = cache.get(url);
 		if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
-			setData(cached.data as SectionData[S]);
-			setError(null);
-			setLoading(false);
+			finish(cached.data as SectionData[S]);
 			return;
 		}
 
 		const controller = new AbortController();
-		// Предыдущий отчёт остаётся на экране приглушённым до прихода нового.
-		setLoading(true);
-		setError(null);
 		fetch(url, {
 			credentials: "same-origin",
 			cache: "no-store",
 			signal: controller.signal,
 		})
 			.then(async (response) => {
+				if (controller.signal.aborted) return;
 				if (response.status === 401) {
 					window.location.assign(
 						`/admin/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`,
 					);
 					return;
 				}
+
 				const body = (await response.json().catch(() => null)) as
 					| AnalyticsResponse
 					| { errors?: { message?: string }[] }
 					| null;
+				if (controller.signal.aborted) return;
 				if (!response.ok) {
 					const message =
 						(body as { errors?: { message?: string }[] } | null)?.errors?.[0]
 							?.message ?? `Ошибка ${response.status}`;
 					throw new Error(message);
 				}
-				remember(url, body as AnalyticsResponse);
-				setData(body as SectionData[S]);
-				setLoading(false);
+				if (
+					!body ||
+					typeof body !== "object" ||
+					!("section" in body) ||
+					body.section !== section
+				) {
+					throw new Error("Не удалось прочитать отчёт");
+				}
+				remember(url, body);
+				finish(body as SectionData[S]);
 			})
 			.catch((reason: Error) => {
 				if (controller.signal.aborted) return;
-				setError(reason.message || "Не удалось загрузить данные");
-				setLoading(false);
+				setState((current) => ({
+					...current,
+					completed: {
+						key: requestKey,
+						error: reason.message || "Не удалось загрузить данные",
+					},
+				}));
 			});
 		return () => controller.abort();
-	}, [section, params, reloadKey]);
+	}, [params, requestKey, section, url]);
 
-	return { data, error, loading };
+	const loading = state.completed?.key !== requestKey;
+	return {
+		data: state.snapshot?.data ?? null,
+		shownParams: state.snapshot?.params ?? null,
+		error: loading ? null : (state.completed?.error ?? null),
+		loading,
+		retry,
+	};
 }

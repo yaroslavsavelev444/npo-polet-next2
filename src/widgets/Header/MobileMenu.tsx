@@ -9,6 +9,10 @@ import { RemoveScroll } from "react-remove-scroll";
 import { logoutAction } from "@/modules/auth/actions/logout";
 import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
 import { SchemeSwitch } from "@/modules/color-scheme/components/SchemeSwitch";
+import {
+	SECURITY_SOLUTIONS_PATH,
+	SECURITY_SOLUTIONS_TITLE,
+} from "@/modules/security-solutions/route";
 import type { Category, Setting, User } from "@/payload-types";
 import { useCartStore } from "@/shared/store/cart.store";
 import { useWishlistStore } from "@/shared/store/wishlist.store";
@@ -263,6 +267,20 @@ export default function MobileMenu({
 											<RollingText text={link.label} />
 										</span>
 									</Link>
+									{link.href === "/category" && (
+										<Link
+											href={SECURITY_SOLUTIONS_PATH}
+											onClick={onClose}
+											aria-current={
+												pathname === SECURITY_SOLUTIONS_PATH
+													? "page"
+													: undefined
+											}
+											className={`${styles.chip} ${styles.catalogSolution}`}
+										>
+											{SECURITY_SOLUTIONS_TITLE}
+										</Link>
+									)}
 								</li>
 							))}
 						</ol>

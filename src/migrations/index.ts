@@ -34,6 +34,8 @@ import * as migration_20261012_120000_support_chat_ban from "./20261012_120000_s
 import * as migration_20261013_120000_user_identities from "./20261013_120000_user_identities.ts";
 import * as migration_20261015_120000_settings_yandex_id from "./20261015_120000_settings_yandex_id.ts";
 import * as migration_20261023_120000_knowledge_search_text_index from "./20261023_120000_knowledge_search_text_index.ts";
+import * as migration_20261114_120000_checkout_order_attempts from "./20261114_120000_checkout_order_attempts.ts";
+import * as migration_20261117_120000_security_solutions_and_shipping_invoice from "./20261117_120000_security_solutions_and_shipping_invoice.ts";
 
 export const migrations = [
 	{
@@ -215,5 +217,15 @@ export const migrations = [
 		up: migration_20261023_120000_knowledge_search_text_index.up,
 		down: migration_20261023_120000_knowledge_search_text_index.down,
 		name: "20261023_120000_knowledge_search_text_index",
+	},
+	{
+		up: migration_20261114_120000_checkout_order_attempts.up,
+		down: migration_20261114_120000_checkout_order_attempts.down,
+		name: "20261114_120000_checkout_order_attempts",
+	},
+	{
+		up: migration_20261117_120000_security_solutions_and_shipping_invoice.up,
+		down: migration_20261117_120000_security_solutions_and_shipping_invoice.down,
+		name: "20261117_120000_security_solutions_and_shipping_invoice",
 	},
 ];

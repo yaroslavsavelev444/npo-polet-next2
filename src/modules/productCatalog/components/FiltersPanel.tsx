@@ -12,6 +12,7 @@ import { StatusFilter } from "./StatusFilter";
 interface FiltersPanelProps {
 	priceBounds: PriceBounds;
 	facets: CatalogFacets;
+	showCounts: boolean;
 }
 
 /**
@@ -30,22 +31,34 @@ interface FiltersPanelProps {
  * Кнопки сброса здесь нет намеренно — она стоит в подвале листа рядом с
  * «Показать N», где принимают решение, а не посреди списка полей.
  */
-export function FiltersPanel({ priceBounds, facets }: FiltersPanelProps) {
-	const { toggleBrand } = useProductFilters();
+export function FiltersPanel({
+	priceBounds,
+	facets,
+	showCounts,
+}: FiltersPanelProps) {
+	const { facets: selection, toggleBrand } = useProductFilters();
 
 	return (
 		<div className={styles.sheetGroups}>
 			<PriceFilter priceBounds={priceBounds} />
 			<StatusFilter variant="list" />
-			{facets.discount && <DiscountFilter discount={facets.discount} />}
+			{facets.discount && (
+				<DiscountFilter discount={facets.discount} showCounts={showCounts} />
+			)}
 			{facets.manufacturers.length > 0 && (
 				<FacetList
 					legend="Производитель"
-					values={facets.manufacturers}
+					values={facets.manufacturers.map((value) => ({
+						...value,
+						selected: selection.brands.includes(value.value),
+					}))}
 					onToggle={toggleBrand}
+					showCounts={showCounts}
 				/>
 			)}
-			{facets.specs.length > 0 && <SpecFacets facets={facets.specs} />}
+			{facets.specs.length > 0 && (
+				<SpecFacets facets={facets.specs} showCounts={showCounts} />
+			)}
 		</div>
 	);
 }

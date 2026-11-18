@@ -25,13 +25,7 @@ import {
 	plural,
 } from "../format";
 import { useAnalyticsData } from "../useAnalyticsData";
-import {
-	Card,
-	Frame,
-	Note,
-	type SectionProps,
-	usePeriodReport,
-} from "./shared";
+import { Card, Frame, Note, type SectionProps } from "./shared";
 
 const FREQUENCY_LABELS: Record<string, string> = {
 	"1": "1 заказ",
@@ -54,21 +48,17 @@ export function CustomersSection({
 	params,
 	reloadKey,
 	setParams,
-	searchParams,
-	onPeriod,
+	onReport,
+	describeReport,
 }: SectionProps) {
-	const { data, error, loading } = useAnalyticsData(
-		"customers",
-		params,
-		reloadKey,
-	);
-	usePeriodReport(data?.period, onPeriod);
+	const report = useAnalyticsData("customers", params, reloadKey);
+	const { data, shownParams } = report;
 	return (
-		<Frame loading={loading} error={error} hasData={Boolean(data)}>
+		<Frame {...report} describeReport={describeReport} onReport={onReport}>
 			{data && (
 				<Customers
 					data={data}
-					customerType={searchParams.get("customerType")}
+					customerType={shownParams?.get("customerType") ?? null}
 					setParams={setParams}
 				/>
 			)}

@@ -40,7 +40,6 @@ import {
 	Frame,
 	type SectionProps,
 	Segmented,
-	usePeriodReport,
 } from "./shared";
 
 type Metric = "revenue" | "orders" | "avgCheck" | "units";
@@ -89,26 +88,22 @@ export function OverviewSection({
 	params,
 	reloadKey,
 	setParams,
-	searchParams,
-	onPeriod,
+	onReport,
+	describeReport,
 }: SectionProps) {
-	const { data, error, loading } = useAnalyticsData(
-		"overview",
-		params,
-		reloadKey,
-	);
-	usePeriodReport(data?.period, onPeriod);
+	const report = useAnalyticsData("overview", params, reloadKey);
+	const { data, shownParams } = report;
 	const [metric, setMetric] = useState<Metric>("revenue");
 
 	return (
-		<Frame loading={loading} error={error} hasData={Boolean(data)}>
+		<Frame {...report} describeReport={describeReport} onReport={onReport}>
 			{data && (
 				<Overview
 					data={data}
 					metric={metric}
 					setMetric={setMetric}
 					setParams={setParams}
-					statusFilter={searchParams.get("status")}
+					statusFilter={shownParams?.get("status") ?? null}
 				/>
 			)}
 		</Frame>

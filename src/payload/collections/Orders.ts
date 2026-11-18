@@ -1,3 +1,4 @@
+import { sql } from "@payloadcms/db-postgres";
 import type {
 	CollectionBeforeChangeHook,
 	CollectionConfig,
@@ -21,6 +22,7 @@ import { legacyIdField } from "../fields/legacyId.ts";
 import { shiftProductPurchases } from "../services/product-counters.db.ts";
 import { revokeRedemptionsForOrder } from "../services/promo-redemptions.db.ts";
 import { inviteToReviewDeliveredOrder } from "../services/review-invitation.notify.ts";
+import { getTransactionDatabase } from "../services/transaction.db.ts";
 
 /** Заказы после удаления аккаунта обезличиваются (user становится пустым) — для них in-app уведомление создавать некому. */
 function getOrderUserId(doc: { user?: unknown }): number | null {
@@ -137,6 +139,14 @@ const generateOrderNumber: CollectionBeforeChangeHook = async ({
 
 	const year = new Date().getFullYear();
 	const prefix = `ORD-${year}-`;
+	// Номер выбирается по максимуму за год. Блокировка держится до коммита,
+	// поэтому два параллельных оформления не получат один и тот же номер.
+	const transactionID = await req.transactionID;
+	if (transactionID) {
+		await getTransactionDatabase(req.payload, transactionID).execute(
+			sql`SELECT pg_advisory_xact_lock(1845793202, ${year}::integer)`,
+		);
+	}
 
 	const { docs } = await req.payload.find({
 		collection: "orders",
@@ -145,6 +155,7 @@ const generateOrderNumber: CollectionBeforeChangeHook = async ({
 		limit: 1,
 		depth: 0,
 		overrideAccess: true,
+		req,
 	});
 
 	const lastNumber: string | undefined = docs[0]?.orderNumber;
@@ -398,6 +409,7 @@ export const Orders: CollectionConfig = {
 
 				let delta: 1 | -1 | 0 = 0;
 				if (operation === "create") {
+					if (req.context?.checkoutTransaction) return doc;
 					delta = isVoidOrderStatus(doc.status) ? 0 : 1;
 				} else if (previousDoc?.status !== doc.status) {
 					const wasVoid = isVoidOrderStatus(previousDoc?.status);
@@ -435,6 +447,7 @@ export const Orders: CollectionConfig = {
 				const userId = getOrderUserId(doc);
 
 				if (operation === "create") {
+					if (req.context?.checkoutTransaction) return doc;
 					void notifyNewOrder(doc, req.payload); // явная передача, без нового импорта getPayload
 					if (userId) {
 						void notify(req.payload, userId, "order_created", {
@@ -619,6 +632,13 @@ export const Orders: CollectionConfig = {
 			type: "group",
 			label: "Доставка",
 			fields: [
+				{
+					name: "includeShippingInInvoice",
+					type: "checkbox",
+					label: "Включать стоимость доставки в счёт",
+					defaultValue: false,
+					admin: { readOnly: true },
+				},
 				{
 					name: "method",
 					type: "select",

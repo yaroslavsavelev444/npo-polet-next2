@@ -6,6 +6,7 @@ import {
 	type CSSProperties,
 	type FocusEvent,
 	type KeyboardEvent,
+	type RefObject,
 	useCallback,
 	useEffect,
 	useId,
@@ -25,7 +26,11 @@ import {
 	useSiteSearch,
 } from "@/modules/search";
 import { useClickOutside } from "@/shared/hooks/useClickOutside";
-import { useSearchStore } from "@/shared/store/search.store";
+import {
+	rememberSearchResult,
+	searchSnapshotFromHistory,
+	useSearchStore,
+} from "@/shared/store/search.store";
 import { cn } from "@/utils/cn";
 
 interface Props {
@@ -38,6 +43,7 @@ interface Props {
 }
 
 const RESULTS_ID = "header-search-results";
+const DESKTOP_SEARCH = "(min-width: 768px)";
 
 /** Ширина выпадающей панели: шире поля — выдаче нужно место под фото, цену и фрагменты. */
 const PANEL_WIDTH = "min(44rem, calc(100vw - 2rem))";
@@ -47,20 +53,61 @@ const VIEWPORT_GUTTER = 16;
 /**
  * Управление поиском, общее для обоих вариантов: запрос, клавиатура, выбор.
  */
-function useSearchController(onDone?: () => void) {
+function useSearchController(
+	variant: NonNullable<Props["variant"]>,
+	inputRef: RefObject<HTMLInputElement | null>,
+	reopen: () => void,
+	hideSheet?: () => void,
+) {
 	const router = useRouter();
 	const query = useSearchStore((s) => s.query);
 	const activeKey = useSearchStore((s) => s.activeKey);
 	const setActiveKey = useSearchStore((s) => s.setActiveKey);
-	const reset = useSearchStore((s) => s.reset);
+	const close = useSearchStore((s) => s.close);
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const [restoreScrollTop, setRestoreScrollTop] = useState<number | null>(null);
 
 	const search = useSiteSearch(query);
 	const entries = flattenSections(search.sections);
 
-	const handleSelect = useCallback(() => {
-		reset();
-		onDone?.();
-	}, [reset, onDone]);
+	const dismiss = useCallback(() => {
+		close();
+		hideSheet?.();
+		setRestoreScrollTop(null);
+	}, [close, hideSheet]);
+
+	const handleSelect = useCallback(
+		(key: string) => {
+			rememberSearchResult(key, scrollRef.current?.scrollTop ?? 0);
+			dismiss();
+		},
+		[dismiss],
+	);
+
+	useEffect(() => {
+		let frame: number | undefined;
+		function onPopState(event: PopStateEvent) {
+			window.cancelAnimationFrame(frame ?? 0);
+			if (window.matchMedia(DESKTOP_SEARCH).matches !== (variant === "desktop"))
+				return;
+			const snapshot = searchSnapshotFromHistory(event.state);
+			if (!snapshot) {
+				dismiss();
+				return;
+			}
+			useSearchStore.getState().restore(snapshot);
+			setRestoreScrollTop(snapshot.scrollTop);
+			reopen();
+			frame = window.requestAnimationFrame(() =>
+				inputRef.current?.focus({ preventScroll: true }),
+			);
+		}
+		window.addEventListener("popstate", onPopState);
+		return () => {
+			window.removeEventListener("popstate", onPopState);
+			window.cancelAnimationFrame(frame ?? 0);
+		};
+	}, [dismiss, inputRef, reopen, variant]);
 
 	const handleLoadMore = useCallback(
 		(type: SearchResultType, offset: number) => {
@@ -98,8 +145,8 @@ function useSearchController(onDone?: () => void) {
 				handleLoadMore(target.type, target.offset);
 				return;
 			}
+			handleSelect(target.key);
 			router.push(target.href);
-			handleSelect();
 		}
 	};
 
@@ -109,6 +156,9 @@ function useSearchController(onDone?: () => void) {
 		setActiveKey,
 		search,
 		handleSelect,
+		dismiss,
+		scrollRef,
+		restoreScrollTop,
 		handleLoadMore,
 		handleKeyDown,
 	};
@@ -138,9 +188,12 @@ function DesktopSearch() {
 		setActiveKey,
 		search,
 		handleSelect,
+		dismiss,
+		scrollRef,
+		restoreScrollTop,
 		handleLoadMore,
 		handleKeyDown,
-	} = useSearchController();
+	} = useSearchController("desktop", inputRef, open);
 
 	useClickOutside([containerRef, panelRef], close, isOpen);
 
@@ -213,6 +266,9 @@ function DesktopSearch() {
 							activeKey={activeKey}
 							onHover={setActiveKey}
 							onSelect={handleSelect}
+							onDismiss={dismiss}
+							scrollRef={scrollRef}
+							restoreScrollTop={restoreScrollTop}
 							onLoadMore={handleLoadMore}
 						/>
 					</div>,
@@ -303,20 +359,26 @@ function MobileSearch() {
 		triggerRef.current?.focus({ preventScroll: true });
 	}, []);
 
+	const reopenSheet = useCallback(() => setSheetOpen(true), []);
+	const hideSheet = useCallback(() => setSheetOpen(false), []);
+
 	const {
 		query,
 		activeKey,
 		setActiveKey,
 		search,
 		handleSelect,
+		dismiss,
+		scrollRef,
+		restoreScrollTop,
 		handleLoadMore,
 		handleKeyDown,
-	} = useSearchController(() => setSheetOpen(false));
+	} = useSearchController("mobile", inputRef, reopenSheet, hideSheet);
 
 	// Шапка переходит на desktop-вёрстку — мобильная панель там не нужна.
 	useEffect(() => {
 		if (!isSheetOpen) return;
-		const media = window.matchMedia("(min-width: 768px)");
+		const media = window.matchMedia(DESKTOP_SEARCH);
 		const onChange = (event: MediaQueryListEvent) => {
 			if (event.matches) closeSheet();
 		};
@@ -403,6 +465,9 @@ function MobileSearch() {
 										activeKey={activeKey}
 										onHover={setActiveKey}
 										onSelect={handleSelect}
+										onDismiss={dismiss}
+										scrollRef={scrollRef}
+										restoreScrollTop={restoreScrollTop}
 										onLoadMore={handleLoadMore}
 										className="h-full"
 									/>

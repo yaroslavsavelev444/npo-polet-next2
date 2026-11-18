@@ -231,6 +231,7 @@ export function CartPageClient({
 								});
 							}}
 							onClear={() => void clear()}
+							positionCount={items.length + unavailable.length}
 						/>
 					</aside>
 				)}

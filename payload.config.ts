@@ -49,6 +49,7 @@ import { UserIdentities } from "./src/payload/collections/UserIdentities.ts";
 import { Wishlists } from "./src/payload/collections/Wishlists.ts";
 import { projectEmailAdapter } from "./src/payload/email/adapter.ts";
 import { AlertingSettings } from "./src/payload/globals/AlertingSettings.ts";
+import { SecuritySolutions } from "./src/payload/globals/SecuritySolutions.ts";
 import { Settings } from "./src/payload/globals/Settings.ts";
 import { SupportSettings } from "./src/payload/globals/SupportSettings.ts";
 import { captureAfterError } from "./src/payload/hooks/captureAfterError.ts";
@@ -139,7 +140,7 @@ export default buildConfig({
 	// (src/payload/lexical/knowledgeEditor.ts).
 	editor: lexicalEditor(),
 
-	globals: [Settings, AlertingSettings, SupportSettings],
+	globals: [Settings, SecuritySolutions, AlertingSettings, SupportSettings],
 
 	// Ошибки 5xx эндпоинтов Payload — в журнал ошибок и письмом дежурному
 	// (src/services/observability/README.md).

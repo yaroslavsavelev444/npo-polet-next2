@@ -128,8 +128,9 @@ function normalizeHref(
  *     документа) или который почему-то без url;
  *   • с пустой или недопустимой ссылкой.
  */
-export function getHomeDocuments(settings: Setting | null): HomeDocumentLink[] {
-	const rows = settings?.homeDocuments ?? [];
+export function getDocumentLinks(
+	rows: NonNullable<Setting["homeDocuments"]>,
+): HomeDocumentLink[] {
 	const documents: HomeDocumentLink[] = [];
 
 	for (const [index, row] of rows.entries()) {
@@ -176,4 +177,8 @@ export function getHomeDocuments(settings: Setting | null): HomeDocumentLink[] {
 	}
 
 	return documents;
+}
+
+export function getHomeDocuments(settings: Setting | null): HomeDocumentLink[] {
+	return getDocumentLinks(settings?.homeDocuments ?? []);
 }

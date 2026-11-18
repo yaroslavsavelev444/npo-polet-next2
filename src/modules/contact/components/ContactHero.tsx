@@ -1,6 +1,7 @@
 import { ArrowDown, Clock } from "lucide-react";
 import { AskManagerButton } from "@/modules/support-chat/widget/AskManagerButton";
 import type { Setting } from "@/payload-types";
+import { LandingHeroSurface } from "@/shared/components/LandingHeroSurface";
 import { Reveal, RevealLines } from "@/shared/components/motion/Reveal";
 import { hero } from "../content/contacts-content";
 import { bySortOrder } from "../lib/format";
@@ -34,31 +35,7 @@ export function ContactHero({ settings }: { settings: Setting }) {
 	const hasChannels = phones.length > 0 || emails.length > 0;
 
 	return (
-		<section
-			className="relative isolate overflow-hidden bg-[var(--void-deep)]"
-			style={{
-				// Шапка сайта — position: fixed, её место в потоке держит
-				// HeaderSpacer. Первый экран заезжает ПОД неё (она
-				// полупрозрачная с размытием), поэтому спейсер компенсируется
-				// отрицательным полем, а содержимое возвращается вниз таким же
-				// паддингом.
-				marginTop: "calc(-1 * var(--sticky-header-height))",
-				paddingTop: "var(--sticky-header-height)",
-			}}
-		>
-			{/* Свет снизу-слева, из-под заголовка. Один источник, очень
-			    сдержанный: это тот же приём, что держит первый экран главной,
-			    когда видео ещё не загрузилось, — и он связывает две страницы
-			    надёжнее, чем любой повторённый элемент. */}
-			<div
-				className="pointer-events-none absolute inset-0 -z-10"
-				aria-hidden="true"
-				style={{
-					background:
-						"radial-gradient(110% 70% at 8% 100%, color-mix(in srgb, var(--primary) 13%, transparent) 0%, transparent 58%)",
-				}}
-			/>
-
+		<LandingHeroSurface>
 			<Container className="flex flex-col pb-[clamp(3rem,7vw,6rem)] pt-[clamp(3.5rem,8vw,7rem)]">
 				{/*
 				  Границы кегля вычислены по замеру гарнитуры, а не подобраны на
@@ -138,6 +115,6 @@ export function ContactHero({ settings }: { settings: Setting }) {
 					</>
 				) : null}
 			</Container>
-		</section>
+		</LandingHeroSurface>
 	);
 }

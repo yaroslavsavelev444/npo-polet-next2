@@ -363,6 +363,15 @@ export function DeliverySection({
 				/>
 
 				<CheckboxRow
+					checked={value.includeShippingInInvoice ?? false}
+					onChange={(checked) =>
+						onChange({ ...value, includeShippingInInvoice: checked })
+					}
+				>
+					Включать стоимость доставки в счёт
+				</CheckboxRow>
+
+				<CheckboxRow
 					checked={value.saveAddress}
 					onChange={(checked) => onChange({ ...value, saveAddress: checked })}
 					note="В следующий раз способ получения и адрес подставятся сами"

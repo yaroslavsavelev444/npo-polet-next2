@@ -1,7 +1,7 @@
 // src/payload/services/discounts.service.ts (append to the existing file)
 
 import { unstable_cache } from "next/cache";
-import { Where } from "payload";
+import type { PayloadRequest, Where } from "payload";
 import { Discount } from "../../../payload-types";
 import { env } from "../../env";
 import {
@@ -29,11 +29,12 @@ export interface DiscountApplicationResult {
  */
 export async function getApplicableDiscount(
 	input: DiscountApplicationInput,
+	req?: Partial<PayloadRequest>,
 ): Promise<DiscountApplicationResult> {
-	const { docs: discounts } = await getCachedDiscounts({
-		isActive: true,
-		sort: "-priority",
-	});
+	const options = { isActive: true, sort: "-priority" };
+	const { docs: discounts } = req
+		? await fetchDiscounts(options, req)
+		: await getCachedDiscounts(options);
 	const now = new Date();
 	const activeDiscounts = discounts.filter((d) =>
 		isDiscountCurrentlyActive(d, now),
@@ -125,7 +126,10 @@ function getDiscountsCacheKey(options?: GetDiscountsOptions): string {
 	return `discounts-active-${isActive ?? "any"}-type-${type || "any"}-code-${code || "any"}-start-${startAt_gte || "any"}-end-${endAt_lte || "any"}-allprod-${appliesToAllProducts ?? "any"}-cat-${applicableCategory || "any"}-prod-${applicableProduct || "any"}-pgte-${priority_gte ?? "any"}-plte-${priority_lte ?? "any"}-sort-${sort || "priority"}-l-${limit || 100}-p-${page || 1}-d-${depth ?? 1}`;
 }
 
-async function fetchDiscounts(options: GetDiscountsOptions = {}) {
+async function fetchDiscounts(
+	options: GetDiscountsOptions = {},
+	req?: Partial<PayloadRequest>,
+) {
 	const payload = await getPayloadInstance();
 	const where = buildDiscountsWhere(options);
 	const result = await payload.find({
@@ -135,6 +139,7 @@ async function fetchDiscounts(options: GetDiscountsOptions = {}) {
 		limit: options.limit || 100,
 		page: options.page || 1,
 		depth: options.depth ?? 1,
+		req,
 	});
 	return {
 		docs: result.docs as unknown as Discount[],

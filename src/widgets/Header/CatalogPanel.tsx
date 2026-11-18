@@ -7,6 +7,10 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { pluralizeCategories } from "@/modules/category/lib/categoryOptions";
 import { formatPrice } from "@/modules/productCard/lib/format";
 import { pluralizeProducts } from "@/modules/productCatalog/lib/catalogOptions";
+import {
+	SECURITY_SOLUTIONS_PATH,
+	SECURITY_SOLUTIONS_TITLE,
+} from "@/modules/security-solutions/route";
 import { cn } from "@/utils/cn";
 import type { CatalogMenuData, CatalogMenuSection } from "./catalog-menu";
 import styles from "./NavMenus.module.css";
@@ -135,6 +139,15 @@ export function CatalogPanel({
 							</span>
 						</span>
 						<ArrowRight aria-hidden className={styles.ctaIcon} />
+					</Link>
+					<Link
+						href={SECURITY_SOLUTIONS_PATH}
+						className={cn(styles.catalogSolution, styles.reveal)}
+						style={{ "--i": sections.length + 2 } as CSSProperties}
+						onClick={onNavigate}
+					>
+						{SECURITY_SOLUTIONS_TITLE}
+						<ArrowUpRight aria-hidden className={styles.ctaIcon} />
 					</Link>
 				</nav>
 

@@ -11,11 +11,13 @@ import styles from "./Catalog.module.css";
  */
 export function DiscountFilter({
 	discount,
+	showCounts,
 }: {
 	discount: NonNullable<CatalogFacets["discount"]>;
+	showCounts: boolean;
 }) {
 	const { facets, setDiscount } = useProductFilters();
-	const disabled = discount.count === 0 && !facets.discount;
+	const disabled = showCounts && discount.count === 0 && !facets.discount;
 
 	return (
 		<fieldset className={styles.group}>
@@ -30,7 +32,9 @@ export function DiscountFilter({
 				/>
 				<span aria-hidden className={styles.optionBox} />
 				<span className={styles.optionLabel}>Только со скидкой</span>
-				<span className={styles.optionCount}>{discount.count}</span>
+				{showCounts && (
+					<span className={styles.optionCount}>{discount.count}</span>
+				)}
 			</label>
 		</fieldset>
 	);

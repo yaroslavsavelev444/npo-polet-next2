@@ -1,6 +1,6 @@
 // services/companies.service.ts
 import { unstable_cache } from "next/cache";
-import type { Where } from "payload";
+import type { PayloadRequest, Where } from "payload";
 import type { Company } from "../../../payload-types";
 import { env } from "../../env";
 import { getPayloadInstance } from "./getPayload";
@@ -149,6 +149,7 @@ export const getCachedCompaniesByUser = (
 export async function isCompanyOwnedByUser(
 	companyId: string | number,
 	userId: string | number,
+	req?: Partial<PayloadRequest>,
 ): Promise<boolean> {
 	const numericId = Number(companyId);
 	if (!Number.isFinite(numericId)) return false;
@@ -160,6 +161,7 @@ export async function isCompanyOwnedByUser(
 			and: [{ id: { equals: numericId } }, { user: { equals: userId } }],
 		},
 		overrideAccess: true,
+		req,
 	});
 
 	return totalDocs > 0;

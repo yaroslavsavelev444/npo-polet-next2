@@ -170,6 +170,13 @@ export function CartDrawer({ categories }: Props) {
 	// Escape закрывает; Tab не выпускает фокус за пределы панели.
 	const handleKeyDown = useCallback(
 		(event: KeyboardEvent) => {
+			// Нативный диалог подтверждения сам обрабатывает Tab и Escape.
+			if (
+				event.target instanceof Element &&
+				event.target.closest("dialog[open]")
+			) {
+				return;
+			}
 			if (event.key === "Escape") {
 				event.preventDefault();
 				close();
@@ -351,6 +358,7 @@ export function CartDrawer({ categories }: Props) {
 							isCheckingOut={isCheckingOut}
 							onCheckout={handleCheckout}
 							onClear={() => void clear()}
+							positionCount={items.length + unavailable.length}
 							onContinue={close}
 						/>
 					)}
