@@ -49,9 +49,21 @@ export function CompanySection({
 	onFieldBlur,
 	suggestionsEnabled,
 }: Props) {
-	const [mode, setMode] = useState<"existing" | "new">(
-		companies.length > 0 ? "existing" : "new",
-	);
+	const [mode, setMode] = useState<"existing" | "new">(() => {
+		if (companies.length === 0) return "new";
+		if (value.existingCompanyId) return "existing";
+		const hasRequisites = [
+			value.companyName,
+			value.taxNumber,
+			value.legalAddress,
+			value.companyAddress,
+			value.kpp,
+			value.ogrn,
+			value.contactPerson,
+			value.saveCompany,
+		].some(Boolean);
+		return hasRequisites ? "new" : "existing";
+	});
 	// Последняя выбранная из реестра организация — только для пояснения под
 	// полями. Данные формы живут в `value`, а не здесь.
 	const [filledFrom, setFilledFrom] = useState<CompanySuggestion | null>(null);

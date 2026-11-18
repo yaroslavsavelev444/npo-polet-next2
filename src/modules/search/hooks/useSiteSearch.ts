@@ -2,6 +2,7 @@
 
 import {
 	keepPreviousData,
+	skipToken,
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ import { useDebouncedValue } from "./useDebouncedValue";
 export const searchKeys = {
 	all: ["site-search"] as const,
 	query: (q: string) => ["site-search", q] as const,
+	appended: (q: string) => ["site-search", q, "appended"] as const,
 	section: (q: string, type: SearchResultType, offset: number) =>
 		["site-search", q, type, offset] as const,
 };
@@ -29,7 +31,9 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 	return (await response.json()) as T;
 }
 
-type Extra = Partial<Record<SearchResultType, SearchSection["items"]>>;
+type Extra = Partial<
+	Record<SearchResultType, Record<number, SearchSection["items"]>>
+>;
 
 /**
  * Данные поиска в шапке.
@@ -69,30 +73,39 @@ export function useSiteSearch(rawQuery: string) {
 		retry: 1,
 	});
 
-	// Догруженные «Показать ещё» строки — по секциям. Сбрасываются вместе со
-	// сменой запроса: состояние привязано к строке, для которой получено.
-	const [more, setMore] = useState<{ query: string; extra: Extra }>({
-		query: debounced,
-		extra: {},
+	// Обе версии поиска читают одни и те же догруженные порции из кэша.
+	const { data: extra } = useQuery<Extra>({
+		queryKey: searchKeys.appended(debounced),
+		queryFn: skipToken,
+		gcTime: 5 * 60_000,
 	});
-	const [loadingMore, setLoadingMore] = useState<SearchResultType | null>(null);
-	const [moreError, setMoreError] = useState<SearchResultType | null>(null);
-	const extra = more.query === debounced ? more.extra : {};
+	const [loadingMore, setLoadingMore] = useState<{
+		query: string;
+		type: SearchResultType;
+	} | null>(null);
+	const [moreError, setMoreError] = useState<{
+		query: string;
+		type: SearchResultType;
+	} | null>(null);
 
 	const data = enabled ? result.data : undefined;
 	const sections: SearchSection[] = (data?.sections ?? []).map((section) => {
-		const appended = extra[section.type];
+		const appended = result.isPlaceholderData
+			? undefined
+			: extra?.[section.type];
 		return appended
 			? ({
 					...section,
-					items: [...section.items, ...appended],
+					items: [...section.items, ...Object.values(appended).flat()],
 				} as SearchSection)
 			: section;
 	});
 
 	const loadMore = useCallback(
 		async (type: SearchResultType, offset: number) => {
-			setLoadingMore(type);
+			if (trimmed !== debounced) return;
+			const request = { query: debounced, type };
+			setLoadingMore(request);
 			setMoreError(null);
 			try {
 				const page = await queryClient.fetchQuery({
@@ -104,23 +117,20 @@ export function useSiteSearch(rawQuery: string) {
 						),
 					staleTime: 60_000,
 				});
-				setMore((current) => {
-					const base = current.query === debounced ? current.extra : {};
-					return {
-						query: debounced,
-						extra: {
-							...base,
-							[type]: [...(base[type] ?? []), ...page.section.items],
-						},
-					};
-				});
+				queryClient.setQueryData<Extra>(
+					searchKeys.appended(debounced),
+					(current) => ({
+						...current,
+						[type]: { ...current?.[type], [offset]: page.section.items },
+					}),
+				);
 			} catch {
-				setMoreError(type);
+				setMoreError(request);
 			} finally {
-				setLoadingMore(null);
+				setLoadingMore((current) => (current === request ? null : current));
 			}
 		},
-		[debounced, queryClient],
+		[debounced, queryClient, trimmed],
 	);
 
 	return {
@@ -141,7 +151,7 @@ export function useSiteSearch(rawQuery: string) {
 		isError: enabled && result.isError,
 		retry: () => void result.refetch(),
 		loadMore,
-		loadingMore,
-		moreError,
+		loadingMore: loadingMore?.query === trimmed ? loadingMore.type : null,
+		moreError: moreError?.query === trimmed ? moreError.type : null,
 	};
 }

@@ -12,6 +12,7 @@ interface FacetListProps {
 	onToggle: (value: string) => void;
 	/** Сколько значений видно до «Показать все». */
 	limit?: number;
+	showCounts: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export function FacetList({
 	values,
 	onToggle,
 	limit = 8,
+	showCounts,
 }: FacetListProps) {
 	const [expanded, setExpanded] = useState(false);
 	const hidden = values.length - limit;
@@ -47,7 +49,7 @@ export function FacetList({
 			</legend>
 			<div className={styles.optionList}>
 				{visible.map((value) => {
-					const disabled = value.count === 0 && !value.selected;
+					const disabled = showCounts && value.count === 0 && !value.selected;
 					return (
 						<label
 							key={value.value}
@@ -63,7 +65,9 @@ export function FacetList({
 							/>
 							<span aria-hidden className={styles.optionBox} />
 							<span className={styles.optionLabel}>{value.label}</span>
-							<span className={styles.optionCount}>{value.count}</span>
+							{showCounts && (
+								<span className={styles.optionCount}>{value.count}</span>
+							)}
 						</label>
 					);
 				})}

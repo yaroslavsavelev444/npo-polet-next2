@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 import type { MetadataRoute } from "next";
+import { SECURITY_SOLUTIONS_PATH } from "@/modules/security-solutions/route";
 import { getCachedCategories } from "@/payload/services/categories.service";
 import { getCachedConsents } from "@/payload/services/consents.service";
 import { getKnowledgeSitemapEntries } from "@/payload/services/knowledge.service";
@@ -39,6 +40,7 @@ const STATIC_ROUTES: Array<{
 		priority: 0.9,
 		lastModFrom: "catalog",
 	},
+	{ path: SECURITY_SOLUTIONS_PATH, changeFrequency: "weekly", priority: 0.7 },
 	{
 		path: "/knowledge",
 		changeFrequency: "weekly",

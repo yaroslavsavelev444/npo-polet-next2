@@ -77,6 +77,8 @@ export interface ProductCardProps {
 	/** Показывать ли кнопку быстрого просмотра. */
 	showQuickView?: boolean;
 	onQuickView?: (product: ProductCardData) => void;
+	onProductNavigate?: (productId: string) => void;
+	productLinkId?: string;
 	/** Приоритетная загрузка изображения (для первых карточек above-the-fold). */
 	priorityImage?: boolean;
 	className?: string;

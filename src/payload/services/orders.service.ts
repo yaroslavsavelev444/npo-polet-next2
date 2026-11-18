@@ -1,6 +1,6 @@
 // ─── Orders list & cancellation (append to existing file) ──────────────────
 
-import type { Where } from "payload";
+import type { PayloadRequest, Where } from "payload";
 import type { CheckoutSubmitInput } from "@/modules/checkout";
 import { composeAddressLine } from "@/modules/checkout/lib/address";
 import { resolveOrderContact } from "@/modules/orders/lib/order-contact";
@@ -31,6 +31,7 @@ export interface CreateOrderInput {
 	 * не было или он не применился.
 	 */
 	promo: PromoAcceptance | null;
+	req: Partial<PayloadRequest>;
 }
 
 export interface GetOrdersOptions {
@@ -258,6 +259,7 @@ export async function createOrderFromCheckout({
 	meta,
 	pricing,
 	promo,
+	req,
 }: CreateOrderInput) {
 	const payload = await getPayloadInstance();
 
@@ -311,6 +313,8 @@ export async function createOrderFromCheckout({
 
 	const order = await payload.create({
 		collection: "orders",
+		req,
+		context: { checkoutTransaction: true },
 		data: {
 			orderNumber: "",
 			user: Number(userId),
@@ -329,6 +333,8 @@ export async function createOrderFromCheckout({
 			},
 			delivery: {
 				method: form.delivery.method,
+				includeShippingInInvoice:
+					form.delivery.includeShippingInInvoice ?? false,
 				// Самовывоз адреса не имеет вовсе — пункт выдачи хранится связью.
 				address:
 					form.delivery.method === "self_pickup"

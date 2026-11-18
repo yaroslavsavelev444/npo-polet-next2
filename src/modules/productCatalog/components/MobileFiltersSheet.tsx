@@ -1,7 +1,11 @@
 "use client";
 
-import { useProductFilters } from "../hooks/useProductFilters";
-import { pluralizeProducts } from "../lib/catalogOptions";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useLayoutEffect, useState } from "react";
+import {
+	FilterDraftContext,
+	useProductFilters,
+} from "../hooks/useProductFilters";
 import type { CatalogFacets, PriceBounds } from "../types/filters";
 import styles from "./Catalog.module.css";
 import { CatalogSheet } from "./CatalogSheet";
@@ -12,25 +16,47 @@ interface Props {
 	onClose: () => void;
 	priceBounds: PriceBounds;
 	facets: CatalogFacets;
-	resultCount: number;
 }
 
-/**
- * Лист фильтров: на узком экране — нижний, на широком — боковой (там в него
- * уходят фасеты, которым не место в одной строке панели).
- *
- * Подвал листа несёт оба исхода сразу: «Сбросить» слева и «Показать N» во всю
- * оставшуюся ширину справа. Число в подписи — не украшение: оно обновляется по
- * мере кручения фильтров и отвечает на единственный вопрос, который держит
- * палец над кнопкой, — «а что там останется».
- */
-export function MobileFiltersSheet({
+/** Лист редактирует копию параметров до нажатия «Показать». */
+export function MobileFiltersSheet(props: Props) {
+	const router = useRouter();
+	const pathname = usePathname();
+	const appliedQuery = useSearchParams().toString();
+	const [draftQuery, setDraftQuery] = useState(appliedQuery);
+	const { open, onClose } = props;
+
+	useLayoutEffect(() => {
+		if (open) setDraftQuery(appliedQuery);
+	}, [open, appliedQuery]);
+
+	const hasChanges = draftQuery !== appliedQuery;
+	function applyFilters() {
+		if (hasChanges) {
+			const params = new URLSearchParams(draftQuery);
+			params.set("page", "1");
+			router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+		}
+		onClose();
+	}
+
+	return (
+		<FilterDraftContext
+			value={{ params: draftQuery, setParams: setDraftQuery }}
+		>
+			<FilterSheet {...props} onApply={applyFilters} showCounts={!hasChanges} />
+		</FilterDraftContext>
+	);
+}
+
+function FilterSheet({
 	open,
 	onClose,
 	priceBounds,
 	facets,
-	resultCount,
-}: Props) {
+	onApply,
+	showCounts,
+}: Props & { onApply: () => void; showCounts: boolean }) {
 	const { activeFiltersCount, resetFilters } = useProductFilters();
 
 	return (
@@ -57,13 +83,18 @@ export function MobileFiltersSheet({
 					>
 						Сбросить
 					</button>
-					<button type="button" onClick={onClose} className={styles.sheetApply}>
-						Показать {resultCount} {pluralizeProducts(resultCount)}
+					<button type="button" onClick={onApply} className={styles.sheetApply}>
+						Показать
 					</button>
 				</>
 			}
 		>
-			<FiltersPanel priceBounds={priceBounds} facets={facets} />
+			<FiltersPanel
+				key={open ? "open" : "closed"}
+				priceBounds={priceBounds}
+				facets={facets}
+				showCounts={showCounts}
+			/>
 		</CatalogSheet>
 	);
 }

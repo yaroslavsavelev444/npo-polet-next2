@@ -48,6 +48,8 @@ interface Props {
 	/** Идёт пересчёт корзины — показанные суммы относятся к прошлому составу. */
 	isStale: boolean;
 	isSubmitting: boolean;
+	attemptStatus: ReactNode;
+	hasPendingAttempt: boolean;
 	onSubmit: () => void;
 	errorEntries: CheckoutErrorEntry[];
 	/** Ошибка, не привязанная к полю: сеть, пустая корзина, отказ сервера. */
@@ -100,6 +102,8 @@ export function OrderSummaryPanel({
 	promoField,
 	isStale,
 	isSubmitting,
+	attemptStatus,
+	hasPendingAttempt,
 	onSubmit,
 	errorEntries,
 	formError,
@@ -315,40 +319,45 @@ export function OrderSummaryPanel({
 				</p>
 			)}
 
-			<button
-				type="button"
-				className={styles.cta}
-				// Кнопка НЕ блокируется при невалидной форме: заблокированная
-				// кнопка не объясняет, чего не хватает, и пользователь остаётся без
-				// обратной связи. Вместо этого нажатие показывает список ошибок и
-				// уводит к первому полю.
-				disabled={isSubmitting}
-				aria-busy={isSubmitting || undefined}
-				onClick={onSubmit}
-			>
-				{isSubmitting && (
-					<Loader2 size={16} aria-hidden className={styles.spin} />
-				)}
-				Подтвердить заказ
-			</button>
+			{attemptStatus}
+			{!hasPendingAttempt && (
+				<>
+					<button
+						type="button"
+						className={styles.cta}
+						// Кнопка НЕ блокируется при невалидной форме: заблокированная
+						// кнопка не объясняет, чего не хватает, и пользователь остаётся без
+						// обратной связи. Вместо этого нажатие показывает список ошибок и
+						// уводит к первому полю.
+						disabled={isSubmitting || isStale}
+						aria-busy={isSubmitting || undefined}
+						onClick={onSubmit}
+					>
+						{isSubmitting && (
+							<Loader2 size={16} aria-hidden className={styles.spin} />
+						)}
+						Подтвердить заказ
+					</button>
 
-			{/* Состояние отправки — отдельной живой областью, а не подменой
+					{/* Состояние отправки — отдельной живой областью, а не подменой
 			    подписи на кнопке: имя кнопки должно называть действие, а не
 			    рассказывать, что происходит. */}
-			<p role="status" className={styles.ctaNote}>
-				{isSubmitting ? (
-					"Создаём заказ — не закрывайте страницу"
-				) : (
-					<>
-						Нажимая кнопку, вы соглашаетесь с{" "}
-						<Link href="/consents" className={styles.ctaLink}>
-							условиями оферты
-						</Link>
-						. Деньги не списываются — менеджер свяжется с вами для
-						подтверждения.
-					</>
-				)}
-			</p>
+					<p role="status" className={styles.ctaNote}>
+						{isSubmitting ? (
+							"Создаём заказ…"
+						) : (
+							<>
+								Нажимая кнопку, вы соглашаетесь с{" "}
+								<Link href="/consents" className={styles.ctaLink}>
+									условиями оферты
+								</Link>
+								. Деньги не списываются — менеджер свяжется с вами для
+								подтверждения.
+							</>
+						)}
+					</p>
+				</>
+			)}
 		</div>
 	);
 }

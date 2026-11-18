@@ -15,7 +15,7 @@ interface SearchResultItemProps {
 	terms: string[];
 	isActive: boolean;
 	onHover: (key: string) => void;
-	onSelect: () => void;
+	onSelect: (key: string) => void;
 }
 
 /**
@@ -41,7 +41,7 @@ export function SearchResultItem({
 				aria-selected={isActive}
 				id={optionId(entryKey)}
 				tabIndex={-1}
-				onClick={onSelect}
+				onNavigate={() => onSelect(entryKey)}
 				onMouseMove={() => onHover(entryKey)}
 				className={cn(
 					"flex items-center gap-3 rounded-xl px-3 py-2 transition-colors duration-150",

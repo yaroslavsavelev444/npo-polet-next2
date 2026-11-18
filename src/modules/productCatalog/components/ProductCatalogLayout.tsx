@@ -86,11 +86,11 @@ export function ProductCatalogLayout({
 			</div>
 
 			<MobileFiltersSheet
+				key={categoryId}
 				open={mobileFiltersOpen}
 				onClose={() => setMobileFiltersOpen(false)}
 				priceBounds={priceBounds}
 				facets={facets}
-				resultCount={initialPage.totalDocs}
 			/>
 			<MobileSortSheet
 				open={mobileSortOpen}

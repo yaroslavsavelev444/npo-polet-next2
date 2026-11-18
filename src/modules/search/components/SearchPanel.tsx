@@ -1,7 +1,12 @@
 "use client";
 
 import { BookOpen, CircleHelp, Loader2, Package } from "lucide-react";
-import type { CSSProperties } from "react";
+import {
+	type CSSProperties,
+	type RefObject,
+	useLayoutEffect,
+	useRef,
+} from "react";
 import { toHighlightStems } from "@/modules/knowledge/lib/search";
 import { cn } from "@/utils/cn";
 import { SEARCH_MIN_QUERY_LENGTH, SEARCH_MORE_LIMIT } from "../constants";
@@ -29,7 +34,10 @@ interface SearchPanelProps {
 	search: ReturnType<typeof useSiteSearch>;
 	activeKey: string | null;
 	onHover: (key: string) => void;
-	onSelect: () => void;
+	onSelect: (key: string) => void;
+	onDismiss: () => void;
+	scrollRef: RefObject<HTMLDivElement | null>;
+	restoreScrollTop: number | null;
 	onLoadMore: (type: SearchResultType, offset: number) => void;
 	/** dropdown — под полем на desktop, sheet — мобильная панель на весь экран. */
 	variant: "dropdown" | "sheet";
@@ -57,6 +65,9 @@ export function SearchPanel({
 	activeKey,
 	onHover,
 	onSelect,
+	onDismiss,
+	scrollRef,
+	restoreScrollTop,
 	onLoadMore,
 	variant,
 	className,
@@ -81,6 +92,36 @@ export function SearchPanel({
 		!isOutdated &&
 		!isLoading;
 
+	const renderedCount = sections.reduce(
+		(count, section) => count + section.items.length,
+		0,
+	);
+	const applied = useRef(false);
+	useLayoutEffect(() => {
+		const viewport = scrollRef.current;
+		if (
+			applied.current ||
+			restoreScrollTop === null ||
+			!viewport ||
+			isOutdated ||
+			renderedCount === 0
+		)
+			return;
+		const selected = activeKey
+			? document.getElementById(optionId(activeKey))
+			: null;
+		if (!selected || !viewport.contains(selected)) return;
+		viewport.scrollTop = restoreScrollTop;
+		const offset =
+			selected.getBoundingClientRect().top -
+			viewport.getBoundingClientRect().top;
+		if (offset < 0) viewport.scrollTop += offset;
+		else if (offset + selected.offsetHeight > viewport.clientHeight)
+			viewport.scrollTop +=
+				offset + selected.offsetHeight - viewport.clientHeight;
+		applied.current = true;
+	}, [restoreScrollTop, scrollRef, activeKey, renderedCount, isOutdated]);
+
 	return (
 		<div
 			id={id}
@@ -98,6 +139,7 @@ export function SearchPanel({
 			style={style}
 		>
 			<div
+				ref={scrollRef}
 				className={cn(
 					"overflow-y-auto overscroll-contain p-2",
 					variant === "dropdown" ? "max-h-[min(70vh,40rem)]" : "h-full",
@@ -162,7 +204,7 @@ export function SearchPanel({
 						// результата, и отпускает фокус: иначе первая же клавиша
 						// снова раскрыла бы его поверх окна чата.
 						onAskManager={() => {
-							onSelect();
+							onDismiss();
 							if (document.activeElement instanceof HTMLElement)
 								document.activeElement.blur();
 						}}
@@ -203,7 +245,7 @@ interface SectionViewProps {
 	terms: string[];
 	activeKey: string | null;
 	onHover: (key: string) => void;
-	onSelect: () => void;
+	onSelect: (key: string) => void;
 	onLoadMore: (type: SearchResultType, offset: number) => void;
 	isLoadingMore: boolean;
 	loadMoreFailed: boolean;

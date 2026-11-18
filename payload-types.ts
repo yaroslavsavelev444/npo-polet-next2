@@ -172,11 +172,13 @@ export interface Config {
   fallbackLocale: ('false' | 'none' | 'null') | false | null | ('ru' | 'en') | ('ru' | 'en')[];
   globals: {
     settings: Setting;
+    'security-solutions': SecuritySolution;
     'alerting-settings': AlertingSetting;
     'support-settings': SupportSetting;
   };
   globalsSelect: {
     settings: SettingsSelect<false> | SettingsSelect<true>;
+    'security-solutions': SecuritySolutionsSelect<false> | SecuritySolutionsSelect<true>;
     'alerting-settings': AlertingSettingsSelect<false> | AlertingSettingsSelect<true>;
     'support-settings': SupportSettingsSelect<false> | SupportSettingsSelect<true>;
   };
@@ -603,6 +605,7 @@ export interface Order {
     contactPerson?: string | null;
   };
   delivery: {
+    includeShippingInInvoice?: boolean | null;
     method: 'door_to_door' | 'pickup_point' | 'self_pickup';
     address?: {
       /**
@@ -2694,6 +2697,7 @@ export interface OrdersSelect<T extends boolean = true> {
   delivery?:
     | T
     | {
+        includeShippingInInvoice?: T;
         method?: T;
         address?:
           | T
@@ -3848,6 +3852,19 @@ export interface Setting {
   createdAt?: string | null;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "security-solutions".
+ */
+export interface SecuritySolution {
+  id: number;
+  /**
+   * Выберите товары из каталога. На сайте они появятся в порядке списка. Удаление из подборки не удаляет товар из каталога.
+   */
+  products?: (number | Product)[] | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * Журнал ошибок пишется всегда и этими настройками не управляется. Здесь — только то, какие ошибки приходят письмом на адрес из переменной ERROR_ALERT_EMAIL.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -4048,6 +4065,16 @@ export interface SettingsSelect<T extends boolean = true> {
         description?: T;
         keywords?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "security-solutions_select".
+ */
+export interface SecuritySolutionsSelect<T extends boolean = true> {
+  products?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

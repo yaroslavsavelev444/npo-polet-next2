@@ -1,5 +1,6 @@
 import { sql } from "@payloadcms/db-postgres";
 import type { Payload } from "payload";
+import type { TransactionDatabase } from "./transaction.db.ts";
 
 /**
  * Низкоуровневые операции над активациями промокодов.
@@ -11,7 +12,7 @@ import type { Payload } from "payload";
  * цепочке тянет за собой рантайм Next и роняет CLI. У хука экземпляр
  * `req.payload` и так под рукой, так что аргумент здесь ничего не усложняет.
  *
- * Обёртки, работающие с глобальным экземпляром, живут в promo-codes.service.
+ * Резерв и привязка выполняются через соединение транзакции оформления.
  */
 
 type DrizzleRows = { rows?: Record<string, unknown>[] };
@@ -50,14 +51,14 @@ export interface ReservePromoCodeInput {
  * @returns id записи журнала или null, если лимит исчерпан.
  */
 export async function reserveRedemption(
-	payload: Payload,
+	db: TransactionDatabase,
 	input: ReservePromoCodeInput,
 ): Promise<string | null> {
 	const promoCodeId = Number(input.promoCodeId);
 	const userId = Number(input.userId);
 	const amount = input.discountAmount;
 
-	const result = (await payload.db.drizzle.execute(sql`
+	const result = (await db.execute(sql`
 		WITH user_uses AS (
 			SELECT COUNT(*)::int AS cnt
 			FROM promo_code_redemptions
@@ -90,45 +91,14 @@ export async function reserveRedemption(
 
 /** Привязывает уже зарезервированную активацию к созданному заказу. */
 export async function attachRedemptionToOrder(
-	payload: Payload,
+	db: TransactionDatabase,
 	redemptionId: string,
 	orderId: string,
 ): Promise<void> {
-	await payload.db.drizzle.execute(sql`
+	await db.execute(sql`
 		UPDATE promo_code_redemptions
 		SET order_id = ${Number(orderId)}, updated_at = now()
 		WHERE id = ${Number(redemptionId)}
-	`);
-}
-
-/**
- * Снимает резерв активации, не дошедший до заказа.
- *
- * Нужен ровно для одного случая: активацию списали, а создание заказа упало.
- * Без него такой сбой навсегда «съедал» бы одну активацию промокода — и у
- * кода с лимитом в 100 штук лимит тихо таял бы при каждой ошибке базы.
- */
-export async function revokeRedemptionById(
-	payload: Payload,
-	redemptionId: string,
-	reason: string,
-): Promise<void> {
-	await payload.db.drizzle.execute(sql`
-		WITH revoked AS (
-			UPDATE promo_code_redemptions
-			SET status = 'revoked',
-			    revoked_at = now(),
-			    revoke_reason = ${reason},
-			    updated_at = now()
-			WHERE id = ${Number(redemptionId)} AND status = 'applied'
-			RETURNING promo_code_id, discount_amount
-		)
-		UPDATE promo_codes p
-		SET total_uses = GREATEST(COALESCE(p.total_uses, 0) - 1, 0),
-		    total_discount_amount = GREATEST(COALESCE(p.total_discount_amount, 0) - r.discount_amount, 0),
-		    updated_at = now()
-		FROM revoked r
-		WHERE p.id = r.promo_code_id
 	`);
 }
 

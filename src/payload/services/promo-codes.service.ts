@@ -1,16 +1,9 @@
+import type { PayloadRequest } from "payload";
 import type { Category, Product, PromoCode } from "../../../payload-types";
 import { normalizePromoCode } from "../../modules/promo/lib/promo-code.ts";
 import type { PromoCodeRule } from "../../modules/promo/types.ts";
 import { getPayloadInstance } from "./getPayload.ts";
-import {
-	attachRedemptionToOrder as attachToOrder,
-	type ReservePromoCodeInput,
-	reserveRedemption,
-	revokeRedemptionById as revokeById,
-	revokeRedemptionsForOrder as revokeForOrder,
-} from "./promo-redemptions.db.ts";
-
-export type { ReservePromoCodeInput };
+import { revokeRedemptionsForOrder as revokeForOrder } from "./promo-redemptions.db.ts";
 
 function toNumber(value: unknown): number {
 	const n = Number(value);
@@ -76,6 +69,7 @@ export function toPromoCodeRule(doc: PromoCode): PromoCodeRule {
  */
 export async function findPromoCodeByCode(
 	rawCode: string,
+	req?: Partial<PayloadRequest>,
 ): Promise<PromoCode | null> {
 	const code = normalizePromoCode(rawCode);
 	if (code === "") return null;
@@ -87,6 +81,7 @@ export async function findPromoCodeByCode(
 		limit: 1,
 		depth: 0,
 		overrideAccess: true,
+		req,
 	});
 
 	return (docs[0] as unknown as PromoCode) ?? null;
@@ -96,6 +91,7 @@ export async function findPromoCodeByCode(
 export async function countUserRedemptions(
 	promoCodeId: string,
 	userId: string,
+	req?: Partial<PayloadRequest>,
 ): Promise<number> {
 	const payload = await getPayloadInstance();
 	const { totalDocs } = await payload.find({
@@ -110,6 +106,7 @@ export async function countUserRedemptions(
 		limit: 0,
 		depth: 0,
 		overrideAccess: true,
+		req,
 	});
 	return totalDocs;
 }
@@ -126,46 +123,18 @@ export interface PromoCodeLookup {
 export async function loadPromoCodeLookup(
 	rawCode: string,
 	userId: string,
+	req?: Partial<PayloadRequest>,
 ): Promise<PromoCodeLookup | null> {
-	const doc = await findPromoCodeByCode(rawCode);
+	const doc = await findPromoCodeByCode(rawCode, req);
 	if (!doc) return null;
 
 	const rule = toPromoCodeRule(doc);
 	const userRedemptions =
 		rule.maxUsesPerUser === null
 			? 0
-			: await countUserRedemptions(rule.id, userId);
+			: await countUserRedemptions(rule.id, userId, req);
 
 	return { rule, userRedemptions };
-}
-
-// ── Обёртки над операциями журнала активаций ────────────────────────────────
-//
-// Сама SQL-логика живёт в promo-redemptions.db.ts и принимает экземпляр
-// Payload аргументом (там же объяснено, почему). Здесь — удобный фасад для
-// серверных действий, у которых своего экземпляра нет.
-
-export async function reservePromoCodeRedemption(
-	input: ReservePromoCodeInput,
-): Promise<string | null> {
-	const payload = await getPayloadInstance();
-	return reserveRedemption(payload, input);
-}
-
-export async function attachRedemptionToOrder(
-	redemptionId: string,
-	orderId: string,
-): Promise<void> {
-	const payload = await getPayloadInstance();
-	return attachToOrder(payload, redemptionId, orderId);
-}
-
-export async function revokePromoCodeRedemptionById(
-	redemptionId: string,
-	reason: string,
-): Promise<void> {
-	const payload = await getPayloadInstance();
-	return revokeById(payload, redemptionId, reason);
 }
 
 export async function revokePromoCodeRedemptionsForOrder(

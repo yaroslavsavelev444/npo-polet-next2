@@ -10,17 +10,6 @@ import { RangeFilter } from "./RangeFilter";
 /** Сколько фасетов раскрыто сразу — остальные свёрнуты до заголовка. */
 const OPEN_BY_DEFAULT = 4;
 
-function isActive(facet: SpecFacet): boolean {
-	return facet.kind === "list"
-		? facet.values.some((value) => value.selected)
-		: facet.selectedMin !== undefined || facet.selectedMax !== undefined;
-}
-
-function activeCount(facet: SpecFacet): number {
-	if (facet.kind === "range") return isActive(facet) ? 1 : 0;
-	return facet.values.filter((value) => value.selected).length;
-}
-
 /**
  * Фасеты по характеристикам раздела — в порядке, который отдал сервер
  * (словарь раздела, затем охват товаров), разложенные по группам
@@ -31,8 +20,18 @@ function activeCount(facet: SpecFacet): number {
  * десятка, и раскрытые все сразу превратили бы лист в ленту на несколько
  * экранов. Первые несколько и все, где что-то выбрано, раскрыты.
  */
-export function SpecFacets({ facets }: { facets: SpecFacet[] }) {
-	const { toggleSpecValue, debouncedSetSpecRange } = useProductFilters();
+export function SpecFacets({
+	facets,
+	showCounts,
+}: {
+	facets: SpecFacet[];
+	showCounts: boolean;
+}) {
+	const {
+		facets: selection,
+		toggleSpecValue,
+		debouncedSetSpecRange,
+	} = useProductFilters();
 
 	const sections: { group: string | null; items: SpecFacet[] }[] = [];
 	for (const facet of facets) {
@@ -48,8 +47,15 @@ export function SpecFacets({ facets }: { facets: SpecFacet[] }) {
 				<section key={section.group ?? ""} className={styles.facetSection}>
 					<h3 className={styles.micro}>{section.group ?? "Характеристики"}</h3>
 					{section.items.map((facet) => {
-						const open = index++ < OPEN_BY_DEFAULT || isActive(facet);
-						const count = activeCount(facet);
+						const selected = selection.specs[facet.key];
+						const values = selected?.values ?? [];
+						const count =
+							facet.kind === "list"
+								? values.length
+								: Number(
+										selected?.min !== undefined || selected?.max !== undefined,
+									);
+						const open = index++ < OPEN_BY_DEFAULT || count > 0;
 						return (
 							<details key={facet.key} open={open} className={styles.facet}>
 								<summary className={styles.facetSummary}>
@@ -68,15 +74,19 @@ export function SpecFacets({ facets }: { facets: SpecFacet[] }) {
 										<FacetList
 											legend={facet.label}
 											showLegend={false}
-											values={facet.values}
+											values={facet.values.map((value) => ({
+												...value,
+												selected: values.includes(value.value),
+											}))}
 											onToggle={(value) => toggleSpecValue(facet.key, value)}
+											showCounts={showCounts}
 										/>
 									) : (
 										<RangeFilter
 											min={facet.min}
 											max={facet.max}
-											from={facet.selectedMin}
-											to={facet.selectedMax}
+											from={selected?.min}
+											to={selected?.max}
 											step={rangeStep(facet.min, facet.max)}
 											suffix={facet.unit ?? undefined}
 											format={(value) => formatFacetNumber(value, facet.unit)}

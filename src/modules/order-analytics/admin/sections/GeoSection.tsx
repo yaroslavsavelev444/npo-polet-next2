@@ -7,14 +7,7 @@ import styles from "../analytics.module.css";
 import { BarList, Delta, StatTile, TipRow } from "../charts";
 import { int, money, moneyCompact, pct } from "../format";
 import { useAnalyticsData } from "../useAnalyticsData";
-import {
-	Card,
-	Frame,
-	Note,
-	type SectionProps,
-	Segmented,
-	usePeriodReport,
-} from "./shared";
+import { Card, Frame, Note, type SectionProps, Segmented } from "./shared";
 
 type GeoMetric = "orders" | "revenue";
 
@@ -29,21 +22,21 @@ export function GeoSection({
 	params,
 	reloadKey,
 	setParams,
-	searchParams,
-	onPeriod,
+	onReport,
+	describeReport,
 }: SectionProps) {
-	const { data, error, loading } = useAnalyticsData("geo", params, reloadKey);
-	usePeriodReport(data?.period, onPeriod);
+	const report = useAnalyticsData("geo", params, reloadKey);
+	const { data, shownParams } = report;
 	const [metric, setMetric] = useState<GeoMetric>("orders");
 
 	return (
-		<Frame loading={loading} error={error} hasData={Boolean(data)}>
+		<Frame {...report} describeReport={describeReport} onReport={onReport}>
 			{data && (
 				<Geo
 					data={data}
 					metric={metric}
 					setMetric={setMetric}
-					region={searchParams.get("region")}
+					region={shownParams?.get("region") ?? null}
 					setParams={setParams}
 				/>
 			)}

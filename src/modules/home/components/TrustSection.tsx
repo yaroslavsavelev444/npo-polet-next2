@@ -1,4 +1,4 @@
-import { ArrowRight, ExternalLink, FileText, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import Link from "next/link";
 import { REVIEW_AUTHOR_LABEL } from "@/modules/reviews/lib/format";
 import type { HomepageReview } from "@/payload/services/reviews.service";
@@ -6,6 +6,7 @@ import { Reveal } from "@/shared/components/motion/Reveal";
 import { trust } from "../content/home-content";
 import type { HomeDocumentLink } from "../lib/documents";
 import { Container, Placeholder, Section } from "./primitives";
+import { TrustDocuments } from "./TrustDocuments";
 
 /**
  * Доверие: документы, отзывы, география.
@@ -43,23 +44,12 @@ export function TrustSection({
 				<div className="grid gap-px bg-[var(--rule)] lg:grid-cols-3">
 					{/* ── Документы ─────────────────────────────────────────── */}
 					<Reveal className="bg-[var(--background)] p-[clamp(1.5rem,2.5vw,2rem)]">
-						<TrustColumnHead
+						<TrustDocuments
 							title={trust.documents.title}
 							lead={trust.documents.lead}
+							documents={documents}
+							emptyMessage={trust.documents.emptyMessage}
 						/>
-						{documents.length === 0 ? (
-							<p className="mt-6 text-[0.875rem] text-[var(--text-muted)]">
-								{trust.documents.emptyMessage}
-							</p>
-						) : (
-							<ul className="mt-6 flex list-none flex-col gap-0 p-0">
-								{documents.map((doc) => (
-									<li key={doc.id}>
-										<DocumentLink document={doc} />
-									</li>
-								))}
-							</ul>
-						)}
 					</Reveal>
 
 					{/* ── Отзывы ────────────────────────────────────────────── */}
@@ -147,88 +137,6 @@ export function TrustSection({
 				</div>
 			</Container>
 		</Section>
-	);
-}
-
-/**
- * Строка документа: кликабельна целиком.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * ПОЧЕМУ ССЫЛКА — ЭТО ВСЯ СТРОКА
- * ────────────────────────────────────────────────────────────────────────────
- * Раньше это был просто текст в <li>, и «сертификат» ничем не отличался от
- * подписи под картинкой. Теперь ссылкой служит вся строка целиком, а не
- * название внутри неё: цель нажатия на телефоне должна быть шириной в
- * колонку, а не в длину слова.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * ЧЕМ ОТКРЫВАЕТСЯ
- * ────────────────────────────────────────────────────────────────────────────
- * Внутренний путь — обычным переходом (next/link, предзагрузка, без потери
- * истории). Файл и внешний адрес — в новой вкладке: посетитель, открывший
- * сертификат, не должен терять место на длинной главной странице, к которой
- * он почти наверняка вернётся. `rel="noopener noreferrer"` обязателен для
- * чужого домена: без `noopener` открытая страница получает доступ к
- * `window.opener` и может подменить нашу вкладку.
- *
- * Внешние ссылки помечены значком — уход на другой сайт не должен быть
- * неожиданностью; у файлов вместо него формат и размер.
- */
-function DocumentLink({ document }: { document: HomeDocumentLink }) {
-	const className =
-		"group flex items-center gap-3 border-b border-[var(--hairline)] py-3 no-underline transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--text-primary)_4%,transparent)]";
-
-	const body = (
-		<>
-			<FileText
-				className="size-4 shrink-0 text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--primary)]"
-				aria-hidden="true"
-			/>
-			{/* Очень длинное название не ломает раскладку: оно переносится, а
-			    подпись формата остаётся прижатой к правому краю (shrink-0). */}
-			<span className="min-w-0 flex-1 text-[0.9375rem] leading-snug text-[var(--text-secondary)] transition-colors duration-200 group-hover:text-[var(--text-primary)]">
-				{document.title}
-			</span>
-			<span className="u-mono flex shrink-0 items-center gap-1.5 text-[0.625rem] text-[var(--text-muted)]">
-				{document.meta}
-				{document.kind === "external" && (
-					<ExternalLink className="size-3" aria-hidden="true" />
-				)}
-			</span>
-		</>
-	);
-
-	// Внутренний путь — обычная навигация, без новой вкладки: это своя же
-	// страница, и история переходов должна остаться целой.
-	if (document.kind === "internal") {
-		return (
-			<Link href={document.href} className={className}>
-				{body}
-			</Link>
-		);
-	}
-
-	// Подпись для скринридера: «PDF · 1,2 МБ» рядом с названием он прочитает
-	// как часть фразы, а вот то, что ссылка уводит на другой сайт или скачает
-	// файл, из текста строки не следует.
-	const hint =
-		document.kind === "external"
-			? " — откроется на другом сайте"
-			: document.shouldDownload
-				? " — скачать файл"
-				: " — откроется в новой вкладке";
-
-	return (
-		<a
-			href={document.href}
-			className={className}
-			target="_blank"
-			rel="noopener noreferrer"
-			{...(document.shouldDownload ? { download: "" } : {})}
-			aria-label={`${document.title}${hint}`}
-		>
-			{body}
-		</a>
 	);
 }
 

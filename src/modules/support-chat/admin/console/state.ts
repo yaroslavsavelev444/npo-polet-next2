@@ -2,8 +2,10 @@ import type {
 	AgentPresenceDTO,
 	CannedSuggestionDTO,
 	StaffConversationDTO,
+	SupportAttachmentDTO,
 	SupportMessageDTO,
 } from "../../lib/events";
+import type { StaffMessageSendInput } from "../../lib/schemas";
 
 /**
  * Состояние консоли — чистый редьюсер, без сокета и DOM. Сокет только
@@ -17,10 +19,9 @@ import type {
 export type StaffTab = "mine" | "queue" | "open" | "snoozed" | "resolved";
 
 export interface PendingMessage {
-	clientMessageId: string;
-	conversationId: number;
-	body: string;
-	kind: "text" | "note";
+	input: StaffMessageSendInput;
+	attachments: Pick<SupportAttachmentDTO, "id" | "filename">[];
+	documents: { id: number; title: string }[];
 	error: string | null;
 }
 
@@ -84,6 +85,7 @@ export type ConsoleAction =
 	  }
 	| { type: "messages"; messages: SupportMessageDTO[] }
 	| { type: "pending"; message: PendingMessage }
+	| { type: "pendingRetry"; clientMessageId: string }
 	| { type: "pendingFailed"; clientMessageId: string; error: string }
 	| { type: "pendingDrop"; clientMessageId: string }
 	| {
@@ -174,6 +176,15 @@ function mergeMessages(
 	return [...byId.values()].sort((a, b) => a.seq - b.seq);
 }
 
+function removeDelivered(
+	pending: PendingMessage[],
+	messages: SupportMessageDTO[],
+) {
+	if (!pending.length || !messages.length) return pending;
+	const delivered = new Set(messages.map((message) => message.clientMessageId));
+	return pending.filter((item) => !delivered.has(item.input.clientMessageId));
+}
+
 export function reducer(
 	state: ConsoleState,
 	action: ConsoleAction,
@@ -227,6 +238,7 @@ export function reducer(
 					[c.id]: mergeMessages(undefined, action.messages),
 				},
 				hasMore: { ...state.hasMore, [c.id]: action.hasMore },
+				pending: removeDelivered(state.pending, action.messages),
 			};
 		}
 
@@ -241,11 +253,11 @@ export function reducer(
 					),
 				},
 				hasMore: { ...state.hasMore, [action.conversationId]: action.hasMore },
+				pending: removeDelivered(state.pending, action.messages),
 			};
 
 		case "messages": {
 			const messages = { ...state.messages };
-			let pending = state.pending;
 			for (const m of action.messages) {
 				// Ленту диалога, который ещё не открывали, не заводим: при открытии
 				// придёт целая страница.
@@ -255,24 +267,27 @@ export function reducer(
 						[m],
 					);
 				}
-				if (m.clientMessageId) {
-					pending = pending.filter(
-						(p) => p.clientMessageId !== m.clientMessageId,
-					);
-				}
 			}
-			return { ...state, messages, pending };
+			return {
+				...state,
+				messages,
+				pending: removeDelivered(state.pending, action.messages),
+			};
 		}
 
 		case "pending":
 			return { ...state, pending: [...state.pending, action.message] };
 
+		case "pendingRetry":
 		case "pendingFailed":
 			return {
 				...state,
 				pending: state.pending.map((p) =>
-					p.clientMessageId === action.clientMessageId
-						? { ...p, error: action.error }
+					p.input.clientMessageId === action.clientMessageId
+						? {
+								...p,
+								error: action.type === "pendingFailed" ? action.error : null,
+							}
 						: p,
 				),
 			};
@@ -281,7 +296,7 @@ export function reducer(
 			return {
 				...state,
 				pending: state.pending.filter(
-					(p) => p.clientMessageId !== action.clientMessageId,
+					(p) => p.input.clientMessageId !== action.clientMessageId,
 				),
 			};
 

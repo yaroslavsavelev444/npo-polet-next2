@@ -9,7 +9,15 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+	useTransition,
+} from "react";
 import { trackPurchase } from "@/modules/analytics/ecommerce";
 import { openAuthOverlay } from "@/modules/auth/store/auth-overlay.store";
 import { useCartPanel } from "@/modules/cart/store/cart-panel.store";
@@ -18,9 +26,21 @@ import type { PromoApplyPreview } from "@/modules/promo";
 import { PromoCodeField } from "@/modules/promo";
 import { PageContainer } from "@/shared/components/PageContainer";
 import { appToast } from "@/shared/lib/toast";
-import { submitOrderAction } from "../actions/checkout.actions";
+import {
+	resolveCheckoutAttemptAction,
+	submitOrderAction,
+} from "../actions/checkout.actions";
 import { useCheckoutValidation } from "../hooks/useCheckoutValidation";
-import { normalizeAddress } from "../lib/address";
+import {
+	CHECKOUT_ATTEMPT_PARAM,
+	getCheckoutCartKey,
+} from "../lib/checkout-attempt";
+import {
+	type CheckoutDraft,
+	getCheckoutDefaults,
+	readCheckoutDraft,
+	writeCheckoutDraft,
+} from "../lib/checkout-draft";
 import {
 	buildErrorEntries,
 	CHECKOUT_FIELDS,
@@ -35,16 +55,18 @@ import {
 	getDefaultPaymentMethod,
 	isPaymentMethodCompatible,
 } from "../lib/payment-compatibility";
-import { formatRuPhoneInput, normalizeRuPhone } from "../lib/phone";
+import { normalizeRuPhone } from "../lib/phone";
 import type {
-	CheckoutCompanyInput,
-	CheckoutContactsFormValue,
 	CheckoutDeliveryInput,
-	CheckoutPaymentMethod,
+	CheckoutReceipt,
 	CheckoutSubmitInput,
 	CheckoutView,
 } from "../types";
 import styles from "./Checkout.module.css";
+import {
+	CheckoutAttemptStatus,
+	type CheckoutRecovery,
+} from "./CheckoutAttemptStatus";
 import { CheckoutDock } from "./CheckoutDock";
 import { CheckoutHero } from "./CheckoutHero";
 import { CheckoutSection, type CheckoutSectionState } from "./CheckoutSection";
@@ -58,6 +80,7 @@ import { PaymentSection } from "./PaymentSection";
 
 interface CheckoutPageClientProps {
 	initialView: CheckoutView;
+	pendingAttempt: string | null;
 	user: { name: string; email: string };
 	/** id покупателя — нужен стору корзины, чтобы отличить сессию от гостевой. */
 	userId: string;
@@ -73,8 +96,7 @@ interface CheckoutPageClientProps {
  * ════════════════════════════════════════════════════════════════════════════
  * ОТКУДА БЕРУТСЯ ДАННЫЕ И КТО ЗДЕСЬ ИСТОЧНИК ПРАВДЫ
  * ════════════════════════════════════════════════════════════════════════════
- * Форма (контакты, доставка, оплата) живёт в состоянии этой страницы и нигде
- * больше — черновик намеренно не сохраняется.
+ * Поля формы сохраняются в черновике текущего покупателя в этой вкладке.
  *
  * СОСТАВ ЗАКАЗА живёт в общем сторе корзины, а не в снимке с сервера. Разница
  * принципиальная: покупатель может изменить количество прямо здесь, поправить
@@ -103,6 +125,7 @@ interface CheckoutPageClientProps {
  */
 export function CheckoutPageClient({
 	initialView,
+	pendingAttempt,
 	user,
 	userId,
 	cartOnboardingSeen,
@@ -136,56 +159,55 @@ export function CheckoutPageClient({
 	const cart = storeView ?? initialView.cart;
 
 	// ── Состояние формы ─────────────────────────────────────────────────────
-	const [contacts, setContacts] = useState<CheckoutContactsFormValue>(() => {
-		const saved = initialView.savedRecipient;
-		// Телефоны подставляются ТОЛЬКО из предпочтений, сохранённых уже после
-		// разделения номеров (признак — заполненный customerPhone). У более
-		// старых предпочтений известен один номер неизвестной принадлежности:
-		// подставить его как «ваш телефон» значило бы с высокой вероятностью
-		// снова направить менеджера на получателя — то есть вернуть ту самую
-		// ошибку, ради которой номера и разделили.
-		const restorePhones = Boolean(saved?.customerPhone);
-		const recipientPhone = restorePhones ? (saved?.recipientPhone ?? "") : "";
-
-		return {
-			// ФИО НЕ подставляется из аккаунта — пользователь вводит получателя
-			// вручную, либо оно приходит из ранее сохранённых (и уже
-			// провалидированных) данных.
-			fullName: saved?.fullName ?? "",
-			email: saved?.email ?? user.email ?? "",
-			customerPhone: restorePhones
-				? formatRuPhoneInput(saved?.customerPhone ?? "")
-				: "",
-			recipientPhone: formatRuPhoneInput(recipientPhone),
-			hasSeparateRecipient: recipientPhone !== "",
-			// Безопасное значение по умолчанию: пока покупатель не выбрал иного,
-			// звонить нужно тому, кто оформляет заказ и точно о нём знает.
-			callPreference: "customer",
-			saveRecipient: Boolean(saved),
-		};
-	});
-
-	const [delivery, setDelivery] = useState<CheckoutDeliveryInput>(() => ({
-		method: initialView.savedDelivery?.method ?? "self_pickup",
-		address: normalizeAddress(initialView.savedDelivery?.address),
-		transportCompanyId: initialView.savedDelivery?.transportCompanyId,
-		pickupPointId: initialView.savedDelivery?.pickupPointId,
-		notes: "",
-		saveAddress: Boolean(initialView.savedDelivery),
-	}));
-
-	const [company, setCompany] = useState<CheckoutCompanyInput>({
-		isCompany: false,
-		saveCompany: false,
-	});
-
-	const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>(
-		() =>
-			getDefaultPaymentMethod(
-				initialView.savedDelivery?.method ?? "self_pickup",
-			),
+	const [draft, setDraft] = useState(() =>
+		getCheckoutDefaults(initialView, user.email),
 	);
-	const [notes, setNotes] = useState("");
+	const draftRef = useRef(draft);
+	const draftLoadedRef = useRef(false);
+	const draftClosedRef = useRef(false);
+	const [hasDraft, setHasDraft] = useState(false);
+	const [draftStatus, setDraftStatus] = useState("");
+	const [draftVersion, setDraftVersion] = useState(0);
+	const {
+		contacts,
+		delivery,
+		company,
+		paymentMethod,
+		notes,
+		addressManualMode,
+	} = draft;
+
+	useLayoutEffect(() => {
+		if (draftLoadedRef.current) return;
+		draftLoadedRef.current = true;
+
+		const restored = readCheckoutDraft(userId, initialView);
+		if (restored) {
+			draftRef.current = restored;
+			setDraft(restored);
+			setHasDraft(true);
+			setDraftStatus("Черновик восстановлен");
+			setDraftVersion((version) => version + 1);
+		}
+	}, [userId, initialView]);
+
+	const updateDraft = useCallback(
+		(changes: Partial<CheckoutDraft>) => {
+			if (draftClosedRef.current) return;
+			const next = { ...draftRef.current, ...changes };
+			draftRef.current = next;
+			setDraft(next);
+			setHasDraft(true);
+			setDraftStatus("");
+			writeCheckoutDraft(userId, next);
+		},
+		[userId],
+	);
+	const handleAddressManualModeChange = useCallback(
+		(manualMode: boolean) => updateDraft({ addressManualMode: manualMode }),
+		[updateDraft],
+	);
+
 	/**
 	 * Применённый промокод.
 	 *
@@ -199,11 +221,6 @@ export function CheckoutPageClient({
 	// бизнес-логики. Живёт отдельно от ошибок полей, потому что исправляется
 	// не правкой формы, а повторной попыткой.
 	const [formError, setFormError] = useState<string | null>(null);
-	const [addressManualMode, setAddressManualMode] = useState(
-		// Подсказки не настроены — сразу показываем поля ручного ввода, чтобы
-		// пользователь не искал, куда вводить адрес.
-		!initialView.addressSuggestionsEnabled,
-	);
 
 	/**
 	 * Полезная нагрузка ровно в том виде, в каком она уйдёт на сервер. Именно
@@ -268,15 +285,7 @@ export function CheckoutPageClient({
 	 * любое изменение любой из этих величин делает показанную скидку скидкой
 	 * от корзины, которой больше нет.
 	 */
-	const cartKey = useMemo(
-		() =>
-			[
-				cart.summary.priceWithoutDiscount,
-				cart.summary.totalPrice,
-				...cart.items.map((item) => `${item.product.id}x${item.quantity}`),
-			].join("|"),
-		[cart],
-	);
+	const cartKey = useMemo(() => getCheckoutCartKey(cart), [cart]);
 
 	// Суммы пересчитываются — показанные относятся к прошлому состоянию, и
 	// молчать об этом нельзя.
@@ -334,14 +343,29 @@ export function CheckoutPageClient({
 
 	const handleDeliveryChange = useCallback(
 		(next: CheckoutDeliveryInput) => {
-			setDelivery(next);
+			const currentPayment = draftRef.current.paymentMethod;
+			updateDraft({
+				delivery: next,
+				paymentMethod: isPaymentMethodCompatible(next.method, currentPayment)
+					? currentPayment
+					: getDefaultPaymentMethod(next.method),
+			});
 			setFormError(null);
-			if (!isPaymentMethodCompatible(next.method, paymentMethod)) {
-				setPaymentMethod(getDefaultPaymentMethod(next.method));
-			}
 		},
-		[paymentMethod],
+		[updateDraft],
 	);
+
+	function resetDraft() {
+		const defaults = getCheckoutDefaults(initialView, user.email);
+		draftRef.current = defaults;
+		setDraft(defaults);
+		setDraftVersion((version) => version + 1);
+		setHasDraft(false);
+		setDraftStatus("Черновик сброшен");
+		setFormError(null);
+		validation.reset();
+		writeCheckoutDraft(userId, null);
+	}
 
 	const handlePromoChange = useCallback((next: PromoApplyPreview | null) => {
 		setPromo(next);
@@ -354,6 +378,10 @@ export function CheckoutPageClient({
 	// useTransition обновляет isSubmitting асинхронно, поэтому одного флага
 	// состояния мало — нужен синхронный барьер.
 	const inFlightRef = useRef(false);
+	const attemptRef = useRef(pendingAttempt);
+	const [recovery, setRecovery] = useState<CheckoutRecovery>(
+		pendingAttempt ? { state: "checking" } : { state: "idle" },
+	);
 	const [summaryFocusToken, setSummaryFocusToken] = useState(0);
 	const summaryRef = useRef<HTMLDivElement | null>(null);
 
@@ -371,9 +399,97 @@ export function CheckoutPageClient({
 		setSummaryFocusToken((token) => token + 1);
 	}
 
-	function handleSubmit() {
-		if (inFlightRef.current || isSubmitting) return;
+	const updateAttempt = useCallback((id: string | null) => {
+		attemptRef.current = id;
+		const url = new URL(window.location.href);
+		if (id) url.searchParams.set(CHECKOUT_ATTEMPT_PARAM, id);
+		else url.searchParams.delete(CHECKOUT_ATTEMPT_PARAM);
+		window.history.replaceState(null, "", url);
+	}, []);
 
+	const finishCheckout = useCallback(
+		(receipt: CheckoutReceipt) => {
+			draftClosedRef.current = true;
+			writeCheckoutDraft(userId, null);
+			const { orderNumber, purchase } = receipt;
+			const key = `checkout:seen:${orderNumber}`;
+			let seen = false;
+			try {
+				seen = window.sessionStorage.getItem(key) !== null;
+				window.sessionStorage.setItem(key, "1");
+			} catch {
+				// Метрика также объединяет события по номеру заказа.
+			}
+			if (!seen) {
+				trackPurchase(purchase);
+				appToast.success(`Заказ №${orderNumber} оформлен`);
+				markOrderJustCreated(orderNumber);
+			}
+			setRecovery({ state: "complete", orderNumber });
+			router.replace(`/orders/${encodeURIComponent(orderNumber)}`);
+		},
+		[router, userId],
+	);
+
+	const checkAttempt = useCallback(() => {
+		const attempt = attemptRef.current;
+		if (!attempt || inFlightRef.current) return;
+
+		inFlightRef.current = true;
+		setRecovery({ state: "checking" });
+		startSubmitting(async () => {
+			try {
+				const result = await resolveCheckoutAttemptAction(attempt, userId);
+				if (result.state === "created") {
+					finishCheckout(result.receipt);
+					return;
+				}
+
+				inFlightRef.current = false;
+				if (result.state === "auth_required") {
+					setRecovery({ state: "auth" });
+					return;
+				}
+
+				updateAttempt(null);
+				setRecovery(
+					result.state === "removed"
+						? { state: "removed", orderNumber: result.orderNumber }
+						: { state: "closed" },
+				);
+				void refreshCart({ silent: true });
+			} catch {
+				inFlightRef.current = false;
+				setRecovery({ state: "unknown" });
+			}
+		});
+	}, [finishCheckout, refreshCart, updateAttempt, userId]);
+
+	useEffect(() => {
+		if (pendingAttempt) checkAttempt();
+	}, [checkAttempt, pendingAttempt]);
+
+	useEffect(() => {
+		if (recovery.state !== "unknown") return;
+		window.addEventListener("online", checkAttempt);
+		return () => window.removeEventListener("online", checkAttempt);
+	}, [checkAttempt, recovery.state]);
+
+	function signInToCheckAttempt() {
+		openAuthOverlay({
+			reason: "Войдите в аккаунт, чтобы проверить, оформился ли заказ.",
+			returnPath: window.location.pathname + window.location.search,
+			onSuccess: (accountId) => {
+				if (accountId === userId) checkAttempt();
+			},
+		});
+	}
+
+	function handleSubmit() {
+		if (inFlightRef.current || isSubmitting || attemptRef.current || isStale)
+			return;
+
+		setRecovery({ state: "idle" });
 		setFormError(null);
 
 		if (!validation.isValid) {
@@ -381,30 +497,25 @@ export function CheckoutPageClient({
 			return;
 		}
 
+		const attemptId = crypto.randomUUID();
+		updateAttempt(attemptId);
 		inFlightRef.current = true;
 		const submitted = submitValue;
 
 		startSubmitting(async () => {
 			try {
-				const result = await submitOrderAction(submitted);
+				const result = await submitOrderAction(submitted, {
+					id: attemptId,
+					userId,
+					cartKey,
+				});
 
 				if (result.success) {
-					// Ровно здесь, а не на странице заказа: эта ветка выполняется
-					// один раз на оформленный заказ, а страницу заказа можно
-					// перезагрузить или открыть из списка.
-					trackPurchase(result.data.purchase);
-					appToast.success(`Заказ №${result.data.orderNumber} оформлен`);
-					// Отметка для страницы заказа: конфетти взлетает только в этот
-					// переход. Она живёт в sessionStorage, а не в адресе, поэтому
-					// перезагрузка страницы заказа и открытие её из списка праздник
-					// не повторяют (см. modules/orders/lib/celebrate-order).
-					markOrderJustCreated(result.data.orderNumber);
-					router.push(`/orders/${result.data.orderNumber}`);
-					// Флаг НЕ снимаем: страница уходит на успех, и повторное нажатие
-					// во время навигации создало бы второй заказ.
+					finishCheckout(result.data);
 					return;
 				}
 
+				updateAttempt(null);
 				inFlightRef.current = false;
 
 				if (result.error === "AUTH_REQUIRED") {
@@ -435,6 +546,7 @@ export function CheckoutPageClient({
 				if (
 					result.error === "CART_EMPTY" ||
 					result.error === "CART_INVALID" ||
+					result.error === "CART_CHANGED" ||
 					result.error === "CART_HAS_UNAVAILABLE"
 				) {
 					// Корзину изменили в другой вкладке или товар сняли с продажи,
@@ -470,15 +582,9 @@ export function CheckoutPageClient({
 				setFormError(result.message);
 				appToast.warning(result.message);
 			} catch (error) {
-				// Сюда попадают сетевые сбои и падения Server Action: без
-				// обработки они уходили бы в error boundary и уносили с собой всю
-				// заполненную форму.
 				console.error("[checkout] submit failed:", error);
 				inFlightRef.current = false;
-				const message =
-					"Не удалось отправить заказ — проверьте соединение и попробуйте ещё раз";
-				setFormError(message);
-				appToast.warning(message);
+				checkAttempt();
 			}
 		});
 	}
@@ -510,6 +616,19 @@ export function CheckoutPageClient({
 				: (cart.validation.issues[0]?.message ??
 					"Проверьте количество товаров в корзине");
 
+	const attemptStatus = (
+		<CheckoutAttemptStatus
+			recovery={recovery}
+			onCheck={checkAttempt}
+			onSignIn={signInToCheckAttempt}
+		/>
+	);
+	const hasPendingAttempt =
+		recovery.state === "checking" ||
+		recovery.state === "unknown" ||
+		recovery.state === "auth" ||
+		recovery.state === "complete";
+
 	// ── Тупиковое состояние: заказывать нечего ──────────────────────────────
 	if (cart.items.length === 0) {
 		return (
@@ -523,46 +642,54 @@ export function CheckoutPageClient({
 				/>
 				<PageContainer>
 					<div className={styles.empty}>
-						<PackageSearch
-							size={28}
-							strokeWidth={1.25}
-							aria-hidden
-							className="text-[var(--border-light)]"
-						/>
-						<p className={styles.emptyTitle}>Заказывать нечего</p>
-						<p className={styles.emptyText}>
-							В корзине не осталось товаров — оформлять пустой заказ не из чего.
-							Загляните в каталог: всё, что вы выберете, вернётся сюда.
-						</p>
-						{/* Причина, по которой корзина опустела (например, её очистили в
+						{hasPendingAttempt ? (
+							attemptStatus
+						) : (
+							<>
+								{attemptStatus}
+								<PackageSearch
+									size={28}
+									strokeWidth={1.25}
+									aria-hidden
+									className="text-[var(--border-light)]"
+								/>
+								<p className={styles.emptyTitle}>Заказывать нечего</p>
+								<p className={styles.emptyText}>
+									В корзине не осталось товаров — оформлять пустой заказ не из
+									чего. Загляните в каталог: всё, что вы выберете, вернётся
+									сюда.
+								</p>
+								{/* Причина, по которой корзина опустела (например, её очистили в
 						    другой вкладке уже после открытия формы), не должна пропасть
 						    вместе с формой. */}
-						{formError && (
-							<p
-								role="alert"
-								className={`${styles.notice} ${styles.noticeWarn}`}
-							>
-								<AlertTriangle
-									size={15}
-									aria-hidden
-									className={styles.noticeIcon}
-								/>
-								<span>{formError}</span>
-							</p>
+								{formError && (
+									<p
+										role="alert"
+										className={`${styles.notice} ${styles.noticeWarn}`}
+									>
+										<AlertTriangle
+											size={15}
+											aria-hidden
+											className={styles.noticeIcon}
+										/>
+										<span>{formError}</span>
+									</p>
+								)}
+								<div className={styles.emptyActions}>
+									<Link
+										href="/category"
+										className={`${styles.btn} ${styles.btnPrimary}`}
+									>
+										<ShoppingBag size={15} aria-hidden />
+										Перейти в каталог
+									</Link>
+									<Link href="/cart" className={styles.btn}>
+										<ArrowLeft size={15} aria-hidden />
+										Вернуться в корзину
+									</Link>
+								</div>
+							</>
 						)}
-						<div className={styles.emptyActions}>
-							<Link
-								href="/category"
-								className={`${styles.btn} ${styles.btnPrimary}`}
-							>
-								<ShoppingBag size={15} aria-hidden />
-								Перейти в каталог
-							</Link>
-							<Link href="/cart" className={styles.btn}>
-								<ArrowLeft size={15} aria-hidden />
-								Вернуться в корзину
-							</Link>
-						</div>
 					</div>
 				</PageContainer>
 			</>
@@ -582,6 +709,22 @@ export function CheckoutPageClient({
 			<PageContainer>
 				<div className={styles.layout}>
 					<div className={styles.form}>
+						<div
+							className={styles.draftBar}
+							data-visible={Boolean(draftStatus || hasDraft)}
+						>
+							<span role="status">{draftStatus}</span>
+							{hasDraft && (
+								<button
+									type="button"
+									className={styles.sectionLink}
+									onClick={resetDraft}
+									disabled={isSubmitting || hasPendingAttempt}
+								>
+									Сбросить черновик
+								</button>
+							)}
+						</div>
 						<CheckoutSection
 							index={1}
 							title="Состав заказа"
@@ -623,6 +766,7 @@ export function CheckoutPageClient({
 							state={sectionStates.delivery}
 						>
 							<DeliverySection
+								key={draftVersion}
 								value={delivery}
 								onChange={handleDeliveryChange}
 								pickupPoints={initialView.pickupPoints}
@@ -632,7 +776,7 @@ export function CheckoutPageClient({
 								onFieldBlur={validation.markTouched}
 								suggestionsEnabled={initialView.addressSuggestionsEnabled}
 								addressManualMode={addressManualMode}
-								onAddressManualModeChange={setAddressManualMode}
+								onAddressManualModeChange={handleAddressManualModeChange}
 							/>
 						</CheckoutSection>
 
@@ -645,7 +789,7 @@ export function CheckoutPageClient({
 							<ContactsSection
 								value={contacts}
 								onChange={(next) => {
-									setContacts(next);
+									updateDraft({ contacts: next });
 									setFormError(null);
 								}}
 								errors={visibleErrors}
@@ -660,8 +804,9 @@ export function CheckoutPageClient({
 							state={sectionStates.company}
 						>
 							<CompanySection
+								key={draftVersion}
 								value={company}
-								onChange={setCompany}
+								onChange={(next) => updateDraft({ company: next })}
 								companies={initialView.companies}
 								errors={visibleErrors}
 								onFieldBlur={validation.markTouched}
@@ -679,7 +824,7 @@ export function CheckoutPageClient({
 						>
 							<PaymentSection
 								value={paymentMethod}
-								onChange={setPaymentMethod}
+								onChange={(next) => updateDraft({ paymentMethod: next })}
 								available={availablePaymentMethods}
 								error={visibleErrors.paymentMethod}
 								total={totals.total}
@@ -698,7 +843,7 @@ export function CheckoutPageClient({
 								rows={3}
 								maxLength={1000}
 								value={notes}
-								onChange={(event) => setNotes(event.target.value)}
+								onChange={(event) => updateDraft({ notes: event.target.value })}
 								placeholder="Например: нужен счёт с НДС"
 							/>
 						</CheckoutSection>
@@ -724,6 +869,8 @@ export function CheckoutPageClient({
 							}
 							isStale={isStale}
 							isSubmitting={isSubmitting}
+							attemptStatus={attemptStatus}
+							hasPendingAttempt={hasPendingAttempt}
 							onSubmit={handleSubmit}
 							errorEntries={errorEntries}
 							formError={formError}

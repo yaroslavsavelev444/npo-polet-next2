@@ -184,6 +184,7 @@ export interface CheckoutContactsFormValue {
 
 export interface CheckoutDeliveryInput {
 	method: CheckoutDeliveryMethod;
+	includeShippingInInvoice?: boolean;
 	address?: CheckoutAddress;
 	transportCompanyId?: string;
 	pickupPointId?: string;
@@ -227,6 +228,9 @@ export type CheckoutActionErrorCode =
 	| "AUTH_REQUIRED"
 	| "CART_EMPTY"
 	| "CART_INVALID"
+	| "CART_CHANGED"
+	| "ATTEMPT_CLOSED"
+	| "ORDER_REMOVED"
 	/**
 	 * В корзине лежит товар, который больше нельзя заказать.
 	 *
@@ -247,18 +251,23 @@ export type CheckoutActionErrorCode =
 	| "PROMO_INVALID"
 	| "UNKNOWN";
 
+export interface CheckoutReceipt {
+	orderNumber: string;
+	/** Снимок покупки для электронной коммерции Метрики. */
+	purchase: EcommercePurchase;
+}
+
+export type CheckoutAttemptResult =
+	| { state: "created"; receipt: CheckoutReceipt }
+	| { state: "closed" }
+	| { state: "removed"; orderNumber: string }
+	| { state: "auth_required" }
+	| { state: "invalid" };
+
 export type CheckoutActionResult =
 	| {
 			success: true;
-			data: {
-				orderNumber: string;
-				/**
-				 * Состав покупки для электронной коммерции Метрики. Собирается на
-				 * сервере из того же расчёта, что лёг в заказ; отправит ли его
-				 * браузер, решает согласие на аналитику (modules/analytics).
-				 */
-				purchase: EcommercePurchase;
-			};
+			data: CheckoutReceipt;
 	  }
 	| {
 			success: false;

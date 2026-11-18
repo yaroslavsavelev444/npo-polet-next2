@@ -2,7 +2,15 @@
 
 import debounce from "lodash/debounce";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo } from "react";
+import {
+	createContext,
+	type Dispatch,
+	type SetStateAction,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+} from "react";
 import {
 	countFacetSelection,
 	EMPTY_FACET_SELECTION,
@@ -17,10 +25,18 @@ import type {
 	SortState,
 } from "../types/filters";
 
+export const FilterDraftContext = createContext<{
+	params: string;
+	setParams: Dispatch<SetStateAction<string>>;
+} | null>(null);
+
 export function useProductFilters() {
 	const router = useRouter();
 	const pathname = usePathname();
-	const searchParams = useSearchParams();
+	const routeParams = useSearchParams();
+	const draft = useContext(FilterDraftContext);
+	const query = draft?.params ?? routeParams.toString();
+	const searchParams = useMemo(() => new URLSearchParams(query), [query]);
 
 	const filters: FilterState = useMemo(
 		() => ({
@@ -51,29 +67,33 @@ export function useProductFilters() {
 	);
 
 	const updateURL = useCallback(
-		(newParams: Record<string, string | null>, nextFacets?: FacetSelection) => {
-			const params = new URLSearchParams(searchParams.toString());
-			Object.entries(newParams).forEach(([key, value]) => {
-				if (value === null || value === "") {
-					params.delete(key);
-				} else {
-					params.set(key, value);
+		(
+			newParams: Record<string, string | null>,
+			updateFacets?: (current: FacetSelection) => FacetSelection,
+		) => {
+			const update = (current: string) => {
+				const params = new URLSearchParams(current);
+				for (const [key, value] of Object.entries(newParams)) {
+					if (value === null || value === "") params.delete(key);
+					else params.set(key, value);
 				}
-			});
-			// Фасеты всегда пишутся в каноническом порядке: один выбор — один
-			// адрес, независимо от того, в какой последовательности отмечали.
-			if (nextFacets) writeFacetSelection(params, nextFacets);
-			params.set("page", "1");
-			router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+				if (updateFacets) {
+					writeFacetSelection(params, updateFacets(readFacetSelection(params)));
+				}
+				if (!draft) params.set("page", "1");
+				return params.toString();
+			};
+			if (draft) draft.setParams(update);
+			else router.replace(`${pathname}?${update(query)}`, { scroll: false });
 		},
-		[searchParams, pathname, router],
+		[draft, query, pathname, router],
 	);
 
 	const updateFacets = useCallback(
 		(mutate: (current: FacetSelection) => FacetSelection) => {
-			updateURL({}, mutate(facets));
+			updateURL({}, mutate);
 		},
-		[updateURL, facets],
+		[updateURL],
 	);
 
 	const toggleBrand = useCallback(
@@ -179,7 +199,7 @@ export function useProductFilters() {
 	const resetFilters = useCallback(() => {
 		updateURL(
 			{ priceFrom: null, priceTo: null, status: null },
-			EMPTY_FACET_SELECTION,
+			() => EMPTY_FACET_SELECTION,
 		);
 	}, [updateURL]);
 
@@ -193,13 +213,13 @@ export function useProductFilters() {
 		facets,
 		sort,
 		updateFilters,
-		debouncedUpdateFilters,
+		debouncedUpdateFilters: draft ? updateFilters : debouncedUpdateFilters,
 		updateSort,
 		toggleBrand,
 		setDiscount,
 		toggleSpecValue,
 		setSpecRange,
-		debouncedSetSpecRange,
+		debouncedSetSpecRange: draft ? setSpecRange : debouncedSetSpecRange,
 		clearSpec,
 		resetFilters,
 		activeFiltersCount,

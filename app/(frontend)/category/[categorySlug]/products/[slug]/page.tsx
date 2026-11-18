@@ -13,6 +13,7 @@ import {
 	getProductHref,
 	mapProductToCardData,
 } from "@/modules/productCard";
+import { ReturnToCatalogLink } from "@/modules/productCatalog/components/ReturnToCatalogLink";
 import {
 	getRelatedProducts,
 	mapProductToDetailData,
@@ -158,6 +159,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
 			<PageContainer className="pt-6 sm:pt-[2rem]">
 				<Breadcrumbs items={breadcrumbItems} />
+				<ReturnToCatalogLink productId={cardData.id} />
 
 				<div className="mt-5 sm:mt-6">
 					<ProductPageHeader

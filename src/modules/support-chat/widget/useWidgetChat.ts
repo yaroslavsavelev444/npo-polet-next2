@@ -45,6 +45,7 @@ export interface SendInput {
 }
 
 interface OpenResult {
+	userId: number;
 	conversation: SupportConversationDTO | null;
 	messages: SupportMessageDTO[];
 	hasMore: boolean;
@@ -70,6 +71,7 @@ function merge(current: SupportMessageDTO[], incoming: SupportMessageDTO[]) {
 export function useWidgetChat(options: {
 	socketUrl: string | null;
 	enabled: boolean;
+	userId: number;
 }) {
 	const [connection, setConnection] = useState<ChatConnection>("connecting");
 	const [conversation, setConversation] =
@@ -79,6 +81,7 @@ export function useWidgetChat(options: {
 	const [eta, setEta] = useState<EtaDTO | null>(null);
 	const [greeting, setGreeting] = useState("");
 	const [loaded, setLoaded] = useState(false);
+	const [loadFailed, setLoadFailed] = useState(false);
 	const [pending, setPending] = useState<PendingMessage[]>([]);
 	const [staffTyping, setStaffTyping] = useState<{
 		name: string;
@@ -177,6 +180,31 @@ export function useWidgetChat(options: {
 		[request],
 	);
 
+	const openConversation = useCallback(async () => {
+		const socket = socketRef.current;
+		if (!socket?.connected) return;
+
+		setLoadFailed(false);
+		try {
+			const result = await request<OpenResult>(CLIENT_EVENTS.conversationOpen);
+			if (socketRef.current !== socket || !socket.connected) return;
+			if (result.userId !== options.userId) {
+				setConnection("unauthorized");
+				return;
+			}
+			setConversation(result.conversation);
+			setMessages(result.messages);
+			setHasMore(result.hasMore);
+			setEta(result.eta);
+			setGreeting(result.greeting);
+			setLoaded(true);
+		} catch {
+			if (socketRef.current === socket && socket.connected) {
+				setLoadFailed(true);
+			}
+		}
+	}, [options.userId, request]);
+
 	useEffect(() => {
 		if (!options.enabled) return;
 		const socket = io(options.socketUrl ?? undefined, {
@@ -214,16 +242,7 @@ export function useWidgetChat(options: {
 					)
 					.catch(() => {});
 			} else {
-				void request<OpenResult>(CLIENT_EVENTS.conversationOpen)
-					.then((result) => {
-						setConversation(result.conversation);
-						setMessages(result.messages);
-						setHasMore(result.hasMore);
-						setEta(result.eta);
-						setGreeting(result.greeting);
-						setLoaded(true);
-					})
-					.catch(() => setLoaded(true));
+				void openConversation();
 			}
 			for (const item of pendingRef.current) {
 				if (item.status === "sending") void deliver(item.clientMessageId);
@@ -333,7 +352,7 @@ export function useWidgetChat(options: {
 			socket.disconnect();
 			socketRef.current = null;
 		};
-	}, [options.enabled, options.socketUrl, request, deliver]);
+	}, [options.enabled, options.socketUrl, openConversation, request, deliver]);
 
 	const send = useCallback(
 		(input: SendInput) => {
@@ -417,6 +436,8 @@ export function useWidgetChat(options: {
 	return {
 		connection,
 		loaded,
+		loadFailed,
+		openConversation,
 		conversation,
 		messages,
 		hasMore,

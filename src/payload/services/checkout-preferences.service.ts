@@ -1,9 +1,11 @@
+import type { PayloadRequest } from "payload";
 import type { CheckoutAddress } from "@/modules/checkout/lib/address";
 import type { CheckoutPreference } from "../../../payload-types";
 import { getPayloadInstance } from "./getPayload";
 
 export async function getCheckoutPreferences(
 	userId: string,
+	req?: Partial<PayloadRequest>,
 ): Promise<CheckoutPreference | null> {
 	const payload = await getPayloadInstance();
 	const { docs } = await payload.find({
@@ -12,6 +14,7 @@ export async function getCheckoutPreferences(
 		limit: 1,
 		depth: 1,
 		overrideAccess: true,
+		req,
 	});
 	return (docs[0] as unknown as CheckoutPreference) ?? null;
 }
@@ -55,9 +58,11 @@ function toStoredAddress(address: Partial<CheckoutAddress> | undefined) {
 export async function saveCheckoutPreferences(
 	userId: string,
 	input: SaveCheckoutPreferencesInput,
+	req?: Partial<PayloadRequest>,
 ): Promise<void> {
+	if (!input.recipient && !input.delivery) return;
 	const payload = await getPayloadInstance();
-	const existing = await getCheckoutPreferences(userId);
+	const existing = await getCheckoutPreferences(userId, req);
 
 	const data: Record<string, unknown> = {};
 	if (input.recipient) {
@@ -88,6 +93,7 @@ export async function saveCheckoutPreferences(
 			id: existing.id,
 			data,
 			overrideAccess: true,
+			req,
 		});
 		return;
 	}
@@ -96,5 +102,6 @@ export async function saveCheckoutPreferences(
 		collection: "checkout-preferences",
 		data: { user: Number(userId), ...data },
 		overrideAccess: true,
+		req,
 	});
 }

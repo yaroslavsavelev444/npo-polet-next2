@@ -5,8 +5,11 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WEBVISOR_HIDE } from "@/widgets/Analytics/webvisor";
-import type { SupportTopic } from "../lib/constants";
-import type { MessageContext } from "../lib/events";
+import {
+	emptyWidgetDraft,
+	type UpdateWidgetDraft,
+	type WidgetDraft,
+} from "./draft";
 import {
 	OPEN_CHAT_EVENT,
 	type OpenChatDetail,
@@ -28,7 +31,7 @@ type WidgetState =
 	| { state: "guest" }
 	| { state: "disabled" }
 	| { state: "banned" }
-	| { state: "ready"; unread: number };
+	| { state: "ready"; unread: number; userId: number };
 
 const POLL_MS = 60_000;
 
@@ -64,8 +67,21 @@ export function SupportWidget({
 	const router = useRouter();
 	const [widget, setWidget] = useState<WidgetState | null>(null);
 	const [open, setOpen] = useState(false);
-	const [context, setContext] = useState<MessageContext | null>(null);
-	const [topic, setTopic] = useState<SupportTopic | null>(null);
+	const [request, setRequest] = useState<{
+		userId: number;
+		detail: OpenChatDetail;
+	} | null>(null);
+	const [drafts, setDrafts] = useState<Record<string, WidgetDraft>>({});
+	const userId = widget?.state === "ready" ? widget.userId : null;
+
+	// Черновики живут в виджете: закрытие окна размонтирует панель и её сокет.
+	const updateDraft: UpdateWidgetDraft = useCallback((key, update) => {
+		setDrafts((current) => ({
+			...current,
+			[key]: update(current[key] ?? emptyWidgetDraft),
+		}));
+	}, []);
+	const clearRequest = useCallback(() => setRequest(null), []);
 	const launcherRef = useRef<HTMLButtonElement>(null);
 	const hidden = hiddenOn(pathname);
 
@@ -100,11 +116,13 @@ export function SupportWidget({
 		};
 	}, [hidden, open, refresh]);
 
-	const show = useCallback((detail?: OpenChatDetail) => {
-		if (detail?.context) setContext(detail.context);
-		if (detail?.topic) setTopic(detail.topic);
-		setOpen(true);
-	}, []);
+	const show = useCallback(
+		(detail?: OpenChatDetail) => {
+			setRequest(userId !== null && detail ? { userId, detail } : null);
+			setOpen(true);
+		},
+		[userId],
+	);
 
 	useEffect(() => {
 		const listener = (event: Event) =>
@@ -131,10 +149,11 @@ export function SupportWidget({
 
 	const close = useCallback(() => {
 		setOpen(false);
+		clearRequest();
 		void refresh(true);
 		// Фокус — туда, откуда открывали.
 		window.setTimeout(() => launcherRef.current?.focus(), 0);
-	}, [refresh]);
+	}, [clearRequest, refresh]);
 
 	// Чат ещё не запущен (или посетитель не в пилотной группе) — кнопки нет.
 	// До ответа сервера её тоже нет: мигнуть и исчезнуть хуже, чем появиться.
@@ -169,11 +188,14 @@ export function SupportWidget({
 
 			{open && widget?.state === "ready" && (
 				<ChatPanel
+					key={widget.userId}
+					userId={widget.userId}
 					socketUrl={socketUrl}
 					consent={consent}
-					context={context}
-					topic={topic}
-					onContextConsumed={() => setContext(null)}
+					drafts={drafts}
+					updateDraft={updateDraft}
+					request={request?.userId === widget.userId ? request.detail : null}
+					onRequestApplied={clearRequest}
 					onClose={close}
 				/>
 			)}

@@ -804,14 +804,6 @@ export async function sendStaffMessage(
 ): Promise<{ message: SupportMessageDTO; duplicate: boolean }> {
 	const { payload } = deps;
 
-	const documentIds = [...new Set(input.documentIds ?? [])];
-	if (documentIds.length > 0) {
-		const found = await loadDocuments(drizzleOf(payload), documentIds);
-		if (found.size !== documentIds.length) {
-			throw new SupportError("invalid", "Документ не найден в медиатеке");
-		}
-	}
-
 	const outcome = await withTransaction(payload, async (tx) => {
 		const locked = await lockConversation(tx, input.conversationId);
 		if (!locked) throw new SupportError("not_found", "Диалог не найден");
@@ -822,6 +814,14 @@ export async function sendStaffMessage(
 			input.clientMessageId,
 		);
 		if (existing) return { row: existing, duplicate: true as const };
+
+		const documentIds = [...new Set(input.documentIds ?? [])];
+		if (documentIds.length > 0) {
+			const found = await loadDocuments(tx, documentIds);
+			if (found.size !== documentIds.length) {
+				throw new SupportError("invalid", "Документ не найден в медиатеке");
+			}
+		}
 
 		const isReply = input.kind === "text";
 		if (isReply && locked.status !== "open") {

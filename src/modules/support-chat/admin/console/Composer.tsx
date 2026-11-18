@@ -102,17 +102,6 @@ export function Composer({
 	const resolved = conversation.status !== "open";
 	const effectiveKind = resolved ? "note" : kind;
 
-	// Смена диалога — свой черновик и чистое состояние.
-	useEffect(() => {
-		setText(readDraft(conversationId));
-		setAttachments([]);
-		setDocuments([]);
-		setCannedResponseId(null);
-		setError(null);
-		setMissing([]);
-		setKbOpen(false);
-	}, [conversationId]);
-
 	useEffect(() => {
 		void api
 			.request<CannedSuggestionDTO[]>(CLIENT_EVENTS.staffCanned)
@@ -202,29 +191,22 @@ export function Composer({
 		}
 	}
 
-	async function send() {
+	function send() {
 		const body = text.trim();
 		if (!body && attachments.length === 0 && documents.length === 0) return;
 		if (uploading > 0) return;
-		const clientMessageId = crypto.randomUUID();
-		const payload = {
-			conversationId,
-			clientMessageId,
-			body,
-			kind: effectiveKind,
-			attachmentIds: attachments.map((a) => a.id),
-			documentIds: documents.map((d) => d.id),
-			...(cannedResponseId ? { cannedResponseId } : {}),
-		};
-		api.dispatch({
-			type: "pending",
-			message: {
-				clientMessageId,
+		api.sendMessage({
+			input: {
 				conversationId,
+				clientMessageId: crypto.randomUUID(),
 				body,
 				kind: effectiveKind,
-				error: null,
+				attachmentIds: attachments.map((file) => file.id),
+				documentIds: documents.map((doc) => doc.id),
+				...(cannedResponseId ? { cannedResponseId } : {}),
 			},
+			attachments,
+			documents,
 		});
 		setText("");
 		setAttachments([]);
@@ -233,16 +215,6 @@ export function Composer({
 		setMissing([]);
 		setError(null);
 		signalComposing(false);
-		try {
-			await api.request(CLIENT_EVENTS.staffMessageSend, payload);
-		} catch (sendError) {
-			const message =
-				sendError instanceof Error ? sendError.message : "Не отправлено";
-			api.dispatch({ type: "pendingFailed", clientMessageId, error: message });
-			// Вернуть текст в поле, чтобы не набирать заново.
-			setText(body);
-			setError(message);
-		}
 	}
 
 	function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -273,7 +245,7 @@ export function Composer({
 			!event.nativeEvent.isComposing
 		) {
 			event.preventDefault();
-			void send();
+			send();
 		}
 	}
 
@@ -478,7 +450,7 @@ export function Composer({
 				<button
 					type="button"
 					className={styles.sendButton}
-					onClick={() => void send()}
+					onClick={send}
 					disabled={
 						uploading > 0 ||
 						(!text.trim() && attachments.length === 0 && documents.length === 0)

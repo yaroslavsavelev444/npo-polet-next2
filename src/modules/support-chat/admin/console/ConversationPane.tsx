@@ -55,7 +55,7 @@ export function ConversationPane({
 	const { state } = api;
 	const messages = state.messages[conversation.id] ?? [];
 	const pending = state.pending.filter(
-		(p) => p.conversationId === conversation.id,
+		(p) => p.input.conversationId === conversation.id,
 	);
 	const feedRef = useRef<HTMLDivElement>(null);
 	const stickToBottom = useRef(true);
@@ -314,10 +314,22 @@ export function ConversationPane({
 				})}
 				{pending.map((item) => (
 					<article
-						key={item.clientMessageId}
-						className={`${styles.bubble} ${styles.bubbleOut} ${item.kind === "note" ? styles.bubbleNote : ""} ${styles.bubblePending}`}
+						key={item.input.clientMessageId}
+						className={`${styles.bubble} ${styles.bubbleOut} ${item.input.kind === "note" ? styles.bubbleNote : ""} ${styles.bubblePending}`}
 					>
-						<p className={styles.bubbleText}>{item.body}</p>
+						{item.input.body && (
+							<p className={styles.bubbleText}>{item.input.body}</p>
+						)}
+						{item.attachments.map((file) => (
+							<span key={file.id} className={styles.chip}>
+								📄 {file.filename}
+							</span>
+						))}
+						{item.documents.map((doc) => (
+							<span key={doc.id} className={styles.chip}>
+								📎 {doc.title}
+							</span>
+						))}
 						<footer className={styles.bubbleStatus}>
 							{item.error ? (
 								<>
@@ -325,10 +337,17 @@ export function ConversationPane({
 									<button
 										type="button"
 										className={styles.linkButton}
+										onClick={() => api.retryMessage(item.input.clientMessageId)}
+									>
+										Повторить
+									</button>{" "}
+									<button
+										type="button"
+										className={styles.linkButton}
 										onClick={() =>
 											api.dispatch({
 												type: "pendingDrop",
-												clientMessageId: item.clientMessageId,
+												clientMessageId: item.input.clientMessageId,
 											})
 										}
 									>
@@ -354,6 +373,7 @@ export function ConversationPane({
 			)}
 
 			<Composer
+				key={conversation.id}
 				api={api}
 				conversation={conversation}
 				messages={messages}

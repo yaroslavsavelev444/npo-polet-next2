@@ -7,13 +7,7 @@ import styles from "../analytics.module.css";
 import { BarList, Delta, SegmentBar, StatTile, TipRow } from "../charts";
 import { int, money, moneyCompact, pct, plural } from "../format";
 import { useAnalyticsData } from "../useAnalyticsData";
-import {
-	Card,
-	Frame,
-	Note,
-	type SectionProps,
-	usePeriodReport,
-} from "./shared";
+import { Card, Frame, Note, type SectionProps } from "./shared";
 
 const INVENTORY_LABELS: Record<string, string> = {
 	available: "В наличии",
@@ -31,17 +25,14 @@ export function ProductsSection({
 	reloadKey,
 	setParams,
 	searchParams,
-	onPeriod,
+	onReport,
+	describeReport,
 }: SectionProps) {
-	const { data, error, loading } = useAnalyticsData(
-		"products",
-		params,
-		reloadKey,
-	);
-	usePeriodReport(data?.period, onPeriod);
+	const report = useAnalyticsData("products", params, reloadKey);
+	const { data, shownParams } = report;
 
 	return (
-		<Frame loading={loading} error={error} hasData={Boolean(data)}>
+		<Frame {...report} describeReport={describeReport} onReport={onReport}>
 			{data && (
 				<div className={styles.grid12}>
 					<Summary data={data} />
@@ -49,12 +40,13 @@ export function ProductsSection({
 					<Structure
 						data={data}
 						setParams={setParams}
-						category={searchParams.get("category")}
+						category={shownParams?.get("category") ?? null}
 					/>
 					<Demand data={data} />
 					<ProductTable
-						params={params}
+						params={shownParams?.toString() ?? params}
 						reloadKey={reloadKey}
+						describeReport={describeReport}
 						setParams={setParams}
 						searchParams={searchParams}
 					/>
@@ -400,11 +392,13 @@ function ProductTable({
 	reloadKey,
 	setParams,
 	searchParams,
+	describeReport,
 }: {
 	params: string;
 	reloadKey: number;
 	setParams: SectionProps["setParams"];
 	searchParams: SectionProps["searchParams"];
+	describeReport: SectionProps["describeReport"];
 }) {
 	const rawSort = searchParams.get("sort");
 	const sort: ProductSort = PRODUCT_SORTS.includes(rawSort as ProductSort)
@@ -434,11 +428,10 @@ function ProductTable({
 		return out.toString();
 	}, [params, sort, dir, page, q]);
 
-	const { data, error, loading } = useAnalyticsData(
-		"product_table",
-		tableParams,
-		reloadKey,
-	);
+	const report = useAnalyticsData("product_table", tableParams, reloadKey);
+	const { data, shownParams } = report;
+	const shownSort = shownParams?.get("sort") ?? sort;
+	const shownDirection = shownParams?.get("dir") ?? dir;
 	const ranking = data?.ranking;
 	const pages = ranking
 		? Math.max(1, Math.ceil(ranking.total / ranking.pageSize))
@@ -469,12 +462,7 @@ function ProductTable({
 				/>
 			}
 		>
-			{error && (
-				<p className={styles.error} role="alert">
-					{error}
-				</p>
-			)}
-			<div className={loading ? styles.stale : undefined}>
+			<Frame {...report} describeReport={describeReport}>
 				<div className={styles.tableWrap}>
 					<table className={styles.table}>
 						<thead>
@@ -486,8 +474,8 @@ function ProductTable({
 										key={header.key}
 										className={styles.num}
 										aria-sort={
-											sort === header.key
-												? dir === "asc"
+											shownSort === header.key
+												? shownDirection === "asc"
 													? "ascending"
 													: "descending"
 												: "none"
@@ -499,7 +487,8 @@ function ProductTable({
 											onClick={() => toggleSort(header.key)}
 										>
 											{header.label}
-											{sort === header.key && (dir === "asc" ? " ↑" : " ↓")}
+											{shownSort === header.key &&
+												(shownDirection === "asc" ? " ↑" : " ↓")}
 										</button>
 									</th>
 								))}
@@ -539,38 +528,40 @@ function ProductTable({
 				</div>
 				{ranking && ranking.rows.length === 0 && (
 					<p className={styles.empty}>
-						{q ? "Ничего не найдено" : "Нет продаж за период"}
+						{shownParams?.get("q")
+							? "Ничего не найдено"
+							: "Нет продаж за период"}
 					</p>
 				)}
-			</div>
-			{ranking && ranking.total > ranking.pageSize && (
-				<nav className={styles.pager} aria-label="Страницы рейтинга">
-					<button
-						type="button"
-						className={styles.ghostButton}
-						disabled={shownPage <= 1}
-						onClick={() =>
-							setParams({
-								page: shownPage <= 2 ? null : String(shownPage - 1),
-							})
-						}
-					>
-						← Назад
-					</button>
-					<span className={styles.muted}>
-						Страница {int(shownPage)} из {int(pages)} · {int(ranking.total)}{" "}
-						{plural(ranking.total, ["товар", "товара", "товаров"])}
-					</span>
-					<button
-						type="button"
-						className={styles.ghostButton}
-						disabled={shownPage >= pages}
-						onClick={() => setParams({ page: String(shownPage + 1) })}
-					>
-						Вперёд →
-					</button>
-				</nav>
-			)}
+				{ranking && ranking.total > ranking.pageSize && (
+					<nav className={styles.pager} aria-label="Страницы рейтинга">
+						<button
+							type="button"
+							className={styles.ghostButton}
+							disabled={shownPage <= 1}
+							onClick={() =>
+								setParams({
+									page: shownPage <= 2 ? null : String(shownPage - 1),
+								})
+							}
+						>
+							← Назад
+						</button>
+						<span className={styles.muted}>
+							Страница {int(shownPage)} из {int(pages)} · {int(ranking.total)}{" "}
+							{plural(ranking.total, ["товар", "товара", "товаров"])}
+						</span>
+						<button
+							type="button"
+							className={styles.ghostButton}
+							disabled={shownPage >= pages}
+							onClick={() => setParams({ page: String(shownPage + 1) })}
+						>
+							Вперёд →
+						</button>
+					</nav>
+				)}
+			</Frame>
 		</Card>
 	);
 }

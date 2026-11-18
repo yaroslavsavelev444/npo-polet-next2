@@ -1,6 +1,9 @@
 "use server";
 
+import { sql } from "@payloadcms/db-postgres";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import type { PayloadRequest } from "payload";
 import { toEcommerceProduct } from "@/modules/analytics/lib/ecommerce-product";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { getRequestMeta } from "@/modules/auth/lib/utils";
@@ -10,32 +13,202 @@ import {
 	clearCartItems,
 	getCartByUserId,
 } from "@/payload/services/carts.service";
+import {
+	readCheckoutAttempt,
+	recordCheckoutAttempt,
+	withCheckoutTransaction,
+} from "@/payload/services/checkout-attempts.db";
 import { saveCheckoutPreferences } from "@/payload/services/checkout-preferences.service";
 import { isCompanyOwnedByUser } from "@/payload/services/companies.service";
 import { getPayloadInstance } from "@/payload/services/getPayload";
 import { createOrderFromCheckout } from "@/payload/services/orders.service";
-import type { PromoCodeLookup } from "@/payload/services/promo-codes.service";
+import { shiftProductPurchases } from "@/payload/services/product-counters.db";
+import {
+	loadPromoCodeLookup,
+	type PromoCodeLookup,
+} from "@/payload/services/promo-codes.service";
 import {
 	attachRedemptionToOrder,
-	loadPromoCodeLookup,
-	reservePromoCodeRedemption,
-	revokePromoCodeRedemptionById,
-} from "@/payload/services/promo-codes.service";
+	reserveRedemption,
+} from "@/payload/services/promo-redemptions.db";
+import type { TransactionDatabase } from "@/payload/services/transaction.db";
+import { notify } from "@/services/notifications/notificationCenter";
+import { notifyNewOrder } from "@/services/notifications/notifyNewOrder";
+import {
+	getCheckoutCartKey,
+	isCheckoutAttemptId,
+} from "../lib/checkout-attempt";
 import { calculateCheckoutPricing } from "../lib/checkout-pricing";
 import { checkoutSchema, collectFieldErrors } from "../lib/checkout-schema";
-import type { CheckoutActionResult, CheckoutSubmitInput } from "../types";
+import type {
+	CheckoutActionResult,
+	CheckoutAttemptResult,
+	CheckoutReceipt,
+	CheckoutSubmitInput,
+} from "../types";
+
+export async function resolveCheckoutAttemptAction(
+	attemptId: string,
+	expectedUserId: string,
+): Promise<CheckoutAttemptResult> {
+	const user = await getCurrentUser();
+	if (!user || String(user.id) !== expectedUserId)
+		return { state: "auth_required" };
+	if (!isCheckoutAttemptId(attemptId)) return { state: "invalid" };
+
+	const payload = await getPayloadInstance();
+	await withCheckoutTransaction(payload, user.id, async (db) => {
+		const attempt = await readCheckoutAttempt(db, user.id, attemptId);
+		if (attempt) return;
+
+		// Если первоначальный запрос ещё не дошёл до транзакции, он увидит
+		// закрытую попытку и уже не сможет создать заказ после ответа «не оформлен».
+		await recordCheckoutAttempt(db, user.id, attemptId);
+	});
+
+	// Адаптер может завершить неудачный коммит откатом без исключения.
+	const committed = await readCheckoutAttempt(
+		payload.db.drizzle,
+		user.id,
+		attemptId,
+	);
+	if (!committed) throw new Error("Checkout attempt missing after commit");
+	if (committed.state === "created") revalidateCheckout();
+	return committed;
+}
+
+function revalidateCheckout() {
+	revalidatePath("/cart");
+	revalidatePath("/orders");
+}
 
 export async function submitOrderAction(
 	input: CheckoutSubmitInput,
+	attempt: { id: string; userId: string; cartKey: string },
 ): Promise<CheckoutActionResult> {
 	const user = await getCurrentUser();
-	if (!user)
+	if (!user || String(user.id) !== attempt?.userId)
 		return {
 			success: false,
 			error: "AUTH_REQUIRED",
 			message: "Войдите в аккаунт, чтобы оформить заказ",
 		};
 
+	if (!isCheckoutAttemptId(attempt.id)) {
+		return {
+			success: false,
+			error: "VALIDATION_ERROR",
+			message: "Обновите страницу и подтвердите заказ ещё раз",
+		};
+	}
+
+	const payload = await getPayloadInstance();
+	const meta = await getRequestMeta();
+	const { result, order } = await withCheckoutTransaction(
+		payload,
+		user.id,
+		async (db, req): Promise<PlacementOutcome> => {
+			const existing = await readCheckoutAttempt(db, user.id, attempt.id);
+			if (existing?.state === "created") {
+				return { result: { success: true, data: existing.receipt } as const };
+			}
+			if (existing) {
+				return {
+					result:
+						existing.state === "removed"
+							? ({
+									success: false,
+									error: "ORDER_REMOVED",
+									message: absentOrderMessage(existing.orderNumber),
+								} as const)
+							: ({
+									success: false,
+									error: "ATTEMPT_CLOSED",
+									message:
+										"Заказ не оформлен. Проверьте данные и подтвердите его снова.",
+								} as const),
+				};
+			}
+
+			const outcome = await placeOrder(
+				input,
+				attempt.cartKey,
+				user.id,
+				meta,
+				payload,
+				db,
+				req,
+			);
+			await recordCheckoutAttempt(
+				db,
+				user.id,
+				attempt.id,
+				outcome.result.success && outcome.order
+					? { id: outcome.order.id, receipt: outcome.result.data }
+					: undefined,
+			);
+			return outcome;
+		},
+	);
+
+	// Адаптер может завершить неудачный коммит откатом без исключения.
+	const committed = await readCheckoutAttempt(
+		payload.db.drizzle,
+		user.id,
+		attempt.id,
+	);
+	if (!committed || (result.success && committed.state !== "created")) {
+		throw new Error("Checkout attempt result missing after commit");
+	}
+
+	if (result.success) {
+		if (order) {
+			after(async () => {
+				const effects = await Promise.allSettled([
+					notifyNewOrder(order, payload),
+					notify(payload, user.id, "order_created", {
+						orderNumber: order.orderNumber,
+						itemsCount: order.items?.length ?? 0,
+					}),
+					shiftProductPurchases(
+						payload,
+						(order.items ?? []).map(({ product }) =>
+							typeof product === "number" ? product : product?.id,
+						),
+						1,
+					),
+				]);
+				for (const effect of effects) {
+					if (effect.status === "rejected") {
+						payload.logger.error(
+							{ err: effect.reason, orderId: order.id },
+							"[checkout] post-commit effect failed",
+						);
+					}
+				}
+			});
+		}
+		revalidateCheckout();
+	}
+	return result;
+}
+
+type PlacementOutcome =
+	| { result: Extract<CheckoutActionResult, { success: false }>; order?: never }
+	| {
+			result: Extract<CheckoutActionResult, { success: true }>;
+			order?: Awaited<ReturnType<typeof createOrderFromCheckout>>;
+	  };
+
+async function placeOrder(
+	input: CheckoutSubmitInput,
+	cartKey: string,
+	userId: number,
+	meta: Awaited<ReturnType<typeof getRequestMeta>>,
+	payload: Awaited<ReturnType<typeof getPayloadInstance>>,
+	db: TransactionDatabase,
+	req: Partial<PayloadRequest>,
+): Promise<PlacementOutcome> {
 	const parsed = checkoutSchema.safeParse(input);
 	if (!parsed.success) {
 		// Та же схема выполняется на клиенте, поэтому сюда попадают только
@@ -44,18 +217,27 @@ export async function submitOrderAction(
 		// форма: она покажет их у полей и в общей сводке.
 		const fieldErrors = collectFieldErrors(parsed.error.issues);
 		return {
-			success: false,
-			error: "VALIDATION_ERROR",
-			message: parsed.error.issues[0]?.message ?? "Проверьте введённые данные",
-			fieldErrors,
+			result: {
+				success: false,
+				error: "VALIDATION_ERROR",
+				message:
+					parsed.error.issues[0]?.message ?? "Проверьте введённые данные",
+				fieldErrors,
+			},
 		};
 	}
 
-	const cartDoc = await getCartByUserId(String(user.id));
-	const cartView = await buildCartView(cartDoc);
+	// Пока пишется заказ, параллельная запись в эту строку корзины ждёт коммита.
+	await db.execute(
+		sql`SELECT id FROM carts WHERE user_id = ${userId} FOR UPDATE`,
+	);
+	const cartDoc = await getCartByUserId(String(userId), req);
+	const cartView = await buildCartView(cartDoc, req);
 
-	if (cartView.items.length === 0) {
-		return { success: false, error: "CART_EMPTY", message: "Корзина пуста" };
+	if (!cartDoc || cartView.items.length === 0) {
+		return {
+			result: { success: false, error: "CART_EMPTY", message: "Корзина пуста" },
+		};
 	}
 
 	// ── Недоступные позиции ────────────────────────────────────────────────
@@ -76,25 +258,38 @@ export async function submitOrderAction(
 			.filter(Boolean)
 			.join(", ");
 		return {
-			success: false,
-			error: "CART_HAS_UNAVAILABLE",
-			message: names
-				? `Эти товары больше недоступны для заказа: ${names}. Уберите их из корзины, чтобы продолжить.`
-				: "В корзине есть товары, недоступные для заказа. Уберите их, чтобы продолжить.",
+			result: {
+				success: false,
+				error: "CART_HAS_UNAVAILABLE",
+				message: names
+					? `Эти товары больше недоступны для заказа: ${names}. Уберите их из корзины, чтобы продолжить.`
+					: "В корзине есть товары, недоступные для заказа. Уберите их, чтобы продолжить.",
+			},
 		};
 	}
 
 	if (!cartView.validation.isValid) {
 		return {
-			success: false,
-			error: "CART_INVALID",
-			message:
-				cartView.validation.issues[0]?.message ??
-				"Проверьте количество товаров в корзине",
+			result: {
+				success: false,
+				error: "CART_INVALID",
+				message:
+					cartView.validation.issues[0]?.message ??
+					"Проверьте количество товаров в корзине",
+			},
 		};
 	}
 
-	const { ip, userAgent } = await getRequestMeta();
+	if (getCheckoutCartKey(cartView) !== cartKey) {
+		return {
+			result: {
+				success: false,
+				error: "CART_CHANGED",
+				message: "Корзина изменилась. Проверьте товары и сумму заказа.",
+			},
+		};
+	}
+
 	const form = parsed.data;
 
 	// ── Company: create if new + save requested ────────────────────────────
@@ -109,41 +304,21 @@ export async function submitOrderAction(
 	if (companyForm?.isCompany && companyForm.existingCompanyId) {
 		const owned = await isCompanyOwnedByUser(
 			companyForm.existingCompanyId,
-			String(user.id),
+			String(userId),
+			req,
 		);
 		if (!owned) {
 			return {
-				success: false,
-				error: "VALIDATION_ERROR",
-				message: "Организация не найдена",
-				fieldErrors: {
-					"company.existingCompanyId": "Организация не найдена",
+				result: {
+					success: false,
+					error: "VALIDATION_ERROR",
+					message: "Организация не найдена",
+					fieldErrors: {
+						"company.existingCompanyId": "Организация не найдена",
+					},
 				},
 			};
 		}
-	}
-
-	if (
-		companyForm?.isCompany &&
-		!companyForm.existingCompanyId &&
-		companyForm.saveCompany
-	) {
-		const payload = await getPayloadInstance();
-		const created = await payload.create({
-			collection: "companies",
-			data: {
-				user: user.id,
-				companyName: companyForm.companyName!,
-				legalAddress: companyForm.legalAddress!,
-				companyAddress: companyForm.companyAddress,
-				taxNumber: companyForm.taxNumber!,
-				kpp: companyForm.kpp || undefined,
-				ogrn: companyForm.ogrn || undefined,
-				contactPerson: companyForm.contactPerson,
-			},
-			overrideAccess: true,
-		});
-		companyForm = { ...companyForm, existingCompanyId: String(created.id) };
 	}
 
 	// ── Промокод: перепроверка на сервере ──────────────────────────────────
@@ -162,9 +337,11 @@ export async function submitOrderAction(
 	let promoLookup: PromoCodeLookup | null = null;
 
 	if (promoCode !== "") {
-		promoLookup = await loadPromoCodeLookup(promoCode, String(user.id));
+		promoLookup = await loadPromoCodeLookup(promoCode, String(userId), req);
 		if (!promoLookup) {
-			return promoError("Промокод не найден или больше не действует");
+			return {
+				result: promoError("Промокод не найден или больше не действует"),
+			};
 		}
 	}
 
@@ -173,11 +350,13 @@ export async function submitOrderAction(
 		pricing.promo && pricing.promo.applied ? pricing.promo : null;
 
 	if (promoLookup && !appliedPromo) {
-		return promoError(
-			pricing.promo && !pricing.promo.applied
-				? pricing.promo.message
-				: "Промокод больше не применим к этому заказу",
-		);
+		return {
+			result: promoError(
+				pricing.promo && !pricing.promo.applied
+					? pricing.promo.message
+					: "Промокод больше не применим к этому заказу",
+			),
+		};
 	}
 
 	// ── Активация промокода ────────────────────────────────────────────────
@@ -185,101 +364,106 @@ export async function submitOrderAction(
 	// Списывается ДО создания заказа. Обратный порядок («создать заказ, затем
 	// списать») означал бы заказ со скидкой, на которую покупатель уже не имел
 	// права: лимит мог кончиться за те миллисекунды, что шла запись заказа.
-	// Само списание атомарно (см. reservePromoCodeRedemption), поэтому
+	// Само списание атомарно (см. reserveRedemption), поэтому
 	// одновременные заказы по последней активации получит ровно один.
 	let redemptionId: string | null = null;
 
 	if (appliedPromo) {
-		redemptionId = await reservePromoCodeRedemption({
+		redemptionId = await reserveRedemption(db, {
 			promoCodeId: appliedPromo.promoCodeId,
 			code: appliedPromo.code,
-			userId: String(user.id),
+			userId: String(userId),
 			discountAmount: appliedPromo.discountAmount,
 		});
 
 		if (!redemptionId) {
-			return promoError("Промокод исчерпал лимит использований");
+			return { result: promoError("Промокод исчерпал лимит использований") };
 		}
 	}
 
-	let order: Awaited<ReturnType<typeof createOrderFromCheckout>>;
-	try {
-		order = await createOrderFromCheckout({
-			userId: String(user.id),
-			cart: cartView,
-			form: { ...form, company: companyForm },
-			meta: { ip, userAgent },
-			pricing,
-			promo: appliedPromo,
+	if (
+		companyForm?.isCompany &&
+		!companyForm.existingCompanyId &&
+		companyForm.saveCompany
+	) {
+		const created = await payload.create({
+			collection: "companies",
+			data: {
+				user: userId,
+				companyName: companyForm.companyName!,
+				legalAddress: companyForm.legalAddress!,
+				companyAddress: companyForm.companyAddress,
+				taxNumber: companyForm.taxNumber!,
+				kpp: companyForm.kpp || undefined,
+				ogrn: companyForm.ogrn || undefined,
+				contactPerson: companyForm.contactPerson,
+			},
+			overrideAccess: true,
+			req,
 		});
-	} catch (error) {
-		// Заказ не создан — активацию нужно вернуть, иначе сбой базы навсегда
-		// «съел» бы одну активацию промокода, не дав покупателю ничего.
-		if (redemptionId) {
-			await revokePromoCodeRedemptionById(
-				redemptionId,
-				"Заказ не был создан",
-			).catch((err) =>
-				console.error("[checkout] promo revoke after failure:", err),
-			);
-		}
-		throw error;
+		companyForm = { ...companyForm, existingCompanyId: String(created.id) };
 	}
+
+	const order = await createOrderFromCheckout({
+		userId: String(userId),
+		cart: cartView,
+		form: { ...form, company: companyForm },
+		meta,
+		pricing,
+		promo: appliedPromo,
+		req,
+	});
 
 	if (redemptionId) {
-		// Связь с заказом проставляется отдельным шагом: до создания заказа его
-		// id ещё не существует. Сбой здесь не отменяет заказ — активация
-		// останется списанной, но без ссылки, и это честнее, чем откатывать уже
-		// оформленный заказ.
-		await attachRedemptionToOrder(redemptionId, String(order.id)).catch((err) =>
-			console.error("[checkout] promo attach to order:", err),
-		);
+		await attachRedemptionToOrder(db, redemptionId, String(order.id));
 	}
 
 	// ── Persist "save for next time" preferences ────────────────────────────
-	await saveCheckoutPreferences(String(user.id), {
-		recipient: form.recipient.saveRecipient
-			? {
-					fullName: form.recipient.fullName,
-					// Свой номер сохраняется отдельно от номера получателя: в
-					// профиле телефона нет, и без этого пользователь набирал бы его
-					// заново при каждом заказе.
-					customerPhone: form.customer.phone,
-					phone: form.recipient.phone,
-					email: form.recipient.email,
-				}
-			: undefined,
-		delivery: form.delivery.saveAddress
-			? {
-					method: form.delivery.method,
-					address: form.delivery.address,
-					transportCompanyId: form.delivery.transportCompanyId,
-					pickupPointId: form.delivery.pickupPointId,
-				}
-			: undefined,
-	});
+	await saveCheckoutPreferences(
+		String(userId),
+		{
+			recipient: form.recipient.saveRecipient
+				? {
+						fullName: form.recipient.fullName,
+						// Свой номер сохраняется отдельно от номера получателя: в
+						// профиле телефона нет, и без этого пользователь набирал бы его
+						// заново при каждом заказе.
+						customerPhone: form.customer.phone,
+						phone: form.recipient.phone,
+						email: form.recipient.email,
+					}
+				: undefined,
+			delivery: form.delivery.saveAddress
+				? {
+						method: form.delivery.method,
+						address: form.delivery.address,
+						transportCompanyId: form.delivery.transportCompanyId,
+						pickupPointId: form.delivery.pickupPointId,
+					}
+				: undefined,
+		},
+		req,
+	);
 
-	await clearCartItems(String(user.id));
-	revalidatePath("/cart");
-	revalidatePath("/checkout");
-	revalidatePath("/orders");
+	await clearCartItems(String(userId), { cartId: cartDoc.id, req });
 
-	const orderNumber = order.orderNumber as string;
-	return {
-		success: true,
-		data: {
-			orderNumber,
-			purchase: {
-				id: orderNumber,
-				revenue: pricing.total,
-				coupon: appliedPromo?.code,
-				products: cartView.items.map((item) => ({
-					...toEcommerceProduct(item.product, item.quantity),
-					price: item.unitFinalPrice,
-				})),
-			},
+	const receipt: CheckoutReceipt = {
+		orderNumber: order.orderNumber,
+		purchase: {
+			id: order.orderNumber,
+			revenue: pricing.total,
+			coupon: appliedPromo?.code,
+			products: cartView.items.map((item) => ({
+				...toEcommerceProduct(item.product, item.quantity),
+				price: item.unitFinalPrice,
+			})),
 		},
 	};
+	return { result: { success: true, data: receipt }, order };
+}
+
+function absentOrderMessage(orderNumber: string) {
+	return `Заказ №${orderNumber} был оформлен, но его карточка больше недоступна.`;
 }
 
 /**
@@ -289,7 +473,9 @@ export async function submitOrderAction(
  * не показала безадресное «проверьте данные»: исправляется такой отказ
  * снятием кода, и вести покупателя нужно туда.
  */
-function promoError(message: string): CheckoutActionResult {
+function promoError(
+	message: string,
+): Extract<CheckoutActionResult, { success: false }> {
 	return {
 		success: false,
 		error: "PROMO_INVALID",

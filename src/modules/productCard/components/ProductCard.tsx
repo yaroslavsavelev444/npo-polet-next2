@@ -40,6 +40,8 @@ export function ProductCard({
 	currentCategorySlug,
 	showQuickView = false,
 	onQuickView,
+	onProductNavigate,
+	productLinkId,
 	priorityImage = false,
 	className,
 }: ProductCardProps) {
@@ -73,7 +75,14 @@ export function ProductCard({
 					minOrderQuantity={product.minOrderQuantity}
 				/>
 
-				<Link href={href} className={styles.titleLink}>
+				<Link
+					href={href}
+					id={productLinkId}
+					className={styles.titleLink}
+					onNavigate={
+						onProductNavigate ? () => onProductNavigate(product.id) : undefined
+					}
+				>
 					<ProductTitle title={product.title} />
 				</Link>
 

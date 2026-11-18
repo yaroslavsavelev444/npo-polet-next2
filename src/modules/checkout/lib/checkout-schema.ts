@@ -94,6 +94,7 @@ export const checkoutSchema = z
 			pickupPointId: z.string().optional(),
 			notes: z.string().max(1000).optional(),
 			saveAddress: z.boolean(),
+			includeShippingInInvoice: z.boolean().default(false),
 		}),
 		company: z
 			.object({

@@ -1,4 +1,5 @@
 // src/modules/cart/lib/build-cart-view.ts
+import type { PayloadRequest } from "payload";
 import {
 	calculatePriceBreakdown,
 	mapProductToCardData,
@@ -124,6 +125,7 @@ async function composeCartView(
 	entries: ResolvedEntry[],
 	unavailable: CartUnavailableItem[],
 	updatedAt: string | null,
+	req?: Partial<PayloadRequest>,
 ): Promise<CartView> {
 	const items: CartItemView[] = [];
 	const issues: CartValidationIssue[] = [];
@@ -175,10 +177,13 @@ async function composeCartView(
 		});
 	}
 
-	const { applied, hints } = await getApplicableDiscount({
-		totalAmount: priceAfterProductDiscounts,
-		totalQuantity,
-	});
+	const { applied, hints } = await getApplicableDiscount(
+		{
+			totalAmount: priceAfterProductDiscounts,
+			totalQuantity,
+		},
+		req,
+	);
 
 	const centralDiscountAmount = applied?.discountAmount ?? 0;
 	const totalPrice = roundMoney(
@@ -238,7 +243,10 @@ async function composeCartView(
  * в `unavailable`, и корзина может честно сказать, что товара больше нет.
  * Из расчёта они по-прежнему исключены — заказать их нельзя.
  */
-export async function buildCartView(cart: Cart | null): Promise<CartView> {
+export async function buildCartView(
+	cart: Cart | null,
+	req?: Partial<PayloadRequest>,
+): Promise<CartView> {
 	const rawItems = cart?.items ?? [];
 
 	const entries: ResolvedEntry[] = [];
@@ -275,7 +283,7 @@ export async function buildCartView(cart: Cart | null): Promise<CartView> {
 		});
 	}
 
-	return composeCartView(entries, unavailable, cart?.updatedAt ?? null);
+	return composeCartView(entries, unavailable, cart?.updatedAt ?? null, req);
 }
 
 /**

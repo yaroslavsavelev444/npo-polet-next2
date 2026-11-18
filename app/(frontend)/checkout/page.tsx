@@ -6,6 +6,10 @@ import { Breadcrumbs } from "@/components/Breadcrumbs/Breadcrumbs";
 import { getCurrentUser } from "@/modules/auth/lib/getCurrentUser";
 import { CheckoutPageClient } from "@/modules/checkout";
 import { buildCheckoutView } from "@/modules/checkout/lib/build-checkout-view";
+import {
+	CHECKOUT_ATTEMPT_PARAM,
+	isCheckoutAttemptId,
+} from "@/modules/checkout/lib/checkout-attempt";
 
 export const metadata = {
 	title: "Оформление заказа",
@@ -36,8 +40,14 @@ const BREADCRUMBS = [
  * клиент и покажет объяснение, не теряя введённые данные, — см.
  * CheckoutPageClient.
  */
-export default async function CheckoutPage() {
-	const user = await getCurrentUser();
+export default async function CheckoutPage({
+	searchParams,
+}: {
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+	const [user, params] = await Promise.all([getCurrentUser(), searchParams]);
+	const attempt = params[CHECKOUT_ATTEMPT_PARAM];
+	const pendingAttempt = isCheckoutAttemptId(attempt) ? attempt : null;
 	// Гостя разворачиваем в корзину с меткой, по которой она сама откроет окно
 	// входа поверх себя (см. CartPageClient), а НЕ на /auth/login: страница
 	// входа уводила из пути покупки и оставляла человека один на один с
@@ -47,11 +57,17 @@ export default async function CheckoutPage() {
 	// пока неизвестно, кто её заполняет (buildCheckoutView принимает id
 	// покупателя), а корзина видна и гостю. Ближайшее место, где ожидание
 	// осмысленно, — она.
-	if (!user) redirect("/cart?auth=1");
+	if (!user) {
+		if (pendingAttempt) {
+			const next = `/checkout?${CHECKOUT_ATTEMPT_PARAM}=${pendingAttempt}`;
+			redirect(`/auth/login?from=${encodeURIComponent(next)}`);
+		}
+		redirect("/cart?auth=1");
+	}
 
 	const checkoutView = await buildCheckoutView(String(user.id));
 
-	if (checkoutView.cart.items.length === 0) {
+	if (!pendingAttempt && checkoutView.cart.items.length === 0) {
 		redirect("/cart");
 	}
 
@@ -64,7 +80,9 @@ export default async function CheckoutPage() {
 			}}
 		>
 			<CheckoutPageClient
+				key={user.id}
 				initialView={checkoutView}
+				pendingAttempt={pendingAttempt}
 				user={{ name: user.name as string, email: user.email as string }}
 				userId={String(user.id)}
 				cartOnboardingSeen={Boolean(user.cartOnboardingSeenAt)}

@@ -18,6 +18,7 @@ import {
 	type ConsoleState,
 	initialState,
 	isUnreadForStaff,
+	type PendingMessage,
 	reducer,
 	type StaffTab,
 } from "./state";
@@ -43,6 +44,8 @@ export interface ConsoleApi {
 	setTab: (tab: StaffTab) => void;
 	select: (id: number | null) => void;
 	loadOlder: (conversationId: number) => Promise<void>;
+	sendMessage: (message: Omit<PendingMessage, "error">) => void;
+	retryMessage: (clientMessageId: string) => void;
 }
 
 /**
@@ -64,6 +67,7 @@ export function useConsole(options: {
 		initialState,
 	);
 	const socketRef = useRef<Socket | null>(null);
+	const sending = useRef(new Set<string>());
 	const stateRef = useRef(state);
 	stateRef.current = state;
 
@@ -92,6 +96,51 @@ export function useConsole(options: {
 			return result.data;
 		},
 		[],
+	);
+
+	const deliverMessage = useCallback(
+		async (input: PendingMessage["input"]) => {
+			const { clientMessageId } = input;
+			if (sending.current.has(clientMessageId)) return;
+			sending.current.add(clientMessageId);
+			try {
+				const result = await request<{ message: SupportMessageDTO }>(
+					CLIENT_EVENTS.staffMessageSend,
+					input,
+				);
+				// Повторный ack возвращает сохранённое сообщение без нового broadcast.
+				dispatch({ type: "messages", messages: [result.message] });
+			} catch (error) {
+				dispatch({
+					type: "pendingFailed",
+					clientMessageId,
+					error: error instanceof Error ? error.message : "Не отправлено",
+				});
+			} finally {
+				sending.current.delete(clientMessageId);
+			}
+		},
+		[request],
+	);
+
+	const sendMessage = useCallback(
+		(message: Omit<PendingMessage, "error">) => {
+			dispatch({ type: "pending", message: { ...message, error: null } });
+			void deliverMessage(message.input);
+		},
+		[deliverMessage],
+	);
+
+	const retryMessage = useCallback(
+		(clientMessageId: string) => {
+			const pending = stateRef.current.pending.find(
+				(item) => item.input.clientMessageId === clientMessageId,
+			);
+			if (!pending?.error || sending.current.has(clientMessageId)) return;
+			dispatch({ type: "pendingRetry", clientMessageId });
+			void deliverMessage(pending.input);
+		},
+		[deliverMessage],
 	);
 
 	const emit = useCallback((event: string, data: unknown) => {
@@ -314,5 +363,15 @@ export function useConsole(options: {
 		[request],
 	);
 
-	return { state, request, emit, dispatch, setTab, select, loadOlder };
+	return {
+		state,
+		request,
+		emit,
+		dispatch,
+		setTab,
+		select,
+		loadOlder,
+		sendMessage,
+		retryMessage,
+	};
 }

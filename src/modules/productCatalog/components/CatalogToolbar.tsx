@@ -150,7 +150,7 @@ export function CatalogToolbar({
 	} — ${filters.priceTo !== undefined ? formatPrice(filters.priceTo) : "∞"}`;
 
 	return (
-		<div className={styles.rail}>
+		<div className={styles.rail} data-catalog-toolbar>
 			<div className={styles.railRow}>
 				<p className={styles.summary}>
 					<span className={styles.summaryValue}>{totalDocs}</span>
