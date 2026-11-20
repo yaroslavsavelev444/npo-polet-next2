@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CLIENT_EVENTS } from "../../lib/events";
 import { ContextPanel } from "./ContextPanel";
 import { ConversationList } from "./ConversationList";
@@ -39,6 +39,7 @@ export function SupportConsole({
 		initialConversationId,
 	});
 	const { state } = api;
+	const consoleRef = useRef<HTMLDivElement>(null);
 	const [toast, setToast] = useState<string | null>(null);
 	const [permission, setPermission] = useState<
 		NotificationPermission | "unsupported"
@@ -55,6 +56,26 @@ export function SupportConsole({
 		const timer = window.setTimeout(() => setToast(null), 5_000);
 		return () => window.clearTimeout(timer);
 	}, [toast]);
+
+	useEffect(() => {
+		const root = consoleRef.current;
+		const viewport = window.visualViewport;
+		if (!root || !viewport) return;
+
+		// На телефоне клавиатура может уменьшать только видимую область,
+		// оставляя высоту CSS viewport прежней.
+		const updateHeight = () => {
+			if (viewport.scale === 1) {
+				root.style.setProperty(
+					"--support-visible-height",
+					`${viewport.height}px`,
+				);
+			}
+		};
+		updateHeight();
+		viewport.addEventListener("resize", updateHeight);
+		return () => viewport.removeEventListener("resize", updateHeight);
+	}, []);
 
 	const listed = useMemo(
 		() =>
@@ -101,7 +122,10 @@ export function SupportConsole({
 	}, [api, listed, selected, state.selectedId]);
 
 	return (
-		<div className={styles.console}>
+		<div
+			ref={consoleRef}
+			className={`${styles.console}${selected ? ` ${styles.hasConversation}` : ""}`}
+		>
 			<div className={styles.topBar}>
 				<h1 className={styles.heading}>Чат поддержки</h1>
 				<a href="/admin/support/reports" className={styles.topLink}>
@@ -167,6 +191,7 @@ export function SupportConsole({
 							me={me}
 							siteUrl={siteUrl}
 							onError={setToast}
+							onBack={() => api.select(null)}
 						/>
 						<ContextPanel
 							conversationId={selected.id}

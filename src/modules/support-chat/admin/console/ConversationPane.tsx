@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+	Fragment,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { SUPPORT_TOPICS } from "../../lib/constants";
 import { CLIENT_EVENTS, type StaffConversationDTO } from "../../lib/events";
 import { Composer } from "./Composer";
@@ -45,12 +52,14 @@ export function ConversationPane({
 	me,
 	siteUrl,
 	onError,
+	onBack,
 }: {
 	api: ConsoleApi;
 	conversation: StaffConversationDTO;
 	me: { adminId: number; name: string };
 	siteUrl: string;
 	onError: (message: string) => void;
+	onBack: () => void;
 }) {
 	const { state } = api;
 	const messages = state.messages[conversation.id] ?? [];
@@ -61,6 +70,8 @@ export function ConversationPane({
 	const stickToBottom = useRef(true);
 	const [tagsDraft, setTagsDraft] = useState("");
 	const [busy, setBusy] = useState(false);
+	const [actionsOpen, setActionsOpen] = useState(false);
+	const actionsId = useId();
 
 	const agentName = (adminId: number) =>
 		state.agents.find((a) => a.adminId === adminId)?.name ?? `#${adminId}`;
@@ -136,7 +147,21 @@ export function ConversationPane({
 			className={styles.pane}
 			aria-label={`Диалог с ${conversation.customer?.name ?? "покупателем"}`}
 		>
-			<header className={styles.paneHead}>
+			<header className={styles.paneHead} data-actions-expanded={actionsOpen}>
+				<div className={styles.mobileNavigation}>
+					<button type="button" className={styles.secondary} onClick={onBack}>
+						<span aria-hidden="true">← </span>К диалогам
+					</button>
+					<button
+						type="button"
+						className={styles.secondary}
+						aria-controls={`${actionsId}-actions ${actionsId}-tags`}
+						aria-expanded={actionsOpen}
+						onClick={() => setActionsOpen((open) => !open)}
+					>
+						Действия
+					</button>
+				</div>
 				<div className={styles.paneTitle}>
 					<h2>{conversation.customer?.name || "Аккаунт удалён"}</h2>
 					<p className={styles.muted}>
@@ -157,7 +182,7 @@ export function ConversationPane({
 					)}
 				</div>
 
-				<div className={styles.actions}>
+				<div id={`${actionsId}-actions`} className={styles.actions}>
 					{open && conversation.assigneeId === null && (
 						<button
 							type="button"
@@ -238,6 +263,7 @@ export function ConversationPane({
 				</div>
 
 				<form
+					id={`${actionsId}-tags`}
 					className={styles.tags}
 					onSubmit={(event) => {
 						event.preventDefault();

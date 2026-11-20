@@ -5,6 +5,7 @@ import {
 	type DragEvent,
 	type KeyboardEvent,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -97,6 +98,7 @@ export function Composer({
 	const [kbQuery, setKbQuery] = useState("");
 	const [kbHints, setKbHints] = useState<KnowledgeHint[]>([]);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const slashListRef = useRef<HTMLUListElement>(null);
 	const lastComposingAt = useRef(0);
 
 	const resolved = conversation.status !== "open";
@@ -122,6 +124,19 @@ export function Composer({
 			)
 			.slice(0, 8);
 	}, [canned, slashQuery]);
+
+	useLayoutEffect(() => {
+		if (slashMatches.length === 0) return;
+		const list = slashListRef.current;
+		const option = list?.children.item(slashIndex);
+		if (!list || !option) return;
+
+		const listTop = list.getBoundingClientRect().top + list.clientTop;
+		const listBottom = listTop + list.clientHeight;
+		const { top, bottom } = option.getBoundingClientRect();
+		if (top < listTop) list.scrollTop += top - listTop;
+		else if (bottom > listBottom) list.scrollTop += bottom - listBottom;
+	}, [slashIndex, slashMatches]);
 
 	const orderNumber = useMemo(() => {
 		for (let i = messages.length - 1; i >= 0; i--) {
@@ -316,7 +331,12 @@ export function Composer({
 			)}
 
 			{slashMatches.length > 0 && (
-				<ul className={styles.slash} role="listbox" aria-label="Заготовки">
+				<ul
+					ref={slashListRef}
+					className={styles.slash}
+					role="listbox"
+					aria-label="Заготовки"
+				>
 					{slashMatches.map((item, index) => (
 						<li
 							key={item.id}

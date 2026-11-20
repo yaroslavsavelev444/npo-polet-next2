@@ -1,6 +1,10 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import {
+	SECURITY_SOLUTIONS_PATH,
+	SECURITY_SOLUTIONS_TITLE_PARTS,
+} from "@/modules/security-solutions/route";
 import { Reveal, RevealLines } from "@/shared/components/motion/Reveal";
 import { hero, metrics } from "../content/home-content";
 import { heroVideo, type VideoSource } from "../lib/media";
@@ -168,7 +172,7 @@ export function HomeHero({
 					<RevealLines lines={[...hero.headlineLines]} stagger={130} />
 				</h1>
 
-				<div className="mt-[clamp(1.75rem,3vw,2.75rem)] grid gap-[1.75rem] lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-[3rem]">
+				<div className="mt-[clamp(1.75rem,3vw,2.75rem)] grid gap-[1.125rem] lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-[3rem]">
 					<div className="flex flex-col gap-[1.75rem]">
 						<Reveal delay={340}>
 							<p className="max-w-[52ch] text-[clamp(0.9375rem,0.86rem+0.35vw,1.125rem)] leading-relaxed text-[var(--text-secondary)]">
@@ -202,22 +206,39 @@ export function HomeHero({
 						</Reveal>
 					</div>
 
-					{/* Маркер прокрутки — во второй колонке, у правого края:
-					    подсказка «здесь есть продолжение» не должна тесниться
-					    под кнопками, ради которых сделан весь экран.
-					    Декоративен: в порядке документа продолжение и так
-					    следующее, объявлять его отдельно нечем. */}
-					<Reveal delay={620} className="hidden lg:block">
-						<div
-							className="flex flex-col items-end gap-3 pb-1"
-							aria-hidden="true"
+					<div className="flex flex-col items-start lg:items-end lg:gap-[clamp(2rem,6svh,5.25rem)]">
+						<Reveal
+							delay={520}
+							className="w-full max-w-[16.875rem] lg:w-[clamp(12.8rem,19vw,19.7rem)] lg:max-w-none"
 						>
-							<span className="u-mono text-[0.625rem] text-[var(--text-muted)]">
-								{hero.scrollHint}
-							</span>
-							<span className="scroll-hint relative h-12 w-px overflow-hidden bg-[var(--rule)]" />
-						</div>
-					</Reveal>
+							<Link
+								href={SECURITY_SOLUTIONS_PATH}
+								className="group grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-3 gap-y-2 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--void-deep)_93%,transparent)] px-4 py-3 text-[var(--text-primary)] no-underline transition-colors duration-200 hover:bg-[var(--surface)] focus-visible:-outline-offset-2 motion-reduce:transition-none"
+							>
+								<span className="col-span-2 text-sm font-semibold">
+									{SECURITY_SOLUTIONS_TITLE_PARTS[0]}
+								</span>
+								<span className="u-display whitespace-nowrap text-[clamp(1.25rem,2.1vw,2.125rem)]">
+									{SECURITY_SOLUTIONS_TITLE_PARTS[1]}
+								</span>
+								<ArrowUpRight
+									className="size-[1.0625rem] text-[var(--primary)] motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:translate-x-0.5"
+									aria-hidden="true"
+								/>
+							</Link>
+						</Reveal>
+						<Reveal delay={620} className="hidden lg:block">
+							<div
+								className="flex flex-col items-end gap-3 pb-1"
+								aria-hidden="true"
+							>
+								<span className="u-mono text-[0.625rem] text-[var(--text-muted)]">
+									{hero.scrollHint}
+								</span>
+								<span className="scroll-hint relative h-12 w-px overflow-hidden bg-[var(--rule)]" />
+							</div>
+						</Reveal>
+					</div>
 				</div>
 			</div>
 
