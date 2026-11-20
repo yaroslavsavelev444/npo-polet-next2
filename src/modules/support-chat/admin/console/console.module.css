@@ -230,6 +230,10 @@
 	border-bottom: 1px solid var(--theme-elevation-150);
 }
 
+.mobileNavigation {
+	display: none;
+}
+
 .paneTitle h2 {
 	margin: 0;
 	font-size: 1.0625rem;
@@ -674,6 +678,149 @@
 	color: var(--theme-elevation-0);
 	box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
 	z-index: 100;
+}
+
+@media (max-width: 768px), (max-width: 950px) and (pointer: coarse) {
+	.console {
+		box-sizing: border-box;
+		height: calc(
+			var(--support-visible-height, 100dvh) -
+			var(--app-header-height, 64px)
+		);
+		min-height: 0;
+		padding-bottom: max(8px, env(safe-area-inset-bottom));
+	}
+
+	.topBar {
+		gap: 6px 10px;
+		padding-block: 6px;
+	}
+
+	.presence {
+		margin-left: 0;
+	}
+
+	.layout {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr);
+	}
+
+	.list {
+		border-right: 0;
+	}
+
+	.list,
+	.pane {
+		overflow-y: auto;
+	}
+
+	.hasConversation .list,
+	.hasConversation .topBar > :not(.connection),
+	.placeholder {
+		display: none;
+	}
+
+	.mobileNavigation {
+		display: flex;
+		justify-content: space-between;
+		gap: 8px;
+	}
+
+	.paneHead {
+		flex: none;
+		padding: 6px 10px;
+		max-height: 50%;
+		overflow-y: auto;
+		overflow-wrap: anywhere;
+	}
+
+	.paneHead[data-actions-expanded="false"] :is(.actions, .tags) {
+		display: none;
+	}
+
+	.select {
+		max-width: 100%;
+	}
+
+	.listItems,
+	.feed {
+		min-height: 3rem;
+	}
+
+	.feed {
+		padding: 8px 10px;
+	}
+
+	.bubble {
+		max-width: 90%;
+	}
+
+	.thumb img {
+		max-width: min(100%, 220px);
+		height: auto;
+		object-fit: contain;
+	}
+
+	.composer {
+		flex: none;
+		grid-template-columns: minmax(0, 1fr);
+		padding: 6px 10px 8px;
+	}
+
+	.composerBar {
+		flex-wrap: wrap;
+	}
+
+	.sendButton {
+		margin-inline-start: auto;
+	}
+
+	.textarea,
+	.search,
+	.tagInput,
+	.select {
+		box-sizing: border-box;
+		font-size: 16px;
+	}
+
+	.textarea {
+		min-height: 48px;
+		max-height: 8rem;
+		resize: none;
+	}
+
+	.tab,
+	.tabActive,
+	.primary,
+	.secondary,
+	.select,
+	.toolButton,
+	.sendButton {
+		min-height: 44px;
+	}
+
+	.chip {
+		max-width: 100%;
+		overflow-wrap: anywhere;
+	}
+
+	.chips,
+	.suggestions,
+	.kb,
+	.slash {
+		max-height: 6rem;
+		overflow-y: auto;
+	}
+
+	.slash {
+		position: static;
+	}
+
+	.toast {
+		inset: calc(var(--app-header-height, 64px) + 8px) 8px auto;
+		margin-inline: auto;
+		overflow-wrap: anywhere;
+	}
 }
 
 /* ── Пункт меню ─────────────────────────────────────────────────────────── */

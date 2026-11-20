@@ -1,5 +1,11 @@
 import path from "node:path";
-import { type Browser, expect, type Page, test } from "@playwright/test";
+import {
+	type Browser,
+	type BrowserContextOptions,
+	expect,
+	type Page,
+	test,
+} from "@playwright/test";
 
 /**
  * Чат поддержки целиком, как его видят люди: покупатель на витрине и
@@ -20,18 +26,64 @@ const PDF = Buffer.from(
 	"%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n",
 );
 
-async function contextPage(browser: Browser, state: string): Promise<Page> {
+async function contextPage(
+	browser: Browser,
+	state: string,
+	options?: BrowserContextOptions,
+): Promise<Page> {
 	const context = await browser.newContext({
+		...options,
 		storageState: path.join(AUTH, state),
 	});
 	return context.newPage();
 }
 
+test("ссылка ЧОП на главной открывает раздел на телефоне и компьютере", async ({
+	browser,
+}) => {
+	for (const viewport of [
+		{ width: 320, height: 568 },
+		{ width: 390, height: 844 },
+		{ width: 1280, height: 900 },
+	]) {
+		const mobile = viewport.width < 768;
+		const page = await browser.newPage({
+			viewport,
+			isMobile: mobile,
+			hasTouch: mobile,
+		});
+		try {
+			await page.goto("/");
+			await page.getByRole("button", { name: "Только необходимые" }).click();
+			const link = page
+				.locator("section")
+				.getByRole("link", { name: "Готовые решения для ЧОП", exact: true });
+			await link.scrollIntoViewIfNeeded();
+			await expect(link).toBeInViewport({ ratio: 0.95 });
+			if (mobile) await link.tap();
+			else await link.click();
+			await expect(page).toHaveURL(/\/security-solutions$/);
+			await expect(
+				page.getByRole("heading", {
+					name: "Готовые решения для ЧОП",
+					level: 1,
+				}),
+			).toBeVisible();
+		} finally {
+			await page.close();
+		}
+	}
+});
+
 test("переписка покупателя и менеджера: сообщения, «печатает», прочтение, вложение, заметка, оценка", async ({
 	browser,
 }) => {
 	const customer = await contextPage(browser, "support-customer.json");
-	const manager = await contextPage(browser, "support-manager.json");
+	const manager = await contextPage(browser, "support-manager.json", {
+		viewport: { width: 390, height: 844 },
+		isMobile: true,
+		hasTouch: true,
+	});
 
 	// ── Покупатель открывает чат ──────────────────────────────────────────────
 	await customer.goto("/");
@@ -90,13 +142,79 @@ test("переписка покупателя и менеджера: сообщ�
 	await expect(
 		pane.getByText("Здравствуйте! Есть ли сертификаты на сеткомёт?"),
 	).toBeVisible();
+
+	const reply = pane.getByRole("textbox", { name: "Текст ответа" });
+	await test.step("мобильная консоль: список, действия, заготовки и короткая видимая область", async () => {
+		const list = manager.getByRole("navigation", { name: "Диалоги" });
+		const actions = pane.getByRole("button", { name: "Действия" });
+		const resolve = pane.getByRole("button", { name: "Закрыть диалог" });
+		await expect(list).toBeHidden();
+		await expect(resolve).toBeHidden();
+		await actions.tap();
+		await expect(actions).toHaveAttribute("aria-expanded", "true");
+		await expect(resolve).toBeVisible();
+		await actions.tap();
+		await expect(resolve).toBeHidden();
+		await pane.getByRole("button", { name: "К диалогам" }).tap();
+		await expect(list).toBeVisible();
+		await expect(pane).toBeHidden();
+		await row.tap();
+
+		await reply.fill("/e2e-mobile");
+		const matches = pane.getByRole("listbox", { name: "Заготовки" });
+		await expect(matches.getByRole("option")).toHaveCount(8);
+		for (let index = 0; index < 7; index++) {
+			await reply.press("ArrowDown");
+		}
+		const active = matches.getByRole("option", { selected: true });
+		await expect(active).toContainText("/e2e-mobile-8");
+		await expect(active).toBeInViewport({ ratio: 0.95 });
+		await reply.press("ArrowDown");
+		await expect(active).toContainText("/e2e-mobile-1");
+		await expect(active).toBeInViewport({ ratio: 0.95 });
+		await reply.press("Enter");
+		await expect(reply).toHaveValue("Ответ из заготовки 1");
+
+		// Меняем только visualViewport, как при открытии клавиатуры.
+		await manager.evaluate(() => {
+			const viewport = window.visualViewport;
+			if (!viewport) throw new Error("visualViewport недоступен");
+			Object.defineProperty(viewport, "height", {
+				configurable: true,
+				value: 300,
+			});
+			viewport.dispatchEvent(new Event("resize"));
+		});
+		await expect
+			.poll(() => pane.evaluate((node) => node.getBoundingClientRect().bottom))
+			.toBeLessThanOrEqual(300);
+		const send = pane.getByRole("button", { name: "Отправить", exact: true });
+		await send.scrollIntoViewIfNeeded();
+		await expect
+			.poll(() => send.evaluate((node) => node.getBoundingClientRect().bottom))
+			.toBeLessThanOrEqual(300);
+		await send.tap();
+		await expect(widget.getByText("Ответ из заготовки 1")).toBeVisible();
+		await manager.evaluate(() => {
+			const viewport = window.visualViewport;
+			if (!viewport) return;
+			Reflect.deleteProperty(viewport, "height");
+			viewport.dispatchEvent(new Event("resize"));
+		});
+		await manager.setViewportSize({ width: 844, height: 390 });
+		await expect(list).toBeHidden();
+		await expect(actions).toBeVisible();
+		await manager.setViewportSize({ width: 1280, height: 900 });
+		await expect(list).toBeVisible();
+		await expect(actions).toBeHidden();
+	});
+
 	const claim = pane.getByRole("button", { name: "Взять себе" });
 	if (await claim.isVisible()) await claim.click();
 
 	// ── «Печатает» в обе стороны ──────────────────────────────────────────────
 	// Сигнал «печатает» обе стороны шлют не чаще раза в несколько секунд —
 	// поэтому печатаем, пока сигнал не дойдёт, как это и бывает у человека.
-	const reply = pane.getByRole("textbox", { name: "Текст ответа" });
 	await expect(async () => {
 		await reply.pressSequentially("а", { delay: 20 });
 		await expect(widget.getByText(`${MANAGER_NAME} печатает…`)).toBeVisible({

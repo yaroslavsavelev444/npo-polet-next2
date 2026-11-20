@@ -97,12 +97,40 @@ const userId = await upsert("users", customer.email, {
 	status: "active",
 	supportChatBanned: false,
 });
-await upsert("admins", manager.email, {
+const managerId = await upsert("admins", manager.email, {
 	password: manager.password,
 	name: manager.name,
 	role: "admin",
 	support: { displayName: manager.displayName },
 });
+
+// Личные заготовки для проверки прокрутки списка по клавишам.
+for (let index = 1; index <= 8; index++) {
+	const shortcut = `e2e-mobile-${index}`;
+	const data = {
+		title: `Тестовая заготовка ${index}`,
+		shortcut,
+		body: `Ответ из заготовки ${index}`,
+		scope: "personal" as const,
+		owner: managerId,
+		isActive: true,
+	};
+	const existing = await payload.find({
+		collection: "support-canned-responses",
+		where: { shortcut: { equals: shortcut } },
+		limit: 1,
+		depth: 0,
+	});
+	if (existing.docs[0]) {
+		await payload.update({
+			collection: "support-canned-responses",
+			id: existing.docs[0].id,
+			data,
+		});
+	} else {
+		await payload.create({ collection: "support-canned-responses", data });
+	}
+}
 
 // Прошлая переписка — целиком. Файлы на диске без записей уберёт шлюз
 // (purgeOrphanFiles), они и так нечитаемы без ключа диалога.
